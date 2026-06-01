@@ -26,6 +26,8 @@ const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const NAIROBI: [number, number] = [-1.286389, 36.817223];
 const AREA_PICKER_SESSION_KEY = "bizmtaani_area_chosen";
+const DEFAULT_RADIUS_KM = 5;
+const RADIUS_STEPS = [1, 2, 3, 5, 7, 10]; // discrete steps for the slider
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -79,15 +81,13 @@ function dedupe(existing: Product[], incoming: Product[]): Product[] {
 }
 
 function ProductCard({
-  product, userCoords, gpsGranted, onClick,
+  product, userCoords, onClick,
 }: {
-  product: Product; userCoords: [number, number] | null;
-  gpsGranted: boolean; onClick: () => void;
+  product: Product; userCoords: [number, number] | null; onClick: () => void;
 }) {
-  const distance =
-    gpsGranted && userCoords
-      ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
-      : null;
+  const distance = userCoords
+    ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
+    : null;
 
   const badgeColor = getCategoryBadgeColor(product.category);
   const isAccommodation = product.category === "Accommodation";
@@ -171,6 +171,9 @@ export default function Home() {
   const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
+
+  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+  const [showRadiusSlider, setShowRadiusSlider] = useState(false);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -381,7 +384,12 @@ export default function Home() {
         p.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.subcategory ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (p.ward ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-      return matchCat && matchSearch;
+      // Radius filter — skip when in search mode (search shows all Kenya)
+      const matchRadius =
+        isSearchMode ||
+        !userCoords ||
+        getDistanceKm(userCoords[0], userCoords[1], p.lat, p.lng) <= radiusKm;
+      return matchCat && matchSearch && matchRadius;
     });
   }
 
@@ -489,6 +497,72 @@ export default function Home() {
             </button>
           ))}
         </div>
+
+        {/* Near me radius row */}
+        {!isSearchMode && (
+          <div className="px-4 pb-2.5">
+            <button
+              onClick={() => setShowRadiusSlider((s) => !s)}
+              className="flex items-center gap-2 group"
+            >
+              <MapPin size={12} className="text-primary flex-shrink-0" />
+              <span className="text-xs font-semibold text-primary">
+                Within {radiusKm} km
+              </span>
+              <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">
+                {showRadiusSlider ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {showRadiusSlider && (
+              <div className="mt-3 pb-1">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-muted-foreground">1 km</span>
+                  <span className="text-xs font-black text-primary">{radiusKm} km from you</span>
+                  <span className="text-[10px] text-muted-foreground">10 km</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={RADIUS_STEPS.length - 1}
+                  step={1}
+                  value={RADIUS_STEPS.indexOf(radiusKm) === -1
+                    ? RADIUS_STEPS.findIndex((s) => s >= radiusKm)
+                    : RADIUS_STEPS.indexOf(radiusKm)}
+                  onChange={(e) => setRadiusKm(RADIUS_STEPS[Number(e.target.value)])}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer
+                    bg-muted [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
+                    [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
+                    [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5
+                    [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
+                    [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
+                      (RADIUS_STEPS.indexOf(radiusKm) / (RADIUS_STEPS.length - 1)) * 100
+                    }%, hsl(var(--muted)) ${
+                      (RADIUS_STEPS.indexOf(radiusKm) / (RADIUS_STEPS.length - 1)) * 100
+                    }%, hsl(var(--muted)) 100%)`,
+                  }}
+                />
+                <div className="flex justify-between mt-1.5">
+                  {RADIUS_STEPS.map((s) => (
+                    <span
+                      key={s}
+                      onClick={() => setRadiusKm(s)}
+                      className={`text-[9px] font-semibold cursor-pointer transition-colors ${
+                        s === radiusKm ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {s}km
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto">
@@ -549,7 +623,7 @@ export default function Home() {
                   {filteredWard.map((p) => (
                     <ProductCard
                       key={p.id} product={p}
-                      userCoords={userCoords} gpsGranted={gpsGranted}
+                      userCoords={userCoords}
                       onClick={() => setLocation(`/product/${p.id}`)}
                     />
                   ))}
@@ -570,7 +644,7 @@ export default function Home() {
                   {filteredArea.map((p) => (
                     <ProductCard
                       key={p.id} product={p}
-                      userCoords={userCoords} gpsGranted={gpsGranted}
+                      userCoords={userCoords}
                       onClick={() => setLocation(`/product/${p.id}`)}
                     />
                   ))}
