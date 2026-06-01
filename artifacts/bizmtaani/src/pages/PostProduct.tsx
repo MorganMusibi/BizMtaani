@@ -103,7 +103,7 @@ export default function PostProduct() {
   const isEatery =
     selectedSubcategory === "Hotels / Eateries" ||
     selectedSubcategory === "Restaurants & Cooked Food";
-  const isTransport = selectedCategory === "Transport";
+  const isTransport = selectedSubcategory === "Delivery & Transport";
   const subcategories = catDef?.subcategories ?? [];
 
   function handleImageFiles(files: FileList | null) {
@@ -316,10 +316,10 @@ export default function PostProduct() {
                       : "border-border bg-card hover:border-border/80"
                   }`}
                 >
-                  <span className="text-2xl">{cat.icon}</span>
+                  <cat.icon size={22} className="flex-shrink-0 text-foreground" />
                   <div className="flex-1">
-                    <p className="font-bold text-sm">{cat.displayLabel}</p>
-                    <p className="text-xs text-muted-foreground">{cat.description}</p>
+                    <p className="font-bold text-sm">{cat.displayShort}</p>
+                    <p className="text-xs text-muted-foreground">{cat.tagline}</p>
                   </div>
                   {selectedCategory === cat.key && (
                     <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">

@@ -144,6 +144,8 @@ export const CATEGORY_DEFS: CategoryDef[] = [
   },
 ];
 
+export type CategoryKey = (typeof CATEGORY_DEFS)[number]["key"];
+
 export function getCategoryDef(key: string): CategoryDef | undefined {
   return CATEGORY_DEFS.find((c) => c.key === key);
 }
