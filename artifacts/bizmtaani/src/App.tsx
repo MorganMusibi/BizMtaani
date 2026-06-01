@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
+import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
@@ -25,6 +26,13 @@ function NotificationSetup() {
   useAuth();
   useNotifications();
   return null;
+}
+
+/** Show the profile setup sheet for users who signed in via Google but have no Firestore profile yet. */
+function ProfileSetupGate() {
+  const { user, userProfile, profileLoading } = useAuth();
+  if (!user || profileLoading || userProfile !== null) return null;
+  return <ProfileSetupModal />;
 }
 
 function Router() {
@@ -57,6 +65,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>
+          <ProfileSetupGate />
           <Toaster />
         </AuthProvider>
       </TooltipProvider>

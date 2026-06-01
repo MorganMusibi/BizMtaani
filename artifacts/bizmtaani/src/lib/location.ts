@@ -2,7 +2,7 @@
  * Location resolution — priority order:
  *  1. GeoJSON ward polygon match  (fastest, most accurate, no network call)
  *  2. Module-level result cache   (avoids repeated work)
- *  3. OSM Nominatim               (fallback only, never overwrites GeoJSON)
+ *  3. OSM Nominatim               (fallback, also used for border detection)
  */
 
 interface WardFeature {
@@ -22,6 +22,9 @@ export interface ResolvedLocation {
   county: string;
   displayName: string;
 }
+
+/** ~330 m at Kenya latitudes — used for border-area probing */
+const BORDER_PROBE_DEG = 0.003;
 
 const resolvedCache = new Map<string, ResolvedLocation>();
 let wardFeatures: WardFeature[] | null | undefined = undefined;
@@ -109,7 +112,25 @@ function findWard(lat: number, lng: number, features: WardFeature[]): WardFeatur
   return null;
 }
 
-async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
+/** Find all wards whose bounding box is within BORDER_PROBE_DEG of the point (border candidates). */
+function findNearbyWardNames(lat: number, lng: number, features: WardFeature[]): string[] {
+  const pad = BORDER_PROBE_DEG;
+  const names: string[] = [];
+  for (const f of features) {
+    const [minLng, minLat, maxLng, maxLat] = f._bbox;
+    // Expand bbox by pad and check if point is inside expanded bbox
+    if (
+      lng >= minLng - pad && lng <= maxLng + pad &&
+      lat >= minLat - pad && lat <= maxLat + pad
+    ) {
+      const name = toTitleCase(f.properties.ward);
+      if (!names.includes(name)) names.push(name);
+    }
+  }
+  return names;
+}
+
+export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
     const res = await fetch(url, {
@@ -170,6 +191,81 @@ export async function getWardInfo(lat: number, lng: number): Promise<ResolvedLoc
 export async function getWardName(lat: number, lng: number): Promise<string> {
   const info = await getWardInfo(lat, lng);
   return info.displayName;
+}
+
+/**
+ * Detect whether a point is near the border of 2–3 areas.
+ * Returns 1 item if clearly inside one area, 2–3 items if near a border.
+ * Uses GeoJSON when available, otherwise probes Nominatim at offset points.
+ */
+export async function getAreaChoices(lat: number, lng: number): Promise<ResolvedLocation[]> {
+  const features = await loadWards();
+
+  if (features) {
+    // GeoJSON path: find all wards whose expanded bbox covers this point
+    const primaryMatch = findWard(lat, lng, features);
+    const nearbyNames = findNearbyWardNames(lat, lng, features);
+
+    if (nearbyNames.length <= 1) {
+      // Clearly inside one area — no picker needed
+      const info = await getWardInfo(lat, lng);
+      return [info];
+    }
+
+    // Map names to full ResolvedLocation objects
+    const choices: ResolvedLocation[] = [];
+    for (const name of nearbyNames.slice(0, 3)) {
+      const feat = features.find((f) => toTitleCase(f.properties.ward) === name);
+      if (!feat) continue;
+      choices.push({
+        wardName: name,
+        constituency: toTitleCase(feat.properties.constituency),
+        county: toTitleCase(feat.properties.county),
+        displayName: `${name}, ${toTitleCase(feat.properties.county)}`,
+      });
+    }
+    // Make sure the primary match is first
+    if (primaryMatch) {
+      const primaryName = toTitleCase(primaryMatch.ward);
+      const idx = choices.findIndex((c) => c.wardName === primaryName);
+      if (idx > 0) {
+        const [item] = choices.splice(idx, 1);
+        choices.unshift(item);
+      }
+    }
+    return choices;
+  }
+
+  // Nominatim path: probe offset points to detect border areas
+  const probes: [number, number][] = [
+    [lat, lng],
+    [lat + BORDER_PROBE_DEG, lng],
+    [lat, lng + BORDER_PROBE_DEG],
+    [lat - BORDER_PROBE_DEG, lng - BORDER_PROBE_DEG],
+  ];
+
+  const results = await Promise.allSettled(
+    probes.map(([plat, plng]) => nominatimFallback(plat, plng))
+  );
+
+  const seen = new Set<string>();
+  const choices: ResolvedLocation[] = [];
+
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    const info = r.value;
+    if (!info.wardName || seen.has(info.wardName)) continue;
+    seen.add(info.wardName);
+    choices.push({
+      wardName: info.wardName,
+      constituency: info.constituency ?? "",
+      county: info.county ?? "",
+      displayName: info.displayName ?? info.wardName,
+    });
+    if (choices.length >= 3) break;
+  }
+
+  return choices.length > 0 ? choices : [await getWardInfo(lat, lng)];
 }
 
 function toTitleCase(str: string): string {

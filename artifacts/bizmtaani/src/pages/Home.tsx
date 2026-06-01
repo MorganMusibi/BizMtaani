@@ -1,5 +1,9 @@
 /**
- * Home feed — two-phase ward-first advert loader.
+ * Home feed — two-phase area-first advert loader.
+ * Location fallback chain:
+ *   1. Live GPS (if permitted)
+ *   2. Saved home area from user's Firestore profile
+ *   3. Nairobi centre (last resort)
  */
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -11,8 +15,9 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { areaPrefix } from "@/lib/geohash";
-import { getWardInfo, type ResolvedLocation } from "@/lib/location";
+import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
@@ -20,6 +25,7 @@ import { BottomNav } from "@/components/BottomNav";
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const NAIROBI: [number, number] = [-1.286389, 36.817223];
+const AREA_PICKER_SESSION_KEY = "bizmtaani_area_chosen";
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -154,12 +160,17 @@ function ProductCard({
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
 
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [gpsGranted, setGpsGranted] = useState(false);
   const [gpsReady, setGpsReady] = useState(false);
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
+
+  // Border-area picker state
+  const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const hasPromptedArea = useRef(false);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -182,22 +193,78 @@ export default function Home() {
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const coords: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setUserCoords(coords);
         setGpsGranted(true);
+
+        // Check if already chosen this session
+        const alreadyChosen = sessionStorage.getItem(AREA_PICKER_SESSION_KEY);
+        if (alreadyChosen) {
+          // Use cached choice
+          try {
+            const cached = JSON.parse(alreadyChosen) as ResolvedLocation;
+            setLocationInfo(cached);
+          } catch {
+            const info = await getWardInfo(coords[0], coords[1]);
+            setLocationInfo(info);
+          }
+          setGpsReady(true);
+          return;
+        }
+
+        // Probe for border areas
+        const choices = await getAreaChoices(coords[0], coords[1]);
+        if (choices.length > 1 && !hasPromptedArea.current) {
+          setAreaChoices(choices);
+          setLocationInfo(choices[0]); // use first while picker is open
+          setShowAreaPicker(true);
+          hasPromptedArea.current = true;
+        } else {
+          const info = choices[0] ?? await getWardInfo(coords[0], coords[1]);
+          setLocationInfo(info);
+        }
         setGpsReady(true);
-        getWardInfo(coords[0], coords[1]).then(setLocationInfo);
       },
-      () => {
-        setUserCoords(NAIROBI);
+      async () => {
+        // GPS denied — use saved home area from profile, or Nairobi as last resort
+        let coords: [number, number] = NAIROBI;
+        let resolvedInfo: ResolvedLocation | null = null;
+
+        if (userProfile?.homeLocation) {
+          const hl = userProfile.homeLocation;
+          coords = [hl.lat, hl.lng];
+          resolvedInfo = {
+            wardName: hl.areaName,
+            constituency: hl.constituency,
+            county: hl.county,
+            displayName: hl.areaName
+              ? `${hl.areaName}${hl.county ? `, ${hl.county}` : ""}`
+              : "your area",
+          };
+        }
+
+        setUserCoords(coords);
         setGpsGranted(false);
+
+        if (resolvedInfo) {
+          setLocationInfo(resolvedInfo);
+        } else {
+          const info = await getWardInfo(coords[0], coords[1]);
+          setLocationInfo(info);
+        }
         setGpsReady(true);
-        getWardInfo(NAIROBI[0], NAIROBI[1]).then(setLocationInfo);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userProfile]);
+
+  function handleAreaSelect(choice: ResolvedLocation) {
+    setLocationInfo(choice);
+    sessionStorage.setItem(AREA_PICKER_SESSION_KEY, JSON.stringify(choice));
+    setShowAreaPicker(false);
+  }
 
   function wardQuery(wardName: string, cursor?: Cursor) {
     const coll = collection(db, "products");
@@ -337,9 +404,9 @@ export default function Home() {
   function bannerText() {
     if (isSearchMode) return `Searching across Kenya`;
     if (!locationInfo) return "Finding your area...";
-    const ward = locationInfo.wardName;
-    if (ward && gpsGranted) return `Showing adverts in ${ward}`;
-    if (ward) return `Showing adverts near ${ward} (location access denied)`;
+    const area = locationInfo.wardName;
+    if (area && gpsGranted) return `Showing adverts in ${area} area`;
+    if (area) return `Showing adverts near ${area} area (from your saved location)`;
     return "Finding nearby adverts...";
   }
 
@@ -380,7 +447,7 @@ export default function Home() {
           <input
             data-testid="input-search"
             type="search"
-            placeholder="Search products, wards, sellers..."
+            placeholder="Search products, areas, sellers..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             autoFocus
@@ -426,9 +493,17 @@ export default function Home() {
 
       <div className="flex-1 overflow-y-auto">
         {gpsReady && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
-            <MapPin size={12} className={gpsGranted ? "text-secondary" : "text-muted-foreground"} />
-            <p className="text-xs text-muted-foreground">{bannerText()}</p>
+          <div
+            className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30 cursor-pointer"
+            onClick={() => {
+              if (areaChoices.length > 1) setShowAreaPicker(true);
+            }}
+          >
+            <MapPin size={12} className={gpsGranted ? "text-secondary" : "text-amber-500"} />
+            <p className="text-xs text-muted-foreground flex-1">{bannerText()}</p>
+            {areaChoices.length > 1 && (
+              <span className="text-[10px] font-semibold text-primary flex-shrink-0">Change area</span>
+            )}
           </div>
         )}
 
@@ -466,7 +541,7 @@ export default function Home() {
                   <div className="flex items-center gap-2 mb-3">
                     <MapPin size={13} className="text-primary flex-shrink-0" />
                     <p className="text-xs font-bold text-primary uppercase tracking-wide">
-                      In {locationInfo.wardName}
+                      In {locationInfo.wardName} area
                     </p>
                   </div>
                 )}
@@ -547,6 +622,17 @@ export default function Home() {
             Sign in
           </Button>
         </div>
+      )}
+
+      {/* Border area picker */}
+      {showAreaPicker && (
+        <AreaPickerSheet
+          choices={areaChoices}
+          onSelect={handleAreaSelect}
+          onDismiss={() => {
+            handleAreaSelect(areaChoices[0]);
+          }}
+        />
       )}
 
       <BottomNav />
