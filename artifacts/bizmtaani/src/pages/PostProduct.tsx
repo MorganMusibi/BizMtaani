@@ -37,7 +37,7 @@ const PRICING_BASIS_OPTIONS = [
 type Step = 1 | 2 | 3;
 
 export default function PostProduct() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -227,7 +227,8 @@ export default function PostProduct() {
         constituency: wardInfo?.constituency ?? "",
         county: wardInfo?.county ?? "",
         sellerId: user.uid,
-        sellerName: user.displayName || "Seller",
+        sellerName: userProfile?.businessName || user.displayName || "Seller",
+        sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
         sellerAvatar: user.photoURL || "",
         phone: phone.trim(),
         priceType: pricingBasis === "quote_only" ? "fixed" : priceType,
@@ -303,53 +304,63 @@ export default function PostProduct() {
           <>
             <h2 className="font-black text-lg">What are you selling?</h2>
             <div className="space-y-2">
-              {CATEGORY_DEFS.map((cat) => (
-                <button
-                  key={cat.key}
-                  onClick={() => {
-                    setSelectedCategory(cat.key);
-                    setSelectedSubcategory("");
-                  }}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
-                    selectedCategory === cat.key
-                      ? "border-primary bg-primary/5"
-                      : "border-border bg-card hover:border-border/80"
-                  }`}
-                >
-                  <cat.icon size={22} className="flex-shrink-0 text-foreground" />
-                  <div className="flex-1">
-                    <p className="font-bold text-sm">{cat.displayShort}</p>
-                    <p className="text-xs text-muted-foreground">{cat.tagline}</p>
-                  </div>
-                  {selectedCategory === cat.key && (
-                    <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
-                      <Check size={11} className="text-white" />
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {catDef && subcategories.length > 0 && (
-              <div className="space-y-2">
-                <p className="font-bold text-sm">Subcategory</p>
-                <div className="flex flex-wrap gap-2">
-                  {subcategories.map((sub) => (
+              {CATEGORY_DEFS.map((cat) => {
+                const isSelected = selectedCategory === cat.key;
+                const subs = cat.subcategories ?? [];
+                return (
+                  <div key={cat.key}>
                     <button
-                      key={sub}
-                      onClick={() => setSelectedSubcategory(sub)}
-                      className={`px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all ${
-                        selectedSubcategory === sub
-                          ? "border-primary bg-primary/5 text-primary"
-                          : "border-border bg-card text-muted-foreground"
+                      onClick={() => {
+                        setSelectedCategory(cat.key);
+                        setSelectedSubcategory("");
+                      }}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
+                        isSelected
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-border/80"
                       }`}
                     >
-                      {sub}
+                      <cat.icon size={22} className="flex-shrink-0 text-foreground" />
+                      <div className="flex-1">
+                        <p className="font-bold text-sm">{cat.displayShort}</p>
+                        <p className="text-xs text-muted-foreground">{cat.tagline}</p>
+                      </div>
+                      {isSelected ? (
+                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                          <Check size={11} className="text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0" />
+                      )}
                     </button>
-                  ))}
-                </div>
-              </div>
-            )}
+
+                    {/* Subcategories appear inline, directly below the selected category */}
+                    {isSelected && subs.length > 0 && (
+                      <div className="mt-2 ml-3 mr-1 mb-1 bg-muted/50 rounded-2xl px-4 py-3 border border-border/60">
+                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2.5">
+                          Choose a subcategory
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {subs.map((sub) => (
+                            <button
+                              key={sub}
+                              onClick={() => setSelectedSubcategory(sub)}
+                              className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
+                                selectedSubcategory === sub
+                                  ? "border-primary bg-primary text-white"
+                                  : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              {sub}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </>
         )}
 
