@@ -1,33 +1,40 @@
 /**
- * MpesaPaymentModal — full STK Push flow.
+ * MpesaPaymentModal — listing activation STK Push flow.
+ *
+ * Used when an advertiser pays to post their listing.
+ * The parent provides an `onInitiate` callback that uploads photos,
+ * saves the pending listing, and triggers the STK push — returning
+ * the checkoutRequestId and productId.
  *
  * States: idle → initiating → awaiting_pin → success | failed | cancelled | timeout
- *
- * After initiating, the component subscribes to Firestore `payments/{checkoutRequestId}`
- * to receive the real-time result from the Safaricom callback.
  */
 import { useState, useEffect, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { initiateStkPush, normalizePhone } from "@/lib/mpesa";
+import { normalizePhone, PLAN_AMOUNTS, ListingPlan } from "@/lib/mpesa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import {
   X, Smartphone, Loader2, CheckCircle2, XCircle,
-  AlertCircle, Clock, ArrowLeft,
+  AlertCircle, Clock, ArrowLeft, Image as ImageIcon,
 } from "lucide-react";
 
 interface Props {
   open: boolean;
   onClose: () => void;
-  productId: string;
-  productTitle: string;
-  sellerId: string;
-  amount: number;
-  /** Pre-fill phone (user's number if known) */
+  plan: ListingPlan;
+  /** Pre-fill phone input with this number */
   defaultPhone?: string;
+  /**
+   * Called when user submits their phone number.
+   * Should upload images, save the pending product to Firestore,
+   * call the STK push API, and return the checkoutRequestId + productId.
+   */
+  onInitiate: (phone: string) => Promise<{ checkoutRequestId: string; productId: string }>;
+  /** Called when payment is confirmed and user taps "View Listing" */
+  onSuccess: (productId: string) => void;
 }
 
 type Stage = "idle" | "initiating" | "awaiting_pin" | "success" | "failed" | "cancelled" | "timeout";
@@ -40,35 +47,38 @@ interface PaymentDoc {
   failureReason?: string;
 }
 
-export function MpesaPaymentModal({
-  open, onClose, productId, productTitle, sellerId, amount, defaultPhone = "",
-}: Props) {
+export function MpesaPaymentModal({ open, onClose, plan, defaultPhone = "", onInitiate, onSuccess }: Props) {
   const { toast } = useToast();
   const [phone, setPhone] = useState(defaultPhone);
   const [phoneError, setPhoneError] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const [productId, setProductId] = useState<string | null>(null);
   const [mpesaCode, setMpesaCode] = useState<string | null>(null);
   const [failReason, setFailReason] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(PIN_TIMEOUT_SECS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const unsubRef = useRef<(() => void) | null>(null);
 
-  // Reset when closed
+  const amount = PLAN_AMOUNTS[plan];
+  const planLabel = plan === "premium" ? "Premium" : "Basic";
+
   useEffect(() => {
     if (!open) {
-      setTimeout(() => {
+      const t = setTimeout(() => {
         setStage("idle");
         setCheckoutId(null);
+        setProductId(null);
         setMpesaCode(null);
         setFailReason(null);
-        setPhone(defaultPhone);
         setPhoneError("");
       }, 300);
+      return () => clearTimeout(t);
+    } else {
+      setPhone(defaultPhone);
     }
   }, [open, defaultPhone]);
 
-  // Start countdown once in awaiting_pin stage
   useEffect(() => {
     if (stage === "awaiting_pin") {
       setCountdown(PIN_TIMEOUT_SECS);
@@ -76,7 +86,7 @@ export function MpesaPaymentModal({
         setCountdown((c) => {
           if (c <= 1) {
             clearInterval(timerRef.current!);
-            if (stage === "awaiting_pin") setStage("timeout");
+            setStage((s) => s === "awaiting_pin" ? "timeout" : s);
             return 0;
           }
           return c - 1;
@@ -86,7 +96,6 @@ export function MpesaPaymentModal({
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [stage]);
 
-  // Listen to Firestore payment doc for real-time result
   useEffect(() => {
     if (!checkoutId) return;
     unsubRef.current?.();
@@ -114,17 +123,18 @@ export function MpesaPaymentModal({
     try {
       normalizePhone(phone);
     } catch {
-      setPhoneError("Enter a valid Kenyan number e.g. 0712 345 678");
+      setPhoneError("Enter a valid Safaricom number e.g. 0712 345 678");
       return;
     }
     setStage("initiating");
     try {
-      const result = await initiateStkPush({ phone, amount, productId, productTitle, sellerId });
-      setCheckoutId(result.checkoutRequestId);
+      const { checkoutRequestId, productId: pid } = await onInitiate(phone);
+      setCheckoutId(checkoutRequestId);
+      setProductId(pid);
       setStage("awaiting_pin");
     } catch (err) {
       setStage("idle");
-      toast({ title: "Could not initiate payment", description: (err as Error).message, variant: "destructive" });
+      toast({ title: "Payment failed to start", description: (err as Error).message, variant: "destructive" });
     }
   }
 
@@ -132,18 +142,13 @@ export function MpesaPaymentModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col">
-      {/* Backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => stage === "idle" && onClose()} />
 
-      {/* Sheet */}
       <div className="relative mt-auto w-full bg-card rounded-t-3xl border-t border-border px-5 pt-4 pb-safe animate-in slide-in-from-bottom-4 duration-300"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}>
 
-        {/* Handle + close */}
-        <div className="flex items-center justify-between mb-5">
-          <div className="w-10 h-1 rounded-full bg-muted mx-auto" />
-        </div>
-        <button onClick={onClose} disabled={stage === "initiating"}
+        <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
+        <button onClick={onClose} disabled={stage === "initiating" || stage === "awaiting_pin"}
           className="absolute top-4 right-4 p-2 rounded-xl hover:bg-muted transition-colors">
           <X size={18} className="text-muted-foreground" />
         </button>
@@ -156,24 +161,26 @@ export function MpesaPaymentModal({
                 <Smartphone size={22} className="text-[#00A651]" />
               </div>
               <div>
-                <p className="font-black text-base">Pay with M-Pesa</p>
-                <p className="text-xs text-muted-foreground">Lipa Na M-Pesa STK Push</p>
+                <p className="font-black text-base">Activate Listing</p>
+                <p className="text-xs text-muted-foreground">Pay to post your advert for 7 days</p>
               </div>
             </div>
 
-            {/* Summary */}
             <div className="bg-muted/50 rounded-2xl px-4 py-3 space-y-1.5">
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Item</span>
-                <span className="font-semibold line-clamp-1 max-w-[55%] text-right">{productTitle}</span>
+                <span className="text-muted-foreground">Plan</span>
+                <span className="font-semibold">{planLabel}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Duration</span>
+                <span className="font-semibold">7 days</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Amount</span>
-                <span className="font-black text-primary">KES {amount.toLocaleString()}</span>
+                <span className="font-black text-primary">KES {amount}</span>
               </div>
             </div>
 
-            {/* Phone input */}
             <div className="space-y-2">
               <Label>M-Pesa Phone Number</Label>
               <Input
@@ -183,28 +190,26 @@ export function MpesaPaymentModal({
                 autoFocus
               />
               {phoneError && <p className="text-xs text-destructive">{phoneError}</p>}
-              <p className="text-xs text-muted-foreground">
-                A push notification will be sent to this Safaricom number.
-              </p>
+              <p className="text-xs text-muted-foreground">Enter your Safaricom number to receive the M-Pesa prompt.</p>
             </div>
 
-            <Button onClick={handlePay} className="w-full h-12 font-black text-base rounded-xl bg-[#00A651] hover:bg-[#008a44] gap-2">
+            <Button onClick={handlePay} className="w-full h-12 font-black text-base rounded-xl gap-2" style={{ backgroundColor: "#00A651" }}>
               <Smartphone size={18} />
-              Send M-Pesa Prompt
+              Pay KES {amount} & Publish
             </Button>
-
-            <p className="text-center text-xs text-muted-foreground">
-              Secure payment powered by Safaricom M-Pesa
-            </p>
+            <p className="text-center text-xs text-muted-foreground">Secured by Safaricom M-Pesa</p>
           </div>
         )}
 
-        {/* ---- INITIATING ---- */}
+        {/* ---- INITIATING: uploading & preparing ---- */}
         {stage === "initiating" && (
           <div className="flex flex-col items-center py-8 gap-4">
-            <Loader2 size={40} className="animate-spin text-[#00A651]" />
-            <p className="font-black text-base">Sending prompt...</p>
-            <p className="text-sm text-muted-foreground text-center">Connecting to M-Pesa</p>
+            <div className="relative">
+              <Loader2 size={40} className="animate-spin text-[#00A651]" />
+              <ImageIcon size={16} className="absolute inset-0 m-auto text-[#00A651]" />
+            </div>
+            <p className="font-black text-base text-center">Uploading photos & preparing your listing...</p>
+            <p className="text-sm text-muted-foreground text-center">Please wait, do not close this screen.</p>
           </div>
         )}
 
@@ -219,30 +224,21 @@ export function MpesaPaymentModal({
                 <Clock size={14} className="text-[#00A651]" />
               </div>
             </div>
-
             <div className="text-center">
               <p className="font-black text-lg">Check your phone</p>
               <p className="text-sm text-muted-foreground mt-1">
-                Enter your M-Pesa PIN to complete the payment of{" "}
-                <strong className="text-foreground">KES {amount.toLocaleString()}</strong>
+                Enter your M-Pesa PIN to pay <strong className="text-foreground">KES {amount}</strong>
               </p>
             </div>
-
-            {/* Countdown ring */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center">
                 <span className="text-xs font-bold text-primary">{countdown}</span>
               </div>
               <span>seconds remaining</span>
             </div>
-
             <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs text-amber-800 text-center">
-              Do <strong>NOT</strong> close this screen until you have entered your PIN
+              Do <strong>NOT</strong> close this screen. Your listing is ready and waiting.
             </div>
-
-            <button onClick={() => setStage("idle")} className="flex items-center gap-1.5 text-xs text-muted-foreground underline underline-offset-2">
-              <ArrowLeft size={12} />Wrong number? Go back
-            </button>
           </div>
         )}
 
@@ -253,14 +249,10 @@ export function MpesaPaymentModal({
               <AlertCircle size={32} className="text-amber-600" />
             </div>
             <div className="text-center">
-              <p className="font-black text-base">Payment timed out</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                The request expired. You were not charged.
-              </p>
+              <p className="font-black text-base">Request timed out</p>
+              <p className="text-sm text-muted-foreground mt-1">You were not charged. Try again.</p>
             </div>
-            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">
-              Try Again
-            </Button>
+            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">Try Again</Button>
           </div>
         )}
 
@@ -272,11 +264,9 @@ export function MpesaPaymentModal({
             </div>
             <div className="text-center">
               <p className="font-black text-base">Payment cancelled</p>
-              <p className="text-sm text-muted-foreground mt-1">You cancelled the M-Pesa prompt.</p>
+              <p className="text-sm text-muted-foreground mt-1">You cancelled the M-Pesa prompt. No charge was made.</p>
             </div>
-            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">
-              Try Again
-            </Button>
+            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">Try Again</Button>
           </div>
         )}
 
@@ -288,11 +278,9 @@ export function MpesaPaymentModal({
             </div>
             <div className="text-center">
               <p className="font-black text-base">Payment failed</p>
-              <p className="text-sm text-muted-foreground mt-1">{failReason ?? "The payment could not be completed."}</p>
+              <p className="text-sm text-muted-foreground mt-1">{failReason ?? "Could not complete payment."}</p>
             </div>
-            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">
-              Try Again
-            </Button>
+            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">Try Again</Button>
             <button onClick={onClose} className="text-xs text-muted-foreground underline">Cancel</button>
           </div>
         )}
@@ -304,10 +292,8 @@ export function MpesaPaymentModal({
               <CheckCircle2 size={40} className="text-[#00A651]" />
             </div>
             <div className="text-center">
-              <p className="font-black text-xl text-[#00A651]">Payment confirmed!</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                KES {amount.toLocaleString()} paid successfully
-              </p>
+              <p className="font-black text-xl" style={{ color: "#00A651" }}>Listing is live!</p>
+              <p className="text-sm text-muted-foreground mt-1">Your advert is now visible for 7 days.</p>
             </div>
             {mpesaCode && (
               <div className="bg-[#00A651]/5 border border-[#00A651]/20 rounded-2xl px-4 py-3 text-center w-full">
@@ -315,11 +301,12 @@ export function MpesaPaymentModal({
                 <p className="font-black text-lg tracking-widest text-[#00A651]">{mpesaCode}</p>
               </div>
             )}
-            <p className="text-xs text-muted-foreground text-center">
-              Save your receipt number for reference. Message the seller to confirm delivery.
-            </p>
-            <Button onClick={onClose} className="w-full h-11 rounded-xl bg-[#00A651] hover:bg-[#008a44]">
-              Done
+            <Button
+              onClick={() => productId && onSuccess(productId)}
+              className="w-full h-11 rounded-xl font-black"
+              style={{ backgroundColor: "#00A651" }}
+            >
+              View My Listing
             </Button>
           </div>
         )}

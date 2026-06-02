@@ -1,14 +1,16 @@
 /**
- * M-Pesa Daraja API — STK Push (Lipa Na M-Pesa) integration.
+ * M-Pesa Daraja API — STK Push for listing activation.
+ *
+ * Business model: advertisers pay KES 60 (basic, 10 photos, 7 days)
+ *                 or KES 120 (premium, 25 photos, 7 days) to post a listing.
  *
  * Required env vars:
  *   MPESA_CONSUMER_KEY      — Daraja app consumer key
  *   MPESA_CONSUMER_SECRET   — Daraja app consumer secret
- *   MPESA_SHORTCODE         — Business short code (Paybill) or Till number
- *   MPESA_PASSKEY           — Lipa Na M-Pesa passkey (from Daraja portal)
+ *   MPESA_SHORTCODE         — Paybill / Till number (sandbox: 174379)
+ *   MPESA_PASSKEY           — Lipa Na M-Pesa passkey
  *   MPESA_ENVIRONMENT       — "sandbox" (default) | "production"
- *   MPESA_TRANSACTION_TYPE  — "CustomerPayBillOnline" (default) | "CustomerBuyGoodsOnline"
- *   MPESA_CALLBACK_URL      — Override callback URL (optional; auto-detected from REPLIT_DOMAINS)
+ *   MPESA_CALLBACK_URL      — Override callback URL (optional)
  */
 import { Router } from "express";
 import admin from "firebase-admin";
@@ -16,8 +18,12 @@ import { getFirebaseAdmin, getFirestore } from "../lib/firebase-admin.js";
 
 const router = Router();
 
-// ---------- helpers ----------
+// ---------- plan config ----------
+const PLAN_AMOUNTS = { basic: 60, premium: 120 } as const;
+const PLAN_PHOTO_LIMITS = { basic: 10, premium: 25 } as const;
+const LISTING_DURATION_DAYS = 7;
 
+// ---------- helpers ----------
 interface DarajaToken { token: string; expiresAt: number }
 let _token: DarajaToken | null = null;
 
@@ -42,7 +48,6 @@ async function getDarajaToken(): Promise<string> {
   return _token.token;
 }
 
-/** Normalize a Kenyan phone number to 254XXXXXXXXX format */
 function normalizePhone(raw: string): string {
   const p = raw.replace(/[\s\-+]/g, "");
   if (p.startsWith("254") && p.length === 12) return p;
@@ -75,18 +80,17 @@ function callbackUrl(): string {
   throw new Error("Cannot determine callback URL — set MPESA_CALLBACK_URL");
 }
 
-// ---------- verify Firebase ID token ----------
 async function verifyToken(authHeader: string | undefined): Promise<admin.auth.DecodedIdToken> {
   if (!authHeader?.startsWith("Bearer ")) throw new Error("Missing auth token");
-  const idToken = authHeader.slice(7);
-  return getFirebaseAdmin().auth().verifyIdToken(idToken);
+  return getFirebaseAdmin().auth().verifyIdToken(authHeader.slice(7));
 }
 
 // ---------- routes ----------
 
 /**
  * POST /api/mpesa/stkpush
- * Body: { phone, amount, productId, productTitle, sellerId }
+ * Initiate STK push for a listing activation payment.
+ * Body: { phone, plan: 'basic'|'premium', productId }
  * Header: Authorization: Bearer <firebaseIdToken>
  */
 router.post("/mpesa/stkpush", async (req, res) => {
@@ -99,12 +103,16 @@ router.post("/mpesa/stkpush", async (req, res) => {
     return;
   }
 
-  const { phone, amount, productId, productTitle, sellerId } = req.body as {
-    phone: string; amount: number; productId: string; productTitle: string; sellerId: string;
+  const { phone, plan, productId } = req.body as {
+    phone: string; plan: "basic" | "premium"; productId: string;
   };
 
-  if (!phone || !amount || !productId || !sellerId) {
-    res.status(400).json({ error: "phone, amount, productId and sellerId are required" });
+  if (!phone || !plan || !productId) {
+    res.status(400).json({ error: "phone, plan and productId are required" });
+    return;
+  }
+  if (plan !== "basic" && plan !== "premium") {
+    res.status(400).json({ error: "plan must be 'basic' or 'premium'" });
     return;
   }
 
@@ -123,6 +131,9 @@ router.post("/mpesa/stkpush", async (req, res) => {
     return;
   }
 
+  const amount = PLAN_AMOUNTS[plan];
+  const photoLimit = PLAN_PHOTO_LIMITS[plan];
+
   try {
     const token = await getDarajaToken();
     const ts = timestamp();
@@ -135,13 +146,13 @@ router.post("/mpesa/stkpush", async (req, res) => {
       Password: password,
       Timestamp: ts,
       TransactionType: txType,
-      Amount: Math.ceil(amount),
+      Amount: amount,
       PartyA: formattedPhone,
       PartyB: shortcode,
       PhoneNumber: formattedPhone,
       CallBackURL: cbUrl,
       AccountReference: productId.slice(0, 12),
-      TransactionDesc: `Pay for ${(productTitle ?? "item").slice(0, 40)}`,
+      TransactionDesc: `BizMtaani ${plan} listing`,
     };
 
     const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
@@ -169,22 +180,22 @@ router.post("/mpesa/stkpush", async (req, res) => {
     const checkoutRequestId = darajaData.CheckoutRequestID!;
     const merchantRequestId = darajaData.MerchantRequestID!;
 
-    // Save payment record to Firestore
     const db = getFirestore();
     await db.collection("payments").doc(checkoutRequestId).set({
       checkoutRequestId,
       merchantRequestId,
+      type: `listing_${plan}`,
+      plan,
+      photoLimit,
       productId,
-      productTitle: productTitle ?? "",
       buyerId: uid,
       buyerPhone: formattedPhone,
-      sellerId,
-      amount: Math.ceil(amount),
+      amount,
       status: "pending",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    req.log.info({ checkoutRequestId, uid, productId, amount }, "STK push initiated");
+    req.log.info({ checkoutRequestId, uid, productId, plan, amount }, "Listing STK push initiated");
     res.json({
       success: true,
       checkoutRequestId,
@@ -200,9 +211,9 @@ router.post("/mpesa/stkpush", async (req, res) => {
 /**
  * POST /api/mpesa/callback
  * Called by Safaricom after the user completes or cancels the STK prompt.
+ * On success: activates the pending listing with a 7-day expiry.
  */
 router.post("/mpesa/callback", async (req, res) => {
-  // Always respond 200 immediately (Safaricom expects quick acknowledgement)
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 
   try {
@@ -217,32 +228,54 @@ router.post("/mpesa/callback", async (req, res) => {
     if (!callback?.CheckoutRequestID) return;
 
     const db = getFirestore();
-    const docRef = db.collection("payments").doc(callback.CheckoutRequestID);
+    const checkoutRequestId = callback.CheckoutRequestID;
+    const paymentRef = db.collection("payments").doc(checkoutRequestId);
 
     if (callback.ResultCode === 0) {
-      // Success — extract receipt details from CallbackMetadata
       const items = callback.CallbackMetadata?.Item ?? [];
       const get = (name: string) => items.find((i) => i.Name === name)?.Value;
       const mpesaCode = get("MpesaReceiptNumber") as string | undefined;
-      const txAmount = get("Amount") as number | undefined;
-      const txPhone = get("PhoneNumber") as string | undefined;
 
-      await docRef.update({
+      // Update payment status
+      await paymentRef.update({
         status: "completed",
         mpesaCode: mpesaCode ?? null,
-        txAmount: txAmount ?? null,
-        txPhone: String(txPhone ?? ""),
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      req.log.info({ checkoutRequestId: callback.CheckoutRequestID, mpesaCode }, "M-Pesa payment completed");
+
+      // Activate the listing
+      const paymentSnap = await paymentRef.get();
+      const paymentData = paymentSnap.data();
+
+      if (paymentData?.productId) {
+        const productRef = db.collection("products").doc(paymentData.productId as string);
+        const productSnap = await productRef.get();
+        const productData = productSnap.data();
+
+        // For renewals: extend from current expiry if still in future; otherwise from now
+        const now = new Date();
+        const currentExpiry = productData?.expiresAt?.toDate?.() as Date | undefined;
+        const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
+        const expiresAt = new Date(baseDate);
+        expiresAt.setDate(expiresAt.getDate() + LISTING_DURATION_DAYS);
+
+        await productRef.update({
+          status: "active",
+          expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
+          plan: paymentData.plan,
+          photoLimit: paymentData.photoLimit,
+          activatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        req.log.info({ productId: paymentData.productId, mpesaCode, expiresAt }, "Listing activated");
+      }
     } else {
-      // Failed or cancelled by user
-      await docRef.update({
+      await paymentRef.update({
         status: callback.ResultCode === 1032 ? "cancelled" : "failed",
         failureReason: callback.ResultDesc,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      req.log.info({ checkoutRequestId: callback.CheckoutRequestID, resultCode: callback.ResultCode }, "M-Pesa payment failed/cancelled");
+      req.log.info({ checkoutRequestId, resultCode: callback.ResultCode }, "M-Pesa payment failed/cancelled");
     }
   } catch (err) {
     req.log.error({ err }, "Error processing M-Pesa callback");
@@ -251,8 +284,7 @@ router.post("/mpesa/callback", async (req, res) => {
 
 /**
  * GET /api/mpesa/status/:checkoutRequestId
- * Query Daraja for live transaction status (optional — Firestore listener is preferred).
- * Header: Authorization: Bearer <firebaseIdToken>
+ * Query Daraja for live transaction status.
  */
 router.get("/mpesa/status/:checkoutRequestId", async (req, res) => {
   try {

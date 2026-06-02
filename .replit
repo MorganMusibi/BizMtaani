@@ -34,3 +34,9 @@ externalPort = 3002
 [[ports]]
 localPort = 24184
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+MPESA_SHORTCODE = "174379"
+MPESA_ENVIRONMENT = "sandbox"

@@ -54,6 +54,8 @@ interface Product {
   phone?: string;
   geohash?: string;
   createdAt?: { seconds: number } | null;
+  expiresAt?: { seconds: number } | null;
+  status?: string;
 }
 
 type Cursor = QueryDocumentSnapshot<DocumentData>;
@@ -388,7 +390,12 @@ export default function Home() {
   }, [loadMore]);
 
   function applyFilters(products: Product[]): Product[] {
+    const nowSec = Date.now() / 1000;
     return products.filter((p) => {
+      // Hide listings pending payment or already expired
+      if (p.status === "pending_payment") return false;
+      if (p.expiresAt && p.expiresAt.seconds < nowSec) return false;
+
       const matchCat = activeKey === "All" || p.category === activeKey;
       const matchSearch =
         !searchQuery ||

@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check } from "lucide-react";
+import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
 import { getWardInfo, type ResolvedLocation } from "@/lib/location";
+import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
+import { initiateStkPush, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS, type ListingPlan } from "@/lib/mpesa";
 
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
-const MAX_IMAGES = 6;
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -34,7 +35,7 @@ const PRICING_BASIS_OPTIONS = [
   { value: "quote_only", label: "Quote Only" },
 ];
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export default function PostProduct() {
   const { user, userProfile } = useAuth();
@@ -73,10 +74,16 @@ export default function PostProduct() {
   const [locationSearch, setLocationSearch] = useState("");
   const [locationLoading, setLocationLoading] = useState(false);
 
-  const [submitting, setSubmitting] = useState(false);
+  // Step 4 — Plan & payment
+  const [plan, setPlan] = useState<ListingPlan>("basic");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const pendingProductIdRef = useRef<string | null>(null);
+
+  const [showImageMenu, setShowImageMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-  const [showImageMenu, setShowImageMenu] = useState(false);
+
+  const photoLimit = PLAN_PHOTO_LIMITS[plan];
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
@@ -98,6 +105,13 @@ export default function PostProduct() {
     );
   }, [user]);
 
+  // Auto-upgrade to premium if photos exceed basic limit
+  useEffect(() => {
+    if (imageFiles.length > PLAN_PHOTO_LIMITS.basic && plan === "basic") {
+      setPlan("premium");
+    }
+  }, [imageFiles.length, plan]);
+
   const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
   const isAccommodation = selectedCategory === "Accommodation";
   const isEatery =
@@ -108,7 +122,17 @@ export default function PostProduct() {
 
   function handleImageFiles(files: FileList | null) {
     if (!files) return;
-    const remaining = MAX_IMAGES - imageFiles.length;
+    const currentLimit = PLAN_PHOTO_LIMITS[plan];
+    const remaining = currentLimit - imageFiles.length;
+    if (remaining <= 0) {
+      if (plan === "basic") {
+        toast({
+          title: "Basic plan limit reached",
+          description: "Upgrade to Premium (KES 120) in the next step to add up to 25 photos.",
+        });
+      }
+      return;
+    }
     const toAdd = Array.from(files).slice(0, remaining);
     const oversized = toAdd.filter((f) => f.size > 8 * 1024 * 1024);
     if (oversized.length > 0) {
@@ -192,12 +216,19 @@ export default function PostProduct() {
     return true;
   }
 
-  async function handleSubmit() {
-    if (!validateStep()) return;
-    if (!user || !coords) return;
+  /**
+   * Called by MpesaPaymentModal when the user submits their M-Pesa number.
+   * Uploads photos, saves the product as pending, initiates STK push.
+   * Returns checkoutRequestId + productId for the modal's Firestore listener.
+   */
+  async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
+    if (!user || !coords) throw new Error("Not ready");
 
-    setSubmitting(true);
-    try {
+    // Re-use pending product if modal is re-opened after a failed attempt
+    let productId = pendingProductIdRef.current;
+
+    if (!productId) {
+      // Upload images
       const uploadedUrls: string[] = [];
       for (const file of imageFiles) {
         const url = await uploadImage(file, "product");
@@ -205,7 +236,6 @@ export default function PostProduct() {
       }
 
       const geohash = encodeGeohash(coords.lat, coords.lng, 7);
-
       const priceVal = isAccommodation
         ? parseFloat(rentPerMonth) || 0
         : pricingBasis === "quote_only"
@@ -232,36 +262,31 @@ export default function PostProduct() {
         sellerAvatar: user.photoURL || "",
         phone: phone.trim(),
         priceType: pricingBasis === "quote_only" ? "fixed" : priceType,
+        status: "pending_payment",
+        plan,
+        photoLimit: PLAN_PHOTO_LIMITS[plan],
         createdAt: serverTimestamp(),
       };
 
-      if (isAccommodation) {
-        docData.rentPerMonth = parseFloat(rentPerMonth) || 0;
-      }
-      if (isTransport) {
-        docData.pricingBasis = pricingBasis;
-      }
-      if (isEatery) {
-        docData.hotelMenu = hotelMenu;
-      }
+      if (isAccommodation) docData.rentPerMonth = parseFloat(rentPerMonth) || 0;
+      if (isTransport) docData.pricingBasis = pricingBasis;
+      if (isEatery) docData.hotelMenu = hotelMenu;
 
-      await addDoc(collection(db, "products"), docData);
-
-      toast({ title: "Advert posted!", description: "Your listing is now live." });
-      navigate("/");
-    } catch (err) {
-      console.error(err);
-      toast({ title: "Failed to post", description: "Please try again.", variant: "destructive" });
-    } finally {
-      setSubmitting(false);
+      const docRef = await addDoc(collection(db, "products"), docData);
+      pendingProductIdRef.current = docRef.id;
+      productId = docRef.id;
     }
+
+    // Initiate STK push
+    const result = await initiateStkPush({ phone: mpesaPhone, plan, productId });
+    return { checkoutRequestId: result.checkoutRequestId, productId };
   }
 
   function goNext() {
-    if (validateStep()) setStep((s) => (s < 3 ? ((s + 1) as Step) : s));
+    if (validateStep()) setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   }
 
-  const stepLabels = ["Category", "Details", "Photos & Location"];
+  const stepLabels = ["Category", "Details", "Photos", "Publish"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -278,20 +303,20 @@ export default function PostProduct() {
         </div>
 
         {/* Step indicators */}
-        <div className="flex items-center px-4 pb-3 gap-2">
+        <div className="flex items-center px-4 pb-3 gap-1">
           {stepLabels.map((label, i) => {
             const n = (i + 1) as Step;
             const done = step > n;
             const active = step === n;
             return (
-              <div key={label} className="flex items-center gap-2 flex-1 min-w-0">
+              <div key={label} className="flex items-center gap-1 flex-1 min-w-0">
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black transition-all ${
                   done ? "bg-secondary text-white" : active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
                 }`}>
                   {done ? <Check size={12} /> : n}
                 </div>
-                <span className={`text-xs font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-                {i < 2 && <div className="flex-1 h-px bg-border min-w-[4px]" />}
+                <span className={`text-[10px] font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                {i < 3 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
               </div>
             );
           })}
@@ -299,6 +324,7 @@ export default function PostProduct() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-5">
+
         {/* ========== STEP 1: Category ========== */}
         {step === 1 && (
           <>
@@ -310,14 +336,9 @@ export default function PostProduct() {
                 return (
                   <div key={cat.key}>
                     <button
-                      onClick={() => {
-                        setSelectedCategory(cat.key);
-                        setSelectedSubcategory("");
-                      }}
+                      onClick={() => { setSelectedCategory(cat.key); setSelectedSubcategory(""); }}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
-                        isSelected
-                          ? "border-primary bg-primary/5"
-                          : "border-border bg-card hover:border-border/80"
+                        isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
                       }`}
                     >
                       <cat.icon size={22} className="flex-shrink-0 text-foreground" />
@@ -334,17 +355,12 @@ export default function PostProduct() {
                       )}
                     </button>
 
-                    {/* Subcategories appear inline, directly below the selected category */}
                     {isSelected && subs.length > 0 && (
                       <div className="mt-2 ml-3 mr-1 mb-1 bg-muted/50 rounded-2xl px-4 py-3 border border-border/60">
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2.5">
-                          Choose a subcategory
-                        </p>
+                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2.5">Choose a subcategory</p>
                         <div className="flex flex-wrap gap-2">
                           {subs.map((sub) => (
-                            <button
-                              key={sub}
-                              onClick={() => setSelectedSubcategory(sub)}
+                            <button key={sub} onClick={() => setSelectedSubcategory(sub)}
                               className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
                                 selectedSubcategory === sub
                                   ? "border-primary bg-primary text-white"
@@ -376,10 +392,7 @@ export default function PostProduct() {
                   : isTransport ? "e.g. Toyota Probox taxi — Eastleigh"
                   : "e.g. iPhone 13 Pro 256GB"
                 }
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={80}
-                className="h-12 text-base"
+                value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="h-12 text-base"
               />
             </div>
 
@@ -387,31 +400,23 @@ export default function PostProduct() {
               <label className="text-sm font-bold">Description</label>
               <Textarea
                 placeholder="Describe your product or service in detail..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[100px] text-sm"
-                maxLength={1000}
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px] text-sm" maxLength={1000}
               />
               <p className="text-xs text-right text-muted-foreground">{description.length}/1000</p>
             </div>
 
-            {/* Pricing */}
             {isAccommodation ? (
               <div className="space-y-1.5">
                 <label className="text-sm font-bold">Monthly Rent (KES) *</label>
-                <Input
-                  type="number" inputMode="numeric" placeholder="e.g. 7500"
-                  value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)}
-                  className="h-12 text-base"
-                />
+                <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
+                  value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
                 <div className="flex gap-2 mt-2">
                   {(["fixed", "negotiable"] as const).map((t) => (
                     <button key={t} onClick={() => setPriceType(t)}
                       className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
                         priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                      }`}>
-                      {t}
-                    </button>
+                      }`}>{t}</button>
                   ))}
                 </div>
               </div>
@@ -424,21 +429,16 @@ export default function PostProduct() {
                       <button key={value} onClick={() => setPricingBasis(value)}
                         className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
                           pricingBasis === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                        }`}>
-                        {label}
-                      </button>
+                        }`}>{label}</button>
                     ))}
                   </div>
                 </div>
                 {pricingBasis !== "quote_only" && (
                   <div className="space-y-1.5">
                     <label className="text-sm font-bold">Price (KES)</label>
-                    <Input
-                      type="number" inputMode="numeric"
+                    <Input type="number" inputMode="numeric"
                       placeholder={pricingBasis === "per_km" ? "e.g. 50 per km" : "e.g. 2000"}
-                      value={price} onChange={(e) => setPrice(e.target.value)}
-                      className="h-12 text-base"
-                    />
+                      value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
                   </div>
                 )}
               </div>
@@ -446,26 +446,20 @@ export default function PostProduct() {
               <div className="space-y-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold">Price (KES)</label>
-                  <Input
-                    type="number" inputMode="numeric" placeholder="e.g. 1500"
-                    value={price} onChange={(e) => setPrice(e.target.value)}
-                    className="h-12 text-base"
-                  />
+                  <Input type="number" inputMode="numeric" placeholder="e.g. 1500"
+                    value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
                 </div>
                 <div className="flex gap-2">
                   {(["fixed", "negotiable"] as const).map((t) => (
                     <button key={t} onClick={() => setPriceType(t)}
                       className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
                         priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                      }`}>
-                      {t}
-                    </button>
+                      }`}>{t}</button>
                   ))}
                 </div>
               </div>
             ) : null}
 
-            {/* Hotel menu */}
             {isEatery && (
               <div className="space-y-4">
                 <p className="font-black text-base">Hotel / Restaurant Menu</p>
@@ -488,24 +482,16 @@ export default function PostProduct() {
                       </div>
                     )}
                     <div className="flex gap-2 p-3">
-                      <Input
-                        placeholder="Dish name"
-                        value={newItems[key].name}
+                      <Input placeholder="Dish name" value={newItems[key].name}
                         onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], name: e.target.value } }))}
                         className="flex-1 h-9 text-sm"
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }}
-                      />
-                      <Input
-                        type="number" inputMode="numeric" placeholder="KES"
-                        value={newItems[key].price}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
+                      <Input type="number" inputMode="numeric" placeholder="KES" value={newItems[key].price}
                         onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], price: e.target.value } }))}
                         className="w-24 h-9 text-sm"
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }}
-                      />
-                      <button
-                        onClick={() => addMenuItem(key)}
-                        className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
-                      >
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
+                      <button onClick={() => addMenuItem(key)}
+                        className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0">
                         <Plus size={16} />
                       </button>
                     </div>
@@ -514,14 +500,10 @@ export default function PostProduct() {
               </div>
             )}
 
-            {/* Phone */}
             <div className="space-y-1.5">
               <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
-              <Input
-                type="tel" placeholder="e.g. 0712345678"
-                value={phone} onChange={(e) => setPhone(e.target.value)}
-                className="h-12 text-base"
-              />
+              <Input type="tel" placeholder="e.g. 0712345678"
+                value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12 text-base" />
             </div>
           </>
         )}
@@ -533,11 +515,20 @@ export default function PostProduct() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <label className="text-sm font-bold">
-                    Photos {isAccommodation ? "(up to 6)" : "(up to 6)"}
-                    {!isEatery && " *"}
+                    Photos (up to {PLAN_PHOTO_LIMITS[plan]}) *
                   </label>
-                  <span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_IMAGES}</span>
+                  <span className="text-xs text-muted-foreground">{imageFiles.length}/{PLAN_PHOTO_LIMITS[plan]}</span>
                 </div>
+
+                {imageFiles.length >= PLAN_PHOTO_LIMITS.basic && plan === "basic" && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+                    <Smartphone size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-amber-800">10-photo limit for Basic plan</p>
+                      <p className="text-xs text-amber-700 mt-0.5">Upgrade to Premium (KES 120) in the next step to add up to 25 photos.</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-3 gap-2">
                   {imagePreviews.map((src, i) => (
@@ -548,19 +539,15 @@ export default function PostProduct() {
                           Cover
                         </div>
                       )}
-                      <button
-                        onClick={() => removeImage(i)}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center"
-                      >
+                      <button onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
                         <X size={12} />
                       </button>
                     </div>
                   ))}
-                  {imageFiles.length < MAX_IMAGES && (
-                    <button
-                      onClick={() => setShowImageMenu(true)}
-                      className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
-                    >
+                  {imageFiles.length < photoLimit && (
+                    <button onClick={() => setShowImageMenu(true)}
+                      className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                       <Camera size={22} />
                       <span className="text-[10px] font-semibold">Add photo</span>
                     </button>
@@ -574,7 +561,6 @@ export default function PostProduct() {
               </div>
             )}
 
-            {/* Location */}
             <div className="space-y-2">
               <label className="text-sm font-bold">Location</label>
               <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
@@ -586,34 +572,110 @@ export default function PostProduct() {
                     <p className="text-sm text-muted-foreground">Detecting your location...</p>
                   )}
                   {wardInfo?.constituency && (
-                    <p className="text-xs text-muted-foreground">
-                      {wardInfo.constituency}, {wardInfo.county}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{wardInfo.constituency}, {wardInfo.county}</p>
                   )}
                 </div>
               </div>
 
               <div className="flex gap-2">
-                <Input
-                  placeholder="Search a different location..."
-                  value={locationSearch}
-                  onChange={(e) => setLocationSearch(e.target.value)}
+                <Input placeholder="Search a different location..."
+                  value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchLocation(); } }}
-                  className="flex-1 h-10 text-sm"
-                />
-                <Button
-                  type="button" variant="outline" size="sm" onClick={searchLocation}
-                  disabled={locationLoading}
-                  className="h-10 px-4 flex-shrink-0"
-                >
+                  className="flex-1 h-10 text-sm" />
+                <Button type="button" variant="outline" size="sm" onClick={searchLocation}
+                  disabled={locationLoading} className="h-10 px-4 flex-shrink-0">
                   {locationLoading ? <Loader2 size={14} className="animate-spin" /> : "Search"}
                 </Button>
               </div>
               {locationName && locationName !== wardInfo?.wardName && (
-                <p className="text-xs text-muted-foreground">
-                  Listing location: <strong>{locationName}</strong>
-                </p>
+                <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
               )}
+            </div>
+          </>
+        )}
+
+        {/* ========== STEP 4: Choose Plan & Pay ========== */}
+        {step === 4 && (
+          <>
+            <div>
+              <h2 className="font-black text-lg">Choose Your Plan</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Your advert goes live immediately after payment.</p>
+            </div>
+
+            {/* Basic plan */}
+            <button
+              onClick={() => imageFiles.length <= PLAN_PHOTO_LIMITS.basic && setPlan("basic")}
+              disabled={imageFiles.length > PLAN_PHOTO_LIMITS.basic}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "basic"
+                  ? "border-primary bg-primary/5"
+                  : imageFiles.length > PLAN_PHOTO_LIMITS.basic
+                  ? "border-border opacity-40 cursor-not-allowed"
+                  : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Basic</span>
+                    {plan === "basic" && (
+                      <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
+                    )}
+                    {imageFiles.length > PLAN_PHOTO_LIMITS.basic && (
+                      <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Not available</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">7 days live · up to 10 photos</p>
+                </div>
+                <span className="font-black text-2xl text-primary">KES {PLAN_AMOUNTS.basic}</span>
+              </div>
+            </button>
+
+            {/* Premium plan */}
+            <button
+              onClick={() => setPlan("premium")}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "premium" ? "border-[#00A651] bg-[#00A651]/5" : "border-border hover:border-[#00A651]/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Premium</span>
+                    {plan === "premium" ? (
+                      <span className="text-[10px] bg-[#00A651] text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">More photos</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">7 days live · up to 25 photos</p>
+                </div>
+                <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium}</span>
+              </div>
+            </button>
+
+            {/* What's included */}
+            <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
+              <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
+              {[
+                "Listed in your ward & nearby areas",
+                "Visible to buyers searching your category",
+                "Direct chat with interested buyers",
+                "Auto-removed after 7 days",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <Check size={13} className="text-[#00A651] flex-shrink-0" />
+                  <span className="text-sm text-muted-foreground">{f}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+              <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-muted-foreground">
+                You'll receive an M-Pesa prompt on your phone to complete payment.
+                Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+              </p>
             </div>
           </>
         )}
@@ -622,19 +684,18 @@ export default function PostProduct() {
       {/* Bottom action */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-        {step < 3 ? (
+        {step < 4 ? (
           <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
             Next
           </Button>
         ) : (
           <Button
-            className="w-full h-12 font-black text-base rounded-2xl shadow-lg"
-            onClick={handleSubmit}
-            disabled={submitting}
+            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+            style={{ backgroundColor: "#00A651" }}
+            onClick={() => setShowPaymentModal(true)}
           >
-            {submitting ? (
-              <><Loader2 size={18} className="animate-spin mr-2" />Posting...</>
-            ) : "Post Advert"}
+            <Smartphone size={18} />
+            Pay KES {PLAN_AMOUNTS[plan]} & Publish
           </Button>
         )}
       </div>
@@ -664,6 +725,19 @@ export default function PostProduct() {
           </div>
         </>
       )}
+
+      {/* M-Pesa listing payment modal */}
+      <MpesaPaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        plan={plan}
+        defaultPhone={phone}
+        onInitiate={handleInitiate}
+        onSuccess={(pid) => {
+          toast({ title: "Listing is live!", description: "Your advert is now visible in the marketplace." });
+          navigate(`/product/${pid}`);
+        }}
+      />
     </div>
   );
 }
