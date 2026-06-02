@@ -23,3 +23,7 @@ export function getFirebaseAdmin(): admin.app.App {
 export function getMessaging(): admin.messaging.Messaging {
   return getFirebaseAdmin().messaging();
 }
+
+export function getFirestore(): admin.firestore.Firestore {
+  return getFirebaseAdmin().firestore();
+}

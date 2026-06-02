@@ -21,6 +21,7 @@ import Jobs from "@/pages/Jobs";
 import PostJob from "@/pages/PostJob";
 import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
+import MyPayments from "@/pages/MyPayments";
 
 const queryClient = new QueryClient();
 
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/jobs/post" component={PostJob} />
       <Route path="/jobs/:id" component={JobDetail} />
       <Route path="/shop/:userId" component={ShopCatalogue} />
+      <Route path="/payments" component={MyPayments} />
       <Route component={NotFound} />
     </Switch>
   );

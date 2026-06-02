@@ -7,9 +7,10 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight } from "lucide-react";
+import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight, Smartphone } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { getCategoryBadgeColor } from "@/lib/categories";
+import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -116,6 +117,7 @@ export default function ProductDetail() {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
@@ -168,6 +170,7 @@ export default function ProductDetail() {
   const isSeller = user?.uid === product.sellerId;
   const isAccommodation = product.category === "Accommodation";
   const isEatery = product.subcategory === "Hotels / Eateries" || product.subcategory === "Restaurants & Cooked Food";
+  const canPay = !isSeller && product.priceType === "fixed" && (product.price > 0 || (product.rentPerMonth ?? 0) > 0) && !isEatery;
   const badgeColor = getCategoryBadgeColor(product.category);
   const distance = userCoords
     ? getDistanceKm(userCoords.lat, userCoords.lng, product.lat, product.lng)
@@ -301,24 +304,45 @@ export default function ProductDetail() {
         )}
       </div>
 
+      <MpesaPaymentModal
+        open={showPayment}
+        onClose={() => setShowPayment(false)}
+        productId={product.id}
+        productTitle={product.title}
+        sellerId={product.sellerId}
+        amount={product.rentPerMonth ?? product.price}
+      />
+
       <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
         {isSeller ? (
           <div className="text-center text-sm text-muted-foreground py-2">This is your listing</div>
         ) : (
-          <div className="flex gap-2">
-            {product.phone && (
-              <a href={`tel:${product.phone}`}
-                className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg">
-                <Phone size={17} />Call
-              </a>
+          <>
+            <div className="flex gap-2">
+              {product.phone && (
+                <a href={`tel:${product.phone}`}
+                  className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg">
+                  <Phone size={17} />Call
+                </a>
+              )}
+              <Button data-testid="button-chat-seller"
+                className={`h-12 font-bold gap-2 shadow-xl ${product.phone ? "flex-1" : "w-full"}`}
+                onClick={handleChat} disabled={chatLoading}>
+                {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+                {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
+              </Button>
+            </div>
+            {canPay && (
+              <button
+                data-testid="button-pay-mpesa"
+                onClick={() => { if (!user) { setLocation("/login"); return; } setShowPayment(true); }}
+                className="w-full h-11 flex items-center justify-center gap-2 rounded-xl bg-[#00A651] text-white font-bold text-sm shadow-lg active:scale-[0.99] transition-transform"
+              >
+                <Smartphone size={17} />
+                Pay with M-Pesa · KES {(product.rentPerMonth ?? product.price).toLocaleString()}
+              </button>
             )}
-            <Button data-testid="button-chat-seller"
-              className={`h-12 font-bold gap-2 shadow-xl ${product.phone ? "flex-1" : "w-full"}`}
-              onClick={handleChat} disabled={chatLoading}>
-              {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
-              {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
-            </Button>
-          </div>
+          </>
         )}
       </div>
 
