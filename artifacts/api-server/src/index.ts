@@ -1,5 +1,6 @@
 import app from "./app";
 import { logger } from "./lib/logger";
+import { runCleanup } from "./routes/cleanup.js";
 
 const rawPort = process.env["PORT"];
 
@@ -22,4 +23,21 @@ app.listen(port, (err) => {
   }
 
   logger.info({ port }, "Server listening");
+
+  // Daily cleanup at 21:00 UTC (midnight EAT)
+  function scheduleNextCleanup() {
+    const now = new Date();
+    const next = new Date(now);
+    next.setUTCHours(21, 0, 0, 0);
+    if (next <= now) next.setUTCDate(next.getUTCDate() + 1);
+    const ms = next.getTime() - now.getTime();
+    setTimeout(() => {
+      runCleanup()
+        .then((r) => logger.info(r, "Scheduled cleanup complete"))
+        .catch((e) => logger.error({ e }, "Scheduled cleanup failed"))
+        .finally(scheduleNextCleanup);
+    }, ms);
+    logger.info({ nextRunMs: ms }, "Cleanup scheduled");
+  }
+  scheduleNextCleanup();
 });

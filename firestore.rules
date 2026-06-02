@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuth() { return request.auth != null; }
+    function isOwner(uid) { return isAuth() && request.auth.uid == uid; }
+
+    // Users: own profile only
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Products: anyone reads active; only seller writes
+    match /products/{productId} {
+      allow read: if resource.data.status != 'pending_payment'
+                    || (isAuth() && request.auth.uid == resource.data.sellerId);
+      allow create: if isAuth() && request.resource.data.sellerId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.sellerId == request.auth.uid;
+    }
+
+    // Orders: buyer creates; buyer or seller reads; seller updates status only
+    match /orders/{orderId} {
+      allow read: if isAuth()
+                    && (request.auth.uid == resource.data.buyerId
+                        || request.auth.uid == resource.data.sellerId);
+      allow create: if isAuth()
+                      && request.resource.data.buyerId == request.auth.uid
+                      && request.resource.data.buyerId != request.resource.data.sellerId;
+      allow update: if isAuth()
+                      && resource.data.sellerId == request.auth.uid
+                      && request.resource.data.diff(resource.data).affectedKeys()
+                           .hasOnly(['status', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // Payments: owner reads; backend (Admin SDK) writes only
+    match /payments/{paymentId} {
+      allow read: if isAuth() && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    // Chats: participants only
+    match /chats/{chatId} {
+      allow read, write: if isAuth()
+                           && (request.auth.uid == resource.data.buyerId
+                               || request.auth.uid == resource.data.sellerId);
+      allow create: if isAuth()
+                      && (request.resource.data.buyerId == request.auth.uid
+                          || request.resource.data.sellerId == request.auth.uid);
+      match /messages/{msgId} {
+        allow read, write: if isAuth()
+                             && (request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.buyerId
+                                 || request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.sellerId);
+      }
+    }
+
+    // Jobs: anyone reads; authenticated creates; owner edits/deletes
+    match /jobs/{jobId} {
+      allow read: if true;
+      allow create: if isAuth() && request.resource.data.posterId == request.auth.uid;
+      allow update, delete: if isAuth() && resource.data.posterId == request.auth.uid;
+    }
+
+    // Community posts: authenticated reads/creates; author edits/deletes
+    match /community_posts/{postId} {
+      allow read, create: if isAuth();
+      allow update, delete: if isAuth() && resource.data.authorId == request.auth.uid;
+      match /comments/{commentId} {
+        allow read, create: if isAuth();
+        allow update, delete: if isAuth() && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
