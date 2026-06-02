@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
+import { InstallPrompt } from "@/components/InstallPrompt";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
@@ -67,6 +68,7 @@ function App() {
             <Router />
           </WouterRouter>
           <ProfileSetupGate />
+          <InstallPrompt />
           <Toaster />
         </AuthProvider>
       </TooltipProvider>

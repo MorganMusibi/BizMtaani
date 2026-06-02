@@ -15,9 +15,9 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft, LayoutDashboard, Package, BarChart2,
-  Phone, Share2, Plus, Loader2, Trash2, Edit3, Eye,
+  Share2, Plus, Loader2, Trash2, Edit3, Eye,
   Star, TrendingUp, ShoppingBag, MessageCircle, Store,
-  ExternalLink, Check, X,
+  ExternalLink, Check, X, Inbox, ChevronRight,
 } from "lucide-react";
 
 interface Listing {
@@ -29,11 +29,25 @@ interface Listing {
   imageUrl?: string;
   imageUrls?: string[];
   createdAt?: { seconds: number } | null;
-  views?: number;
-  priceType?: string;
 }
 
-type Tab = "overview" | "listings" | "profile";
+interface InquiryGroup {
+  productId: string;
+  productTitle: string;
+  productImage?: string;
+  count: number;
+  unreadCount: number;
+  lastActivity?: { seconds: number };
+}
+
+type Tab = "overview" | "inquiries" | "listings" | "profile";
+
+function timeAgo(seconds: number): string {
+  const d = Math.floor(Date.now() / 1000) - seconds;
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  return `${Math.floor(d / 86400)}d ago`;
+}
 
 export default function Business() {
   const [, navigate] = useLocation();
@@ -41,9 +55,15 @@ export default function Business() {
   const { toast } = useToast();
 
   const [tab, setTab] = useState<Tab>("overview");
+
+  // Listings state
   const [listings, setListings] = useState<Listing[]>([]);
   const [listingsLoading, setListingsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Inquiries state
+  const [inquiries, setInquiries] = useState<InquiryGroup[]>([]);
+  const [inquiriesLoading, setInquiriesLoading] = useState(true);
 
   // Profile editing
   const [editingName, setEditingName] = useState(false);
@@ -52,25 +72,54 @@ export default function Business() {
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
-    if (userProfile !== null && !userProfile?.isBusinessOwner) {
-      navigate("/profile");
-    }
+    if (userProfile !== null && !userProfile?.isBusinessOwner) navigate("/profile");
   }, [user, userProfile]);
 
+  // Fetch listings
   useEffect(() => {
     if (!user) return;
     setListingsLoading(true);
     getDocs(
-      query(
-        collection(db, "products"),
-        where("sellerId", "==", user.uid),
-        orderBy("createdAt", "desc"),
-        limit(50)
-      )
+      query(collection(db, "products"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"), limit(50))
     ).then((snap) => {
       setListings(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Listing)));
       setListingsLoading(false);
     }).catch(() => setListingsLoading(false));
+  }, [user]);
+
+  // Fetch inquiries (chats about this seller's products)
+  useEffect(() => {
+    if (!user) return;
+    setInquiriesLoading(true);
+    getDocs(
+      query(collection(db, "chats"), where("sellerId", "==", user.uid))
+    ).then((snap) => {
+      const map = new Map<string, InquiryGroup>();
+      for (const d of snap.docs) {
+        const data = d.data();
+        if (!data.productId) continue;
+        if (!map.has(data.productId)) {
+          map.set(data.productId, {
+            productId: data.productId,
+            productTitle: data.productTitle || "Listing",
+            productImage: data.productImage,
+            count: 0,
+            unreadCount: 0,
+            lastActivity: data.updatedAt ?? data.createdAt ?? null,
+          });
+        }
+        const g = map.get(data.productId)!;
+        g.count++;
+        if (data.lastSenderId && data.lastSenderId !== user.uid) g.unreadCount++;
+        // Keep most recent activity
+        const ts = (data.updatedAt ?? data.createdAt)?.seconds ?? 0;
+        if (ts > (g.lastActivity?.seconds ?? 0)) g.lastActivity = data.updatedAt ?? data.createdAt;
+      }
+      setInquiries(
+        [...map.values()].sort((a, b) => (b.lastActivity?.seconds ?? 0) - (a.lastActivity?.seconds ?? 0))
+      );
+      setInquiriesLoading(false);
+    }).catch(() => setInquiriesLoading(false));
   }, [user]);
 
   async function handleDelete(id: string) {
@@ -115,11 +164,14 @@ export default function Business() {
     }
   }
 
-  const activeListings = listings.filter((l) => l.id);
+  const activeListings = listings.length;
   const totalValue = listings.reduce((sum, l) => sum + (l.rentPerMonth ?? l.price ?? 0), 0);
+  const totalInquiries = inquiries.reduce((s, g) => s + g.count, 0);
+  const unreadInquiries = inquiries.filter((g) => g.unreadCount > 0).length;
 
-  const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+  const TABS: { key: Tab; label: string; icon: typeof LayoutDashboard; badge?: number }[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard },
+    { key: "inquiries", label: "Inquiries", icon: Inbox, badge: unreadInquiries || undefined },
     { key: "listings", label: "Listings", icon: Package },
     { key: "profile", label: "Business", icon: Store },
   ];
@@ -147,15 +199,22 @@ export default function Business() {
 
       {/* Tab bar */}
       <div className="flex-shrink-0 bg-card border-b border-border flex">
-        {TABS.map(({ key, label, icon: Icon }) => (
+        {TABS.map(({ key, label, icon: Icon, badge }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-bold transition-colors border-b-2 ${
+            className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 text-xs font-bold transition-colors border-b-2 relative ${
               tab === key ? "border-primary text-primary" : "border-transparent text-muted-foreground"
             }`}
           >
-            <Icon size={18} strokeWidth={tab === key ? 2.5 : 1.8} />
+            <div className="relative">
+              <Icon size={18} strokeWidth={tab === key ? 2.5 : 1.8} />
+              {badge != null && badge > 0 && (
+                <span className="absolute -top-1.5 -right-2 text-[9px] font-black bg-destructive text-white min-w-[16px] h-4 rounded-full flex items-center justify-center px-1">
+                  {badge}
+                </span>
+              )}
+            </div>
             {label}
           </button>
         ))}
@@ -166,44 +225,42 @@ export default function Business() {
         {/* ===== OVERVIEW ===== */}
         {tab === "overview" && (
           <div className="px-4 py-5 space-y-5">
-            {/* Stats grid */}
             <div className="grid grid-cols-2 gap-3">
-              <StatCard icon={ShoppingBag} label="Active Listings" value={activeListings.length} color="text-primary bg-primary/10" />
+              <StatCard icon={ShoppingBag} label="Active Listings" value={activeListings} color="text-primary bg-primary/10" />
+              <StatCard icon={Inbox} label="Total Inquiries" value={totalInquiries} color="text-teal-600 bg-teal-100" badge={unreadInquiries > 0 ? `${unreadInquiries} new` : undefined} />
               <StatCard icon={TrendingUp} label="Total Value (KES)" value={totalValue > 0 ? totalValue.toLocaleString() : "—"} color="text-secondary bg-secondary/10" />
-              <StatCard icon={BarChart2} label="Avg. Price (KES)" value={
-                listings.length > 0 ? Math.round(totalValue / listings.length).toLocaleString() : "—"
-              } color="text-amber-600 bg-amber-100" />
               <StatCard icon={Star} label="Seller Type" value="Business" color="text-orange-600 bg-orange-100" />
             </div>
+
+            {/* Unread inquiry alert */}
+            {unreadInquiries > 0 && (
+              <button
+                onClick={() => setTab("inquiries")}
+                className="w-full flex items-center gap-3 px-4 py-3.5 bg-destructive/5 border border-destructive/20 rounded-2xl text-left"
+              >
+                <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center flex-shrink-0">
+                  <Inbox size={17} className="text-destructive" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-destructive">{unreadInquiries} new {unreadInquiries === 1 ? "inquiry" : "inquiries"}</p>
+                  <p className="text-xs text-muted-foreground">Buyers are waiting for your reply</p>
+                </div>
+                <ChevronRight size={16} className="text-muted-foreground" />
+              </button>
+            )}
 
             {/* Quick actions */}
             <div>
               <p className="font-black text-sm mb-3">Quick Actions</p>
               <div className="space-y-2">
-                <ActionRow
-                  icon={Plus} label="Post a new product or service"
-                  sub="Add a listing to your shop" onClick={() => navigate("/post")}
-                />
-                <ActionRow
-                  icon={Eye} label="Preview my shop"
-                  sub="See how buyers see your business" onClick={() => navigate(`/shop/${user?.uid}`)}
-                />
-                <ActionRow
-                  icon={Share2} label="Share my shop link"
-                  sub="Send customers directly to your listings" onClick={handleShare}
-                />
-                <ActionRow
-                  icon={MessageCircle} label="View customer messages"
-                  sub="Reply to buyers who messaged you" onClick={() => navigate("/chats")}
-                />
-                <ActionRow
-                  icon={ExternalLink} label="Post a job listing"
-                  sub="Recruit staff or freelancers" onClick={() => navigate("/jobs/post")}
-                />
+                <ActionRow icon={Plus} label="Post a new product or service" sub="Add a listing to your shop" onClick={() => navigate("/post")} />
+                <ActionRow icon={Eye} label="Preview my shop" sub="See how buyers see your business" onClick={() => navigate(`/shop/${user?.uid}`)} />
+                <ActionRow icon={Share2} label="Share my shop link" sub="Send customers directly to your listings" onClick={handleShare} />
+                <ActionRow icon={MessageCircle} label="View customer messages" sub="Reply to buyers who messaged you" onClick={() => navigate("/chats")} />
+                <ActionRow icon={ExternalLink} label="Post a job listing" sub="Recruit staff or freelancers" onClick={() => navigate("/jobs/post")} />
               </div>
             </div>
 
-            {/* Tips */}
             <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-4 space-y-2">
               <p className="font-black text-sm text-primary">💡 Business tips</p>
               <ul className="space-y-1.5 text-xs text-muted-foreground">
@@ -216,15 +273,95 @@ export default function Business() {
           </div>
         )}
 
+        {/* ===== INQUIRIES ===== */}
+        {tab === "inquiries" && (
+          <div className="px-4 py-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold text-muted-foreground">
+                {totalInquiries} total {totalInquiries === 1 ? "inquiry" : "inquiries"} across {inquiries.length} {inquiries.length === 1 ? "listing" : "listings"}
+              </p>
+              {unreadInquiries > 0 && (
+                <span className="text-xs font-bold text-destructive">{unreadInquiries} unread</span>
+              )}
+            </div>
+
+            {inquiriesLoading ? (
+              <div className="flex justify-center py-12">
+                <Loader2 size={24} className="animate-spin text-primary" />
+              </div>
+            ) : inquiries.length === 0 ? (
+              <div className="flex flex-col items-center py-16 gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center">
+                  <Inbox size={28} className="text-muted-foreground" />
+                </div>
+                <div className="text-center">
+                  <p className="font-bold">No inquiries yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Buyers will message you here when they're interested in your listings
+                  </p>
+                </div>
+                <Button onClick={() => navigate("/post")} className="gap-2">
+                  <Plus size={16} />Post a listing
+                </Button>
+              </div>
+            ) : (
+              inquiries.map((group) => (
+                <button
+                  key={group.productId}
+                  onClick={() => navigate("/chats")}
+                  className="w-full bg-card border border-border rounded-2xl p-3.5 flex items-center gap-3 text-left active:scale-[0.99] transition-transform"
+                >
+                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0">
+                    {group.productImage ? (
+                      <img src={group.productImage} alt={group.productTitle} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Package size={20} className="text-muted-foreground" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-sm line-clamp-1 flex-1">{group.productTitle}</p>
+                      {group.unreadCount > 0 && (
+                        <span className="flex-shrink-0 text-[10px] font-black bg-destructive text-white px-1.5 py-0.5 rounded-full">
+                          {group.unreadCount} new
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <MessageCircle size={11} />
+                        <span>{group.count} {group.count === 1 ? "buyer" : "buyers"}</span>
+                      </div>
+                      {group.lastActivity && (
+                        <span className="text-xs text-muted-foreground">{timeAgo(group.lastActivity.seconds)}</span>
+                      )}
+                    </div>
+                  </div>
+                  <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
+                </button>
+              ))
+            )}
+
+            {!inquiriesLoading && (
+              <button
+                onClick={() => navigate("/chats")}
+                className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl border border-border text-sm font-bold text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <MessageCircle size={16} />
+                Open all conversations
+              </button>
+            )}
+          </div>
+        )}
+
         {/* ===== LISTINGS ===== */}
         {tab === "listings" && (
           <div className="px-4 py-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-bold text-muted-foreground">{activeListings.length} listing{activeListings.length !== 1 ? "s" : ""}</p>
-              <button
-                onClick={() => navigate("/post")}
-                className="flex items-center gap-1 text-xs font-bold text-primary"
-              >
+              <p className="text-sm font-bold text-muted-foreground">{activeListings} listing{activeListings !== 1 ? "s" : ""}</p>
+              <button onClick={() => navigate("/post")} className="flex items-center gap-1 text-xs font-bold text-primary">
                 <Plus size={14} />Add listing
               </button>
             </div>
@@ -251,11 +388,7 @@ export default function Business() {
                 <div key={listing.id} className="bg-card border border-border rounded-2xl p-3 flex items-center gap-3">
                   <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0">
                     {listing.imageUrls?.[0] || listing.imageUrl ? (
-                      <img
-                        src={listing.imageUrls?.[0] || listing.imageUrl}
-                        alt={listing.title}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={listing.imageUrls?.[0] || listing.imageUrl} alt={listing.title} className="w-full h-full object-cover" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center">
                         <Package size={20} className="text-muted-foreground" />
@@ -274,10 +407,7 @@ export default function Business() {
                     </p>
                   </div>
                   <div className="flex flex-col gap-1 flex-shrink-0">
-                    <button
-                      onClick={() => navigate(`/product/${listing.id}`)}
-                      className="p-2 rounded-xl hover:bg-muted transition-colors"
-                    >
+                    <button onClick={() => navigate(`/product/${listing.id}`)} className="p-2 rounded-xl hover:bg-muted transition-colors">
                       <Eye size={16} className="text-muted-foreground" />
                     </button>
                     <button
@@ -285,9 +415,7 @@ export default function Business() {
                       disabled={deletingId === listing.id}
                       className="p-2 rounded-xl hover:bg-destructive/10 text-destructive transition-colors"
                     >
-                      {deletingId === listing.id
-                        ? <Loader2 size={16} className="animate-spin" />
-                        : <Trash2 size={16} />}
+                      {deletingId === listing.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>
                   </div>
                 </div>
@@ -312,16 +440,12 @@ export default function Business() {
               </div>
               {editingName ? (
                 <div className="space-y-2">
-                  <Input
-                    value={newName} onChange={(e) => setNewName(e.target.value)}
-                    placeholder="Your business name" className="h-11" autoFocus
-                  />
+                  <Input value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Your business name" className="h-11" autoFocus />
                   <div className="flex gap-2">
                     <button onClick={() => setEditingName(false)} className="flex-1 h-9 rounded-xl border border-border text-sm font-semibold flex items-center justify-center gap-1 text-muted-foreground">
                       <X size={14} />Cancel
                     </button>
-                    <button onClick={handleSaveName} disabled={savingName}
-                      className="flex-1 h-9 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-1">
+                    <button onClick={handleSaveName} disabled={savingName} className="flex-1 h-9 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-1">
                       {savingName ? <Loader2 size={14} className="animate-spin" /> : <><Check size={14} />Save</>}
                     </button>
                   </div>
@@ -340,39 +464,12 @@ export default function Business() {
                 </p>
               </div>
               <div className="flex gap-2">
-                <button onClick={handleShare}
-                  className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-2">
+                <button onClick={handleShare} className="flex-1 h-10 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-2">
                   <Share2 size={15} />Share Shop
                 </button>
-                <button onClick={() => navigate(`/shop/${user?.uid}`)}
-                  className="flex-1 h-10 rounded-xl border border-border text-sm font-semibold flex items-center justify-center gap-2 text-muted-foreground">
+                <button onClick={() => navigate(`/shop/${user?.uid}`)} className="flex-1 h-10 rounded-xl border border-border text-sm font-semibold flex items-center justify-center gap-2 text-muted-foreground">
                   <Eye size={15} />Preview
                 </button>
-              </div>
-            </div>
-
-            {/* Contact */}
-            <div className="bg-card border border-border rounded-2xl p-4">
-              <p className="font-black text-sm mb-3">Contact & Reach</p>
-              <div className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-                    <Phone size={15} className="text-green-700" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="text-sm font-semibold">{user?.phoneNumber || "Not set — add in your listings"}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
-                    <MessageCircle size={15} className="text-blue-700" />
-                  </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Chat</p>
-                    <p className="text-sm font-semibold">Buyers message you via in-app chat</p>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -380,7 +477,7 @@ export default function Business() {
             <div className="border border-border rounded-2xl p-4">
               <p className="font-black text-sm text-destructive mb-1">Need help?</p>
               <p className="text-xs text-muted-foreground">
-                To upgrade your account type or remove your business, visit your Profile settings.
+                To change your account type or remove your business, visit your Profile settings.
               </p>
               <button onClick={() => navigate("/profile")} className="mt-3 text-sm font-semibold text-primary">
                 Go to Profile →
@@ -393,8 +490,8 @@ export default function Business() {
   );
 }
 
-function StatCard({ icon: Icon, label, value, color }: {
-  icon: typeof ShoppingBag; label: string; value: string | number; color: string;
+function StatCard({ icon: Icon, label, value, color, badge }: {
+  icon: typeof ShoppingBag; label: string; value: string | number; color: string; badge?: string;
 }) {
   return (
     <div className="bg-card border border-border rounded-2xl p-4">
@@ -403,6 +500,7 @@ function StatCard({ icon: Icon, label, value, color }: {
       </div>
       <p className="font-black text-xl leading-none">{value}</p>
       <p className="text-xs text-muted-foreground mt-1">{label}</p>
+      {badge && <span className="mt-1.5 inline-block text-[10px] font-bold text-destructive">{badge}</span>}
     </div>
   );
 }
@@ -422,7 +520,7 @@ function ActionRow({ icon: Icon, label, sub, onClick }: {
         <p className="font-bold text-sm">{label}</p>
         <p className="text-xs text-muted-foreground">{sub}</p>
       </div>
-      <ChevronLeft size={16} className="text-muted-foreground rotate-180 flex-shrink-0" />
+      <ChevronRight size={16} className="text-muted-foreground flex-shrink-0" />
     </button>
   );
 }
