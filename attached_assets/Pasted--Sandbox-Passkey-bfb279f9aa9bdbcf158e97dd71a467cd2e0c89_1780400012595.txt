@@ -1,0 +1,149 @@
+
+
+
+Sandbox Passkey: bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+
+Secret: WtzToZlXsKmyywcs5Vxeq5FXm7TPJAG7dYL9gqLdQKvzmvMKCfDlCW3kntYCcAi6
+
+
+VdQqrGcAB55rRAfvPmDPwGPj6G6TMyXwAQ3GyoFbK7w6syQH
+
+
+
+✅ COPY-PASTE PROMPT FOR REPLIT AI
+Build and integrate a Business Management module into my existing project with the following requirements:
+1. Feature Scope
+Add a Business Management system with:
+A) Orders Tracking
+B) Inventory Management
+2. Location Collection (IMPORTANT)
+During user signup (business registration):
+The system MUST prompt users to enter their location manually (required field)
+Fields:
+County
+Town/City
+Exact area (estate/street/landmark optional)
+This is required even if browser/device location is not enabled
+Purpose: ensure accurate service matching and avoid incorrect geolocation
+Optional: allow “Use device location” button, but manual entry is mandatory fallback
+3. Project Structure Requirements
+Refactor project into a clean structure:
+Backend (separate folder)
+/backend
+Express/Nest/FastAPI server (whichever is used)
+Routes:
+/auth
+/orders
+/inventory
+/users
+Controllers, services, models properly separated
+Frontend (separate folder)
+/frontend
+React / PWA UI
+Pages:
+Dashboard
+Orders page
+Inventory page
+Business profile page
+Signup with location form
+4. Security Requirements (VERY IMPORTANT)
+Before finalizing:
+Scan the codebase for any sensitive data exposure
+Ensure:
+No API keys in frontend
+No database credentials exposed publicly
+All secrets stored in environment variables (.env)
+Validate secure separation between frontend and backend
+5. GitHub Integration
+Commit all changes to my existing GitHub repository: (https://github.com/MorganMusibi/BizMtaani
+), all changes should be committed to that repo.
+Use meaningful commit message: "Add Orders & Inventory Business Management System with secure architecture"
+Ensure correct branch usage (main or dev if available)
+1. Final Output
+After completion:
+Ensure backend runs independently
+Ensure frontend connects properly via API
+Ensure authentication is applied to orders and inventory routes
+Ensure clean separation and no mixed logic
+IMPORTANT NOTE
+Do NOT break existing features. Extend the system safely and maintain compatibility with current authentication and M-Pesa integration.
+
+
+
+
+
+ SYSTEM REQUIREMENTS & INFRASTRUCTURE BRIEF (BizMtaani)
+Ensure the application is production-ready, scalable, and optimized for millions of users and high upload traffic.
+1. Firebase / Firestore (Backend Database)
+Use Firebase Firestore as the primary database.
+Requirements:
+Store users, businesses, orders, inventory, and transactions
+Use proper indexing for fast queries at scale
+Implement security rules (strict authentication-based access)
+Structure data to avoid deep nested reads (optimize for performance)
+Enable pagination for all list queries
+Avoid large unbounded queries
+2. Cloudinary (Image & Media Storage)
+Use Cloudinary for all images (ads, products, profiles).
+Requirements:
+Upload all images to Cloudinary (NOT Firestore or backend storage)
+Enable automatic image optimization (compression + resizing)
+Use lazy loading for all images in frontend
+Implement responsive image delivery (different sizes for mobile/desktop)
+Set limits on upload size and file type validation
+Delete unused or expired images automatically
+3. Vercel (Frontend Deployment)
+Frontend must be deployed on Vercel.
+Requirements:
+Enable edge caching for static assets
+Use server-side rendering (SSR) or static generation where needed
+Enable automatic CI/CD deployment from GitHub
+Optimize build size (code splitting and lazy loading)
+Ensure fast initial load time (<2s target where possible)
+4. Cloudflare (Performance + Security Layer)
+Use Cloudflare in front of the application.
+Requirements:
+Enable CDN caching for static content
+Enable DDoS protection and bot protection
+Use caching rules for frequently accessed pages (ads, listings)
+Enable rate limiting to prevent abuse (API + login endpoints)
+Enable SSL (HTTPS always)
+Use page rules for performance optimization
+5. Scalability & Performance Requirements
+The system MUST be designed to handle:
+Millions of users
+Millions of listings/uploads
+High concurrent traffic
+Required optimizations:
+Pagination everywhere (no full data loads)
+Lazy loading for images and lists
+Code splitting in frontend
+Database indexing and query optimization
+Background processing for heavy tasks
+Avoid blocking API calls
+6. Data Cleanup & Automation
+Implement automated cleanup jobs:
+Automatically delete expired adverts after 7 days
+Remove orphaned images (not linked to any listing)
+Archive old orders and logs
+Use scheduled backend jobs (cron or Firebase scheduled functions)
+7. Security Requirements
+No API keys exposed in frontend
+All secrets stored in environment variables
+Authentication required for all sensitive routes
+Firestore rules must prevent unauthorized access
+Validate all user inputs (prevent injection attacks)
+Rate limit login, upload, and API requests
+8. Frontend Performance
+Use lazy loading for images and components
+Implement infinite scroll for listings
+Minimize bundle size
+Use caching for API responses
+Optimize for mobile-first usage (majority users)
+FINAL NOTE
+The system must be stable, secure, and optimized for large-scale usage with minimal downtime. It should support growth from MVP to production-level traffic without major architectural changes.
+
+
+
+
+
