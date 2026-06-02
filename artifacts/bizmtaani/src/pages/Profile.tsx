@@ -6,13 +6,13 @@ import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2 } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -58,9 +58,11 @@ export default function Profile() {
     );
   }
 
-  const initials = user.displayName
-    ? user.displayName.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()
-    : user.email?.[0]?.toUpperCase() ?? "U";
+  const displayName = userProfile?.businessName || userProfile?.displayName || user.displayName || "Seller";
+  const isBusinessOwner = userProfile?.isBusinessOwner ?? false;
+
+  const initials = displayName
+    .split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -69,6 +71,8 @@ export default function Profile() {
       </header>
 
       <div className="px-4 py-6 max-w-lg mx-auto space-y-6">
+
+        {/* Avatar + info */}
         <div className="flex items-center gap-4">
           <button
             type="button"
@@ -80,7 +84,7 @@ export default function Profile() {
             {user.photoURL ? (
               <img
                 src={user.photoURL}
-                alt={user.displayName ?? ""}
+                alt={displayName}
                 className="w-full h-full object-cover"
                 data-testid="img-avatar"
               />
@@ -102,10 +106,17 @@ export default function Profile() {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
 
-          <div>
-            <p data-testid="text-display-name" className="font-black text-xl">
-              {user.displayName || "Seller"}
-            </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <p data-testid="text-display-name" className="font-black text-xl truncate">
+                {displayName}
+              </p>
+              {isBusinessOwner && (
+                <span className="flex-shrink-0 text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+                  BIZ
+                </span>
+              )}
+            </div>
             <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
             <p className="text-xs text-muted-foreground mt-0.5">Tap photo to change</p>
           </div>
@@ -114,7 +125,8 @@ export default function Profile() {
         {showAvatarMenu && (
           <>
             <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowAvatarMenu(false)} />
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
+            <div
+              className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
             >
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
@@ -145,6 +157,7 @@ export default function Profile() {
           </>
         )}
 
+        {/* Quick links grid */}
         <div className="grid grid-cols-2 gap-3">
           <Link
             href="/my-listings"
@@ -163,6 +176,40 @@ export default function Profile() {
             <span className="font-semibold text-sm">Messages</span>
           </Link>
         </div>
+
+        {/* Business management — only for business owners */}
+        {isBusinessOwner && (
+          <button
+            onClick={() => setLocation("/business")}
+            className="w-full flex items-center gap-4 px-4 py-4 bg-gradient-to-r from-primary/10 to-orange-50 border-2 border-primary/30 rounded-2xl hover:border-primary transition-all text-left active:scale-[0.98]"
+          >
+            <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+              <Store size={22} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">Manage My Business</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Dashboard, listings, shop profile & tools
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+          </button>
+        )}
+
+        {/* Jobs link */}
+        <button
+          onClick={() => setLocation("/jobs")}
+          className="w-full flex items-center gap-4 px-4 py-4 bg-card border border-border rounded-2xl hover:border-primary/40 transition-all text-left active:scale-[0.98]"
+        >
+          <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+            <Briefcase size={22} className="text-blue-700" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-black text-sm">Jobs Board</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Browse jobs or post a vacancy</p>
+          </div>
+          <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+        </button>
 
         <Button
           data-testid="button-signout"

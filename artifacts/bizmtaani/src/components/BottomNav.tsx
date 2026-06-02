@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { LayoutGrid, Package, MessageCircle, User, Users2 } from "lucide-react";
+import { LayoutGrid, Package, MessageCircle, User, Briefcase } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -35,7 +35,7 @@ export function BottomNav() {
 
   const navItems = [
     { path: "/", label: "Discover", icon: LayoutGrid, badge: false },
-    { path: "/msquare", label: "Msquare", icon: Users2, badge: false },
+    { path: "/jobs", label: "Jobs", icon: Briefcase, badge: false },
     { path: "/my-listings", label: "Listings", icon: Package, badge: false },
     { path: "/chats", label: "Chats", icon: MessageCircle, badge: hasUnread },
     { path: "/profile", label: "Profile", icon: User, badge: false },
@@ -54,7 +54,7 @@ export function BottomNav() {
           return (
             <Link
               key={path}
-              href={user || path === "/" ? path : "/login"}
+              href={user || path === "/" || path === "/jobs" ? path : "/login"}
               data-testid={`nav-${label.toLowerCase()}`}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
                 isActive

@@ -15,9 +15,10 @@ import MyListings from "@/pages/MyListings";
 import ChatList from "@/pages/ChatList";
 import ChatThread from "@/pages/ChatThread";
 import Profile from "@/pages/Profile";
-import Msquare from "@/pages/Msquare";
-import CreateCommunityPost from "@/pages/CreateCommunityPost";
-import CommunityPostDetail from "@/pages/CommunityPostDetail";
+import Business from "@/pages/Business";
+import Jobs from "@/pages/Jobs";
+import PostJob from "@/pages/PostJob";
+import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 
 const queryClient = new QueryClient();
@@ -28,7 +29,6 @@ function NotificationSetup() {
   return null;
 }
 
-/** Show the profile setup sheet for users who signed in via Google but have no Firestore profile yet. */
 function ProfileSetupGate() {
   const { user, userProfile, profileLoading } = useAuth();
   if (!user || profileLoading || userProfile !== null) return null;
@@ -47,9 +47,10 @@ function Router() {
       <Route path="/chats" component={ChatList} />
       <Route path="/chat/:chatId" component={ChatThread} />
       <Route path="/profile" component={Profile} />
-      <Route path="/msquare" component={Msquare} />
-      <Route path="/msquare/create" component={CreateCommunityPost} />
-      <Route path="/msquare/:postId" component={CommunityPostDetail} />
+      <Route path="/business" component={Business} />
+      <Route path="/jobs" component={Jobs} />
+      <Route path="/jobs/post" component={PostJob} />
+      <Route path="/jobs/:id" component={JobDetail} />
       <Route path="/shop/:userId" component={ShopCatalogue} />
       <Route component={NotFound} />
     </Switch>

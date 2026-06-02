@@ -132,6 +132,7 @@ function findNearbyWardNames(lat: number, lng: number, features: WardFeature[]):
 
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
+    // zoom=14 targets ward/suburb level; zoom=12 would give sub-county
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
     const res = await fetch(url, {
       headers: { "Accept-Language": "en", "User-Agent": "BizMtaani/1.0" },
@@ -139,17 +140,37 @@ export async function nominatimFallback(lat: number, lng: number): Promise<Parti
     if (!res.ok) throw new Error("Nominatim error");
     const data = await res.json();
     const addr = data.address ?? {};
-    const ward =
-      addr.suburb ?? addr.neighbourhood ?? addr.village ?? addr.town ?? addr.city_district ?? "";
-    const county = (addr.state ?? addr.county ?? "")
-      .replace(/ County$/i, "").trim();
-    const wardName = toTitleCase(ward);
-    const countyName = toTitleCase(county);
+
+    // Priority order for Kenya ward names:
+    // suburb / neighbourhood / quarter  → ward-level (most accurate)
+    // village / hamlet                  → small settlement (ward-level)
+    // town / municipality               → small town (ward-level)
+    // city_district / county_district   → sub-county (only if nothing better)
+    const wardName = toTitleCase(
+      addr.suburb ??
+      addr.neighbourhood ??
+      addr.quarter ??
+      addr.village ??
+      addr.hamlet ??
+      addr.town ??
+      addr.municipality ??
+      (addr.city_district !== addr.county ? addr.city_district : undefined) ??
+      ""
+    );
+
+    // County: prefer state (e.g. "Nairobi County") stripped of " County"
+    const countyRaw = (addr.state ?? addr.county ?? "").replace(/ County$/i, "").trim();
+    const countyName = toTitleCase(countyRaw);
+
+    // Sub-county as constituency stand-in
+    const constituencyName = toTitleCase(addr.city_district ?? addr.county_district ?? "");
+
     const displayName =
       wardName && countyName && wardName !== countyName
         ? `${wardName}, ${countyName}`
         : wardName || countyName || "your area";
-    return { wardName, county: countyName, constituency: "", displayName };
+
+    return { wardName, county: countyName, constituency: constituencyName, displayName };
   } catch {
     return { wardName: "", displayName: "your area" };
   }
