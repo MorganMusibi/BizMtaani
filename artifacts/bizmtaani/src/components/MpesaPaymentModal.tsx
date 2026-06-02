@@ -76,6 +76,7 @@ export function MpesaPaymentModal({ open, onClose, plan, defaultPhone = "", onIn
       return () => clearTimeout(t);
     } else {
       setPhone(defaultPhone);
+      return undefined;
     }
   }, [open, defaultPhone]);
 
