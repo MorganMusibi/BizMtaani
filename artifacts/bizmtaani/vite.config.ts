@@ -115,6 +115,26 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "react-vendor": ["react", "react-dom"],
+          "radix-ui": [
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-dropdown-menu",
+            "@radix-ui/react-select",
+            "@radix-ui/react-popover",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-accordion",
+          ],
+          "leaflet-vendor": ["leaflet", "react-leaflet"],
+          "firebase-vendor": ["firebase"],
+          "charts-vendor": ["recharts"],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
   server: {
     port,
