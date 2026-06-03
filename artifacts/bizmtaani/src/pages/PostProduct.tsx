@@ -712,7 +712,7 @@ export default function PostProduct() {
                     <span className="font-black text-base">Free</span>
                     {plan === "free" && <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Selected</span>}
                   </div>
-                  <p className="text-sm text-muted-foreground">3 days live · 1 photo · up to 5 adverts</p>
+                  <p className="text-sm text-muted-foreground">3 days live · 1 photo each · up to 5 adverts</p>
                   {plan === "free" && imageFiles.length > 1 && (
                     <p className="text-xs text-amber-700 mt-1.5">Only first photo used on Free plan</p>
                   )}
