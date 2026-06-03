@@ -20,7 +20,7 @@ const router = Router();
 
 // ---------- plan config ----------
 const PLAN_AMOUNTS = { basic: 60, premium: 120 } as const;
-const PLAN_PHOTO_LIMITS = { basic: 10, premium: 25 } as const;
+const PLAN_PHOTO_LIMITS = { basic: 2, premium: 4 } as const;
 const LISTING_DURATION_DAYS = 7;
 
 // ---------- helpers ----------
@@ -264,6 +264,7 @@ router.post("/mpesa/callback", async (req, res) => {
           expiresAt: admin.firestore.Timestamp.fromDate(expiresAt),
           plan: paymentData.plan,
           photoLimit: paymentData.photoLimit,
+          verified: true,
           activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 

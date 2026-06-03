@@ -59,8 +59,16 @@ export default function Login() {
     <div className="min-h-screen bg-background flex flex-col">
       <div className="flex-1 flex flex-col justify-center px-6 py-12 max-w-sm mx-auto w-full">
         <div className="mb-10">
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center mb-6">
-            <span className="text-white text-2xl font-black">B</span>
+          <div className="w-14 h-14 mb-6">
+            <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
+              <rect width="100" height="100" rx="22" fill="#F97316"/>
+              <path d="M12 48L50 20L88 48H12Z" fill="white"/>
+              <rect x="18" y="45" width="64" height="42" rx="4" fill="white" opacity="0.92"/>
+              <rect x="37" y="56" width="26" height="31" rx="3" fill="#F97316"/>
+              <circle cx="59" cy="72" r="2.5" fill="white" opacity="0.7"/>
+              <rect x="21" y="50" width="13" height="10" rx="2" fill="#F97316" opacity="0.3"/>
+              <rect x="66" y="50" width="13" height="10" rx="2" fill="#F97316" opacity="0.3"/>
+            </svg>
           </div>
           <h1 className="text-3xl font-black text-foreground">Welcome back</h1>
           <p className="text-muted-foreground mt-1">Sign in to BizMtaani</p>

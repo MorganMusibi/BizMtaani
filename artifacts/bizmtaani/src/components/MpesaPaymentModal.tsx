@@ -11,7 +11,7 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { normalizePhone, PLAN_AMOUNTS, ListingPlan } from "@/lib/mpesa";
+import { normalizePhone, PLAN_AMOUNTS, type PaidListingPlan } from "@/lib/mpesa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,7 +24,7 @@ import {
 interface Props {
   open: boolean;
   onClose: () => void;
-  plan: ListingPlan;
+  plan: PaidListingPlan;
   /** Pre-fill phone input with this number */
   defaultPhone?: string;
   /**

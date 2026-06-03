@@ -19,7 +19,7 @@ import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/locati
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, MapPin, Loader2, Package, X } from "lucide-react";
+import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
 const WARD_PAGE = 20;
@@ -56,6 +56,8 @@ interface Product {
   createdAt?: { seconds: number } | null;
   expiresAt?: { seconds: number } | null;
   status?: string;
+  plan?: string;
+  verified?: boolean;
 }
 
 type Cursor = QueryDocumentSnapshot<DocumentData>;
@@ -75,7 +77,9 @@ function fmtDist(km: number) {
 }
 
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
-  return docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+  return docs
+    .map((d) => ({ id: d.id, ...d.data() } as Product))
+    .filter((p) => !p.status || p.status === "active");
 }
 
 function dedupe(existing: Product[], incoming: Product[]): Product[] {
@@ -140,6 +144,12 @@ function ProductCard({
         <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
           {product.subcategory ?? product.category}
         </div>
+        {(product.verified || product.plan === "basic" || product.plan === "premium") && (
+          <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+            <Check size={8} />
+            <span>Verified</span>
+          </div>
+        )}
         {isAccommodation && (product.imageUrls?.length ?? 0) > 1 && (
           <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
             +{(product.imageUrls?.length ?? 1) - 1} photos

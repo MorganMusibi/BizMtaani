@@ -14,7 +14,7 @@ import {
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, type ListingPlan, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS } from "@/lib/mpesa";
+import { initiateStkPush, type PaidListingPlan, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS } from "@/lib/mpesa";
 
 interface Product {
   id: string;
@@ -26,7 +26,7 @@ interface Product {
   createdAt: { seconds: number } | null;
   expiresAt?: { seconds: number } | null;
   status?: string;
-  plan?: ListingPlan;
+  plan?: string;
 }
 
 function getExpiryInfo(p: Product): { label: string; color: string; isExpired: boolean } | null {
@@ -52,7 +52,7 @@ export default function MyListings() {
 
   // Renewal state
   const [renewProduct, setRenewProduct] = useState<Product | null>(null);
-  const [renewPlan, setRenewPlan] = useState<ListingPlan>("basic");
+  const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("basic");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export default function MyListings() {
                               Delete
                             </button>
                             {expiry && !expiry.isExpired && (
-                              <button onClick={() => { setRenewProduct(product); setRenewPlan(product.plan ?? "basic"); }}
+                              <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium" ? "premium" : "basic") as PaidListingPlan); }}
                                 className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
                                 <RefreshCw size={11} />Renew
                               </button>
@@ -217,7 +217,7 @@ export default function MyListings() {
                             {deleting === product.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                             Delete
                           </button>
-                          <button onClick={() => { setRenewProduct(product); setRenewPlan(product.plan ?? "basic"); }}
+                          <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium" ? "premium" : "basic") as PaidListingPlan); }}
                             className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
                             <RefreshCw size={11} />Renew
                           </button>
@@ -241,7 +241,7 @@ export default function MyListings() {
             <p className="font-black text-base mb-1">Renew Listing</p>
             <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{renewProduct.title}</p>
             <div className="flex gap-3 mb-5">
-              {(["basic", "premium"] as ListingPlan[]).map((p) => (
+              {(["basic", "premium"] as PaidListingPlan[]).map((p) => (
                 <button key={p} onClick={() => setRenewPlan(p)}
                   className={`flex-1 py-3 rounded-2xl border-2 text-center transition-all ${
                     renewPlan === p ? "border-primary bg-primary/5" : "border-border"

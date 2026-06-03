@@ -3,11 +3,11 @@ import { useLocation, useParams } from "wouter";
 import {
   doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp
 } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight, Clock } from "lucide-react";
+import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight, Clock, Check } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { getCategoryBadgeColor } from "@/lib/categories";
 
@@ -37,6 +37,7 @@ interface Product {
   expiresAt?: { seconds: number } | null;
   status?: string;
   plan?: string;
+  verified?: boolean;
 }
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
@@ -120,9 +121,6 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [showOrder, setShowOrder] = useState(false);
-  const [orderNote, setOrderNote] = useState("");
-  const [orderLoading, setOrderLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -171,40 +169,6 @@ export default function ProductDetail() {
     </div>
   );
 
-  async function handlePlaceOrder() {
-    if (!product || !user) return;
-    setOrderLoading(true);
-    try {
-      const token = await auth.currentUser?.getIdToken();
-      const res = await fetch("/api/orders", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          listingId: product.id,
-          listingTitle: product.title,
-          listingImage: product.imageUrls?.[0] || product.imageUrl || null,
-          sellerId: product.sellerId,
-          amount: product.rentPerMonth ?? product.price,
-          note: orderNote,
-          buyerName: user.displayName || "",
-          buyerPhone: user.phoneNumber || "",
-        }),
-      });
-      if (res.ok) {
-        toast({ title: "Order placed!", description: "The seller will confirm your order shortly." });
-        setShowOrder(false);
-        setOrderNote("");
-      } else {
-        const data = await res.json() as { error?: string };
-        toast({ title: data.error || "Could not place order", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Network error", variant: "destructive" });
-    } finally {
-      setOrderLoading(false);
-    }
-  }
-
   const isSeller = user?.uid === product.sellerId;
   const isAccommodation = product.category === "Accommodation";
   const isEatery = product.subcategory === "Hotels / Eateries" || product.subcategory === "Restaurants & Cooked Food";
@@ -235,6 +199,12 @@ export default function ProductDetail() {
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1">
             <h1 data-testid="text-product-title" className="text-2xl font-black leading-tight">{product.title}</h1>
+            {(product.verified || product.plan === "basic" || product.plan === "premium") && (
+              <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#00A651] bg-[#00A651]/10 px-2 py-0.5 rounded-full mt-1">
+                <Check size={10} />
+                Verified Seller
+              </span>
+            )}
             {isAccommodation ? (
               <div className="mt-1 flex items-center gap-2 flex-wrap">
                 <p data-testid="text-product-price" className="text-xl font-bold text-indigo-600">
@@ -376,53 +346,9 @@ export default function ProductDetail() {
                 {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
               </Button>
             </div>
-            {!isEatery && product.price > 0 && (
-              <button
-                onClick={() => { if (!user) { setLocation("/login"); return; } setShowOrder(true); }}
-                className="w-full h-11 flex items-center justify-center gap-2 rounded-xl border-2 border-primary text-primary font-bold text-sm active:scale-[0.99] transition-transform"
-              >
-                <ChevronRight size={17} />Place Order
-              </button>
-            )}
           </div>
         )}
       </div>
-
-      {/* Order sheet */}
-      {showOrder && product && (
-        <div className="fixed inset-0 z-[90] bg-black/50 flex flex-col justify-end" onClick={() => setShowOrder(false)}>
-          <div className="bg-card rounded-t-3xl border-t border-border px-5 pt-4"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-            onClick={(e) => e.stopPropagation()}>
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
-            <p className="font-black text-base mb-1">Place an Order</p>
-            <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{product.title}</p>
-            <div className="bg-muted rounded-2xl px-4 py-3 mb-4 flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Amount</span>
-              <span className="font-black text-primary">KES {(product.rentPerMonth ?? product.price).toLocaleString()}</span>
-            </div>
-            <textarea
-              value={orderNote}
-              onChange={(e) => setOrderNote(e.target.value)}
-              placeholder="Add a note to the seller (optional)…"
-              rows={3}
-              className="w-full rounded-2xl border border-border bg-muted px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary mb-4"
-            />
-            <div className="flex gap-3">
-              <button onClick={() => setShowOrder(false)}
-                className="flex-1 py-3 rounded-2xl border-2 border-border text-sm font-semibold text-muted-foreground">
-                Cancel
-              </button>
-              <button onClick={handlePlaceOrder} disabled={orderLoading}
-                className="flex-1 py-3 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2 disabled:opacity-60"
-                style={{ backgroundColor: "#00A651" }}>
-                {orderLoading ? <Loader2 size={16} className="animate-spin" /> : <ChevronRight size={16} />}
-                Confirm Order
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <BottomNav />
     </div>

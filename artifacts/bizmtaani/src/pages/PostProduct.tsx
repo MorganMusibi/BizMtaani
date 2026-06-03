@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone } from "lucide-react";
+import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
 import { getWardInfo, type ResolvedLocation } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS, type ListingPlan } from "@/lib/mpesa";
+import { initiateStkPush, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS, PLAN_ADVERT_LIMITS, FREE_PLAN_DURATION_DAYS, type ListingPlan, type PaidListingPlan } from "@/lib/mpesa";
 
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 
@@ -75,8 +75,9 @@ export default function PostProduct() {
   const [locationLoading, setLocationLoading] = useState(false);
 
   // Step 4 — Plan & payment
-  const [plan, setPlan] = useState<ListingPlan>("basic");
+  const [plan, setPlan] = useState<ListingPlan>("free");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [publishingFree, setPublishingFree] = useState(false);
   const pendingProductIdRef = useRef<string | null>(null);
 
   const [showImageMenu, setShowImageMenu] = useState(false);
@@ -98,12 +99,20 @@ export default function PostProduct() {
         });
       },
       () => {
-        setCoords(NAIROBI);
-        getWardInfo(NAIROBI.lat, NAIROBI.lng).then(setWardInfo);
+        // GPS denied — use saved home location from profile, or Nairobi as last resort
+        if (userProfile?.homeLocation) {
+          const hl = userProfile.homeLocation;
+          setCoords({ lat: hl.lat, lng: hl.lng });
+          setWardInfo({ wardName: hl.areaName, constituency: hl.constituency, county: hl.county, displayName: hl.areaName });
+          setLocationName(hl.areaName);
+        } else {
+          setCoords(NAIROBI);
+          getWardInfo(NAIROBI.lat, NAIROBI.lng).then(setWardInfo);
+        }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [user]);
+  }, [user, userProfile]);
 
   // Auto-upgrade to premium if photos exceed basic limit
   useEffect(() => {
@@ -125,11 +134,10 @@ export default function PostProduct() {
     const currentLimit = PLAN_PHOTO_LIMITS[plan];
     const remaining = currentLimit - imageFiles.length;
     if (remaining <= 0) {
-      if (plan === "basic") {
-        toast({
-          title: "Basic plan limit reached",
-          description: "Upgrade to Premium (KES 120) in the next step to add up to 25 photos.",
-        });
+      if (plan === "free") {
+        toast({ title: "Free plan limit reached", description: "Choose Basic or Premium in the next step for more photos." });
+      } else if (plan === "basic") {
+        toast({ title: "Basic plan limit reached", description: "Upgrade to Premium (KES 120) in the next step for up to 4 photos." });
       }
       return;
     }
@@ -221,6 +229,84 @@ export default function PostProduct() {
    * Uploads photos, saves the product as pending, initiates STK push.
    * Returns checkoutRequestId + productId for the modal's Firestore listener.
    */
+  async function handlePublishFree() {
+    if (!user || !coords) {
+      toast({ title: "Location not ready", description: "Please wait a moment and try again.", variant: "destructive" });
+      return;
+    }
+    setPublishingFree(true);
+    try {
+      // Check free advert count limit
+      const snap = await getDocs(query(collection(db, "products"), where("sellerId", "==", user.uid)));
+      const activeFree = snap.docs.filter(d => {
+        const data = d.data();
+        return (data.status === "active" || data.status === "pending_payment") && (!data.plan || data.plan === "free");
+      });
+      if (activeFree.length >= PLAN_ADVERT_LIMITS.free) {
+        toast({
+          title: "Free plan limit reached",
+          description: `You have ${activeFree.length} active free adverts (max ${PLAN_ADVERT_LIMITS.free}). Remove one or choose a paid plan.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const uploadedUrls: string[] = [];
+      for (const file of imageFiles.slice(0, PLAN_PHOTO_LIMITS.free)) {
+        const url = await uploadImage(file, "product");
+        uploadedUrls.push(url);
+      }
+
+      const geohash = encodeGeohash(coords.lat, coords.lng, 7);
+      const priceVal = isAccommodation
+        ? parseFloat(rentPerMonth) || 0
+        : pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0;
+
+      const expiry = new Date(Date.now() + FREE_PLAN_DURATION_DAYS * 86_400_000);
+
+      const docData: Record<string, unknown> = {
+        title: title.trim(),
+        description: description.trim(),
+        price: priceVal,
+        category: selectedCategory,
+        subcategory: selectedSubcategory || selectedCategory,
+        imageUrl: uploadedUrls[0] ?? "",
+        imageUrls: uploadedUrls,
+        lat: coords.lat,
+        lng: coords.lng,
+        geohash,
+        ward: wardInfo?.wardName ?? "",
+        constituency: wardInfo?.constituency ?? "",
+        county: wardInfo?.county ?? "",
+        sellerId: user.uid,
+        sellerName: userProfile?.businessName || user.displayName || "Seller",
+        sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
+        sellerAvatar: user.photoURL || "",
+        phone: phone.trim(),
+        priceType: pricingBasis === "quote_only" ? "fixed" : priceType,
+        status: "active",
+        plan: "free",
+        photoLimit: PLAN_PHOTO_LIMITS.free,
+        verified: false,
+        expiresAt: Timestamp.fromDate(expiry),
+        activatedAt: serverTimestamp(),
+        createdAt: serverTimestamp(),
+      };
+
+      if (isAccommodation) docData.rentPerMonth = parseFloat(rentPerMonth) || 0;
+      if (isTransport) docData.pricingBasis = pricingBasis;
+      if (isEatery) docData.hotelMenu = hotelMenu;
+
+      const docRef = await addDoc(collection(db, "products"), docData);
+      toast({ title: "Advert is live!", description: `Your free listing is visible for ${FREE_PLAN_DURATION_DAYS} days.` });
+      navigate(`/product/${docRef.id}`);
+    } catch (err) {
+      toast({ title: "Failed to publish", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
+    } finally {
+      setPublishingFree(false);
+    }
+  }
+
   async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
     if (!user || !coords) throw new Error("Not ready");
 
@@ -228,6 +314,17 @@ export default function PostProduct() {
     let productId = pendingProductIdRef.current;
 
     if (!productId) {
+      // Check paid advert count limit
+      const snap = await getDocs(query(collection(db, "products"), where("sellerId", "==", user.uid)));
+      const activePaidOfPlan = snap.docs.filter(d => {
+        const data = d.data();
+        return data.plan === plan && (data.status === "active" || data.status === "pending_payment");
+      });
+      const planLimit = PLAN_ADVERT_LIMITS[plan as PaidListingPlan];
+      if (activePaidOfPlan.length >= planLimit) {
+        throw new Error(`${plan === "basic" ? "Basic" : "Premium"} plan limit of ${planLimit} active adverts reached.`);
+      }
+
       // Upload images
       const uploadedUrls: string[] = [];
       for (const file of imageFiles) {
@@ -278,7 +375,7 @@ export default function PostProduct() {
     }
 
     // Initiate STK push
-    const result = await initiateStkPush({ phone: mpesaPhone, plan, productId });
+    const result = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
     return { checkoutRequestId: result.checkoutRequestId, productId };
   }
 
@@ -520,12 +617,12 @@ export default function PostProduct() {
                   <span className="text-xs text-muted-foreground">{imageFiles.length}/{PLAN_PHOTO_LIMITS[plan]}</span>
                 </div>
 
-                {imageFiles.length >= PLAN_PHOTO_LIMITS.basic && plan === "basic" && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-3">
-                    <Smartphone size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                {plan === "free" && imageFiles.length >= PLAN_PHOTO_LIMITS.free && (
+                  <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                    <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="text-xs font-bold text-amber-800">10-photo limit for Basic plan</p>
-                      <p className="text-xs text-amber-700 mt-0.5">Upgrade to Premium (KES 120) in the next step to add up to 25 photos.</p>
+                      <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Choose Basic (KES 60) or Premium (KES 120) in the next step for more photos.</p>
                     </div>
                   </div>
                 )}
@@ -594,40 +691,58 @@ export default function PostProduct() {
           </>
         )}
 
-        {/* ========== STEP 4: Choose Plan & Pay ========== */}
+        {/* ========== STEP 4: Choose Plan & Publish ========== */}
         {step === 4 && (
           <>
             <div>
               <h2 className="font-black text-lg">Choose Your Plan</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Your advert goes live immediately after payment.</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
             </div>
 
-            {/* Basic plan */}
+            {/* Free plan */}
             <button
-              onClick={() => imageFiles.length <= PLAN_PHOTO_LIMITS.basic && setPlan("basic")}
-              disabled={imageFiles.length > PLAN_PHOTO_LIMITS.basic}
+              onClick={() => setPlan("free")}
               className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
-                plan === "basic"
-                  ? "border-primary bg-primary/5"
-                  : imageFiles.length > PLAN_PHOTO_LIMITS.basic
-                  ? "border-border opacity-40 cursor-not-allowed"
-                  : "border-border hover:border-primary/40"
+                plan === "free" ? "border-border bg-muted/40" : "border-border hover:border-muted-foreground/40"
               }`}
             >
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Free</span>
+                    {plan === "free" && <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">3 days live · 1 photo · up to 5 adverts</p>
+                  {plan === "free" && imageFiles.length > 1 && (
+                    <p className="text-xs text-amber-700 mt-1.5">Only first photo used on Free plan</p>
+                  )}
+                </div>
+                <span className="font-black text-xl text-muted-foreground flex-shrink-0">Free</span>
+              </div>
+            </button>
+
+            {/* Basic plan */}
+            <button
+              onClick={() => setPlan("basic")}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "basic" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-black text-base">Basic</span>
-                    {plan === "basic" && (
-                      <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
-                    )}
-                    {imageFiles.length > PLAN_PHOTO_LIMITS.basic && (
-                      <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Not available</span>
-                    )}
+                    {plan === "basic" && <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
                   </div>
-                  <p className="text-sm text-muted-foreground">7 days live · up to 10 photos</p>
+                  <p className="text-sm text-muted-foreground">7 days live · 2 photos · up to 10 adverts</p>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
+                      <Shield size={11} /> Verified badge
+                    </span>
+                    <span className="text-xs text-muted-foreground">50% more visibility</span>
+                  </div>
                 </div>
-                <span className="font-black text-2xl text-primary">KES {PLAN_AMOUNTS.basic}</span>
+                <span className="font-black text-2xl text-primary flex-shrink-0">KES {PLAN_AMOUNTS.basic}</span>
               </div>
             </button>
 
@@ -639,29 +754,35 @@ export default function PostProduct() {
               }`}
             >
               <div className="flex items-center justify-between">
-                <div>
+                <div className="flex-1 min-w-0 pr-3">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="font-black text-base">Premium</span>
                     {plan === "premium" ? (
                       <span className="text-[10px] bg-[#00A651] text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
                     ) : (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">More photos</span>
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">Best value</span>
                     )}
                   </div>
-                  <p className="text-sm text-muted-foreground">7 days live · up to 25 photos</p>
+                  <p className="text-sm text-muted-foreground">7 days live · 4 photos · up to 30 adverts</p>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
+                      <Shield size={11} /> Verified badge
+                    </span>
+                    <span className="text-xs text-muted-foreground">70% more visibility</span>
+                    <span className="text-xs text-muted-foreground">Business tools</span>
+                  </div>
                 </div>
-                <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium}</span>
+                <span className="font-black text-2xl flex-shrink-0" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium}</span>
               </div>
             </button>
 
-            {/* What's included */}
+            {/* Common features */}
             <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
               <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
               {[
                 "Listed in your ward & nearby areas",
                 "Visible to buyers searching your category",
                 "Direct chat with interested buyers",
-                "Auto-removed after 7 days",
               ].map((f) => (
                 <div key={f} className="flex items-center gap-2">
                   <Check size={13} className="text-[#00A651] flex-shrink-0" />
@@ -670,13 +791,15 @@ export default function PostProduct() {
               ))}
             </div>
 
-            <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
-              <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-muted-foreground">
-                You'll receive an M-Pesa prompt on your phone to complete payment.
-                Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
-              </p>
-            </div>
+            {plan !== "free" && (
+              <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  You'll receive an M-Pesa prompt on your phone to complete payment.
+                  Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+                </p>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -688,6 +811,14 @@ export default function PostProduct() {
           <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
             Next
           </Button>
+        ) : plan === "free" ? (
+          <Button
+            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+            onClick={handlePublishFree}
+            disabled={publishingFree}
+          >
+            {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
+          </Button>
         ) : (
           <Button
             className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
@@ -695,7 +826,7 @@ export default function PostProduct() {
             onClick={() => setShowPaymentModal(true)}
           >
             <Smartphone size={18} />
-            Pay KES {PLAN_AMOUNTS[plan]} & Publish
+            Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
           </Button>
         )}
       </div>
@@ -730,7 +861,7 @@ export default function PostProduct() {
       <MpesaPaymentModal
         open={showPaymentModal}
         onClose={() => setShowPaymentModal(false)}
-        plan={plan}
+        plan={plan as PaidListingPlan}
         defaultPhone={phone}
         onInitiate={handleInitiate}
         onSuccess={(pid) => {

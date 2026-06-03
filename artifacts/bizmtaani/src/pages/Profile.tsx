@@ -6,7 +6,7 @@ import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Smartphone } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -158,7 +158,7 @@ export default function Profile() {
         )}
 
         {/* Quick links grid */}
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           <Link
             href="/my-listings"
             data-testid="link-my-listings"
@@ -174,14 +174,6 @@ export default function Profile() {
           >
             <MessageCircle size={22} className="text-primary" />
             <span className="font-semibold text-xs text-center">Messages</span>
-          </Link>
-          <Link
-            href="/payments"
-            data-testid="link-my-payments"
-            className="flex flex-col items-center gap-2 p-4 bg-card rounded-2xl border border-border hover:border-[#00A651] transition-colors"
-          >
-            <Smartphone size={22} className="text-[#00A651]" />
-            <span className="font-semibold text-xs text-center">Payments</span>
           </Link>
         </div>
 

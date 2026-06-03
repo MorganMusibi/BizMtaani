@@ -1,14 +1,45 @@
 /**
  * Frontend M-Pesa helpers — listing activation payments.
- * Advertisers pay to post: KES 60 (basic) or KES 120 (premium).
+ *
+ * Plans:
+ *   free    — 0 KES, 1 photo, 3 days, up to 5 active adverts
+ *   basic   — KES 60/week, 2 photos, 7 days, up to 10 active adverts, verified badge
+ *   premium — KES 120/week, 4 photos, 7 days, up to 30 active adverts, verified badge + biz tools
  */
 import { auth } from "@/lib/firebase";
 
-export type ListingPlan = "basic" | "premium";
+export type ListingPlan = "free" | "basic" | "premium";
+export type PaidListingPlan = "basic" | "premium";
+
+export const FREE_PLAN_DURATION_DAYS = 3;
+export const FREE_PLAN_ADVERT_LIMIT = 5;
+
+export const PLAN_AMOUNTS: Record<PaidListingPlan, number> = {
+  basic: 60,
+  premium: 120,
+};
+
+export const PLAN_PHOTO_LIMITS: Record<ListingPlan, number> = {
+  free: 1,
+  basic: 2,
+  premium: 4,
+};
+
+export const PLAN_ADVERT_LIMITS: Record<ListingPlan, number> = {
+  free: 5,
+  basic: 10,
+  premium: 30,
+};
+
+export const LISTING_DURATION_DAYS: Record<ListingPlan, number> = {
+  free: 3,
+  basic: 7,
+  premium: 7,
+};
 
 export interface StkPushParams {
   phone: string;
-  plan: ListingPlan;
+  plan: PaidListingPlan;
   productId: string;
 }
 
@@ -17,18 +48,6 @@ export interface StkPushResult {
   merchantRequestId: string;
   customerMessage?: string;
 }
-
-export const PLAN_AMOUNTS: Record<ListingPlan, number> = {
-  basic: 60,
-  premium: 120,
-};
-
-export const PLAN_PHOTO_LIMITS: Record<ListingPlan, number> = {
-  basic: 10,
-  premium: 25,
-};
-
-export const LISTING_DURATION_DAYS = 7;
 
 /** Normalize a Kenyan phone number to 254XXXXXXXXX format */
 export function normalizePhone(raw: string): string {
