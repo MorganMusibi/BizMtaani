@@ -129,7 +129,6 @@ export default defineConfig({
             "@radix-ui/react-accordion",
           ],
           "leaflet-vendor": ["leaflet", "react-leaflet"],
-          "firebase-vendor": ["firebase"],
           "charts-vendor": ["recharts"],
         },
       },
