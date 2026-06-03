@@ -116,9 +116,12 @@ router.post("/mpesa/stkpush", async (req, res) => {
     return;
   }
 
-  const shortcode = process.env.MPESA_SHORTCODE;
+  // Sandbox shortcode 174379 is Safaricom's public test Paybill — safe to use as default
+  const shortcode = process.env.MPESA_SHORTCODE
+    ?? (process.env.MPESA_ENVIRONMENT !== "production" ? "174379" : undefined);
   const passkey = process.env.MPESA_PASSKEY;
   if (!shortcode || !passkey) {
+    req.log.error("MPESA_SHORTCODE / MPESA_PASSKEY not configured");
     res.status(503).json({ error: "M-Pesa not configured on this server (missing MPESA_SHORTCODE / MPESA_PASSKEY)" });
     return;
   }
@@ -296,7 +299,8 @@ router.get("/mpesa/status/:checkoutRequestId", async (req, res) => {
   }
 
   const { checkoutRequestId } = req.params;
-  const shortcode = process.env.MPESA_SHORTCODE;
+  const shortcode = process.env.MPESA_SHORTCODE
+    ?? (process.env.MPESA_ENVIRONMENT !== "production" ? "174379" : undefined);
   const passkey = process.env.MPESA_PASSKEY;
   if (!shortcode || !passkey) {
     res.status(503).json({ error: "M-Pesa not configured" });

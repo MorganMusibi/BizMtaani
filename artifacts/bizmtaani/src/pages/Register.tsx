@@ -14,18 +14,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
-import { Loader2, ChevronLeft, Store, User } from "lucide-react";
+import { Loader2, ChevronLeft, Store, User, MapPin } from "lucide-react";
 
 type Step = 1 | 2;
 
-async function tryGetLocation() {
+interface HomeLocation {
+  lat: number; lng: number;
+  areaName: string; constituency: string; county: string;
+}
+
+/**
+ * Try to geocode an area name → coordinates + ward info.
+ * Times out in 4 s. Returns null on any failure — never throws.
+ */
+async function geocodeArea(area: string): Promise<HomeLocation | null> {
   try {
-    const pos = await new Promise<GeolocationPosition>((res, rej) =>
-      navigator.geolocation.getCurrentPosition(res, rej, {
-        enableHighAccuracy: true, timeout: 8000, maximumAge: 0,
-      })
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(area.trim() + ", Kenya")}&limit=1`,
+      { signal: controller.signal }
     );
-    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    clearTimeout(tid);
+    const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
+    if (!results.length) return null;
+    const { lat, lon } = results[0];
+    const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
+    const info = await getWardInfo(c.lat, c.lng);
+    return {
+      lat: c.lat,
+      lng: c.lng,
+      areaName: info?.wardName || area.trim(),
+      constituency: info?.constituency ?? "",
+      county: info?.county ?? "",
+    };
   } catch {
     return null;
   }
@@ -37,32 +59,16 @@ async function saveUserProfile(
     displayName: string;
     isBusinessOwner: boolean;
     businessName?: string;
+    homeLocation?: HomeLocation;
   }
 ) {
-  let homeLocation: {
-    lat: number; lng: number;
-    areaName: string; constituency: string; county: string;
-  } | undefined;
-
-  const coords = await tryGetLocation();
-  if (coords) {
-    const info = await getWardInfo(coords.lat, coords.lng);
-    homeLocation = {
-      lat: coords.lat,
-      lng: coords.lng,
-      areaName: info.wardName,
-      constituency: info.constituency,
-      county: info.county,
-    };
-  }
-
   await setDoc(doc(db, "users", uid), {
     displayName: opts.displayName,
     isBusinessOwner: opts.isBusinessOwner,
     ...(opts.isBusinessOwner && opts.businessName
       ? { businessName: opts.businessName }
       : {}),
-    ...(homeLocation ? { homeLocation } : {}),
+    ...(opts.homeLocation ? { homeLocation: opts.homeLocation } : {}),
     createdAt: serverTimestamp(),
   });
 }
@@ -73,9 +79,13 @@ export default function Register() {
 
   const [step, setStep] = useState<Step>(1);
   const [isBusinessOwner, setIsBusinessOwner] = useState<boolean | null>(null);
+
+  // Form fields
   const [name, setName] = useState("");
+  const [area, setArea] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -90,18 +100,33 @@ export default function Register() {
       toast({ title: "Please enter your name", variant: "destructive" });
       return;
     }
+    if (!area.trim()) {
+      toast({ title: "Please enter your area / location", variant: "destructive" });
+      return;
+    }
     if (password.length < 6) {
       toast({ title: "Password too short", description: "At least 6 characters.", variant: "destructive" });
       return;
     }
+
     setLoading(true);
     try {
+      // Geocode area (4 s timeout, non-blocking on failure)
+      const geo = await geocodeArea(area);
+      const homeLocation: HomeLocation = geo ?? {
+        lat: 0, lng: 0,
+        areaName: area.trim(),
+        constituency: "",
+        county: "",
+      };
+
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name.trim() });
       await saveUserProfile(cred.user.uid, {
         displayName: name.trim(),
         isBusinessOwner: isBusinessOwner ?? false,
         businessName: isBusinessOwner ? name.trim() : undefined,
+        homeLocation,
       });
       setLocation("/");
     } catch (err: unknown) {
@@ -116,15 +141,26 @@ export default function Register() {
   }
 
   async function handleGoogleLogin() {
+    if (!area.trim()) {
+      toast({ title: "Please enter your area / location first", variant: "destructive" });
+      return;
+    }
     setGoogleLoading(true);
     try {
+      const geo = await geocodeArea(area);
+      const homeLocation: HomeLocation = geo ?? {
+        lat: 0, lng: 0,
+        areaName: area.trim(),
+        constituency: "",
+        county: "",
+      };
+
       const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      // Save profile — ProfileSetupModal in App.tsx will catch users with no profile
-      // but we can pre-save with detected location right now:
       await saveUserProfile(result.user.uid, {
         displayName: result.user.displayName ?? "BizMtaani User",
         isBusinessOwner: isBusinessOwner ?? false,
         businessName: isBusinessOwner ? (result.user.displayName ?? undefined) : undefined,
+        homeLocation,
       });
       setLocation("/");
     } catch (err: unknown) {
@@ -213,7 +249,7 @@ export default function Register() {
         {/* ========== STEP 2: Credentials ========== */}
         {step === 2 && (
           <>
-            <div className="mb-8">
+            <div className="mb-6">
               <div className="flex items-center gap-2 mb-5">
                 <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${isBusinessOwner ? "bg-orange-100" : "bg-blue-100"}`}>
                   {isBusinessOwner
@@ -229,6 +265,27 @@ export default function Register() {
                 {isBusinessOwner
                   ? "Use your business name so buyers can find you"
                   : "Choose a name that other users will see"}
+              </p>
+            </div>
+
+            {/* ── Location field (required, shared between email & Google flows) ── */}
+            <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 mb-5">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <MapPin size={13} className="text-primary flex-shrink-0" />
+                <Label htmlFor="area" className="text-xs font-bold text-foreground">
+                  Your area / location *
+                </Label>
+              </div>
+              <Input
+                id="area"
+                data-testid="input-area"
+                placeholder="e.g. Kariobangi, Eastleigh, Githurai 45"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                className="h-11 bg-background"
+              />
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Helps buyers find your ads and shows you nearby listings.
               </p>
             </div>
 
