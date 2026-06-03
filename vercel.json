@@ -1,13 +1,9 @@
 {
-  "buildCommand": "pnpm run build",
-  "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "artifacts/bizmtaani/dist",
-  "env": {
-    "NODE_ENV": "production"
-  },
-  "git": {
-    "deploymentEnabled": {
-      "main": true
+  "projects": {
+    "frontend": {
+      "rootDirectory": "artifacts/bizmtaani",
+      "buildCommand": "pnpm --filter @workspace/bizmtaani build",
+      "outputDirectory": "dist"
     }
   }
 }
