@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { Switch, Route, Router as WouterRouter } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,6 +7,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { SplashScreen } from "@/components/SplashScreen";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
@@ -23,6 +25,9 @@ import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 
 const queryClient = new QueryClient();
+
+// Show splash once per browser session (not on every SPA navigation)
+const splashAlreadyShown = sessionStorage.getItem("bm_splash") === "1";
 
 function NotificationSetup() {
   useAuth();
@@ -59,6 +64,13 @@ function Router() {
 }
 
 function App() {
+  const [showSplash, setShowSplash] = useState(!splashAlreadyShown);
+
+  const handleSplashDone = useCallback(() => {
+    sessionStorage.setItem("bm_splash", "1");
+    setShowSplash(false);
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -70,6 +82,7 @@ function App() {
           <ProfileSetupGate />
           <InstallPrompt />
           <Toaster />
+          {showSplash && <SplashScreen onDone={handleSplashDone} />}
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

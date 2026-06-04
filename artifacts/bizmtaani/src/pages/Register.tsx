@@ -198,13 +198,23 @@ export default function Register() {
             <div className="mb-8">
               <div className="w-12 h-12 mb-5">
                 <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-                  <rect width="100" height="100" rx="22" fill="#F97316"/>
-                  <path d="M12 48L50 20L88 48H12Z" fill="white"/>
-                  <rect x="18" y="45" width="64" height="42" rx="4" fill="white" opacity="0.92"/>
-                  <rect x="37" y="56" width="26" height="31" rx="3" fill="#F97316"/>
-                  <circle cx="59" cy="72" r="2.5" fill="white" opacity="0.7"/>
-                  <rect x="21" y="50" width="13" height="10" rx="2" fill="#F97316" opacity="0.3"/>
-                  <rect x="66" y="50" width="13" height="10" rx="2" fill="#F97316" opacity="0.3"/>
+                  <defs>
+                    <linearGradient id="rbg" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stopColor="#047857"/>
+                      <stop offset="100%" stopColor="#022C22"/>
+                    </linearGradient>
+                    <linearGradient id="raw" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#FB923C"/>
+                      <stop offset="100%" stopColor="#EA580C"/>
+                    </linearGradient>
+                  </defs>
+                  <rect width="100" height="100" rx="22" fill="url(#rbg)"/>
+                  <path d="M14 40 L50 24 L86 40 L82 49 L18 49 Z" fill="url(#raw)"/>
+                  <rect x="18" y="47" width="64" height="34" rx="3" fill="white" opacity="0.97"/>
+                  <rect x="23" y="53" width="15" height="11" rx="2.5" fill="#D1FAE5"/>
+                  <rect x="43" y="55" width="14" height="26" rx="2" fill="#065F46"/>
+                  <rect x="62" y="53" width="15" height="11" rx="2.5" fill="#D1FAE5"/>
+                  <rect x="12" y="79" width="76" height="4" rx="2" fill="#F97316" opacity="0.45"/>
                 </svg>
               </div>
               <h1 className="text-3xl font-black text-foreground">Join BizMtaani</h1>
