@@ -25,6 +25,8 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   profileLoading: boolean;
   refreshProfile: () => Promise<void>;
+  /** Re-fetches the Firebase Auth user object to pick up emailVerified changes */
+  reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -33,6 +35,7 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   profileLoading: true,
   refreshProfile: async () => {},
+  reloadUser: async () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -59,6 +62,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user) await loadProfile(user.uid);
   }, [user, loadProfile]);
 
+  /**
+   * Call auth.currentUser.reload() to refresh the in-memory user object
+   * (picks up emailVerified = true after the user clicks the link).
+   * Then force a re-render by cloning the user reference.
+   */
+  const reloadUser = useCallback(async () => {
+    const current = auth.currentUser;
+    if (!current) return;
+    await current.reload();
+    // Create a new reference so React re-renders components that depend on user
+    setUser(Object.assign(Object.create(Object.getPrototypeOf(current)), current));
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -74,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, userProfile, profileLoading, refreshProfile }}>
+    <AuthContext.Provider value={{ user, loading, userProfile, profileLoading, refreshProfile, reloadUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );

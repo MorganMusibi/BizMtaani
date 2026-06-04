@@ -1,6 +1,6 @@
 /**
  * Shown after Google sign-in when the user has no Firestore profile yet.
- * Asks: business owner or individual → name (if different from Google display name).
+ * Asks: business owner or individual → name + area (no GPS to prevent hang).
  */
 import { useState } from "react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -9,8 +9,44 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getWardInfo } from "@/lib/location";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Loader2, Store, User } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Loader2, Store, User, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+interface HomeLocation {
+  lat: number; lng: number;
+  areaName: string; constituency: string; county: string;
+}
+
+/**
+ * Try to geocode an area name → coordinates + ward info.
+ * Times out in 4 s. Returns null on any failure — never throws.
+ */
+async function geocodeArea(area: string): Promise<HomeLocation | null> {
+  try {
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 4000);
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(area.trim() + ", Kenya")}&limit=1`,
+      { signal: controller.signal }
+    );
+    clearTimeout(tid);
+    const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
+    if (!results.length) return null;
+    const { lat, lon } = results[0];
+    const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
+    const info = await getWardInfo(c.lat, c.lng);
+    return {
+      lat: c.lat,
+      lng: c.lng,
+      areaName: info?.wardName || area.trim(),
+      constituency: info?.constituency ?? "",
+      county: info?.county ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
 
 export function ProfileSetupModal() {
   const { user, refreshProfile } = useAuth();
@@ -19,6 +55,7 @@ export function ProfileSetupModal() {
   const [step, setStep] = useState<1 | 2>(1);
   const [isBusinessOwner, setIsBusinessOwner] = useState<boolean | null>(null);
   const [name, setName] = useState(user?.displayName ?? "");
+  const [area, setArea] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -27,31 +64,20 @@ export function ProfileSetupModal() {
       toast({ title: "Please enter a name", variant: "destructive" });
       return;
     }
+    if (!area.trim()) {
+      toast({ title: "Please enter your area / location", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
-      // Try to detect location for home area
-      let homeLocation: {
-        lat: number; lng: number;
-        areaName: string; constituency: string; county: string;
-      } | undefined;
-
-      try {
-        const coords = await new Promise<GeolocationCoordinates>((res, rej) =>
-          navigator.geolocation.getCurrentPosition((p) => res(p.coords), rej, {
-            enableHighAccuracy: true, timeout: 8000, maximumAge: 0,
-          })
-        );
-        const info = await getWardInfo(coords.latitude, coords.longitude);
-        homeLocation = {
-          lat: coords.latitude,
-          lng: coords.longitude,
-          areaName: info.wardName,
-          constituency: info.constituency,
-          county: info.county,
-        };
-      } catch {
-        // Location permission denied — no home area saved
-      }
+      // Geocode area with 4 s timeout — never blocks indefinitely
+      const geo = await geocodeArea(area);
+      const homeLocation: HomeLocation = geo ?? {
+        lat: 0, lng: 0,
+        areaName: area.trim(),
+        constituency: "",
+        county: "",
+      };
 
       await setDoc(
         doc(db, "users", user.uid),
@@ -59,7 +85,7 @@ export function ProfileSetupModal() {
           displayName: name.trim(),
           isBusinessOwner: isBusinessOwner ?? false,
           ...(isBusinessOwner ? { businessName: name.trim() } : {}),
-          ...(homeLocation ? { homeLocation } : {}),
+          homeLocation,
           createdAt: serverTimestamp(),
         },
         { merge: true }
@@ -127,7 +153,7 @@ export function ProfileSetupModal() {
 
         {step === 2 && (
           <>
-            <div className="mb-6">
+            <div className="mb-5">
               <h2 className="font-black text-xl">
                 {isBusinessOwner ? "Your business name" : "Your name"}
               </h2>
@@ -138,13 +164,40 @@ export function ProfileSetupModal() {
               </p>
             </div>
 
-            <Input
-              placeholder={isBusinessOwner ? "e.g. Mama Njeri Groceries" : "e.g. Jane Wanjiru"}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="h-12 text-base mb-5"
-              autoFocus
-            />
+            <div className="space-y-4 mb-5">
+              <div className="space-y-1.5">
+                <Label htmlFor="psm-name" className="text-sm font-bold">
+                  {isBusinessOwner ? "Business name" : "Full name"}
+                </Label>
+                <Input
+                  id="psm-name"
+                  placeholder={isBusinessOwner ? "e.g. Mama Njeri Groceries" : "e.g. Jane Wanjiru"}
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="h-12 text-base"
+                  autoFocus
+                />
+              </div>
+
+              <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <MapPin size={13} className="text-primary flex-shrink-0" />
+                  <Label htmlFor="psm-area" className="text-xs font-bold text-foreground">
+                    Your area / location *
+                  </Label>
+                </div>
+                <Input
+                  id="psm-area"
+                  placeholder="e.g. Kariobangi, Eastleigh, Githurai 45"
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  className="h-11 bg-background"
+                />
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  Helps buyers find your ads and shows you nearby listings.
+                </p>
+              </div>
+            </div>
 
             <div className="flex gap-3">
               <button
@@ -156,7 +209,7 @@ export function ProfileSetupModal() {
               <Button
                 className="flex-1 h-12 font-black text-base rounded-xl"
                 onClick={handleSave}
-                disabled={saving || !name.trim()}
+                disabled={saving || !name.trim() || !area.trim()}
               >
                 {saving ? <Loader2 size={18} className="animate-spin" /> : "Let's go →"}
               </Button>

@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
+import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { SplashScreen } from "@/components/SplashScreen";
 import NotFound from "@/pages/not-found";
@@ -76,6 +77,7 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <NotificationSetup />
+          <EmailVerificationBanner />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>

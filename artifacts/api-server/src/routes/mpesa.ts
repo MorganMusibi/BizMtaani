@@ -1,14 +1,14 @@
 /**
  * M-Pesa Daraja API — STK Push for listing activation.
  *
- * Business model: advertisers pay KES 60 (basic, 10 photos, 7 days)
- *                 or KES 120 (premium, 25 photos, 7 days) to post a listing.
+ * Business model: advertisers pay KES 60 (basic, 2 photos, 7 days)
+ *                 or KES 120 (premium, 4 photos, 7 days) to post a listing.
  *
  * Required env vars:
  *   MPESA_CONSUMER_KEY      — Daraja app consumer key
  *   MPESA_CONSUMER_SECRET   — Daraja app consumer secret
- *   MPESA_SHORTCODE         — Paybill / Till number (sandbox: 174379)
- *   MPESA_PASSKEY           — Lipa Na M-Pesa passkey
+ *   MPESA_SHORTCODE         — Paybill / Till number (sandbox default: 174379)
+ *   MPESA_PASSKEY           — Lipa Na M-Pesa passkey (sandbox default provided)
  *   MPESA_ENVIRONMENT       — "sandbox" (default) | "production"
  *   MPESA_CALLBACK_URL      — Override callback URL (optional)
  */
@@ -23,14 +23,33 @@ const PLAN_AMOUNTS = { basic: 60, premium: 120 } as const;
 const PLAN_PHOTO_LIMITS = { basic: 2, premium: 4 } as const;
 const LISTING_DURATION_DAYS = 7;
 
+// Safaricom sandbox public test passkey for shortcode 174379
+const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+
 // ---------- helpers ----------
 interface DarajaToken { token: string; expiresAt: number }
 let _token: DarajaToken | null = null;
 
+function isSandbox(): boolean {
+  return process.env.MPESA_ENVIRONMENT !== "production";
+}
+
 function darajaBase(): string {
-  return process.env.MPESA_ENVIRONMENT === "production"
-    ? "https://api.safaricom.co.ke"
-    : "https://sandbox.safaricom.co.ke";
+  return isSandbox()
+    ? "https://sandbox.safaricom.co.ke"
+    : "https://api.safaricom.co.ke";
+}
+
+/** Fetch with a hard timeout (ms). Throws on timeout. */
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(tid);
+  }
 }
 
 async function getDarajaToken(): Promise<string> {
@@ -39,11 +58,32 @@ async function getDarajaToken(): Promise<string> {
   const secret = process.env.MPESA_CONSUMER_SECRET;
   if (!key || !secret) throw new Error("MPESA_CONSUMER_KEY / MPESA_CONSUMER_SECRET not set");
   const creds = Buffer.from(`${key}:${secret}`).toString("base64");
-  const res = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
-    headers: { Authorization: `Basic ${creds}` },
-  });
-  if (!res.ok) throw new Error(`Daraja token request failed: ${res.status}`);
-  const data = (await res.json()) as { access_token: string; expires_in: string };
+
+  const url = `${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`;
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(url, { headers: { Authorization: `Basic ${creds}` } }, 15_000);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Daraja token request timed out or failed: ${msg}`);
+  }
+
+  const rawText = await res.text();
+  if (!res.ok) {
+    throw new Error(`Daraja token request failed HTTP ${res.status}: ${rawText}`);
+  }
+
+  let data: { access_token: string; expires_in: string };
+  try {
+    data = JSON.parse(rawText) as { access_token: string; expires_in: string };
+  } catch {
+    throw new Error(`Daraja token response not JSON: ${rawText.slice(0, 200)}`);
+  }
+
+  if (!data.access_token) {
+    throw new Error(`Daraja token response missing access_token: ${rawText.slice(0, 200)}`);
+  }
+
   _token = { token: data.access_token, expiresAt: Date.now() + parseInt(data.expires_in) * 1000 };
   return _token.token;
 }
@@ -77,6 +117,11 @@ function callbackUrl(): string {
   const domains = process.env.REPLIT_DOMAINS ?? "";
   const first = domains.split(",")[0]?.trim();
   if (first) return `https://${first}/api/mpesa/callback`;
+  // In sandbox mode, Safaricom doesn't validate the callback URL strictly,
+  // so use a placeholder that won't crash. In production this must be a real URL.
+  if (isSandbox()) {
+    return "https://example.com/api/mpesa/callback";
+  }
   throw new Error("Cannot determine callback URL — set MPESA_CALLBACK_URL");
 }
 
@@ -116,13 +161,19 @@ router.post("/mpesa/stkpush", async (req, res) => {
     return;
   }
 
-  // Sandbox shortcode 174379 is Safaricom's public test Paybill — safe to use as default
   const shortcode = process.env.MPESA_SHORTCODE
-    ?? (process.env.MPESA_ENVIRONMENT !== "production" ? "174379" : undefined);
-  const passkey = process.env.MPESA_PASSKEY;
-  if (!shortcode || !passkey) {
-    req.log.error("MPESA_SHORTCODE / MPESA_PASSKEY not configured");
-    res.status(503).json({ error: "M-Pesa not configured on this server (missing MPESA_SHORTCODE / MPESA_PASSKEY)" });
+    ?? (isSandbox() ? "174379" : undefined);
+  const passkey = process.env.MPESA_PASSKEY
+    ?? (isSandbox() ? SANDBOX_PASSKEY : undefined);
+
+  if (!shortcode) {
+    req.log.error("MPESA_SHORTCODE not configured");
+    res.status(503).json({ error: "M-Pesa not configured on this server (missing MPESA_SHORTCODE)" });
+    return;
+  }
+  if (!passkey) {
+    req.log.error("MPESA_PASSKEY not configured");
+    res.status(503).json({ error: "M-Pesa not configured on this server (missing MPESA_PASSKEY)" });
     return;
   }
 
@@ -137,14 +188,22 @@ router.post("/mpesa/stkpush", async (req, res) => {
   const amount = PLAN_AMOUNTS[plan];
   const photoLimit = PLAN_PHOTO_LIMITS[plan];
 
+  req.log.info(
+    { uid, plan, amount, productId, phone: formattedPhone, env: process.env.MPESA_ENVIRONMENT ?? "sandbox" },
+    "STK push initiated"
+  );
+
   try {
+    req.log.info("Fetching Daraja access token...");
     const token = await getDarajaToken();
+    req.log.info("Daraja access token obtained");
+
     const ts = timestamp();
     const password = stkPassword(shortcode, passkey, ts);
     const txType = process.env.MPESA_TRANSACTION_TYPE ?? "CustomerPayBillOnline";
     const cbUrl = callbackUrl();
 
-    const body = {
+    const stkBody = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: ts,
@@ -158,13 +217,28 @@ router.post("/mpesa/stkpush", async (req, res) => {
       TransactionDesc: `BizMtaani ${plan} listing`,
     };
 
-    const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    req.log.info({ stkBody: { ...stkBody, Password: "[redacted]" } }, "Sending STK push to Daraja");
 
-    const darajaData = (await darajaRes.json()) as {
+    let darajaRes: Response;
+    try {
+      darajaRes = await fetchWithTimeout(
+        `${darajaBase()}/mpesa/stkpush/v1/processrequest`,
+        {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          body: JSON.stringify(stkBody),
+        },
+        30_000
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`Daraja STK push timed out or failed: ${msg}`);
+    }
+
+    const rawText = await darajaRes.text();
+    req.log.info({ status: darajaRes.status, body: rawText.slice(0, 500) }, "Daraja STK push response");
+
+    let darajaData: {
       MerchantRequestID?: string;
       CheckoutRequestID?: string;
       ResponseCode?: string;
@@ -173,10 +247,18 @@ router.post("/mpesa/stkpush", async (req, res) => {
       errorCode?: string;
       errorMessage?: string;
     };
+    try {
+      darajaData = JSON.parse(rawText);
+    } catch {
+      throw new Error(`Daraja response not JSON (HTTP ${darajaRes.status}): ${rawText.slice(0, 200)}`);
+    }
 
-    if (!darajaRes.ok || darajaData.errorCode) {
-      req.log.warn({ darajaData }, "Daraja STK push error");
-      res.status(502).json({ error: darajaData.errorMessage ?? darajaData.ResponseDescription ?? "Daraja error" });
+    if (!darajaRes.ok || darajaData.errorCode || darajaData.ResponseCode !== "0") {
+      req.log.warn({ darajaData, httpStatus: darajaRes.status }, "Daraja STK push error response");
+      res.status(502).json({
+        error: darajaData.errorMessage ?? darajaData.ResponseDescription ?? "Daraja error",
+        darajaCode: darajaData.errorCode ?? darajaData.ResponseCode,
+      });
       return;
     }
 
@@ -198,7 +280,7 @@ router.post("/mpesa/stkpush", async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    req.log.info({ checkoutRequestId, uid, productId, plan, amount }, "Listing STK push initiated");
+    req.log.info({ checkoutRequestId, uid, productId, plan, amount }, "STK push created, payment doc written");
     res.json({
       success: true,
       checkoutRequestId,
@@ -206,8 +288,8 @@ router.post("/mpesa/stkpush", async (req, res) => {
       customerMessage: darajaData.CustomerMessage,
     });
   } catch (err) {
-    req.log.error({ err }, "STK push failed");
-    res.status(500).json({ error: "Failed to initiate payment" });
+    req.log.error({ err: err instanceof Error ? { message: err.message, stack: err.stack } : err }, "STK push failed");
+    res.status(500).json({ error: err instanceof Error ? err.message : "Failed to initiate payment" });
   }
 });
 
@@ -228,6 +310,8 @@ router.post("/mpesa/callback", async (req, res) => {
       CallbackMetadata?: { Item: Array<{ Name: string; Value: unknown }> };
     };
 
+    req.log.info({ callback }, "M-Pesa callback received");
+
     if (!callback?.CheckoutRequestID) return;
 
     const db = getFirestore();
@@ -239,14 +323,12 @@ router.post("/mpesa/callback", async (req, res) => {
       const get = (name: string) => items.find((i) => i.Name === name)?.Value;
       const mpesaCode = get("MpesaReceiptNumber") as string | undefined;
 
-      // Update payment status
       await paymentRef.update({
         status: "completed",
         mpesaCode: mpesaCode ?? null,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
 
-      // Activate the listing
       const paymentSnap = await paymentRef.get();
       const paymentData = paymentSnap.data();
 
@@ -255,7 +337,6 @@ router.post("/mpesa/callback", async (req, res) => {
         const productSnap = await productRef.get();
         const productData = productSnap.data();
 
-        // For renewals: extend from current expiry if still in future; otherwise from now
         const now = new Date();
         const currentExpiry = productData?.expiresAt?.toDate?.() as Date | undefined;
         const baseDate = (currentExpiry && currentExpiry > now) ? currentExpiry : now;
@@ -271,7 +352,7 @@ router.post("/mpesa/callback", async (req, res) => {
           activatedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
 
-        req.log.info({ productId: paymentData.productId, mpesaCode, expiresAt }, "Listing activated");
+        req.log.info({ productId: paymentData.productId, mpesaCode, expiresAt }, "Listing activated after payment");
       }
     } else {
       await paymentRef.update({
@@ -279,7 +360,7 @@ router.post("/mpesa/callback", async (req, res) => {
         failureReason: callback.ResultDesc,
         completedAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-      req.log.info({ checkoutRequestId, resultCode: callback.ResultCode }, "M-Pesa payment failed/cancelled");
+      req.log.info({ checkoutRequestId, resultCode: callback.ResultCode, desc: callback.ResultDesc }, "M-Pesa payment failed/cancelled");
     }
   } catch (err) {
     req.log.error({ err }, "Error processing M-Pesa callback");
@@ -300,8 +381,10 @@ router.get("/mpesa/status/:checkoutRequestId", async (req, res) => {
 
   const { checkoutRequestId } = req.params;
   const shortcode = process.env.MPESA_SHORTCODE
-    ?? (process.env.MPESA_ENVIRONMENT !== "production" ? "174379" : undefined);
-  const passkey = process.env.MPESA_PASSKEY;
+    ?? (isSandbox() ? "174379" : undefined);
+  const passkey = process.env.MPESA_PASSKEY
+    ?? (isSandbox() ? SANDBOX_PASSKEY : undefined);
+
   if (!shortcode || !passkey) {
     res.status(503).json({ error: "M-Pesa not configured" });
     return;
@@ -310,21 +393,26 @@ router.get("/mpesa/status/:checkoutRequestId", async (req, res) => {
   try {
     const token = await getDarajaToken();
     const ts = timestamp();
-    const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpushquery/v1/query`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        BusinessShortCode: shortcode,
-        Password: stkPassword(shortcode, passkey, ts),
-        Timestamp: ts,
-        CheckoutRequestID: checkoutRequestId,
-      }),
-    });
+    const darajaRes = await fetchWithTimeout(
+      `${darajaBase()}/mpesa/stkpushquery/v1/query`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          BusinessShortCode: shortcode,
+          Password: stkPassword(shortcode, passkey, ts),
+          Timestamp: ts,
+          CheckoutRequestID: checkoutRequestId,
+        }),
+      },
+      15_000
+    );
     const data = await darajaRes.json();
+    req.log.info({ checkoutRequestId, data }, "STK status query result");
     res.json(data);
   } catch (err) {
     req.log.error({ err }, "Status query failed");
-    res.status(500).json({ error: "Status query failed" });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Status query failed" });
   }
 });
 

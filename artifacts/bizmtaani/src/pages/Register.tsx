@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
@@ -128,6 +129,15 @@ export default function Register() {
         businessName: isBusinessOwner ? name.trim() : undefined,
         homeLocation,
       });
+
+      // Send email verification — non-blocking (don't fail if this errors)
+      sendEmailVerification(cred.user).catch(() => {});
+
+      toast({
+        title: "Account created!",
+        description: "Check your email and click the verification link to unlock all features.",
+      });
+
       setLocation("/");
     } catch (err: unknown) {
       toast({
