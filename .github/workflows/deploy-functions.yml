@@ -42,6 +42,11 @@ jobs:
           echo "id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
 
       - name: Set Firebase secrets
+        # Requires Secret Manager Admin role on the service account.
+        # This step is non-fatal: if secrets already exist in Secret Manager
+        # from a previous run or manual setup, the deploy below will work
+        # even if this step is skipped or fails.
+        continue-on-error: true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
         run: |
