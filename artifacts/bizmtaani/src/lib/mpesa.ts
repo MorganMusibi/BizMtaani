@@ -7,6 +7,7 @@
  *   premium — KES 120/week, 4 photos, 7 days, up to 30 active adverts, verified badge + biz tools
  */
 import { auth } from "@/lib/firebase";
+import { apiBase } from "@/lib/apiUrl";
 
 export type ListingPlan = "free" | "basic" | "premium";
 export type PaidListingPlan = "basic" | "premium";
@@ -63,7 +64,7 @@ export async function initiateStkPush(params: StkPushParams): Promise<StkPushRes
   if (!user) throw new Error("Not signed in");
   const token = await user.getIdToken();
 
-  const res = await fetch("/api/mpesa/stkpush", {
+  const res = await fetch(`${apiBase()}/api/mpesa/stkpush`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(params),

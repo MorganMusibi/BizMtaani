@@ -1,4 +1,5 @@
 import { auth } from "@/lib/firebase";
+import { apiBase } from "@/lib/apiUrl";
 
 export type ImageUploadType = "avatar" | "product" | "community";
 
@@ -15,7 +16,7 @@ export async function uploadImage(
   form.append("image", file);
   form.append("uploadType", type);
 
-  const res = await fetch("/api/upload", {
+  const res = await fetch(`${apiBase()}/api/upload`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
     body: form,

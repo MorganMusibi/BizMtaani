@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { apiBase } from "@/lib/apiUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ChevronLeft, Send, Loader2 } from "lucide-react";
@@ -42,7 +43,7 @@ async function sendPushNotification(recipientUid: string, title: string, body: s
     const { token } = tokenDoc.data() as { token: string };
     if (!token) return;
 
-    await fetch("/api/notify", {
+    await fetch(`${apiBase()}/api/notify`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
