@@ -25,6 +25,8 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   profileLoading: boolean;
   refreshProfile: () => Promise<void>;
+  /** Immediately update the in-memory profile without a Firestore round-trip */
+  setProfileDirectly: (profile: UserProfile) => void;
   /** Re-fetches the Firebase Auth user object to pick up emailVerified changes */
   reloadUser: () => Promise<void>;
 }
@@ -35,6 +37,7 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   profileLoading: true,
   refreshProfile: async () => {},
+  setProfileDirectly: () => {},
   reloadUser: async () => {},
 });
 
@@ -49,7 +52,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async (uid: string) => {
     setProfileLoading(true);
     try {
-      const snap = await getDoc(doc(db, "users", uid));
+      // Race Firestore against an 8-second timeout so a blocked/slow
+      // connection never leaves the app in an infinite loading state.
+      const snap = await Promise.race([
+        getDoc(doc(db, "users", uid)),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("profile-load-timeout")), 8000)
+        ),
+      ]);
       setUserProfile(snap.exists() ? (snap.data() as UserProfile) : null);
     } catch {
       setUserProfile(null);
@@ -67,6 +77,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * (picks up emailVerified = true after the user clicks the link).
    * Then force a re-render by cloning the user reference.
    */
+  const setProfileDirectly = useCallback((profile: UserProfile) => {
+    setUserProfile(profile);
+  }, []);
+
   const reloadUser = useCallback(async () => {
     const current = auth.currentUser;
     if (!current) return;
@@ -90,7 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [loadProfile]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, userProfile, profileLoading, refreshProfile, reloadUser }}>
+    <AuthContext.Provider value={{ user, loading, userProfile, profileLoading, refreshProfile, setProfileDirectly, reloadUser }}>
       {!loading && children}
     </AuthContext.Provider>
   );
