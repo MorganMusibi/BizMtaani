@@ -47,6 +47,7 @@ export default function PostProduct() {
   // Step 1 — Category
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "">("");
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [customSubcategory, setCustomSubcategory] = useState("");
 
   // Step 2 — Details
   const [title, setTitle] = useState("");
@@ -207,6 +208,9 @@ export default function PostProduct() {
       if (subcategories.length > 0 && !selectedSubcategory) {
         toast({ title: "Select a subcategory", variant: "destructive" }); return false;
       }
+      if (selectedSubcategory === "Other" && !customSubcategory.trim()) {
+        toast({ title: "Describe what you're selling", description: "Type your product or service in the box below.", variant: "destructive" }); return false;
+      }
       return true;
     }
     if (step === 2) {
@@ -263,13 +267,16 @@ export default function PostProduct() {
         : pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0;
 
       const expiry = new Date(Date.now() + FREE_PLAN_DURATION_DAYS * 86_400_000);
+      const finalSubcategory = selectedSubcategory === "Other"
+        ? (customSubcategory.trim() || "Other")
+        : (selectedSubcategory || selectedCategory);
 
       const docData: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
         price: priceVal,
         category: selectedCategory,
-        subcategory: selectedSubcategory || selectedCategory,
+        subcategory: finalSubcategory,
         imageUrl: uploadedUrls[0] ?? "",
         imageUrls: uploadedUrls,
         lat: coords.lat,
@@ -339,12 +346,16 @@ export default function PostProduct() {
         ? 0
         : parseFloat(price) || 0;
 
+      const finalSubcategory = selectedSubcategory === "Other"
+        ? (customSubcategory.trim() || "Other")
+        : (selectedSubcategory || selectedCategory);
+
       const docData: Record<string, unknown> = {
         title: title.trim(),
         description: description.trim(),
         price: priceVal,
         category: selectedCategory,
-        subcategory: selectedSubcategory || selectedCategory,
+        subcategory: finalSubcategory,
         imageUrl: uploadedUrls[0] ?? "",
         imageUrls: uploadedUrls,
         lat: coords.lat,
@@ -433,7 +444,7 @@ export default function PostProduct() {
                 return (
                   <div key={cat.key}>
                     <button
-                      onClick={() => { setSelectedCategory(cat.key); setSelectedSubcategory(""); }}
+                      onClick={() => { setSelectedCategory(cat.key); setSelectedSubcategory(""); setCustomSubcategory(""); }}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
                         isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
                       }`}
@@ -457,7 +468,7 @@ export default function PostProduct() {
                         <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2.5">Choose a subcategory</p>
                         <div className="flex flex-wrap gap-2">
                           {subs.map((sub) => (
-                            <button key={sub} onClick={() => setSelectedSubcategory(sub)}
+                            <button key={sub} onClick={() => { setSelectedSubcategory(sub); setCustomSubcategory(""); }}
                               className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
                                 selectedSubcategory === sub
                                   ? "border-primary bg-primary text-white"
@@ -467,7 +478,33 @@ export default function PostProduct() {
                               {sub}
                             </button>
                           ))}
+                          {/* "Other" escape hatch for products/services not in the list */}
+                          <button
+                            onClick={() => { setSelectedSubcategory("Other"); setCustomSubcategory(""); }}
+                            className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
+                              selectedSubcategory === "Other"
+                                ? "border-primary bg-primary text-white"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                            }`}
+                          >
+                            Other…
+                          </button>
                         </div>
+
+                        {selectedSubcategory === "Other" && (
+                          <div className="mt-3">
+                            <input
+                              type="text"
+                              placeholder="Describe what you're selling e.g. Handmade beads, Car wash, Tailoring…"
+                              value={customSubcategory}
+                              onChange={(e) => setCustomSubcategory(e.target.value)}
+                              maxLength={60}
+                              className="w-full h-10 px-3 rounded-xl border-2 border-primary bg-background text-sm font-semibold focus:outline-none placeholder:text-muted-foreground/60 placeholder:font-normal"
+                              autoFocus
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">This will appear as your advert's category label.</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>

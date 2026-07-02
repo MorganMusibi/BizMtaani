@@ -25,7 +25,7 @@ import { BottomNav } from "@/components/BottomNav";
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const NAIROBI: [number, number] = [-1.286389, 36.817223];
-const AREA_PICKER_SESSION_KEY = "bizmtaani_area_chosen";
+const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 const DEFAULT_RADIUS_KM = 5;
 const RADIUS_STEPS = [1, 2, 3, 5, 7, 10]; // discrete steps for the slider
 
@@ -225,14 +225,19 @@ export default function Home() {
         setUserCoords(coords);
         setGpsGranted(true);
 
-        // Check if already chosen this session
-        const alreadyChosen = sessionStorage.getItem(AREA_PICKER_SESSION_KEY);
-        if (alreadyChosen) {
-          // Use cached choice
-          try {
-            const cached = JSON.parse(alreadyChosen) as ResolvedLocation;
+        // If the user already chose their area during sign-up (homeLocation saved to
+        // their profile), or has previously dismissed the picker, skip it entirely —
+        // just resolve the current GPS position to a ward name silently.
+        const alreadyChosen = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
+        const hasHomeLocation = !!userProfile?.homeLocation;
+
+        if (hasHomeLocation || alreadyChosen) {
+          const cached = alreadyChosen && !hasHomeLocation
+            ? (() => { try { return JSON.parse(alreadyChosen) as ResolvedLocation; } catch { return null; } })()
+            : null;
+          if (cached) {
             setLocationInfo(cached);
-          } catch {
+          } else {
             const info = await getWardInfo(coords[0], coords[1]);
             setLocationInfo(info);
           }
@@ -240,7 +245,7 @@ export default function Home() {
           return;
         }
 
-        // Probe for border areas
+        // First-time / guest: probe for border areas and offer a picker
         const choices = await getAreaChoices(coords[0], coords[1]);
         if (choices.length > 1 && !hasPromptedArea.current) {
           setAreaChoices(choices);
@@ -289,7 +294,7 @@ export default function Home() {
 
   function handleAreaSelect(choice: ResolvedLocation) {
     setLocationInfo(choice);
-    sessionStorage.setItem(AREA_PICKER_SESSION_KEY, JSON.stringify(choice));
+    localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
     setShowAreaPicker(false);
   }
 
