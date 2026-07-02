@@ -1,0 +1,63 @@
+name: Deploy Firebase Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'functions/**'
+      - 'firebase.json'
+      - '.firebaserc'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Firebase Functions
+        run: pnpm --filter @workspace/functions run build
+
+      - name: Write service account credentials
+        run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > /tmp/sa.json
+
+      - name: Extract Firebase project ID
+        id: project
+        run: |
+          PROJECT_ID=$(python3 -c "import json; print(json.load(open('/tmp/sa.json'))['project_id'])")
+          echo "id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Set Firebase secrets
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          PROJECT="${{ steps.project.outputs.id }}"
+          set_secret() {
+            printf '%s' "$2" | pnpm dlx firebase-tools functions:secrets:set "$1" --data-file=- --project "$PROJECT" --force
+          }
+          set_secret CLOUDINARY_API_KEY      "${{ secrets.CLOUDINARY_API_KEY }}"
+          set_secret CLOUDINARY_API_SECRET   "${{ secrets.CLOUDINARY_API_SECRET }}"
+          set_secret CLOUDINARY_CLOUD_NAME   "${{ secrets.CLOUDINARY_CLOUD_NAME }}"
+          set_secret MPESA_CONSUMER_KEY      "${{ secrets.MPESA_CONSUMER_KEY }}"
+          set_secret MPESA_CONSUMER_SECRET   "${{ secrets.MPESA_CONSUMER_SECRET }}"
+          set_secret MPESA_PASSKEY           "${{ secrets.MPESA_PASSKEY }}"
+
+      - name: Deploy Firebase Functions
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
+        run: |
+          pnpm dlx firebase-tools deploy --only functions \
+            --project "${{ steps.project.outputs.id }}" \
+            --non-interactive

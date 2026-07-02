@@ -5,9 +5,12 @@
  *   free    — 0 KES, 1 photo, 3 days, up to 5 active adverts
  *   basic   — KES 60/week, 2 photos, 7 days, up to 10 active adverts, verified badge
  *   premium — KES 120/week, 4 photos, 7 days, up to 30 active adverts, verified badge + biz tools
+ *
+ * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
+ * which calls the Daraja STK push API server-side using secret keys.
  */
-import { auth } from "@/lib/firebase";
-import { apiBase } from "@/lib/apiUrl";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
 
 export type ListingPlan = "free" | "basic" | "premium";
 export type PaidListingPlan = "basic" | "premium";
@@ -60,17 +63,11 @@ export function normalizePhone(raw: string): string {
 }
 
 export async function initiateStkPush(params: StkPushParams): Promise<StkPushResult> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not signed in");
-  const token = await user.getIdToken();
-
-  const res = await fetch(`${apiBase()}/api/mpesa/stkpush`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-    body: JSON.stringify(params),
-  });
-
-  const data = (await res.json()) as StkPushResult & { error?: string };
-  if (!res.ok) throw new Error(data.error ?? "Payment request failed");
+  const functions = getFunctions(app);
+  const initiate = httpsCallable<StkPushParams, StkPushResult>(
+    functions,
+    "initiateMpesaPayment"
+  );
+  const { data } = await initiate(params);
   return data;
 }
