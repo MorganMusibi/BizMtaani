@@ -14,6 +14,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
 
@@ -35,6 +36,10 @@ jobs:
       - name: Write service account credentials
         run: echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}' > /tmp/sa.json
 
+      - name: Show service account being used
+        run: |
+          python3 -c "import json; j=json.load(open('/tmp/sa.json')); print('Client email:', j['client_email']); print('Project:', j['project_id'])"
+
       - name: Extract Firebase project ID
         id: project
         run: |
@@ -42,18 +47,16 @@ jobs:
           echo "id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
 
       - name: Set Firebase secrets
-        # Requires Secret Manager Admin role on the service account.
-        # This step is non-fatal: if secrets already exist in Secret Manager
-        # from a previous run or manual setup, the deploy below will work
-        # even if this step is skipped or fails.
         continue-on-error: true
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
         run: |
           PROJECT="${{ steps.project.outputs.id }}"
+
           set_secret() {
             printf '%s' "$2" | pnpm dlx firebase-tools functions:secrets:set "$1" --data-file=- --project "$PROJECT" --force
           }
+
           set_secret CLOUDINARY_API_KEY      "${{ secrets.CLOUDINARY_API_KEY }}"
           set_secret CLOUDINARY_API_SECRET   "${{ secrets.CLOUDINARY_API_SECRET }}"
           set_secret CLOUDINARY_CLOUD_NAME   "${{ secrets.CLOUDINARY_CLOUD_NAME }}"
