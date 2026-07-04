@@ -98,10 +98,6 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
 }
 
 // ─── 1. getCloudinarySignature ───────────────────────────────────────────────
-// Returns a signed upload signature so the browser can POST the image file
-// directly to Cloudinary. Only `folder` and `timestamp` are signed — these
-// are the only upload params the browser sends (beyond `file` and `api_key`,
-// which Cloudinary excludes from the signature).
 export const getCloudinarySignature = onCall(
   {
     secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName],
@@ -117,11 +113,16 @@ export const getCloudinarySignature = onCall(
       "product";
     const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
     const timestamp = Math.floor(Date.now() / 1000);
-    const apiSecret = cloudinaryApiSecret.value();
+    
+    // Read directly from process.env to avoid runtime parameter evaluation crashes
+    const apiSecret = process.env.CLOUDINARY_API_SECRET || "";
+    const apiKey = process.env.CLOUDINARY_API_KEY || "";
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "";
 
-    // Signature: SHA1 of sorted params string + apiSecret.
-    // MUST match exactly the params sent in the browser upload request
-    // (excluding: file, api_key, resource_type).
+    if (!apiSecret || !apiKey || !cloudName) {
+      throw new HttpsError("internal", "Cloudinary configuration keys are missing or invalid.");
+    }
+
     const paramsToSign = `folder=${folder}&timestamp=${timestamp}`;
     const signature = crypto
       .createHash("sha1")
@@ -132,17 +133,13 @@ export const getCloudinarySignature = onCall(
       signature,
       timestamp,
       folder,
-      apiKey: cloudinaryApiKey.value(),
-      cloudName: cloudinaryCloudName.value(),
+      apiKey,
+      cloudName,
     };
   }
 );
 
 // ─── 2. initiateMpesaPayment ─────────────────────────────────────────────────
-// Initiates an M-Pesa STK push for a paid listing plan.
-// A per-payment callback token is generated and embedded in the callback URL.
-// This token is also stored in the payment Firestore doc and verified by
-// mpesaCallback before processing any payment completion.
 export const initiateMpesaPayment = onCall(
   {
     secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey],
@@ -194,9 +191,6 @@ export const initiateMpesaPayment = onCall(
       "base64"
     );
 
-    // Generate a cryptographically random token for this payment.
-    // Embedded in the callback URL and stored in Firestore — mpesaCallback
-    // verifies it matches before processing any completion event.
     const callbackToken = crypto.randomBytes(24).toString("hex");
 
     const projectId = process.env.GCLOUD_PROJECT ?? "";
@@ -265,7 +259,6 @@ export const initiateMpesaPayment = onCall(
     const checkoutRequestId = darajaData.CheckoutRequestID!;
     const merchantRequestId = darajaData.MerchantRequestID!;
 
-    // Write payment doc including the callback token for later verification.
     await db.collection("payments").doc(checkoutRequestId).set({
       checkoutRequestId,
       merchantRequestId,
@@ -290,16 +283,6 @@ export const initiateMpesaPayment = onCall(
 );
 
 // ─── 3. mpesaCallback ────────────────────────────────────────────────────────
-// HTTP endpoint called by Safaricom after the user completes or cancels.
-//
-// Security: the callback URL includes a ?cbtoken= generated per-payment in
-// initiateMpesaPayment and stored in the Firestore payment doc. We look up the
-// payment doc first and verify the token matches before acting on the result.
-// This prevents unauthenticated callers from forging a successful callback
-// and activating listings without payment.
-//
-// Reliability: all Firestore writes are awaited before responding so that
-// no state updates are lost in the serverless execution model.
 export const mpesaCallback = onRequest(async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback as
@@ -321,12 +304,10 @@ export const mpesaCallback = onRequest(async (req, res) => {
     const checkoutRequestId = callback.CheckoutRequestID;
     const receivedToken = req.query["cbtoken"] as string | undefined;
 
-    // Fetch the payment doc and verify the per-payment callback token.
     const paymentRef = db.collection("payments").doc(checkoutRequestId);
     const paymentSnap = await paymentRef.get();
 
     if (!paymentSnap.exists) {
-      // Unknown payment — respond OK so Safaricom stops retrying.
       res.json({ ResultCode: 0, ResultDesc: "Accepted" });
       return;
     }
@@ -334,7 +315,6 @@ export const mpesaCallback = onRequest(async (req, res) => {
     const paymentData = paymentSnap.data()!;
 
     if (!receivedToken || paymentData.callbackToken !== receivedToken) {
-      // Token mismatch — silently reject to avoid leaking info.
       res.status(400).json({ ResultCode: 1, ResultDesc: "Invalid token" });
       return;
     }
@@ -387,6 +367,5 @@ export const mpesaCallback = onRequest(async (req, res) => {
     console.error("Error processing M-Pesa callback:", err);
   }
 
-  // Respond after all writes are complete.
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
