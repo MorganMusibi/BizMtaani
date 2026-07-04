@@ -70,4 +70,6 @@ jobs:
         run: |
           pnpm dlx firebase-tools deploy --only functions \
             --project "${{ steps.project.outputs.id }}" \
-            --non-interactive
+            --non-interactive \
+            --force
+
