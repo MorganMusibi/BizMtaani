@@ -72,4 +72,3 @@ jobs:
             --project "${{ steps.project.outputs.id }}" \
             --non-interactive \
             --force
-
