@@ -1,8 +1,8 @@
 {
   "buildCommand": "pnpm --filter @workspace/bizmtaani run build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": "dist",
+  "outputDirectory": "artifacts/bizmtaani/dist",
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/).*)", "destination": "/artifacts/bizmtaani/dist/index.html" }
   ]
 }
