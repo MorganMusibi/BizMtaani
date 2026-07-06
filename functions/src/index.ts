@@ -1,30 +1,38 @@
 /**
- * BizMtaani Firebase Cloud Functions
+ * BizMtaani Firebase Cloud Functions — CONSOLIDATED BACKEND
  *
- * Handles two operations that require secret keys:
- *   1. getCloudinarySignature — signs a direct browser upload to Cloudinary
- *   2. initiateMpesaPayment  — STK push via Daraja API
- *   3. mpesaCallback         — Safaricom webhook, activates paid listings
+ * All backend operations now handled via Firebase Cloud Functions.
+ * (artifacts/api-server/ is DEPRECATED — see DEPRECATION.md)
+ *
+ * Operations:
+ *   1. getCloudinarySignature   — signs direct browser uploads to Cloudinary
+ *   2. initiateMpesaPayment     — STK push via Daraja API
+ *   3. mpesaCallback            — Safaricom webhook, activates paid listings
+ *   4. scheduledCleanup         — daily cleanup: expires listings, stale payments (21:00 UTC)
+ *   5. triggerCleanup           — manual cleanup endpoint
+ *   6. sendNotification         — FCM push notifications (auth-protected)
  *
  * Secrets (set via `firebase functions:secrets:set <NAME>`):
  *   CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET, CLOUDINARY_CLOUD_NAME
  *   MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_PASSKEY
  *
- * Env vars (set in firebase.json or GCP console):
+ * Env vars (firebase.json or GCP console):
  *   MPESA_SHORTCODE (default: 174379 sandbox)
  *   MPESA_ENVIRONMENT (default: sandbox)
  *   MPESA_CALLBACK_URL (optional full URL override)
+ *   CRON_SECRET (for manual cleanup trigger)
  */
 
 import * as crypto from "crypto";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
 const db = admin.firestore();
 
-// ─── Secrets ────────────────────────────────────────────────────────────────
+// ─── Secrets ───────────────────────────────────────────────────────────────
 const cloudinaryApiKey = defineSecret("CLOUDINARY_API_KEY");
 const cloudinaryApiSecret = defineSecret("CLOUDINARY_API_SECRET");
 const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
@@ -97,7 +105,10 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
   return _darajaToken.token;
 }
 
-// ─── 1. getCloudinarySignature ───────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// 1. IMAGE UPLOADS (Cloudinary)
+// ═══════════════════════════════════════════════════════════════════════════
+
 export const getCloudinarySignature = onCall(
   {
     secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName],
@@ -113,8 +124,7 @@ export const getCloudinarySignature = onCall(
       "product";
     const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
     const timestamp = Math.floor(Date.now() / 1000);
-    
-    // Read directly from process.env to avoid runtime parameter evaluation crashes
+
     const apiSecret = process.env.CLOUDINARY_API_SECRET || "";
     const apiKey = process.env.CLOUDINARY_API_KEY || "";
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "";
@@ -139,7 +149,10 @@ export const getCloudinarySignature = onCall(
   }
 );
 
-// ─── 2. initiateMpesaPayment ─────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
+// 2. M-PESA PAYMENTS (Daraja)
+// ═══════════════════════════════════════════════════════════════════════════
+
 export const initiateMpesaPayment = onCall(
   {
     secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey],
@@ -282,7 +295,6 @@ export const initiateMpesaPayment = onCall(
   }
 );
 
-// ─── 3. mpesaCallback ────────────────────────────────────────────────────────
 export const mpesaCallback = onRequest(async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback as
@@ -369,3 +381,176 @@ export const mpesaCallback = onRequest(async (req, res) => {
 
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 3. AUTOMATED CLEANUP (formerly in artifacts/api-server/)
+// ═══════════════════════════════════════════════════════════════════════════
+
+async function runCleanup() {
+  const now = new Date();
+  let archived = 0, deleted = 0, stalePending = 0, paymentsCleaned = 0;
+
+  console.log("[CLEANUP] Starting automated cleanup...");
+
+  // 1. Archive expired listings (3-day grace period before permanent deletion)
+  try {
+    const snap = await db.collection("products")
+      .where("status", "==", "active").where("expiresAt", "<", now).limit(500).get();
+    if (snap.size > 0) {
+      const batch = db.batch();
+      snap.docs.forEach((d) => {
+        batch.update(d.ref, {
+          status: "archived",
+          archivedAt: admin.firestore.Timestamp.fromDate(now),
+        });
+        archived++;
+      });
+      await batch.commit();
+    }
+    console.log(`[CLEANUP] Archived ${archived} expired listings`);
+  } catch (err) {
+    console.error("[CLEANUP] Error archiving listings:", err);
+  }
+
+  // 2. Permanently delete archived listings older than 3 days
+  const cutoff3d = new Date(Date.now() - 3 * 86_400_000);
+  try {
+    const snap = await db.collection("products")
+      .where("status", "==", "archived").where("archivedAt", "<", cutoff3d).limit(200).get();
+    for (const docSnap of snap.docs) {
+      await deleteProductWithImages(docSnap);
+      deleted++;
+    }
+    console.log(`[CLEANUP] Deleted ${deleted} archived listings (3+ days old)`);
+  } catch (err) {
+    console.error("[CLEANUP] Error deleting archived listings:", err);
+  }
+
+  // 3. Delete stale pending_payment products (24h old)
+  const cutoff24h = new Date(Date.now() - 86_400_000);
+  try {
+    const snap = await db.collection("products")
+      .where("status", "==", "pending_payment").where("createdAt", "<", cutoff24h).limit(200).get();
+    for (const docSnap of snap.docs) {
+      await deleteProductWithImages(docSnap);
+      stalePending++;
+    }
+    console.log(`[CLEANUP] Deleted ${stalePending} stale pending listings (24h+ old)`);
+  } catch (err) {
+    console.error("[CLEANUP] Error deleting stale pending listings:", err);
+  }
+
+  // 4. Time out old pending payments (2h old)
+  const cutoff2h = new Date(Date.now() - 7_200_000);
+  try {
+    const snap = await db.collection("payments")
+      .where("status", "==", "pending").where("createdAt", "<", cutoff2h).limit(500).get();
+    if (snap.size > 0) {
+      const batch = db.batch();
+      snap.docs.forEach((d) => {
+        batch.update(d.ref, { status: "timed_out" });
+        paymentsCleaned++;
+      });
+      await batch.commit();
+    }
+    console.log(`[CLEANUP] Timed out ${paymentsCleaned} old pending payments`);
+  } catch (err) {
+    console.error("[CLEANUP] Error timing out payments:", err);
+  }
+
+  console.log(`[CLEANUP] Complete: archived=${archived}, deleted=${deleted}, stalePending=${stalePending}, paymentsCleaned=${paymentsCleaned}`);
+  return { archived, deleted, stalePending, paymentsCleaned };
+}
+
+async function deleteProductWithImages(docSnap: FirebaseFirestore.QueryDocumentSnapshot) {
+  const data = docSnap.data();
+  const urls: string[] = data.imageUrls ?? (data.imageUrl ? [data.imageUrl] : []);
+
+  // Delete Cloudinary images (best-effort, non-critical)
+  for (const url of urls) {
+    try {
+      const m = url.match(/\/bizmtaani\/([^/]+)\/([^/.]+)(?:\.[a-z]+)?$/i);
+      if (m) {
+        // In production, call Cloudinary API to delete
+        // For now, just log intent
+        console.log(`[CLEANUP] Would delete Cloudinary image: bizmtaani/${m[1]}/${m[2]}`);
+      }
+    } catch (e) {
+      console.warn(`[CLEANUP] Image delete failed (non-critical):`, e);
+    }
+  }
+
+  // Delete Firestore doc
+  await docSnap.ref.delete();
+}
+
+/**
+ * Scheduled cleanup runs daily at 21:00 UTC (midnight EAT).
+ */
+export const scheduledCleanup = onSchedule("0 21 * * *", async (_context) => {
+  return await runCleanup();
+});
+
+/**
+ * Manual cleanup trigger (requires x-cron-secret header).
+ */
+export const triggerCleanup = onRequest(async (req, res) => {
+  const cronSecret = process.env.CRON_SECRET || "";
+  if (!cronSecret || req.headers["x-cron-secret"] !== cronSecret) {
+    res.status(403).json({ error: "Forbidden: invalid or missing CRON_SECRET" });
+    return;
+  }
+  const result = await runCleanup();
+  res.json({ ok: true, ...result });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 4. PUSH NOTIFICATIONS (FCM)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const sendNotification = onCall(
+  { cors: true },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError("unauthenticated", "Must be signed in");
+    }
+
+    const { token, title, body, data } = request.data as {
+      token: string;
+      title: string;
+      body?: string;
+      data?: Record<string, string>;
+    };
+
+    if (!token || !title) {
+      throw new HttpsError("invalid-argument", "token and title are required");
+    }
+
+    try {
+      await admin.messaging().send({
+        token,
+        notification: { title, body: body ?? "" },
+        data: data ?? {},
+        android: {
+          notification: {
+            clickAction: "FLUTTER_NOTIFICATION_CLICK",
+            sound: "default",
+          },
+        },
+        webpush: {
+          notification: {
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+          },
+          fcmOptions: {
+            link: data?.chatUrl ?? "/",
+          },
+        },
+      });
+      return { success: true };
+    } catch (err) {
+      console.error("[FCM] Notification send failed:", err);
+      throw new HttpsError("internal", "Notification send failed");
+    }
+  }
+);
