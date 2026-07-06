@@ -26,7 +26,8 @@ import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 
 // Configuration for API requests
-import { setBaseUrl } from "../../lib/api-client-react/src/custom-fetch"; 
+// Updated path to correctly reach the root lib folder
+import { setBaseUrl } from "../../../lib/api-client-react/src/custom-fetch"; 
 
 // Sets the base URL to your production Firebase Cloud Functions
 setBaseUrl('https://us-central1-bizmtaani-f50d5.cloudfunctions.net');
