@@ -132,7 +132,10 @@ async function runCleanup() {
   return { archived: snap.size };
 }
 
-export const scheduledCleanup = onSchedule({ schedule: "0 21 * * *" }, async (_context) => { return await runCleanup(); });
+// Fixed
+export const scheduledCleanup = onSchedule({ schedule: "0 21 * * *" }, async (_event) => {
+  await runCleanup();
+});
 export const triggerCleanup = onRequest(async (req, res) => {
   if (req.headers["x-cron-secret"] !== process.env.CRON_SECRET) { res.status(403).send(); return; }
   await runCleanup();
