@@ -307,10 +307,22 @@ export default function PostProduct() {
       const docRef = await addDoc(collection(db, "products"), docData);
       toast({ title: "Advert is live!", description: `Your free listing is visible for ${FREE_PLAN_DURATION_DAYS} days.` });
       navigate(`/product/${docRef.id}`);
-    } catch (err) {
-      toast({ title: "Failed to publish", description: err instanceof Error ? err.message : "Please try again.", variant: "destructive" });
-    } finally {
-      setPublishingFree(false);
+    } catch (err: any) {
+  console.error("UPLOAD ERROR:", err);
+
+  toast({
+    title: "Failed to publish",
+    description: [
+      err?.code,
+      err?.message,
+      err?.details ? JSON.stringify(err.details) : "",
+    ]
+      .filter(Boolean)
+      .join(" | "),
+    variant: "destructive",
+  });
+} finally {
+  setPublishingFree(false);
     }
   }
 
