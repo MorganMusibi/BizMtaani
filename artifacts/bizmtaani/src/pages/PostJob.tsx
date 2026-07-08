@@ -84,9 +84,15 @@ export default function PostJob() {
       });
       toast({ title: "Job posted!", description: "Your job listing is now live." });
       navigate("/jobs");
-    } catch {
-      toast({ title: "Failed to post job", description: "Please try again.", variant: "destructive" });
-    } finally {
+    } catch (error: any) {
+  console.error("Job posting error:", error);
+
+  toast({
+    title: "Failed to post job",
+    description: error.message || "Please try again.",
+    variant: "destructive",
+  });
+    }finally {
       setSubmitting(false);
     }
   }
