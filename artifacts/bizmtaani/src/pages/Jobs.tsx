@@ -178,9 +178,9 @@ export default function Jobs() {
   function buildQuery(cur?: Cursor) {
     const coll = collection(db, "jobs");
     const constraints = [orderBy("createdAt", "desc"), limit(PAGE_SIZE)] as Parameters<typeof query>[1][];
-    if (county && activeCategory === "All" && activeType === "All Types" && !searchQuery) {
-      constraints.unshift(where("county", "==", county));
-    }
+  //if (county && activeCategory === "All" && activeType === "All Types" && !searchQuery) {
+     // constraints.unshift(where("county", "==", county));
+    //}
     if (activeCategory !== "All") {
       constraints.unshift(where("category", "==", activeCategory));
     }
