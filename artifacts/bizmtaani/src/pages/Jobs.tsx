@@ -177,19 +177,28 @@ export default function Jobs() {
 
   function buildQuery(cur?: Cursor) {
     const coll = collection(db, "jobs");
-    const constraints = [orderBy("createdAt", "desc"), limit(PAGE_SIZE)] as Parameters<typeof query>[1][];
-  if (wardName && activeCategory === "All" && activeType === "All Types" && !searchQuery) {
-  constraints.unshift(where("ward", "==", wardName));
-}
+    const constraints = [
+        orderBy("createdAt", "desc"),
+        limit(PAGE_SIZE),
+    ] as Parameters<typeof query>[1][];
+
+    // TEMPORARILY REMOVE WARD FILTER
+    // We will add it back after confirming your job documents contain the ward field.
+
     if (activeCategory !== "All") {
-      constraints.unshift(where("category", "==", activeCategory));
+        constraints.unshift(where("category", "==", activeCategory));
     }
+
     if (activeType !== "All Types") {
-      constraints.unshift(where("jobType", "==", activeType));
+        constraints.unshift(where("jobType", "==", activeType));
     }
-    if (cur) constraints.push(startAfter(cur));
+
+    if (cur) {
+        constraints.push(startAfter(cur));
+    }
+
     return query(coll, ...constraints);
-  }
+                 }
 
   useEffect(() => {
     if (!locationReady) return;
