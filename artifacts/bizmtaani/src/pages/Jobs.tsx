@@ -178,9 +178,9 @@ export default function Jobs() {
   function buildQuery(cur?: Cursor) {
     const coll = collection(db, "jobs");
     const constraints = [orderBy("createdAt", "desc"), limit(PAGE_SIZE)] as Parameters<typeof query>[1][];
-  //if (county && activeCategory === "All" && activeType === "All Types" && !searchQuery) {
-     // constraints.unshift(where("county", "==", county));
-    //}
+  if (wardName && activeCategory === "All" && activeType === "All Types" && !searchQuery) {
+  constraints.unshift(where("ward", "==", wardName));
+}
     if (activeCategory !== "All") {
       constraints.unshift(where("category", "==", activeCategory));
     }
@@ -205,9 +205,9 @@ export default function Jobs() {
     setLoading(false);
   })
   .catch((error) => {
-    alert(error.message);
-    setLoading(false);
-  });
+  console.error("Failed to load jobs:", error);
+  setLoading(false);
+});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationReady, activeCategory, activeType, searchQuery]);
 
