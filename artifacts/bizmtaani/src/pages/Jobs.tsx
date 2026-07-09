@@ -203,16 +203,21 @@ export default function Jobs() {
   useEffect(() => {
     if (!locationReady) return;
     setLoading(true);
-    setJobs([]); setCursor(null); setDone(false);
-    getDocs(buildQuery())
-  .then((snap) => {
+    setJobs([]);
+    setCursor(null);
+    setDone(false);
 
-    setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
-    setCursor(snap.docs[snap.docs.length - 1] ?? null);
-    setDone(snap.docs.length < PAGE_SIZE);
-    setLoading(false);
-  })
-  .catch((error) => {
+    getDocs(buildQuery())
+      .then((snap) => {
+
+        alert("Jobs found: " + snap.docs.length);
+
+        setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
+        setCursor(snap.docs[snap.docs.length - 1] ?? null);
+        setDone(snap.docs.length < PAGE_SIZE);
+        setLoading(false);
+      })
+    .catch((error) => {
   console.error("Failed to load jobs:", error);
   setLoading(false);
 });
