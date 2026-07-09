@@ -195,12 +195,19 @@ export default function Jobs() {
     if (!locationReady) return;
     setLoading(true);
     setJobs([]); setCursor(null); setDone(false);
-    getDocs(buildQuery()).then((snap) => {
-      setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
-      setCursor(snap.docs[snap.docs.length - 1] ?? null);
-      setDone(snap.docs.length < PAGE_SIZE);
-      setLoading(false);
-    }).catch(() => setLoading(false));
+    getDocs(buildQuery())
+  .then((snap) => {
+    alert("Jobs found: " + snap.docs.length);
+
+    setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
+    setCursor(snap.docs[snap.docs.length - 1] ?? null);
+    setDone(snap.docs.length < PAGE_SIZE);
+    setLoading(false);
+  })
+  .catch((error) => {
+    alert(error.message);
+    setLoading(false);
+  });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locationReady, activeCategory, activeType, searchQuery]);
 
