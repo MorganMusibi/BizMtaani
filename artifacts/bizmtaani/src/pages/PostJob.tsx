@@ -37,11 +37,13 @@ export default function PostJob() {
   const [county, setCounty] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
+    useEffect(() => {
     if (!user) { navigate("/login"); return; }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
+        // Prioritize the wardName; if 'wardName' and 'constituency' are identical, 
+        // it means we likely only have the constituency level info.
         setWard(info.wardName);
         setCounty(info.county);
       },
