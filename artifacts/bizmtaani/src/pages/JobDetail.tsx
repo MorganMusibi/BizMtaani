@@ -110,8 +110,92 @@ export default function JobDetail() {
   const applyLabel = job.contactMethod === "email" ? "Apply via Email" : job.contactMethod === "whatsapp" ? "Apply on WhatsApp" : "Call to Apply";
 
   return (
-    <div className="flex flex-col h-screen bg-background">
-      {/* ... (The rest of your JSX remains exactly as you had it) ... */}
+  <div className="min-h-screen bg-background">
+    <header className="flex items-center gap-3 border-b p-4">
+      <button onClick={() => navigate("/jobs")}>
+        <ChevronLeft size={22} />
+      </button>
+
+      <div className="flex-1">
+        <h1 className="font-bold text-lg">Job Details</h1>
+      </div>
+
+      <button onClick={handleShare}>
+        <Share2 size={20} />
+      </button>
+
+      {isOwner && (
+        <button onClick={handleDelete} disabled={deleting}>
+          {deleting ? (
+            <Loader2 className="animate-spin" size={20} />
+          ) : (
+            <Trash2 size={20} />
+          )}
+        </button>
+      )}
+    </header>
+
+    <div className="p-4 space-y-5">
+
+      <div>
+        <h2 className="text-2xl font-bold">{job.title}</h2>
+        <p className="text-muted-foreground">{job.company}</p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <span className={`px-3 py-1 rounded-full text-xs font-bold ${TYPE_COLORS[job.jobType] ?? "bg-muted"}`}>
+          {job.jobType}
+        </span>
+
+        <span className="px-3 py-1 rounded-full bg-muted text-xs">
+          {job.category}
+        </span>
+      </div>
+
+      {job.salary && (
+        <div className="flex items-center gap-2">
+          <Banknote size={18} />
+          <span>{job.salary}</span>
+        </div>
+      )}
+
+      {(job.ward || job.county) && (
+        <div className="flex items-center gap-2">
+          <MapPin size={18} />
+          <span>{job.ward || job.county}</span>
+        </div>
+      )}
+
+      {job.createdAt && (
+        <div className="flex items-center gap-2">
+          <Clock size={18} />
+          <span>{timeAgo(job.createdAt.seconds)}</span>
+        </div>
+      )}
+
+      <div>
+        <h3 className="font-semibold mb-2">Description</h3>
+        <p>{job.description}</p>
+      </div>
+
+      {job.requirements && (
+        <div>
+          <h3 className="font-semibold mb-2">Requirements</h3>
+          <p>{job.requirements}</p>
+        </div>
+      )}
+
+      {isExpired ? (
+        <Button disabled className="w-full">
+          Job Expired
+        </Button>
+      ) : (
+        <Button className="w-full" onClick={handleApply}>
+          <ApplyIcon className="mr-2" size={18} />
+          {applyLabel}
+        </Button>
+      )}
+
     </div>
-  );
-}
+  </div>
+);
