@@ -235,116 +235,40 @@ export default function PostProduct() {
    * Uploads photos, saves the product as pending, initiates STK push.
    * Returns checkoutRequestId + productId for the modal's Firestore listener.
    */
-  async function handlePublishFree() {
-    if (!user || !coords) {
-      toast({ title: "Location not ready", description: "Please wait a moment and try again.", variant: "destructive" });
-      return;
-    }
-    setPublishingFree(true);
-    try {
-      // Check free advert count limit
-      const snap = await getDocs(query(collection(db, "products"), where("sellerId", "==", user.uid)));
-      const activeFree = snap.docs.filter(d => {
-        const data = d.data();
-        return (data.status === "active" || data.status === "pending_payment") && (!data.plan || data.plan === "free");
-      });
-      if (activeFree.length >= PLAN_ADVERT_LIMITS.free) {
-        toast({
-          title: "Free plan limit reached",
-          description: `You have ${activeFree.length} active free adverts (max ${PLAN_ADVERT_LIMITS.free}). Remove one or choose a paid plan.`,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const uploadedUrls: string[] = [];
-      for (const file of imageFiles.slice(0, PLAN_PHOTO_LIMITS.free)) {
-        const url = await uploadImage(file, "product");
-        uploadedUrls.push(url);
-      }
-
-      const geohash = encodeGeohash(coords.lat, coords.lng, 7);
-      const priceVal = isAccommodation
-        ? parseFloat(rentPerMonth) || 0
-        : pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0;
-
-      const expiry = new Date(Date.now() + FREE_PLAN_DURATION_DAYS * 86_400_000);
-      const finalSubcategory = selectedSubcategory === "Other"
-        ? (customSubcategory.trim() || "Other")
-        : (selectedSubcategory || selectedCategory);
-
-      const docData: Record<string, unknown> = {
-        title: title.trim(),
-        description: description.trim(),
-        price: priceVal,
-        category: selectedCategory,
-        subcategory: finalSubcategory,
-        imageUrl: uploadedUrls[0] ?? "",
-        imageUrls: uploadedUrls,
-        lat: coords.lat,
-        lng: coords.lng,
-        geohash,
-        ward: wardInfo?.wardName ?? "",
-        constituency: wardInfo?.constituency ?? "",
-        county: wardInfo?.county ?? "",
-        sellerId: user.uid,
-        sellerName: userProfile?.businessName || user.displayName || "Seller",
-        sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
-        sellerAvatar: user.photoURL || "",
-        phone: phone.trim(),
-        priceType: pricingBasis === "quote_only" ? "fixed" : priceType,
-        status: "active",
-        plan: "free",
-        photoLimit: PLAN_PHOTO_LIMITS.free,
-        verified: false,
-        expiresAt: Timestamp.fromDate(expiry),
-        activatedAt: serverTimestamp(),
-        createdAt: serverTimestamp(),
-      };
-
-      if (isAccommodation) docData.rentPerMonth = parseFloat(rentPerMonth) || 0;
-      if (isTransport) docData.pricingBasis = pricingBasis;
-      if (isEatery) docData.hotelMenu = hotelMenu;
-
-      const docRef = await addDoc(collection(db, "products"), docData);
-      toast({ title: "Advert is live!", description: `Your free listing is visible for ${FREE_PLAN_DURATION_DAYS} days.` });
-      navigate(`/product/${docRef.id}`);
-    } catch (err: any) {
-  console.error("UPLOAD ERROR:", err);
-
-  toast({
-    title: "Failed to publish",
-    description: [
-      err?.code,
-      err?.message,
-      err?.details ? JSON.stringify(err.details) : "",
-    ]
-      .filter(Boolean)
-      .join(" | "),
-    variant: "destructive",
-  });
-} finally {
-  setPublishingFree(false);
-    }
-  }
-
-  async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
+    async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
     if (!user || !coords) throw new Error("Not ready");
 
-    // Re-use pending product if modal is re-opened after a failed attempt
-    let productId = pendingProductIdRef.current;
+    // Upload images first
+    const uploadedUrls: string[] = [];
+    for (const file of imageFiles) {
+      const url = await uploadImage(file, "product");
+      uploadedUrls.push(url);
+    }
 
-    if (!productId) {
-      // Check paid advert count limit
-      const snap = await getDocs(query(collection(db, "products"), where("sellerId", "==", user.uid)));
-      const activePaidOfPlan = snap.docs.filter(d => {
-        const data = d.data();
-        return data.plan === plan && (data.status === "active" || data.status === "pending_payment");
-      });
-      const planLimit = PLAN_ADVERT_LIMITS[plan as PaidListingPlan];
-      if (activePaidOfPlan.length >= planLimit) {
-        throw new Error(`${plan === "basic" ? "Basic" : "Premium"} plan limit of ${planLimit} active adverts reached.`);
-      }
+    const docData: any = {
+      title: title.trim(),
+      description: description.trim(),
+      price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+      category: selectedCategory,
+      subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+      imageUrl: uploadedUrls[0] ?? "",
+      imageUrls: uploadedUrls,
+      lat: coords.lat,
+      lng: coords.lng,
+      plan: plan,
+      phone: phone.trim(),
+    };
+
+    // Call Backend Gatekeeper to create the document securely
+    const publishAdvert = httpsCallable(functions, "publishAdvert");
+    const result: any = await publishAdvert({ ...docData, isPaid: true });
+    const productId = result.data.productId;
+
+    // Initiate STK push
+    const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
+    return { checkoutRequestId: stkResult.checkoutRequestId, productId };
+  
+  }
 
       // Upload images
       const uploadedUrls: string[] = [];
