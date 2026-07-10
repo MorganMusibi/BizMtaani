@@ -149,4 +149,36 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   await admin.messaging().send({ token: request.data.token, notification: { title: request.data.title, body: request.data.body ?? "" }, data: request.data.data ?? {} });
   return { success: true };
+  });
+// ═══════════════════════════════════════════════════════════════════════════
+// 5. SUBSCRIPTION GATEKEEPER
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const publishAdvert = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  // 1. Fetch user to check subscription
+  const userSnap = await db.collection("users").doc(request.auth.uid).get();
+  const userData = userSnap.data();
+  const sub = userData?.subscription;
+
+  // 2. Logic: Freemium is okay, or Premium if expiry is in the future
+  const isPremium = sub?.planType !== 'freemium' && sub?.expiryDate && sub.expiryDate.toMillis() > Date.now();
+  const isFreemium = sub?.planType === 'freemium';
+
+  if (!isPremium && !isFreemium) {
+    throw new HttpsError("failed-precondition", "NO_SUBSCRIPTION");
+  }
+
+  // 3. If passed, proceed to save product
+  const productData = request.data;
+  const newProductRef = await db.collection("products").add({
+    ...productData,
+    ownerId: request.auth.uid,
+    status: "active",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, productId: newProductRef.id };
 });
+
