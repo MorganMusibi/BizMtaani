@@ -210,7 +210,7 @@ export default function Jobs() {
     getDocs(buildQuery())
       .then((snap) => {
 
-        alert("Jobs found: " + snap.docs.length);
+        console.log("Jobs found: " + snap.docs.length);
 
         setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
         setCursor(snap.docs[snap.docs.length - 1] ?? null);
