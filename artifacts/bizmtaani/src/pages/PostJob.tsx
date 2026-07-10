@@ -37,13 +37,19 @@ export default function PostJob() {
   const [county, setCounty] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-    useEffect(() => {
-    if (!user) { navigate("/login"); return; }
+  useEffect(() => {
+  if (!user) { navigate("/login"); return; }
+  
+  // Check if we have a saved location from the profile
+  // This works regardless of whether they are a business or individual
+  if (userProfile?.homeLocation) {
+    setWard(userProfile.homeLocation.areaName);
+    setCounty(userProfile.homeLocation.county);
+  } else {
+    // Fallback: GPS/GeoJSON logic if profile location is missing
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
-        // Prioritize the wardName; if 'wardName' and 'constituency' are identical, 
-        // it means we likely only have the constituency level info.
         setWard(info.wardName);
         setCounty(info.county);
       },
@@ -54,7 +60,8 @@ export default function PostJob() {
       },
       { timeout: 8000, maximumAge: 0 }
     );
-  }, [user]);
+  }
+}, [user, userProfile, navigate]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
