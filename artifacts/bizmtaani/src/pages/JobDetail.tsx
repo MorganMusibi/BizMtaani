@@ -65,17 +65,19 @@ export default function JobDetail() {
   }, [params?.id]);
 
   async function handleDelete() {
-    if (!job || !confirm("Are you sure?")) return;
-    setDeleting(true);
-    try {
-      await deleteDoc(doc(db, "jobs", job.id));
-      toast({ title: "Job deleted" });
-      navigate("/jobs");
-    } catch (e) {
-      toast({ title: "Failed to delete", variant: "destructive" });
-      setDeleting(false);
-    }
+  async function handleDelete() {
+  if (!job) return; // Removed the 'confirm()' check
+  setDeleting(true);
+  try {
+    await deleteDoc(doc(db, "jobs", job.id));
+    toast({ title: "Job deleted" });
+    navigate("/jobs");
+  } catch (e) {
+    toast({ title: "Failed to delete", variant: "destructive" });
+    setDeleting(false);
   }
+}
+
 
   function handleApply() {
     if (!job) return;
