@@ -270,64 +270,6 @@ export default function PostProduct() {
   
   }
 
-      // Upload images
-      const uploadedUrls: string[] = [];
-      for (const file of imageFiles) {
-        const url = await uploadImage(file, "product");
-        uploadedUrls.push(url);
-      }
-
-      const geohash = encodeGeohash(coords.lat, coords.lng, 7);
-      const priceVal = isAccommodation
-        ? parseFloat(rentPerMonth) || 0
-        : pricingBasis === "quote_only"
-        ? 0
-        : parseFloat(price) || 0;
-
-      const finalSubcategory = selectedSubcategory === "Other"
-        ? (customSubcategory.trim() || "Other")
-        : (selectedSubcategory || selectedCategory);
-
-      const docData: Record<string, unknown> = {
-        title: title.trim(),
-        description: description.trim(),
-        price: priceVal,
-        category: selectedCategory,
-        subcategory: finalSubcategory,
-        imageUrl: uploadedUrls[0] ?? "",
-        imageUrls: uploadedUrls,
-        lat: coords.lat,
-        lng: coords.lng,
-        geohash,
-        ward: wardInfo?.wardName ?? "",
-        constituency: wardInfo?.constituency ?? "",
-        county: wardInfo?.county ?? "",
-        sellerId: user.uid,
-        sellerName: userProfile?.businessName || user.displayName || "Seller",
-        sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
-        sellerAvatar: user.photoURL || "",
-        phone: phone.trim(),
-        priceType: pricingBasis === "quote_only" ? "fixed" : priceType,
-        status: "pending_payment",
-        plan,
-        photoLimit: PLAN_PHOTO_LIMITS[plan],
-        createdAt: serverTimestamp(),
-      };
-
-      if (isAccommodation) docData.rentPerMonth = parseFloat(rentPerMonth) || 0;
-      if (isTransport) docData.pricingBasis = pricingBasis;
-      if (isEatery) docData.hotelMenu = hotelMenu;
-
-      const docRef = await addDoc(collection(db, "products"), docData);
-      pendingProductIdRef.current = docRef.id;
-      productId = docRef.id;
-    }
-
-    // Initiate STK push
-    const result = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
-    return { checkoutRequestId: result.checkoutRequestId, productId };
-  }
-
   function goNext() {
     if (validateStep()) setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   }
