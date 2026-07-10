@@ -29,6 +29,7 @@ export default function PostJob() {
   const [category, setCategory] = useState("");
   const [jobType, setJobType] = useState("");
   const [salary, setSalary] = useState("");
+  const [deadline,setDeadline] = useState("");
   const [description, setDescription] = useState("");
   const [requirements, setRequirements] = useState("");
   const [contact, setContact] = useState("");
@@ -70,6 +71,10 @@ export default function PostJob() {
     if (!category) { toast({ title: "Select a category", variant: "destructive" }); return; }
     if (!jobType) { toast({ title: "Select job type", variant: "destructive" }); return; }
     if (!description.trim()) { toast({ title: "Enter a job description", variant: "destructive" }); return; }
+    if (!deadline) { 
+      toast({ title: "Please select an application deadline", variant: "destructive" }); 
+      return; 
+    }
     if (!contact.trim()) { toast({ title: "Enter contact details", variant: "destructive" }); return; }
     if (!user) return;
 
@@ -81,6 +86,7 @@ export default function PostJob() {
         category,
         jobType,
         salary: salary.trim() || null,
+        deadline: deadline,
         description: description.trim(),
         requirements: requirements.trim() || null,
         contact: contact.trim(),
@@ -173,6 +179,20 @@ export default function PostJob() {
           <Label>Salary / Compensation <span className="text-muted-foreground font-normal">(optional)</span></Label>
           <Input placeholder="e.g. KES 30,000–50,000/month or Negotiable" value={salary} onChange={(e) => setSalary(e.target.value)} className="h-12" />
         </div>
+
+        {/* Deadline */}
+        <div className="space-y-1.5">
+          <Label>Application Deadline *</Label>
+          <Input 
+            type="date" 
+            value={deadline} 
+            onChange={(e) => setDeadline(e.target.value)} 
+            className="h-12" 
+            required 
+            min={new Date().toISOString().split('T')[0]} 
+          />
+        </div>
+
 
         {/* Description */}
         <div className="space-y-1.5">
