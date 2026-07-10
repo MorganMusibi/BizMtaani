@@ -65,7 +65,6 @@ export default function JobDetail() {
   }, [params?.id]);
 
   async function handleDelete() {
-  async function handleDelete() {
   if (!job) return; // Removed the 'confirm()' check
   setDeleting(true);
   try {
