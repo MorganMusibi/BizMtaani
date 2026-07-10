@@ -46,6 +46,7 @@ export interface JobPost {
   category: string;
   jobType: string;
   salary?: string;
+  deadline?: string;
   ward?: string;
   county?: string;
   description: string;
