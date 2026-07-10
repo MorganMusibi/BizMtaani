@@ -37,7 +37,7 @@ const PRICING_BASIS_OPTIONS = [
   { value: "quote_only", label: "Quote Only" },
 ];
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function PostProduct() {
   const { user, userProfile } = useAuth();
