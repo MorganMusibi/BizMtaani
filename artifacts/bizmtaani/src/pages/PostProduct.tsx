@@ -1,3 +1,5 @@
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase"; 
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
