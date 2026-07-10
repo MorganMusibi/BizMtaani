@@ -66,6 +66,12 @@ async function saveUserProfile(
   await setDoc(doc(db, "users", uid), {
     displayName: opts.displayName,
     isBusinessOwner: opts.isBusinessOwner,
+    // --- ADD THESE LINES BELOW ---
+    subscription: {
+      planType: "freemium",
+      expiryDate: null
+    },
+    // -----------------------------
     ...(opts.isBusinessOwner && opts.businessName
       ? { businessName: opts.businessName }
       : {}),
@@ -73,6 +79,8 @@ async function saveUserProfile(
     createdAt: serverTimestamp(),
   });
 }
+
+
 
 export default function Register() {
   const [, setLocation] = useLocation();
