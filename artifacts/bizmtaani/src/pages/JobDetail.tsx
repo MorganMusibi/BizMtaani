@@ -137,15 +137,33 @@ export default function JobDetail() {
         <Share2 size={20} />
       </button>
 
-      {isOwner && (
-        <button onClick={handleDelete} disabled={deleting}>
-          {deleting ? (
-            <Loader2 className="animate-spin" size={20} />
-          ) : (
-            <Trash2 size={20} />
-          )}
-        </button>
+            {isOwner && (
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <button>
+              <Trash2 size={20} />
+            </button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently remove your job posting from BizMtaani.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleDelete} 
+                className="bg-destructive hover:bg-destructive/90 text-white"
+              >
+                {deleting ? <Loader2 className="animate-spin" /> : "Delete Job"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
+
     </header>
 
     <div className="p-4 space-y-5">
