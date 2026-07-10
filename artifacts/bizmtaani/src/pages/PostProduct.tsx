@@ -274,7 +274,7 @@ export default function PostProduct() {
     if (validateStep()) setStep((s) => (s < 4 ? ((s + 1) as Step) : s));
   }
 
-  const stepLabels = ["Category", "Details", "Photos", "Publish"];
+  const stepLabels = ["Category", "Details", "Photos", "Publish","Plan"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
