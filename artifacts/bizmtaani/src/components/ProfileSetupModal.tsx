@@ -84,6 +84,10 @@ export function ProfileSetupModal() {
         isBusinessOwner: isBusinessOwner ?? false,
         ...(isBusinessOwner ? { businessName: name.trim() } : {}),
         homeLocation,
+        subscription: {
+    planType: "freemium",
+    expiryDate: null
+          }
       };
 
       await setDoc(
