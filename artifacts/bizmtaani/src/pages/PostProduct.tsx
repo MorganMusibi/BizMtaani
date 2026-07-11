@@ -261,7 +261,7 @@ export default function PostProduct() {
 
     // Call Backend Gatekeeper to create the document securely
     const publishAdvert = httpsCallable(functions, "publishAdvert");
-    const result: any = await publishAdvert({ ...docData, isPaid: true });
+    const result: any = await publishAdvert(docData);
     const productId = result.data.productId;
 
     // Initiate STK push
