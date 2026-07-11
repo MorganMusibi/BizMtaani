@@ -239,10 +239,9 @@ export default function PostProduct() {
     if (!user || !coords) throw new Error("Not ready");
 
     // Upload images first
-    const uploadedUrls: string[] = [];
-    for (const file of imageFiles) {
-      const url = await uploadImage(file, "product");
-      uploadedUrls.push(url);
+    const uploadedUrls = await Promise.all(
+  imageFiles.map(file => uploadImage(file, "product"))
+);
     }
 
     const docData: any = {
@@ -275,10 +274,9 @@ export default function PostProduct() {
 
     try {
       // 1. Upload images
-      const uploadedUrls: string[] = [];
-      for (const file of imageFiles) {
-        const url = await uploadImage(file, "product");
-        uploadedUrls.push(url);
+      const uploadedUrls = await Promise.all(
+  imageFiles.map(file => uploadImage(file, "product"))
+);
       }
 
       // 2. Prepare data
