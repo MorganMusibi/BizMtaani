@@ -269,6 +269,49 @@ export default function PostProduct() {
     return { checkoutRequestId: stkResult.checkoutRequestId, productId };
   
   }
+    async function handlePublishFree() {
+    if (!user || !coords) return;
+    setPublishingFree(true);
+
+    try {
+      // 1. Upload images
+      const uploadedUrls: string[] = [];
+      for (const file of imageFiles) {
+        const url = await uploadImage(file, "product");
+        uploadedUrls.push(url);
+      }
+
+      // 2. Prepare data
+      const docData: any = {
+        title: title.trim(),
+        description: description.trim(),
+        price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+        category: selectedCategory,
+        subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+        imageUrl: uploadedUrls[0] ?? "",
+        imageUrls: uploadedUrls,
+        lat: coords.lat,
+        lng: coords.lng,
+        plan: "free", // <--- Backend sees this and sets status: 'active'
+        phone: phone.trim(),
+      };
+
+      // 3. Call backend
+      const publishAdvert = httpsCallable(functions, "publishAdvert");
+      const result: any = await publishAdvert(docData);
+
+      if (result.data.success) {
+        toast({ title: "Advert published!", description: "Your free listing is now live." });
+        navigate(`/product/${result.data.productId}`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
+    } finally {
+      setPublishingFree(false);
+    }
+  }
+
 
   function goNext() {
     if (validateStep()) setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
