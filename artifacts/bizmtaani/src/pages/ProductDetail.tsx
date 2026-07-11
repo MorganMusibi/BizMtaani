@@ -1,44 +1,26 @@
-import { useState, useEffect } from "react";
-import { useLocation, useParams } from "wouter";
-import {
-  doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp
-} from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase"; 
+import { useState, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { collection, addDoc, getDocs, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight, Clock, Check } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
-import { getCategoryBadgeColor } from "@/lib/categories";
+import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
+import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
+import { encodeGeohash } from "@/lib/geohash";
+import { getWardInfo, type ResolvedLocation } from "@/lib/location";
+import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
+import { initiateStkPush, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS, PLAN_ADVERT_LIMITS, FREE_PLAN_DURATION_DAYS, type ListingPlan, type PaidListingPlan } from "@/lib/mpesa";
+
+const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
-
-interface Product {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  rentPerMonth?: number;
-  category: string;
-  subcategory?: string;
-  imageUrl: string;
-  imageUrls?: string[];
-  lat: number;
-  lng: number;
-  sellerId: string;
-  sellerName: string;
-  sellerAvatar: string;
-  phone?: string;
-  priceType?: "fixed" | "negotiable";
-  pricingBasis?: string;
-  hotelMenu?: HotelMenu;
-  createdAt: { seconds: number } | null;
-  expiresAt?: { seconds: number } | null;
-  status?: string;
-  plan?: string;
-  verified?: boolean;
-}
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -46,311 +28,815 @@ const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
   { key: "supper", label: "Supper" },
 ];
 
-function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
-  const R = 6371;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+const PRICING_BASIS_OPTIONS = [
+  { value: "per_km", label: "Per KM" },
+  { value: "per_hour", label: "Per Hour" },
+  { value: "per_day", label: "Per Day" },
+  { value: "per_trip", label: "Per Trip / Fixed" },
+  { value: "per_session", label: "Per Session" },
+  { value: "quote_only", label: "Quote Only" },
+];
 
-function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
-  const periodsWithItems = MEAL_PERIODS.filter(({ key }) => (menu[key]?.length ?? 0) > 0);
-  if (periodsWithItems.length === 0) return null;
-  return (
-    <div className="space-y-4">
-      <h2 className="font-black text-lg">Menu</h2>
-      {periodsWithItems.map(({ key, label }) => (
-        <div key={key} className="rounded-2xl border border-border overflow-hidden">
-          <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
-            <span className="font-bold text-sm text-rose-700 dark:text-rose-400">{label}</span>
-          </div>
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40">
-              <tr>
-                <th className="text-left px-4 py-2 text-xs font-semibold text-muted-foreground">Dish</th>
-                <th className="text-right px-4 py-2 text-xs font-semibold text-muted-foreground">Price</th>
-              </tr>
-            </thead>
-            <tbody>
-              {menu[key].map((item, i) => (
-                <tr key={i} className={i > 0 ? "border-t border-border" : ""}>
-                  <td className="px-4 py-2.5 font-medium">{item.name}</td>
-                  <td className="px-4 py-2.5 text-right font-bold text-primary whitespace-nowrap">KES {item.price.toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ))}
-    </div>
-  );
-}
+type Step = 1 | 2 | 3 | 4 | 5;
 
-function ImageGallery({ images }: { images: string[] }) {
-  const [active, setActive] = useState(0);
-  if (images.length === 0) return (
-    <div className="w-full aspect-square bg-muted flex items-center justify-center">
-      <Store size={48} className="text-muted-foreground" />
-    </div>
-  );
-  return (
-    <div>
-      <img src={images[active]} alt="" className="w-full aspect-square object-cover" />
-      {images.length > 1 && (
-        <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar bg-card border-b border-border">
-          {images.map((url, i) => (
-            <button key={i} onClick={() => setActive(i)}
-              className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${i === active ? "border-primary" : "border-transparent opacity-60"}`}>
-              <img src={url} alt="" className="w-full h-full object-cover" />
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function ProductDetail() {
-  const { id } = useParams<{ id: string }>();
-  const [, setLocation] = useLocation();
-  const { user } = useAuth();
+export default function PostProduct() {
+  const { user, userProfile } = useAuth();
+  const [, navigate] = useLocation();
   const { toast } = useToast();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [chatLoading, setChatLoading] = useState(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [step, setStep] = useState<Step>(1);
+
+  // Step 1 — Category
+  const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "">("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [customSubcategory, setCustomSubcategory] = useState("");
+
+  // Step 2 — Details
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [price, setPrice] = useState("");
+  const [rentPerMonth, setRentPerMonth] = useState("");
+  const [priceType, setPriceType] = useState<"fixed" | "negotiable">("fixed");
+  const [pricingBasis, setPricingBasis] = useState("per_trip");
+  const [phone, setPhone] = useState("");
+
+  // Hotel menu
+  const [hotelMenu, setHotelMenu] = useState<HotelMenu>({ breakfast: [], lunch: [], supper: [] });
+  const [newItems, setNewItems] = useState<Record<keyof HotelMenu, { name: string; price: string }>>({
+    breakfast: { name: "", price: "" },
+    lunch: { name: "", price: "" },
+    supper: { name: "", price: "" },
+  });
+
+  // Step 3 — Images + location
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [wardInfo, setWardInfo] = useState<ResolvedLocation | null>(null);
+  const [locationName, setLocationName] = useState("");
+  const [locationSearch, setLocationSearch] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
+
+  // Step 4 — Plan & payment
+  const [plan, setPlan] = useState<ListingPlan>("free");
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [publishingFree, setPublishingFree] = useState(false);
+  const pendingProductIdRef = useRef<string | null>(null);
+
+  const [showImageMenu, setShowImageMenu] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+
+  const photoLimit = PLAN_PHOTO_LIMITS[plan];
 
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "products", id)).then((snap) => {
-      if (snap.exists()) setProduct({ id: snap.id, ...snap.data() } as Product);
-      setLoading(false);
-    });
+    if (!user) { navigate("/login"); return; }
+    if (user.phoneNumber) setPhone(user.phoneNumber);
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
+      (pos) => {
+        const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        setCoords(c);
+        getWardInfo(c.lat, c.lng).then((info) => {
+          setWardInfo(info);
+          if (info?.wardName) setLocationName(info.wardName);
+        });
+      },
+      () => {
+        // GPS denied — use saved home location from profile, or Nairobi as last resort
+        if (userProfile?.homeLocation) {
+          const hl = userProfile.homeLocation;
+          setCoords({ lat: hl.lat, lng: hl.lng });
+          setWardInfo({ wardName: hl.areaName, constituency: hl.constituency, county: hl.county, displayName: hl.areaName });
+          setLocationName(hl.areaName);
+        } else {
+          setCoords(NAIROBI);
+          getWardInfo(NAIROBI.lat, NAIROBI.lng).then(setWardInfo);
+        }
+      },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [id]);
+  }, [user, userProfile]);
 
-  async function handleChat() {
-    if (!user) return setLocation("/login");
-    if (!product || product.sellerId === user.uid) return;
-    setChatLoading(true);
-    try {
-      const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
-      const existing = await getDocs(q);
-      if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
-      const chatDoc = await addDoc(collection(db, "chats"), {
-        productId: product.id, productTitle: product.title,
-        productImage: product.imageUrls?.[0] ?? product.imageUrl,
-        buyerId: user.uid, buyerName: user.displayName || "Buyer",
-        sellerId: product.sellerId, sellerName: product.sellerName,
-        participants: [user.uid, product.sellerId],
-        lastMessage: "", lastMessageAt: serverTimestamp(),
-      });
-      setLocation(`/chat/${chatDoc.id}`);
-    } catch (err: unknown) {
-      toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-    } finally { setChatLoading(false); }
+  // Auto-upgrade to premium if photos exceed basic limit
+  useEffect(() => {
+    if (imageFiles.length > PLAN_PHOTO_LIMITS.basic && plan === "basic") {
+      setPlan("premium");
+    }
+  }, [imageFiles.length, plan]);
+
+  const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
+  const isAccommodation = selectedCategory === "Accommodation";
+  const isEatery =
+    selectedSubcategory === "Hotels / Eateries" ||
+    selectedSubcategory === "Restaurants & Cooked Food";
+  const isTransport = selectedSubcategory === "Delivery & Transport";
+  const subcategories = catDef?.subcategories ?? [];
+
+  function handleImageFiles(files: FileList | null) {
+    if (!files) return;
+    const currentLimit = PLAN_PHOTO_LIMITS[plan];
+    const remaining = currentLimit - imageFiles.length;
+    if (remaining <= 0) {
+      if (plan === "free") {
+        toast({ title: "Free plan limit reached", description: "Choose Basic or Premium in the next step for more photos." });
+      } else if (plan === "basic") {
+        toast({ title: "Basic plan limit reached", description: "Upgrade to Premium (KES 120) in the next step for up to 4 photos." });
+      }
+      return;
+    }
+    const toAdd = Array.from(files).slice(0, remaining);
+    const oversized = toAdd.filter((f) => f.size > 8 * 1024 * 1024);
+    if (oversized.length > 0) {
+      toast({ title: "Some images too large", description: "Max 8 MB per image.", variant: "destructive" });
+      return;
+    }
+    setImageFiles((prev) => [...prev, ...toAdd]);
+    const previews = toAdd.map((f) => URL.createObjectURL(f));
+    setImagePreviews((prev) => [...prev, ...previews]);
   }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={32} className="animate-spin text-primary" />
-    </div>
-  );
-  if (!product) return (
-    <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
-      <p className="text-muted-foreground">Product not found.</p>
-      <Button onClick={() => setLocation("/")}>Go back</Button>
-    </div>
-  );
+  function removeImage(i: number) {
+    URL.revokeObjectURL(imagePreviews[i]);
+    setImageFiles((prev) => prev.filter((_, idx) => idx !== i));
+    setImagePreviews((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
-  const isSeller = user?.uid === product.sellerId;
-  const isAccommodation = product.category === "Accommodation";
-  const isEatery = product.subcategory === "Hotels / Eateries" || product.subcategory === "Restaurants & Cooked Food";
-  const badgeColor = getCategoryBadgeColor(product.category);
-  const distance = userCoords
-    ? getDistanceKm(userCoords.lat, userCoords.lng, product.lat, product.lng)
-    : null;
-  const images = product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [];
+  function addMenuItem(period: keyof HotelMenu) {
+    const item = newItems[period];
+    if (!item.name.trim() || !item.price) return;
+    setHotelMenu((prev) => ({
+      ...prev,
+      [period]: [...prev[period], { name: item.name.trim(), price: parseFloat(item.price) }],
+    }));
+    setNewItems((prev) => ({ ...prev, [period]: { name: "", price: "" } }));
+  }
 
-  const roleLabel = isAccommodation ? "Landlord / Agent"
-    : isEatery ? "Restaurant owner"
-    : "Seller";
+  function removeMenuItem(period: keyof HotelMenu, i: number) {
+    setHotelMenu((prev) => ({
+      ...prev,
+      [period]: prev[period].filter((_, idx) => idx !== i),
+    }));
+  }
+
+  async function searchLocation() {
+    if (!locationSearch.trim()) return;
+    setLocationLoading(true);
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch + ", Kenya")}&limit=1`
+      );
+      const results = await resp.json();
+      if (results && results.length > 0) {
+        const { lat, lon, display_name } = results[0];
+        const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
+        setCoords(c);
+        const info = await getWardInfo(c.lat, c.lng);
+        setWardInfo(info);
+        setLocationName(info?.wardName ?? display_name.split(",")[0]);
+        toast({ title: "Location updated" });
+      } else {
+        toast({ title: "Location not found", description: "Try a more specific search.", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Location search failed", variant: "destructive" });
+    } finally {
+      setLocationLoading(false);
+    }
+  }
+
+  function validateStep(): boolean {
+    if (step === 1) {
+      if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
+      if (subcategories.length > 0 && !selectedSubcategory) {
+        toast({ title: "Select a subcategory", variant: "destructive" }); return false;
+      }
+      if (selectedSubcategory === "Other" && !customSubcategory.trim()) {
+        toast({ title: "Describe what you're selling", description: "Type your product or service in the box below.", variant: "destructive" }); return false;
+      }
+      return true;
+    }
+    if (step === 2) {
+      if (!title.trim()) { toast({ title: "Enter a title", variant: "destructive" }); return false; }
+      if (isAccommodation && !rentPerMonth) { toast({ title: "Enter monthly rent", variant: "destructive" }); return false; }
+      return true;
+    }
+    if (step === 3) {
+      if (!isEatery && imageFiles.length === 0) {
+        toast({ title: "Add at least one photo", variant: "destructive" }); return false;
+      }
+      if (!coords) { toast({ title: "Location not ready", variant: "destructive" }); return false; }
+      return true;
+    }
+    return true;
+  }
+
+  /**
+   * Called by MpesaPaymentModal when the user submits their M-Pesa number.
+   * Uploads photos, saves the product as pending, initiates STK push.
+   * Returns checkoutRequestId + productId for the modal's Firestore listener.
+   */
+    async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
+    if (!user || !coords) throw new Error("Not ready");
+
+    // Upload images first
+    const uploadedUrls: string[] = [];
+    for (const file of imageFiles) {
+      const url = await uploadImage(file, "product");
+      uploadedUrls.push(url);
+    }
+
+    const docData: any = {
+      title: title.trim(),
+      description: description.trim(),
+      price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+      category: selectedCategory,
+      subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+      imageUrl: uploadedUrls[0] ?? "",
+      imageUrls: uploadedUrls,
+      lat: coords.lat,
+      lng: coords.lng,
+      plan: plan,
+      phone: phone.trim(),
+    };
+
+    // Call Backend Gatekeeper to create the document securely
+    const publishAdvert = httpsCallable(functions, "publishAdvert");
+    const result: any = await publishAdvert(docData);
+    const productId = result.data.productId;
+
+    // Initiate STK push
+    const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
+    return { checkoutRequestId: stkResult.checkoutRequestId, productId };
+  
+  }
+    async function handlePublishFree() {
+    if (!user || !coords) return;
+    setPublishingFree(true);
+
+    try {
+      // 1. Upload images
+      const uploadedUrls: string[] = [];
+      for (const file of imageFiles) {
+        const url = await uploadImage(file, "product");
+        uploadedUrls.push(url);
+      }
+
+      // 2. Prepare data
+      const docData: any = {
+        title: title.trim(),
+        description: description.trim(),
+        price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+        category: selectedCategory,
+        subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+        imageUrl: uploadedUrls[0] ?? "",
+        imageUrls: uploadedUrls,
+        lat: coords.lat,
+        lng: coords.lng,
+        plan: "free", // <--- Backend sees this and sets status: 'active'
+        phone: phone.trim(),
+      };
+
+      // 3. Call backend
+      const publishAdvert = httpsCallable(functions, "publishAdvert");
+      const result: any = await publishAdvert(docData);
+
+      if (result.data.success) {
+        toast({ title: "Advert published!", description: "Your free listing is now live." });
+        navigate(`/product/${result.data.productId}`);
+      }
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
+    } finally {
+      setPublishingFree(false);
+    }
+  }
+
+
+  function goNext() {
+    if (validateStep()) setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
+  }
+
+  const stepLabels = ["Category", "Details", "Photos", "Publish","Plan"];
 
   return (
-    <div className="min-h-screen bg-background pb-36">
-      <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
-        <button data-testid="button-back" onClick={() => setLocation("/")}
-          className="p-2 rounded-full bg-card/80 backdrop-blur-sm shadow">
-          <ChevronLeft size={20} />
-        </button>
-      </header>
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-card border-b border-border">
+        <div className="flex items-center gap-3 px-4 h-14">
+          <button
+            onClick={() => (step === 1 ? navigate("/") : setStep((s) => (s - 1) as Step))}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <h1 className="font-black text-base flex-1">Post Advert</h1>
+        </div>
 
-      <div className="-mt-14">
-        <ImageGallery images={images} />
+        {/* Step indicators */}
+        <div className="flex items-center px-4 pb-3 gap-1">
+          {stepLabels.map((label, i) => {
+            const n = (i + 1) as Step;
+            const done = step > n;
+            const active = step === n;
+            return (
+              <div key={label} className="flex items-center gap-1 flex-1 min-w-0">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black transition-all ${
+                  done ? "bg-secondary text-white" : active ? "bg-primary text-white" : "bg-muted text-muted-foreground"
+                }`}>
+                  {done ? <Check size={12} /> : n}
+                </div>
+                <span className={`text-[10px] font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+                {i < 4 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
-      <div className="px-4 pt-4 pb-4 space-y-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <h1 data-testid="text-product-title" className="text-2xl font-black leading-tight">{product.title}</h1>
-            {(product.verified || product.plan === "basic" || product.plan === "premium") && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-black text-[#00A651] bg-[#00A651]/10 px-2 py-0.5 rounded-full mt-1">
-                <Check size={10} />
-                Verified Seller
-              </span>
-            )}
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-5">
+
+        {/* ========== STEP 1: Category ========== */}
+        {step === 1 && (
+          <>
+            <h2 className="font-black text-lg">What are you selling?</h2>
+            <div className="space-y-2">
+              {CATEGORY_DEFS.map((cat) => {
+                const isSelected = selectedCategory === cat.key;
+                const subs = cat.subcategories ?? [];
+                return (
+                  <div key={cat.key}>
+                    <button
+                      onClick={() => { setSelectedCategory(cat.key); setSelectedSubcategory(""); setCustomSubcategory(""); }}
+                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
+                        isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
+                      }`}
+                    >
+                      <cat.icon size={22} className="flex-shrink-0 text-foreground" />
+                      <div className="flex-1">
+                        <p className="font-bold text-sm">{cat.displayShort}</p>
+                        <p className="text-xs text-muted-foreground">{cat.tagline}</p>
+                      </div>
+                      {isSelected ? (
+                        <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+                          <Check size={11} className="text-white" />
+                        </div>
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-border flex-shrink-0" />
+                      )}
+                    </button>
+
+                    {isSelected && subs.length > 0 && (
+                      <div className="mt-2 ml-3 mr-1 mb-1 bg-muted/50 rounded-2xl px-4 py-3 border border-border/60">
+                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide mb-2.5">Choose a subcategory</p>
+                        <div className="flex flex-wrap gap-2">
+                          {subs.map((sub) => (
+                            <button key={sub} onClick={() => { setSelectedSubcategory(sub); setCustomSubcategory(""); }}
+                              className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
+                                selectedSubcategory === sub
+                                  ? "border-primary bg-primary text-white"
+                                  : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                              }`}
+                            >
+                              {sub}
+                            </button>
+                          ))}
+                          {/* "Other" escape hatch for products/services not in the list */}
+                          <button
+                            onClick={() => { setSelectedSubcategory("Other"); setCustomSubcategory(""); }}
+                            className={`px-3 py-1.5 rounded-xl border-2 text-xs font-semibold transition-all active:scale-95 ${
+                              selectedSubcategory === "Other"
+                                ? "border-primary bg-primary text-white"
+                                : "border-border bg-card text-muted-foreground hover:border-primary/40"
+                            }`}
+                          >
+                            Other…
+                          </button>
+                        </div>
+
+                        {selectedSubcategory === "Other" && (
+                          <div className="mt-3">
+                            <input
+                              type="text"
+                              placeholder="Describe what you're selling e.g. Handmade beads, Car wash, Tailoring…"
+                              value={customSubcategory}
+                              onChange={(e) => setCustomSubcategory(e.target.value)}
+                              maxLength={60}
+                              className="w-full h-10 px-3 rounded-xl border-2 border-primary bg-background text-sm font-semibold focus:outline-none placeholder:text-muted-foreground/60 placeholder:font-normal"
+                              autoFocus
+                            />
+                            <p className="text-[11px] text-muted-foreground mt-1">This will appear as your advert's category label.</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ========== STEP 2: Details ========== */}
+        {step === 2 && (
+          <>
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Title *</label>
+              <Input
+                placeholder={
+                  isAccommodation ? "e.g. 1 bedroom bedsitter in Kariobangi"
+                  : isEatery ? "e.g. Mama Njeri Restaurant"
+                  : isTransport ? "e.g. Toyota Probox taxi — Eastleigh"
+                  : "e.g. iPhone 13 Pro 256GB"
+                }
+                value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="h-12 text-base"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Description</label>
+              <Textarea
+                placeholder="Describe your product or service in detail..."
+                value={description} onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px] text-sm" maxLength={1000}
+              />
+              <p className="text-xs text-right text-muted-foreground">{description.length}/1000</p>
+            </div>
+
             {isAccommodation ? (
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <p data-testid="text-product-price" className="text-xl font-bold text-indigo-600">
-                  KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
-                </p>
-                {product.priceType === "negotiable" && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Negotiable</span>
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">Monthly Rent (KES) *</label>
+                <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
+                  value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
+                <div className="flex gap-2 mt-2">
+                  {(["fixed", "negotiable"] as const).map((t) => (
+                    <button key={t} onClick={() => setPriceType(t)}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
+                        priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                      }`}>{t}</button>
+                  ))}
+                </div>
+              </div>
+            ) : isTransport ? (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">Pricing Basis</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PRICING_BASIS_OPTIONS.map(({ value, label }) => (
+                      <button key={value} onClick={() => setPricingBasis(value)}
+                        className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
+                          pricingBasis === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                        }`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+                {pricingBasis !== "quote_only" && (
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">Price (KES)</label>
+                    <Input type="number" inputMode="numeric"
+                      placeholder={pricingBasis === "per_km" ? "e.g. 50 per km" : "e.g. 2000"}
+                      value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
+                  </div>
                 )}
               </div>
             ) : !isEatery ? (
-              <div className="mt-1 space-y-1">
-                {product.pricingBasis === "quote_only" ? (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">Quote on request</p>
-                ) : product.price > 0 ? (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
-                    KES {product.price.toLocaleString()}
-                    {product.pricingBasis && product.pricingBasis !== "per_trip" && (
-                      <span className="text-base font-semibold text-muted-foreground ml-1">
-                        {{ per_km: "per km", per_hour: "per hour", per_day: "per day", per_session: "per session" }[product.pricingBasis]}
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">Price on request</p>
-                )}
-                {product.pricingBasis !== "quote_only" && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                    product.priceType === "negotiable" ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"
-                  }`}>
-                    {product.priceType === "negotiable" ? "Negotiable" : "Fixed price"}
-                  </span>
-                )}
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">Price (KES)</label>
+                  <Input type="number" inputMode="numeric" placeholder="e.g. 1500"
+                    value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
+                </div>
+                <div className="flex gap-2">
+                  {(["fixed", "negotiable"] as const).map((t) => (
+                    <button key={t} onClick={() => setPriceType(t)}
+                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
+                        priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
+                      }`}>{t}</button>
+                  ))}
+                </div>
               </div>
             ) : null}
-          </div>
-          <div className="flex-shrink-0">
-            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 ${badgeColor}`}>
-              <Tag size={11} />{product.subcategory ?? product.category}
-            </span>
-          </div>
-        </div>
 
-        {product.description && (
-          <p data-testid="text-product-description" className="text-muted-foreground leading-relaxed">
-            {product.description}
-          </p>
-        )}
-
-        {isEatery && product.hotelMenu && <HotelMenuDisplay menu={product.hotelMenu} />}
-
-        <div
-          className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
-          onClick={() => setLocation(`/shop/${product.sellerId}`)}
-        >
-          {product.sellerAvatar ? (
-            <img src={product.sellerAvatar} alt={product.sellerName} className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold text-lg">{product.sellerName[0]?.toUpperCase()}</span>
-            </div>
-          )}
-          <div className="flex-1">
-            <p data-testid="text-seller-name" className="font-semibold text-sm">{product.sellerName}</p>
-            <p className="text-xs text-muted-foreground">{roleLabel}</p>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            {distance !== null && (
-              <div className="flex items-center gap-1 text-xs">
-                <MapPin size={12} />
-                <span data-testid="text-distance">
-                  {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`}
-                </span>
+            {isEatery && (
+              <div className="space-y-4">
+                <p className="font-black text-base">Hotel / Restaurant Menu</p>
+                {MEAL_PERIODS.map(({ key, label }) => (
+                  <div key={key} className="rounded-2xl border border-border overflow-hidden">
+                    <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
+                      <span className="font-bold text-sm text-rose-700 dark:text-rose-400">{label}</span>
+                    </div>
+                    {hotelMenu[key].length > 0 && (
+                      <div className="divide-y divide-border">
+                        {hotelMenu[key].map((item, i) => (
+                          <div key={i} className="flex items-center px-4 py-2.5 gap-2">
+                            <span className="flex-1 text-sm font-medium">{item.name}</span>
+                            <span className="text-sm font-bold text-primary">KES {item.price}</span>
+                            <button onClick={() => removeMenuItem(key, i)} className="ml-2 text-muted-foreground hover:text-destructive">
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex gap-2 p-3">
+                      <Input placeholder="Dish name" value={newItems[key].name}
+                        onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], name: e.target.value } }))}
+                        className="flex-1 h-9 text-sm"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
+                      <Input type="number" inputMode="numeric" placeholder="KES" value={newItems[key].price}
+                        onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], price: e.target.value } }))}
+                        className="w-24 h-9 text-sm"
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
+                      <button onClick={() => addMenuItem(key)}
+                        className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0">
+                        <Plus size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-            <ChevronRight size={16} />
-          </div>
-        </div>
 
-        <div className="flex justify-end px-1">
-          <button
-            onClick={() => setLocation(`/shop/${product.sellerId}`)}
-            className="flex items-center gap-1.5 text-xs text-primary font-semibold"
-          >
-            <Store size={12} />
-            {isSeller ? "View my shop" : `See all from ${product.sellerName.split(" ")[0]}`}
-            <ChevronRight size={12} />
-          </button>
-        </div>
-
-        {product.phone && (
-          <a href={`tel:${product.phone}`} data-testid="link-phone"
-            className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-secondary transition-colors">
-            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
-              <Phone size={18} className="text-secondary" />
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
+              <Input type="tel" placeholder="e.g. 0712345678"
+                value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12 text-base" />
             </div>
-            <div className="flex-1">
-              <p className="text-xs text-muted-foreground">
-                {isAccommodation ? "Landlord's number" : "WhatsApp / Phone"}
-              </p>
-              <p className="font-bold text-sm">{product.phone}</p>
-            </div>
-            <span className="text-xs font-semibold text-secondary px-3 py-1.5 bg-secondary/10 rounded-xl">Call</span>
-          </a>
+          </>
         )}
-      </div>
 
-      <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
-        {isSeller ? (
-          <div className="flex items-center justify-center gap-2 py-2">
-            <span className="text-sm text-muted-foreground">Your listing</span>
-            {product.expiresAt && (() => {
-              const diff = product.expiresAt!.seconds - Date.now() / 1000;
-              if (diff < 0) return (
-                <span className="text-xs font-bold text-destructive bg-destructive/10 px-2 py-0.5 rounded-full">Expired</span>
-              );
-              const days = Math.ceil(diff / 86400);
-              return (
-                <span className={`flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full ${
-                  days <= 2 ? "text-amber-700 bg-amber-100" : "text-[#00A651] bg-[#00A651]/10"
-                }`}>
-                  <Clock size={10} />{days}d left
-                </span>
-              );
-            })()}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              {product.phone && (
-                <a href={`tel:${product.phone}`}
-                  className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg">
-                  <Phone size={17} />Call
-                </a>
+        {/* ========== STEP 3: Photos & Location ========== */}
+        {step === 3 && (
+          <>
+            {!isEatery && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-bold">
+                    Photos (up to {PLAN_PHOTO_LIMITS[plan]}) *
+                  </label>
+                  <span className="text-xs text-muted-foreground">{imageFiles.length}/{PLAN_PHOTO_LIMITS[plan]}</span>
+                </div>
+
+                {plan === "free" && imageFiles.length >= PLAN_PHOTO_LIMITS.free && (
+                  <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                    <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">Choose Basic (KES 60) or Premium (KES 120) in the next step for more photos.</p>
+                    </div>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-3 gap-2">
+                  {imagePreviews.map((src, i) => (
+                    <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
+                      <img src={src} alt="" className="w-full h-full object-cover" />
+                      {i === 0 && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-1 font-semibold">
+                          Cover
+                        </div>
+                      )}
+                      <button onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {imageFiles.length < photoLimit && (
+                    <button onClick={() => setShowImageMenu(true)}
+                      className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                      <Camera size={22} />
+                      <span className="text-[10px] font-semibold">Add photo</span>
+                    </button>
+                  )}
+                </div>
+
+                <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                  onChange={(e) => handleImageFiles(e.target.files)} />
+                <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+                  onChange={(e) => handleImageFiles(e.target.files)} />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <label className="text-sm font-bold">Location</label>
+              <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
+                <MapPin size={16} className="text-primary flex-shrink-0" />
+                <div className="flex-1">
+                  {wardInfo ? (
+                    <p className="text-sm font-semibold">{wardInfo.wardName || "Unknown ward"}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Detecting your location...</p>
+                  )}
+                  {wardInfo?.constituency && (
+                    <p className="text-xs text-muted-foreground">{wardInfo.constituency}, {wardInfo.county}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <Input placeholder="Search a different location..."
+                  value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchLocation(); } }}
+                  className="flex-1 h-10 text-sm" />
+                <Button type="button" variant="outline" size="sm" onClick={searchLocation}
+                  disabled={locationLoading} className="h-10 px-4 flex-shrink-0">
+                  {locationLoading ? <Loader2 size={14} className="animate-spin" /> : "Search"}
+                </Button>
+              </div>
+              {locationName && locationName !== wardInfo?.wardName && (
+                <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
               )}
-              <Button data-testid="button-chat-seller"
-                className={`h-12 font-bold gap-2 shadow-xl ${product.phone ? "flex-1" : "w-full"}`}
-                onClick={handleChat} disabled={chatLoading}>
-                {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
-                {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
-              </Button>
             </div>
+          </>
+        )}
+
+        {/* ========== STEP 4: Choose Plan & Publish ========== */}
+        {step === 4 && (
+          <>
+            <div>
+              <h2 className="font-black text-lg">Choose Your Plan</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
+            </div>
+
+            {/* Free plan */}
+            <button
+              onClick={() => setPlan("free")}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "free" ? "border-border bg-muted/40" : "border-border hover:border-muted-foreground/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Free</span>
+                    {plan === "free" && <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">3 days live · 1 photo each · up to 5 adverts</p>
+                  {plan === "free" && imageFiles.length > 1 && (
+                    <p className="text-xs text-amber-700 mt-1.5">Only first photo used on Free plan</p>
+                  )}
+                </div>
+                <span className="font-black text-xl text-muted-foreground flex-shrink-0">Free</span>
+              </div>
+            </button>
+
+            {/* Basic plan */}
+            <button
+              onClick={() => setPlan("basic")}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "basic" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Basic</span>
+                    {plan === "basic" && <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">7 days live · 2 photos · up to 10 adverts</p>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
+                      <Shield size={11} /> Verified badge
+                    </span>
+                    <span className="text-xs text-muted-foreground">50% more visibility</span>
+                  </div>
+                </div>
+                <span className="font-black text-2xl text-primary flex-shrink-0">KES {PLAN_AMOUNTS.basic}</span>
+              </div>
+            </button>
+
+            {/* Premium plan */}
+            <button
+              onClick={() => setPlan("premium")}
+              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                plan === "premium" ? "border-[#00A651] bg-[#00A651]/5" : "border-border hover:border-[#00A651]/40"
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0 pr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-black text-base">Premium</span>
+                    {plan === "premium" ? (
+                      <span className="text-[10px] bg-[#00A651] text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
+                    ) : (
+                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">Best value</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-muted-foreground">7 days live · 4 photos · up to 30 adverts</p>
+                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
+                      <Shield size={11} /> Verified badge
+                    </span>
+                    <span className="text-xs text-muted-foreground">70% more visibility</span>
+                    <span className="text-xs text-muted-foreground">Business tools</span>
+                  </div>
+                </div>
+                <span className="font-black text-2xl flex-shrink-0" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium}</span>
+              </div>
+            </button>
+
+            {/* Common features */}
+            <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
+              <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
+              {[
+                "Listed in your ward & nearby areas",
+                "Visible to buyers searching your category",
+                "Direct chat with interested buyers",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <Check size={13} className="text-[#00A651] flex-shrink-0" />
+                  <span className="text-sm text-muted-foreground">{f}</span>
+                </div>
+              ))}
+            </div>
+
+            {plan !== "free" && (
+              <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  You'll receive an M-Pesa prompt on your phone to complete payment.
+                  Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+        
+         {/* PASTE STEP 5 HERE */}
+        {step === 5 && (
+          <div className="space-y-4 py-8">
+            <h2 className="font-black text-lg">Review and Publish</h2>
+            {/* ... summary content ... */}
           </div>
         )}
       </div>
 
-      <BottomNav />
+      {/* Bottom action */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+        {step < 5 ? (
+          <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
+            Next
+          </Button>
+        ) : plan === "free" ? (
+          <Button
+            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+            onClick={handlePublishFree}
+            disabled={publishingFree}
+          >
+            {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
+          </Button>
+        ) : (
+          <Button
+            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+            style={{ backgroundColor: "#00A651" }}
+            onClick={() => setShowPaymentModal(true)}
+          >
+            <Smartphone size={18} />
+            Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
+          </Button>
+        )}
+      </div>
+
+      {/* Image source picker sheet */}
+      {showImageMenu && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowImageMenu(false)} />
+          <div className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pt-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}>
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+            <p className="font-bold text-sm text-center mb-4">Add a photo</p>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowImageMenu(false); cameraRef.current?.click(); }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
+                <Camera size={20} className="text-primary" />Take a photo
+              </button>
+              <button type="button" onClick={() => { setShowImageMenu(false); fileRef.current?.click(); }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
+                <Camera size={20} className="text-primary" />Choose from gallery
+              </button>
+              <button type="button" onClick={() => setShowImageMenu(false)}
+                className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* M-Pesa listing payment modal */}
+      <MpesaPaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        plan={plan as PaidListingPlan}
+        defaultPhone={phone}
+        onInitiate={handleInitiate}
+        onSuccess={(pid) => {
+          toast({ title: "Listing is live!", description: "Your advert is now visible in the marketplace." });
+          navigate(`/product/${pid}`);
+        }}
+      />
     </div>
   );
 }
