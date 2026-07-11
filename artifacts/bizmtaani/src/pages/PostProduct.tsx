@@ -719,6 +719,57 @@ export default function PostProduct() {
             )}
           </>
         )}
+        {/* Common features */}
+            <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
+              <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
+              {[
+                "Listed in your ward & nearby areas",
+                "Visible to buyers searching your category",
+                "Direct chat with interested buyers",
+              ].map((f) => (
+                <div key={f} className="flex items-center gap-2">
+                  <Check size={13} className="text-[#00A651] flex-shrink-0" />
+                  <span className="text-sm text-muted-foreground">{f}</span>
+                </div>
+              ))}
+            </div>
+
+            {plan !== "free" && (
+              <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-muted-foreground">
+                  You'll receive an M-Pesa prompt on your phone to complete payment.
+                  Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+         {/* PASTE STEP 5 HERE */}
+        {step === 5 && (
+          <div className="space-y-4 py-8">
+            <h2 className="font-black text-lg">Review and Publish</h2>
+            {/* ... summary content ... */}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom action */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
+        style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
+        {step < 5 ? (
+          <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
+            Next
+          </Button>
+        ) : plan === "free" ? (
+          <Button
+            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+            onClick={handlePublishFree}
+            disabled={publishingFree}
+          >
+            {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
+          </Button>
+        ) : (
       </div>
 
       {/* Bottom action */}
