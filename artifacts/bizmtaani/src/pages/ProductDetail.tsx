@@ -229,13 +229,12 @@ export default function PostProduct() {
     }
     return true;
   }
-
-  /**
+      /**
    * Called by MpesaPaymentModal when the user submits their M-Pesa number.
    * Uploads photos, saves the product as pending, initiates STK push.
    * Returns checkoutRequestId + productId for the modal's Firestore listener.
    */
-    async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
+  async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
     if (!user || !coords) throw new Error("Not ready");
 
     // Upload images first
@@ -267,8 +266,8 @@ export default function PostProduct() {
     // Initiate STK push
     const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
     return { checkoutRequestId: stkResult.checkoutRequestId, productId };
-  
   }
+
     async function handlePublishFree() {
     if (!user || !coords) return;
     setPublishingFree(true);
