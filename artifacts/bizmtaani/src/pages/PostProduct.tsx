@@ -304,7 +304,7 @@ export default function PostProduct() {
                   {done ? <Check size={12} /> : n}
                 </div>
                 <span className={`text-[10px] font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-                {i < 3 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
+                {i < 4 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
               </div>
             );
           })}
