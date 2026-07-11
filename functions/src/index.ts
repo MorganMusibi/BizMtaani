@@ -157,25 +157,18 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  // 1. Fetch user to check subscription
-  const userSnap = await db.collection("users").doc(request.auth.uid).get();
-  const userData = userSnap.data();
-  const sub = userData?.subscription;
-
-  // 2. Logic: Freemium is okay, or Premium if expiry is in the future
-  const isPremium = sub?.planType !== 'freemium' && sub?.expiryDate && sub.expiryDate.toMillis() > Date.now();
-  const isFreemium = sub?.planType === 'freemium';
-
-  if (!isPremium && !isFreemium) {
-    throw new HttpsError("failed-precondition", "NO_SUBSCRIPTION");
-  }
-
-  // 3. If passed, proceed to save product
+  // 1. Data Prep
   const productData = request.data;
+  
+  // 2. Logic: If plan is 'free', it is active immediately. 
+  // If it's a paid plan, it stays 'pending_payment' until M-Pesa is done.
+  const status = productData.plan === 'free' ? 'active' : 'pending_payment';
+
+  // 3. Save to Firestore
   const newProductRef = await db.collection("products").add({
     ...productData,
     ownerId: request.auth.uid,
-    status: "active",
+    status: status,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
