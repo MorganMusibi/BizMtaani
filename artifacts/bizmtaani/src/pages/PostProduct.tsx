@@ -724,7 +724,7 @@ export default function PostProduct() {
       {/* Bottom action */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
-        {step < 4 ? (
+        {step < 5 ? (
           <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
             Next
           </Button>
