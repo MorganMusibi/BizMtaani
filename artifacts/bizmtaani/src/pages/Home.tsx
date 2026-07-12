@@ -302,11 +302,12 @@ export default function Home() {
     const coll = collection(db, "products");
     const constraints = [
       where("ward", "==", wardName),
+      where("status", "==", "active"), // Added filter
       orderBy("createdAt", "desc"),
       limit(WARD_PAGE),
     ] as const;
     return cursor
-      ? query(coll, constraints[0], constraints[1], startAfter(cursor), constraints[2])
+      ? query(coll, constraints[0], constraints[1], constraints[2], startAfter(cursor), constraints[3])
       : query(coll, ...constraints);
   }
 
