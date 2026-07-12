@@ -311,17 +311,18 @@ export default function Home() {
       : query(coll, ...constraints);
   }
 
-  function areaQuery(coords: [number, number], cursor?: Cursor) {
+    function areaQuery(coords: [number, number], cursor?: Cursor) {
     const prefix = areaPrefix(coords[0], coords[1]);
     const coll = collection(db, "products");
     const constraints = [
       where("geohash", ">=", prefix),
       where("geohash", "<", prefix + "\uf8ff"),
+      where("status", "==", "active"), // Added filter
       orderBy("geohash"),
       limit(AREA_PAGE),
     ] as const;
     return cursor
-      ? query(coll, constraints[0], constraints[1], constraints[2], startAfter(cursor), constraints[3])
+      ? query(coll, constraints[0], constraints[1], constraints[2], constraints[3], startAfter(cursor), constraints[4])
       : query(coll, ...constraints);
   }
 
