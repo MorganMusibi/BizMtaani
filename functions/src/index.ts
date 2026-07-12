@@ -166,11 +166,12 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
 
   // 3. Save to Firestore
   const newProductRef = await db.collection("products").add({
-    ...productData,
-    ownerId: request.auth.uid,
-    status: status,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  ...productData,
+  ownerId: request.auth.uid,
+  sellerId: request.auth.uid,
+  status,
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+});
 
   return { success: true, productId: newProductRef.id };
 });
