@@ -762,14 +762,50 @@ async function handlePublishFree() {
           </>
         )}
         
-         {/* PASTE STEP 5 HERE */}
+              {/* ========== STEP 5: Review and Publish ========== */}
         {step === 5 && (
-          <div className="space-y-4 py-8">
-            <h2 className="font-black text-lg">Review and Publish</h2>
-            {/* ... summary content ... */}
+          <div className="space-y-6 py-2">
+            <h2 className="font-black text-lg">Review your advert</h2>
+            
+            {/* Summary Card */}
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+              <div className="aspect-video bg-muted rounded-xl overflow-hidden">
+                {imagePreviews[0] ? (
+                  <img src={imagePreviews[0]} className="w-full h-full object-cover" alt="Preview" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No image</div>
+                )}
+              </div>
+              
+              <div>
+                <h3 className="font-bold text-base">{title || "Untitled Advert"}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{description || "No description provided."}</p>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border pt-4">
+                <span className="text-sm font-semibold">Category</span>
+                <span className="text-sm text-muted-foreground">{selectedCategory} / {selectedSubcategory}</span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Price</span>
+                <span className="text-sm font-bold text-primary">
+                  {isAccommodation ? `KES ${rentPerMonth}/mo` : price ? `KES ${price}` : "Negotiable"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Plan</span>
+                <span className="text-sm font-bold capitalize">{plan}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-center text-muted-foreground px-4">
+              By clicking {plan === 'free' ? 'Publish Free' : 'Pay & Publish'}, you agree to our terms and conditions.
+            </p>
           </div>
         )}
-      </div>
+
 
       {/* Bottom action */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
