@@ -229,21 +229,56 @@ export default function PostProduct() {
     }
     return true;
   }
+/**
+ * Corrected handleInitiate
+ */
+async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
+  if (!user || !coords) throw new Error("Not ready");
 
-  /**
-   * Called by MpesaPaymentModal when the user submits their M-Pesa number.
-   * Uploads photos, saves the product as pending, initiates STK push.
-   * Returns checkoutRequestId + productId for the modal's Firestore listener.
-   */
-    async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
-    if (!user || !coords) throw new Error("Not ready");
+  // 1. Upload images
+  const uploadedUrls = await Promise.all(
+    imageFiles.map(file => uploadImage(file, "product"))
+  );
 
-    // Upload images first
+  // 2. Prepare data
+  const docData: any = {
+    title: title.trim(),
+    description: description.trim(),
+    price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+    category: selectedCategory,
+    subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+    imageUrl: uploadedUrls[0] ?? "",
+    imageUrls: uploadedUrls,
+    lat: coords.lat,
+    lng: coords.lng,
+    plan: plan,
+    phone: phone.trim(),
+  };
+
+  // 3. Call Backend Gatekeeper
+  const publishAdvert = httpsCallable(functions, "publishAdvert");
+  const result: any = await publishAdvert(docData);
+  const productId = result.data.productId;
+
+  // 4. Initiate STK push
+  const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
+  return { checkoutRequestId: stkResult.checkoutRequestId, productId };
+}
+
+/**
+ * Corrected handlePublishFree
+ */
+async function handlePublishFree() {
+  if (!user || !coords) return;
+  setPublishingFree(true);
+
+  try {
+    // 1. Upload images
     const uploadedUrls = await Promise.all(
-  imageFiles.map(file => uploadImage(file, "product"))
-);
-    }
+      imageFiles.map(file => uploadImage(file, "product"))
+    );
 
+    // 2. Prepare data
     const docData: any = {
       title: title.trim(),
       description: description.trim(),
@@ -254,63 +289,25 @@ export default function PostProduct() {
       imageUrls: uploadedUrls,
       lat: coords.lat,
       lng: coords.lng,
-      plan: plan,
+      plan: "free",
       phone: phone.trim(),
     };
 
-    // Call Backend Gatekeeper to create the document securely
+    // 3. Call backend
     const publishAdvert = httpsCallable(functions, "publishAdvert");
     const result: any = await publishAdvert(docData);
-    const productId = result.data.productId;
 
-    // Initiate STK push
-    const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
-    return { checkoutRequestId: stkResult.checkoutRequestId, productId };
-  
-  }
-    async function handlePublishFree() {
-    if (!user || !coords) return;
-    setPublishingFree(true);
-
-    try {
-      // 1. Upload images
-      const uploadedUrls = await Promise.all(
-  imageFiles.map(file => uploadImage(file, "product"))
-);
-      }
-
-      // 2. Prepare data
-      const docData: any = {
-        title: title.trim(),
-        description: description.trim(),
-        price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
-        category: selectedCategory,
-        subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
-        imageUrl: uploadedUrls[0] ?? "",
-        imageUrls: uploadedUrls,
-        lat: coords.lat,
-        lng: coords.lng,
-        plan: "free", // <--- Backend sees this and sets status: 'active'
-        phone: phone.trim(),
-      };
-
-      // 3. Call backend
-      const publishAdvert = httpsCallable(functions, "publishAdvert");
-      const result: any = await publishAdvert(docData);
-
-      if (result.data.success) {
-        toast({ title: "Advert published!", description: "Your free listing is now live." });
-        navigate(`/product/${result.data.productId}`);
-      }
-    } catch (error) {
-      console.error(error);
-      toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
-    } finally {
-      setPublishingFree(false);
+    if (result.data.success) {
+      toast({ title: "Advert published!", description: "Your free listing is now live." });
+      navigate(`/product/${result.data.productId}`);
     }
+  } catch (error) {
+    console.error(error);
+    toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
+  } finally {
+    setPublishingFree(false);
   }
-
-
+}
   function goNext() {
     if (validateStep()) setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
   }
