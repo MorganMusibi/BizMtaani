@@ -309,10 +309,14 @@ async function handlePublishFree() {
   }
 }
   function goNext() {
-    if (validateStep()) setStep((s) => (s < 5 ? ((s + 1) as Step) : s));
+  if (validateStep()) {
+    if (step < 5) {
+      setStep((s) => (s + 1) as Step);
+    }
   }
+}
 
-  const stepLabels = ["Category", "Details", "Photos", "Publish","Plan"];
+  const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
