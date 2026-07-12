@@ -805,6 +805,7 @@ async function handlePublishFree() {
             </p>
           </div>
         )}
+        </div>
 
 
       {/* Bottom action */}
