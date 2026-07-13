@@ -607,10 +607,11 @@ pricingBasis,
             {!isEatery && (
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-bold">
-                    Photos (up to {PLAN_PHOTO_LIMITS[plan]}) *
-                  </label>
-                  <span className="text-xs text-muted-foreground">{imageFiles.length}/{PLAN_PHOTO_LIMITS[plan]}</span>
+                  // Change the label and the span to use MAX_PHOTO_LIMIT
+<label className="text-sm font-bold">
+  Photos (up to {MAX_PHOTO_LIMIT[plan]}) *
+</label>
+<span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
                 </div>
 
                 {plan === "free" && imageFiles.length >= PLAN_PHOTO_LIMITS.free && (
