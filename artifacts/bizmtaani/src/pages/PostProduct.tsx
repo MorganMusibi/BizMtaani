@@ -688,116 +688,63 @@ pricingBasis,
         )}
 
         {/* ========== STEP 4: Choose Plan & Publish ========== */}
-        {step === 4 && (
-          <>
-            <div>
-              <h2 className="font-black text-lg">Choose Your Plan</h2>
-              <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
-            </div>
+{step === 4 && (
+  <>
+    <div>
+      <h2 className="font-black text-lg">Choose Your Plan</h2>
+      <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
+    </div>
 
-            {/* Free plan */}
-            <button
-              onClick={() => setPlan("free")}
-              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
-                plan === "free" ? "border-border bg-muted/40" : "border-border hover:border-muted-foreground/40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0 pr-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-black text-base">Free</span>
-                    {plan === "free" && <span className="text-[10px] bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-bold">Selected</span>}
-                  </div>
-                  <p className="text-sm text-muted-foreground">3 days live · 1 photo each · up to 5 adverts</p>
-                  {plan === "free" && imageFiles.length > 1 && (
-                    <p className="text-xs text-amber-700 mt-1.5">Only first photo used on Free plan</p>
-                  )}
-                </div>
-                <span className="font-black text-xl text-muted-foreground flex-shrink-0">Free</span>
-              </div>
-            </button>
+    {/* Free plan */}
+    <button onClick={() => setPlan("free")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}>
+      <div className="flex justify-between items-center">
+        <div><span className="font-black text-base">Free</span><p className="text-sm text-muted-foreground">3 days · 1 photo</p></div>
+        <span className="font-black text-xl text-muted-foreground">Free</span>
+      </div>
+    </button>
 
-            {/* Basic plan */}
-            <button
-              onClick={() => setPlan("basic")}
-              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
-                plan === "basic" ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0 pr-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-black text-base">Basic</span>
-                    {plan === "basic" && <span className="text-[10px] bg-primary text-white px-2 py-0.5 rounded-full font-bold">Selected</span>}
-                  </div>
-                  <p className="text-sm text-muted-foreground">7 days live · 2 photos · up to 10 adverts</p>
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
-                      <Shield size={11} /> Verified badge
-                    </span>
-                    <span className="text-xs text-muted-foreground">50% more visibility</span>
-                  </div>
-                </div>
-                <span className="font-black text-2xl text-primary flex-shrink-0">KES {PLAN_AMOUNTS.basic}</span>
-              </div>
-            </button>
+    {/* Weekly Premium */}
+    <button onClick={() => setPlan("premium_weekly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_weekly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
+      <div className="flex justify-between items-center">
+        <div><span className="font-black text-base">Weekly Premium</span><p className="text-sm text-muted-foreground">7 days · 4 photos · Verified</p></div>
+        <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
+      </div>
+    </button>
 
-            {/* Premium plan */}
-            <button
-              onClick={() => setPlan("premium")}
-              className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
-                plan === "premium" ? "border-[#00A651] bg-[#00A651]/5" : "border-border hover:border-[#00A651]/40"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0 pr-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-black text-base">Premium</span>
-                    {plan === "premium" ? (
-                      <span className="text-[10px] bg-[#00A651] text-white px-2 py-0.5 rounded-full font-bold">Selected</span>
-                    ) : (
-                      <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-bold">Best value</span>
-                    )}
-                  </div>
-                  <p className="text-sm text-muted-foreground">7 days live · 4 photos · up to 30 adverts</p>
-                  <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                    <span className="flex items-center gap-1 text-xs text-[#00A651] font-semibold">
-                      <Shield size={11} /> Verified badge
-                    </span>
-                    <span className="text-xs text-muted-foreground">70% more visibility</span>
-                    <span className="text-xs text-muted-foreground">Business tools</span>
-                  </div>
-                </div>
-                <span className="font-black text-2xl flex-shrink-0" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium}</span>
-              </div>
-            </button>
+    {/* Monthly Premium */}
+    <button onClick={() => setPlan("premium_monthly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_monthly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
+      <div className="flex justify-between items-center">
+        <div><span className="font-black text-base">Monthly Premium</span><p className="text-sm text-muted-foreground">30 days · 10 photos · Top Priority</p></div>
+        <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
+      </div>
+    </button>
 
-            {/* Common features */}
-            <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
-              <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
-              {[
-                "Listed in your ward & nearby areas",
-                "Visible to buyers searching your category",
-                "Direct chat with interested buyers",
-              ].map((f) => (
-                <div key={f} className="flex items-center gap-2">
-                  <Check size={13} className="text-[#00A651] flex-shrink-0" />
-                  <span className="text-sm text-muted-foreground">{f}</span>
-                </div>
-              ))}
-            </div>
+    {/* Common features */}
+    <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
+      <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
+      {[
+        "Listed in your ward & nearby areas",
+        "Visible to buyers searching your category",
+        "Direct chat with interested buyers",
+      ].map((f) => (
+        <div key={f} className="flex items-center gap-2">
+          <Check size={13} className="text-[#00A651] flex-shrink-0" />
+          <span className="text-sm text-muted-foreground">{f}</span>
+        </div>
+      ))}
+    </div>
 
-            {plan !== "free" && (
-              <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
-                <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
-                <p className="text-xs text-muted-foreground">
-                  You'll receive an M-Pesa prompt on your phone to complete payment.
-                  Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
-                </p>
-              </div>
-            )}
-          </>
-        )}
+    {plan !== "free" && (
+      <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+        <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          You'll receive an M-Pesa prompt on your phone to complete payment.
+          Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+        </p>
+      </div>
+    )}
+  </>
+)}
         
               {/* ========== STEP 5: Review and Publish ========== */}
         {step === 5 && (
