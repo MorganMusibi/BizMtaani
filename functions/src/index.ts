@@ -122,13 +122,30 @@ export const mpesaCallback = onRequest(async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
+    
     const paymentRef = db.collection("payments").doc(callback.CheckoutRequestID);
     const paymentSnap = await paymentRef.get();
+    
     if (paymentSnap.exists && paymentSnap.data()?.callbackToken === req.query["cbtoken"]) {
       if (callback.ResultCode === 0) {
-        await paymentRef.update({ status: "completed", completedAt: admin.firestore.FieldValue.serverTimestamp() });
-        const productRef = db.collection("products").doc(paymentSnap.data()?.productId);
-        await productRef.update({ status: "active", expiresAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + LISTING_DURATION_DAYS * 86_400_000)) });
+        const paymentData = paymentSnap.data()!;
+        // Retrieve the plan from the payment record to determine duration
+        const plan = paymentData.plan ?? "free";
+        const durationDays = LISTING_DURATIONS[plan] ?? 7;
+
+        await paymentRef.update({ 
+            status: "completed", 
+            completedAt: admin.firestore.FieldValue.serverTimestamp() 
+        });
+
+        const productRef = db.collection("products").doc(paymentData.productId);
+        await productRef.update({ 
+          status: "active", 
+          // Dynamically calculate expiry based on the specific plan duration
+          expiresAt: admin.firestore.Timestamp.fromDate(
+            new Date(Date.now() + durationDays * 86_400_000)
+          ) 
+        });
       }
     }
   } catch (err) { console.error(err); }
