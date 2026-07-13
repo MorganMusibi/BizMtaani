@@ -302,7 +302,6 @@ export default function Home() {
     const coll = collection(db, "products");
     const constraints = [
       where("ward", "==", wardName),
-      where("status", "==", "active"), // Added filter
       orderBy("createdAt", "desc"),
       limit(WARD_PAGE),
     ] as const;
