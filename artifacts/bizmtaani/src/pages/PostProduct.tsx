@@ -614,7 +614,7 @@ pricingBasis,
 <span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
                 </div>
 
-                {plan === "free" && imageFiles.length >= PLAN_PHOTO_LIMITS.free && (
+                {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
                   <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
                     <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
