@@ -133,27 +133,44 @@ export default function PostProduct() {
   const subcategories = catDef?.subcategories ?? [];
 
   function handleImageFiles(files: FileList | null) {
-    if (!files) return;
-    const currentLimit = PLAN_PHOTO_LIMITS[plan];
-    const remaining = currentLimit - imageFiles.length;
-    if (remaining <= 0) {
-      if (plan === "free") {
-        toast({ title: "Free plan limit reached", description: "Choose Basic or Premium in the next step for more photos." });
-      } else if (plan === "basic") {
-        toast({ title: "Basic plan limit reached", description: "Upgrade to Premium (KES 120) in the next step for up to 4 photos." });
-      }
-      return;
+  if (!files) return;
+  
+  // Use the new MAX_PHOTO_LIMIT constant
+  const currentLimit = MAX_PHOTO_LIMIT[plan];
+  const remaining = currentLimit - imageFiles.length;
+  
+  if (remaining <= 0) {
+    if (plan === "free") {
+      toast({ 
+        title: "Free plan limit reached", 
+        description: "Upgrade to Weekly or Monthly Premium for more photos." 
+      });
+    } else {
+      // This covers both premium_weekly and premium_monthly
+      toast({ 
+        title: "Limit reached", 
+        description: "You have reached the photo limit for your current plan." 
+      });
     }
-    const toAdd = Array.from(files).slice(0, remaining);
-    const oversized = toAdd.filter((f) => f.size > 8 * 1024 * 1024);
-    if (oversized.length > 0) {
-      toast({ title: "Some images too large", description: "Max 8 MB per image.", variant: "destructive" });
-      return;
-    }
-    setImageFiles((prev) => [...prev, ...toAdd]);
-    const previews = toAdd.map((f) => URL.createObjectURL(f));
-    setImagePreviews((prev) => [...prev, ...previews]);
+    return;
   }
+  
+  const toAdd = Array.from(files).slice(0, remaining);
+  const oversized = toAdd.filter((f) => f.size > 8 * 1024 * 1024);
+  
+  if (oversized.length > 0) {
+    toast({ 
+      title: "Some images too large", 
+      description: "Max 8 MB per image.", 
+      variant: "destructive" 
+    });
+    return;
+  }
+  
+  setImageFiles((prev) => [...prev, ...toAdd]);
+  const previews = toAdd.map((f) => URL.createObjectURL(f));
+  setImagePreviews((prev) => [...prev, ...previews]);
+}
 
   function removeImage(i: number) {
     URL.revokeObjectURL(imagePreviews[i]);
