@@ -14,8 +14,7 @@ import {
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, type PaidListingPlan, PLAN_PHOTO_LIMITS, PLAN_AMOUNTS } from "@/lib/mpesa";
-
+import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS } from "@/lib/mpesa";
 interface Product {
   id: string;
   title: string;
@@ -247,7 +246,9 @@ export default function MyListings() {
                     renewPlan === p ? "border-primary bg-primary/5" : "border-border"
                   }`}>
                   <p className="font-black text-sm capitalize">{p}</p>
-                  <p className="text-xs text-muted-foreground">{PLAN_PHOTO_LIMITS[p]} photos · 7 days</p>
+                  <p className="text-xs text-muted-foreground">
+  {MAX_PHOTO_LIMIT[p] === Infinity ? "Unlimited" : MAX_PHOTO_LIMIT[p]} photos · 7 days
+</p>
                   <p className="font-black text-primary mt-1">KES {PLAN_AMOUNTS[p]}</p>
                 </button>
               ))}
