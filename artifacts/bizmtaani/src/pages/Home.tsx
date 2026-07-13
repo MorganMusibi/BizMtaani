@@ -316,7 +316,6 @@ export default function Home() {
     const constraints = [
       where("geohash", ">=", prefix),
       where("geohash", "<", prefix + "\uf8ff"),
-      where("status", "==", "active"), // Added filter
       orderBy("geohash"),
       limit(AREA_PAGE),
     ] as const;
