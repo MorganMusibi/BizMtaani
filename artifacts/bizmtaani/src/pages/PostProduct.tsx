@@ -87,7 +87,7 @@ export default function PostProduct() {
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
-  const photoLimit = PLAN_PHOTO_LIMITS[plan];
+  const photoLimit = MAX_PHOTO_LIMIT[plan];
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
