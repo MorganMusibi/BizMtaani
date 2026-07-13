@@ -711,17 +711,17 @@ export default function Home() {
         )}
       </div>
 
-      {user && (
-        <div className="fixed bottom-20 right-4 z-40">
-          <button
-            data-testid="fab-advertise"
-            onClick={() => setLocation("/post")}
-            className="flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
-          >
-            <Plus size={18} />Advertise
-          </button>
-        </div>
-      )}
+{user && (
+  <div className="fixed bottom-20 right-4 z-40 pointer-events-none"> {/* Added pointer-events-none */}
+    <button
+      data-testid="fab-advertise"
+      onClick={() => setLocation("/post")}
+      className="pointer-events-auto flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
+    >
+      <Plus size={18} />Advertise
+    </button>
+  </div>
+)}
 
       {!user && gpsReady && (
         <div className="flex-shrink-0 bg-card border-t border-border px-4 py-3 flex items-center gap-3 z-40">
