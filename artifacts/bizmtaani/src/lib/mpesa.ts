@@ -3,7 +3,7 @@
  *
  * Plans:
  *   free    — 0 KES, 1 photo, 3 days, up to 5 active adverts
- *   basic   — KES 60/week, 2 photos, 7 days, up to 10 active adverts, verified badge
+ *   weekly   — KES 100/week, 1 photos, 7 days, up to 5 active adverts, verified badge
  *   premium — KES 120/week, 4 photos, 7 days, up to 30 active adverts, verified badge + biz tools
  *
  * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
@@ -12,33 +12,35 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 
-export type ListingPlan = "free" | "basic" | "premium";
-export type PaidListingPlan = "basic" | "premium";
+// --- TYPES ---
+export type ListingPlan = "free" | "premium_weekly" | "premium_monthly";
+export type PaidListingPlan = "premium_weekly" | "premium_monthly";
 
-export const FREE_PLAN_DURATION_DAYS = 3;
-export const FREE_PLAN_ADVERT_LIMIT = 5;
-
-export const PLAN_AMOUNTS: Record<PaidListingPlan, number> = {
-  basic: 60,
-  premium: 120,
-};
-
-export const PLAN_PHOTO_LIMITS: Record<ListingPlan, number> = {
-  free: 1,
-  basic: 2,
-  premium: 4,
-};
-
-export const PLAN_ADVERT_LIMITS: Record<ListingPlan, number> = {
-  free: 5,
-  basic: 10,
-  premium: 30,
-};
-
+// --- EXPIRY LOGIC (Days until ad expires) ---
 export const LISTING_DURATION_DAYS: Record<ListingPlan, number> = {
-  free: 3,
-  basic: 7,
-  premium: 7,
+  free: 7,
+  premium_weekly: 7,
+  premium_monthly: 30,
+};
+
+// --- AD LIMITS (Max active adverts) ---
+export const MAX_ACTIVE_ADVERTS: Record<ListingPlan, number> = {
+  free: 5,
+  premium_weekly: Infinity, // 'Infinity' means no limit
+  premium_monthly: Infinity,
+};
+
+// --- PHOTO LIMITS (Photos per advert) ---
+export const MAX_PHOTO_LIMIT: Record<ListingPlan, number> = {
+  free: 1,
+  premium_weekly: Infinity,
+  premium_monthly: Infinity,
+};
+
+// --- PRICING ---
+export const PLAN_AMOUNTS: Record<PaidListingPlan, number> = {
+  premium_weekly: 100,
+  premium_monthly: 350,
 };
 
 export interface StkPushParams {
