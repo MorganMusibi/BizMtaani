@@ -2,12 +2,12 @@
  * Frontend M-Pesa helpers — listing activation payments.
  *
  * Plans:
- *   free    — 0 KES, 1 photo, 3 days, up to 5 active adverts
- *   weekly   — KES 100/week, 1 photos, 7 days, up to 5 active adverts, verified badge
- *   premium — KES 120/week, 4 photos, 7 days, up to 30 active adverts, verified badge + biz tools
+ * free            — 0 KES, 1 photo, 7 days, up to 5 active adverts
+ * premium_weekly  — 100 KES, Unlimited photos, 7 days, Unlimited active adverts
+ * premium_monthly — 350 KES, Unlimited photos, 30 days, Unlimited active adverts
  *
  * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
- * which calls the Daraja STK push API server-side using secret keys.
+ * which calls the Daraja STK push API server-side.
  */
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
