@@ -118,11 +118,13 @@ export default function PostProduct() {
   }, [user, userProfile]);
 
   // Auto-upgrade to premium if photos exceed basic limit
-  useEffect(() => {
-    if (imageFiles.length > PLAN_PHOTO_LIMITS.basic && plan === "basic") {
-      setPlan("premium");
-    }
-  }, [imageFiles.length, plan]);
+  // Replace lines 132-136
+useEffect(() => {
+  if (imageFiles.length > MAX_PHOTO_LIMIT.free && plan === "free") {
+    // Automatically suggest/switch to weekly if they go over free limit
+    setPlan("premium_weekly");
+  }
+}, [imageFiles.length, plan]);
 
   const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
   const isAccommodation = selectedCategory === "Accommodation";
