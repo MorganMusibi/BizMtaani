@@ -25,10 +25,25 @@ const FOLDER_MAP: Record<string, string> = {
   product: "bizmtaani/products",
   community: "bizmtaani/community",
 };
+// Update these to reflect the plans actually used in your frontend (mpesa.ts)
+const PLAN_AMOUNTS: Record<string, number> = { 
+  free: 0, 
+  premium_weekly: 100, 
+  premium_monthly: 350 
+};
 
-const PLAN_AMOUNTS: Record<string, number> = { basic: 60, premium: 120 };
-const PLAN_PHOTO_LIMITS: Record<string, number> = { basic: 2, premium: 4 };
-const LISTING_DURATION_DAYS = 7;
+// If you are using limits in your backend, update them here:
+const MAX_PHOTO_LIMIT: Record<string, number> = {
+  free: 1,
+  premium_weekly: Infinity,
+  premium_monthly: Infinity,
+};
+// Add this in your Constants section
+const LISTING_DURATIONS: Record<string, number> = {
+  free: 7,
+  premium_weekly: 7,
+  premium_monthly: 30,
+};
 const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 
 function isSandbox(): boolean {
