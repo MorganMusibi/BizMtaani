@@ -655,12 +655,15 @@ export default function Home() {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   {filteredWard.map((p) => (
-                    <ProductCard
-                      key={p.id} product={p}
-                      userCoords={userCoords}
-                      onClick={() => setLocation(`/product/${p.id}`)}
-                    />
-                  ))}
+  <ProductCard
+    key={p.id} 
+    product={p}
+    userCoords={userCoords}
+    onClick={(e) => {
+      e.stopPropagation(); // This prevents the click from reaching the FAB
+      setLocation(`/product/${p.id}`);
+    }}
+  />
                 </div>
               </>
             )}
@@ -676,12 +679,16 @@ export default function Home() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {filteredArea.map((p) => (
-                    <ProductCard
-                      key={p.id} product={p}
-                      userCoords={userCoords}
-                      onClick={() => setLocation(`/product/${p.id}`)}
-                    />
-                  ))}
+  <ProductCard
+    key={p.id} 
+    product={p}
+    userCoords={userCoords}
+    onClick={(e) => {
+      e.stopPropagation(); // This prevents the click from reaching the FAB
+      setLocation(`/product/${p.id}`);
+    }}
+  />
+))}
                 </div>
               </>
             )}
