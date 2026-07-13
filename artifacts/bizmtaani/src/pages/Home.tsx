@@ -664,6 +664,7 @@ export default function Home() {
       setLocation(`/product/${p.id}`);
     }}
   />
+                ))}
                 </div>
               </>
             )}
