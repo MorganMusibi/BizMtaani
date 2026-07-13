@@ -90,7 +90,7 @@ function dedupe(existing: Product[], incoming: Product[]): Product[] {
 function ProductCard({
   product, userCoords, onClick,
 }: {
-  product: Product; userCoords: [number, number] | null; onClick: () => void;
+  product: Product; userCoords: [number, number] | null; onClick: (e: React.MouseEvent | React.TouchEvent) => void; // Add the event type
 }) {
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
@@ -122,7 +122,7 @@ function ProductCard({
   return (
     <div
       data-testid={`product-card-${product.id}`}
-      onClick={onClick}
+      onClick={(e) => onClick(e)}
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
     >
       <div className="relative">
