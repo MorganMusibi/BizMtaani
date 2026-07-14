@@ -182,6 +182,10 @@ async function runCleanup() {
     .where("status", "==", "pending_payment")
     .where("createdAt", "<", oneHourAgo)
     .get();
+  const expiredPayments = await db.collection("payments")
+  .where("status", "==", "pending")
+  .where("createdAt", "<", oneHourAgo)
+  .get();
 
   const batch = db.batch();
 
@@ -196,13 +200,18 @@ async function runCleanup() {
   expiredPending.docs.forEach((doc) => {
     batch.delete(doc.ref);
   });
+  // Delete abandoned pending payment records
+expiredPayments.docs.forEach((doc) => {
+  batch.delete(doc.ref);
+});
 
   await batch.commit();
 
   return {
-    archived: expiredActive.size,
-    deletedPending: expiredPending.size,
-  };
+  archived: expiredActive.size,
+  deletedPending: expiredPending.size,
+  deletedPayments: expiredPayments.size,
+};
 }
 
 export const scheduledCleanup = onSchedule(
