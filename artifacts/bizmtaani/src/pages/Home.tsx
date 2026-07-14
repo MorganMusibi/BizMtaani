@@ -91,7 +91,9 @@ function dedupe(existing: Product[], incoming: Product[]): Product[] {
 function ProductCard({
   product, userCoords, onClick,
 }: {
-  product: Product; userCoords: [number, number] | null; onClick: (e: React.MouseEvent | React.TouchEvent) => void;
+  product: Product; 
+  userCoords: [number, number] | null; 
+  onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
@@ -123,17 +125,16 @@ function ProductCard({
   return (
     <div
       data-testid={`product-card-${product.id}`}
-      onClick={(e) => onClick(e)}
+      onClick={onClick}
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
     >
       <div className="relative">
-        {/* --- PREMIUM BADGE START --- */}
+        {/* --- PREMIUM BADGE --- */}
         {product.plan?.startsWith("premium") && (
           <div className="absolute top-2 left-2 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
             PREMIUM
           </div>
         )}
-        {/* --- PREMIUM BADGE END --- */}
 
         {displayImage ? (
           <img
@@ -145,16 +146,18 @@ function ProductCard({
             <Package size={28} className="text-muted-foreground" />
           </div>
         )}
+        
         {priceLabel && (
-          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg">
+          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg z-[5]">
             {priceLabel}
           </div>
         )}
-        <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+        
+        <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor} z-[5]`}>
           {product.subcategory ?? product.category}
         </div>
         
-        {/* Verified Badge */}
+        {/* Verified Badge - Positioned to avoid overlapping Premium badge */}
         {(product.verified || product.plan === "basic" || product.plan === "premium") && (
           <div className="absolute top-2 left-14 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
             <Check size={8} />
@@ -163,11 +166,12 @@ function ProductCard({
         )}
         
         {isAccommodation && (product.imageUrls?.length ?? 0) > 1 && (
-          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
+          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
             +{(product.imageUrls?.length ?? 1) - 1} photos
           </div>
         )}
       </div>
+      
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
         <div className="flex items-center justify-between mt-1.5 gap-1">
