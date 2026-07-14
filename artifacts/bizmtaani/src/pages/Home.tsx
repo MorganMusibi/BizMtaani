@@ -91,7 +91,7 @@ function dedupe(existing: Product[], incoming: Product[]): Product[] {
 function ProductCard({
   product, userCoords, onClick,
 }: {
-  product: Product; userCoords: [number, number] | null; onClick: (e: React.MouseEvent | React.TouchEvent) => void; // Add the event type
+  product: Product; userCoords: [number, number] | null; onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
@@ -127,6 +127,14 @@ function ProductCard({
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
     >
       <div className="relative">
+        {/* --- PREMIUM BADGE START --- */}
+        {product.plan?.startsWith("premium") && (
+          <div className="absolute top-2 left-2 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
+            PREMIUM
+          </div>
+        )}
+        {/* --- PREMIUM BADGE END --- */}
+
         {displayImage ? (
           <img
             src={displayImage} alt={product.title} loading="lazy"
@@ -145,12 +153,15 @@ function ProductCard({
         <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
           {product.subcategory ?? product.category}
         </div>
+        
+        {/* Verified Badge */}
         {(product.verified || product.plan === "basic" || product.plan === "premium") && (
-          <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+          <div className="absolute top-2 left-14 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
             <Check size={8} />
             <span>Verified</span>
           </div>
         )}
+        
         {isAccommodation && (product.imageUrls?.length ?? 0) > 1 && (
           <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
             +{(product.imageUrls?.length ?? 1) - 1} photos
