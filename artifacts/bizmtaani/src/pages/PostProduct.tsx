@@ -621,15 +621,15 @@ pricingBasis,
 <span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
                 </div>
 
-                {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
-                  <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
-                    <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">Choose Basic (KES 60) or Premium (KES 120) in the next step for more photos.</p>
-                    </div>
-                  </div>
-                )}
+            {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
+  <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+    <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+    <div className="flex-1">
+      <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
+      <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Weekly or Monthly Premium for unlimited photos.</p>
+    </div>
+  </div>
+)}
 
                 <div className="grid grid-cols-3 gap-2">
                   {imagePreviews.map((src, i) => (
