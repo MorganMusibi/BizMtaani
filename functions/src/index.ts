@@ -187,10 +187,26 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, ...productData } = request.data;
+  const { plan, title, price, imageUrls, ...otherData } = request.data;
   const uid = request.auth.uid;
 
-  // 1. Enforce 5-ad limit for Free plan
+  // 1. Validation: Plan Existence
+  if (!PLAN_AMOUNTS.hasOwnProperty(plan)) {
+    throw new HttpsError("invalid-argument", "Invalid plan selected.");
+  }
+
+  // 2. Validation: Required Fields
+  if (!title || !price || !imageUrls || !Array.isArray(imageUrls)) {
+    throw new HttpsError("invalid-argument", "Missing required product details.");
+  }
+
+  // 3. Validation: Photo Limits
+  const limit = MAX_PHOTO_LIMIT[plan] ?? 0;
+  if (imageUrls.length > limit) {
+    throw new HttpsError("failed-precondition", `Your plan allows a maximum of ${limit} photos.`);
+  }
+
+  // 4. Logic: Free Ad Limit Enforcement
   if (plan === 'free') {
     const userAds = await db.collection("products").where("ownerId", "==", uid).where("status", "==", "active").get();
     if (userAds.size >= 5) {
@@ -198,19 +214,30 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
     }
   }
 
-  // 2. Set Hard Expiry (30 days for Monthly, 7 days for others)
-  const durationDays = plan === 'premium_monthly' ? 30 : 7;
-  const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
+  // 5. Logic: Status Determination
+  // Paid plans start as 'pending_payment'; Free plans start as 'active'
+  const status = plan === 'free' ? 'active' : 'pending_payment';
 
-  // 3. Save Ad
-  await db.collection("products").add({
-    ...productData,
-    plan, 
+  // 6. Logic: Dynamic Expiry (Only if active immediately)
+  const durationDays = LISTING_DURATIONS[plan] ?? 7;
+  const expiresAt = status === 'active' 
+    ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000))
+    : null;
+
+  // 7. Save Ad
+  const newProductRef = await db.collection("products").add({
+    ...otherData,
+    title,
+    price,
+    imageUrls,
+    plan,
     ownerId: uid,
-    status: 'active',
+    sellerId: uid,
+    status,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt
   });
 
-  return { success: true };
+  // 8. Return the generated productId
+  return { success: true, productId: newProductRef.id };
 });
