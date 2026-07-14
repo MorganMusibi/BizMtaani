@@ -706,7 +706,10 @@ pricingBasis,
     {/* Free plan */}
     <button onClick={() => setPlan("free")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
-        <div><span className="font-black text-base">Free</span><p className="text-sm text-muted-foreground">3 days · 1 photo</p></div>
+        <div>
+          <span className="font-black text-base">Free</span>
+          <p className="text-sm text-muted-foreground">7 days · 1 photo · 5 max active adverts</p>
+        </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
     </button>
@@ -714,7 +717,10 @@ pricingBasis,
     {/* Weekly Premium */}
     <button onClick={() => setPlan("premium_weekly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_weekly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
-        <div><span className="font-black text-base">Weekly Premium</span><p className="text-sm text-muted-foreground">7 days · 4 photos · Verified</p></div>
+        <div>
+          <span className="font-black text-base">Weekly Premium</span>
+          <p className="text-sm text-muted-foreground">7 days · Unlimited photos · Unlimited active adverts</p>
+        </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
     </button>
@@ -722,7 +728,10 @@ pricingBasis,
     {/* Monthly Premium */}
     <button onClick={() => setPlan("premium_monthly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_monthly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
-        <div><span className="font-black text-base">Monthly Premium</span><p className="text-sm text-muted-foreground">30 days · 10 photos · Top Priority</p></div>
+        <div>
+          <span className="font-black text-base">Monthly Premium</span>
+          <p className="text-sm text-muted-foreground">30 days · Unlimited photos · Unlimited active adverts</p>
+        </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
     </button>
