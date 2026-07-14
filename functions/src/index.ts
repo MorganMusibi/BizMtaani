@@ -205,6 +205,19 @@ async function runCleanup() {
   };
 }
 
+export const scheduledCleanup = onSchedule(
+  "every 1 hours",
+  async () => {
+    try {
+      const result = await runCleanup();
+      console.log(
+        `Cleanup complete. Archived: ${result.archived}, Deleted pending: ${result.deletedPending}`
+      );
+    } catch (error) {
+      console.error("Cleanup failed:", error);
+    }
+  }
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
