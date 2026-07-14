@@ -26,7 +26,10 @@ interface CloudinarySignatureResult {
 export async function uploadImage(
   file: File,
   type: ImageUploadType
-): Promise<string> {
+): Promise<{
+  url: string;
+  public_id: string;
+}> {
   const functions = getFunctions(app);
   const getSignature = httpsCallable<
     { uploadType: string },
@@ -59,7 +62,17 @@ export async function uploadImage(
     );
   }
 
-  const data = (await res.json()) as { secure_url: string };
-  if (!data.secure_url) throw new Error("No URL returned from Cloudinary");
-  return data.secure_url;
+  const data = (await res.json()) as {
+  secure_url: string;
+  public_id: string;
+};
+
+if (!data.secure_url || !data.public_id) {
+  throw new Error("Cloudinary response missing image data");
+}
+
+return {
+  url: data.secure_url,
+  public_id: data.public_id,
+};
 }
