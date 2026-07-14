@@ -57,6 +57,7 @@ interface Product {
   expiresAt?: { seconds: number } | null;
   status?: string;
   plan?: string;
+  isPremium?: boolean;
   verified?: boolean;
 }
 
