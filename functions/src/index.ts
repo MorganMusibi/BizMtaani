@@ -137,6 +137,14 @@ export const mpesaCallback = onRequest(async (req, res) => {
             status: "completed", 
             completedAt: admin.firestore.FieldValue.serverTimestamp() 
         });
+        // Activate the advert
+await db.collection("products").doc(paymentData.productId).update({
+  status: "active",
+  paidAt: admin.firestore.FieldValue.serverTimestamp(),
+  expiresAt: admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() + durationDays * 86_400_000)
+  )
+});
 
         // Add this in mpesaCallback
 await db.collection("users").doc(paymentData.buyerId)
