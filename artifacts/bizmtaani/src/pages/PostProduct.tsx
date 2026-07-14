@@ -262,9 +262,9 @@ async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: 
   if (!user || !coords) throw new Error("Not ready");
 
   // 1. Upload images
-  const uploadedUrls = await Promise.all(
-    imageFiles.map(file => uploadImage(file, "product"))
-  );
+  const uploadedImages = await Promise.all(
+  imageFiles.map(file => uploadImage(file, "product"))
+);
 
   // 2. Prepare data
   const docData: any = {
@@ -273,8 +273,8 @@ async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: 
     price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
     category: selectedCategory,
     subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
-    imageUrl: uploadedUrls[0] ?? "",
-    imageUrls: uploadedUrls,
+    imageUrl: uploadedImages[0]?.url ?? "",
+    imageUrls: uploadedImages,
     lat: coords.lat,
     lng: coords.lng,
     ward: wardInfo?.wardName ?? "",
@@ -309,9 +309,9 @@ async function handlePublishFree() {
 
   try {
     // 1. Upload images
-    const uploadedUrls = await Promise.all(
-      imageFiles.map(file => uploadImage(file, "product"))
-    );
+    const uploadedImages = await Promise.all(
+  imageFiles.map(file => uploadImage(file, "product"))
+);
 
     // 2. Prepare data
     const docData: any = {
@@ -320,8 +320,8 @@ async function handlePublishFree() {
       price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
       category: selectedCategory,
       subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
-      imageUrl: uploadedUrls[0] ?? "",
-      imageUrls: uploadedUrls,
+      imageUrl: uploadedImages[0]?.url ?? "",
+      imageUrls: uploadedImages,
       lat: coords.lat,
       lng: coords.lng,
       ward: wardInfo?.wardName ?? "",
