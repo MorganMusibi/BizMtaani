@@ -220,8 +220,8 @@ export const scheduledCleanup = onSchedule(
     try {
       const result = await runCleanup();
       console.log(
-        `Cleanup complete. Archived: ${result.archived}, Deleted pending: ${result.deletedPending}`
-      );
+  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}`
+);
     } catch (error) {
       console.error("Cleanup failed:", error);
     }
