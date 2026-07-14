@@ -156,23 +156,42 @@ export const mpesaCallback = onRequest(async (req, res) => {
 // 3. CLEANUP
 // ═══════════════════════════════════════════════════════════════════════════
 async function runCleanup() {
-  const now = new Date();
-  const snap = await db.collection("products").where("status", "==", "active").where("expiresAt", "<", now).get();
-  const batch = db.batch();
-  snap.docs.forEach(d => batch.update(d.ref, { status: "archived", archivedAt: admin.firestore.Timestamp.fromDate(now) }));
-  await batch.commit();
-  return { archived: snap.size };
-}
+  const now = admin.firestore.Timestamp.now();
+  const productsRef = db.collection("products");
 
-// Fixed
-export const scheduledCleanup = onSchedule({ schedule: "0 21 * * *" }, async (_event) => {
-  await runCleanup();
-});
-export const triggerCleanup = onRequest(async (req, res) => {
-  if (req.headers["x-cron-secret"] !== process.env.CRON_SECRET) { res.status(403).send(); return; }
-  await runCleanup();
-  res.json({ ok: true });
-});
+  // 1. Handle Downgrades (Premium -> Free)
+  // Query all active premium ads where expiresAt is passed
+  const premiumSnap = await productsRef
+    .where("status", "==", "active")
+    .where("plan", "in", ["premium_weekly", "premium_monthly"])
+    .where("expiresAt", "<", now)
+    .get();
+
+  const batch = db.batch();
+  
+  premiumSnap.docs.forEach(doc => {
+    // Downgrade to Free: Set new expiry 7 days from NOW
+    const newExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 86_400_000));
+    batch.update(doc.ref, { 
+      plan: "free", 
+      expiresAt: newExpiry 
+    });
+  });
+
+  // 2. Handle Free Expiry (Free -> Archived)
+  const freeSnap = await productsRef
+    .where("status", "==", "active")
+    .where("plan", "==", "free")
+    .where("expiresAt", "<", now)
+    .get();
+
+  freeSnap.docs.forEach(doc => {
+    batch.update(doc.ref, { status: "archived", archivedAt: now });
+  });
+
+  await batch.commit();
+  return { downgraded: premiumSnap.size, archived: freeSnap.size };
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
@@ -189,21 +208,37 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  // 1. Data Prep
-  const productData = request.data;
-  
-  // 2. Logic: If plan is 'free', it is active immediately. 
-  // If it's a paid plan, it stays 'pending_payment' until M-Pesa is done.
-  const status = productData.plan === 'free' ? 'active' : 'pending_payment';
+  const productData = request.data; // Expecting { ..., plan: 'free' | 'premium_weekly' | 'premium_monthly' }
+  const uid = request.auth.uid;
 
-  // 3. Save to Firestore
+  // Enforce 5-ad limit for Free plan
+  if (productData.plan === 'free') {
+    const userAds = await db.collection("products")
+      .where("ownerId", "==", uid)
+      .where("plan", "==", "free")
+      .where("status", "in", ["active", "pending_payment"]) // Count active ads
+      .get();
+      
+    if (userAds.size >= 5) {
+      throw new HttpsError("failed-precondition", "You have reached the maximum of 5 free advertisements.");
+    }
+  }
+
+  // Proceed with saving...
+  const status = productData.plan === 'free' ? 'active' : 'pending_payment';
+  
+  // Set expiry here for free ads immediately
+  const expiryDate = productData.plan === 'free' 
+    ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 86_400_000))
+    : null;
+
   const newProductRef = await db.collection("products").add({
-  ...productData,
-  ownerId: request.auth.uid,
-  sellerId: request.auth.uid,
-  status,
-  createdAt: admin.firestore.FieldValue.serverTimestamp(),
-});
+    ...productData,
+    ownerId: uid,
+    status,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: expiryDate 
+  });
 
   return { success: true, productId: newProductRef.id };
 });
