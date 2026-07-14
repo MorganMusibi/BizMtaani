@@ -248,6 +248,13 @@ useEffect(() => {
     }
     return true;
   }
+  function goNext() {
+  if (!validateStep()) return;
+
+  if (step < 5) {
+    setStep((prev) => (prev + 1) as Step);
+  }
+}
 /**
  * Corrected handleInitiate
  */
