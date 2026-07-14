@@ -166,17 +166,43 @@ await db.collection("users").doc(paymentData.buyerId)
 // ═══════════════════════════════════════════════════════════════════════════
 async function runCleanup() {
   const now = admin.firestore.Timestamp.now();
-  
-  // Just find ads where the "Hard Expiry" date has passed
-  const snap = await db.collection("products")
+
+  // Archive expired active adverts
+  const expiredActive = await db.collection("products")
     .where("status", "==", "active")
     .where("expiresAt", "<", now)
     .get();
 
+  // Delete abandoned pending payment adverts older than 1 hour
+  const oneHourAgo = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() - 60 * 60 * 1000)
+  );
+
+  const expiredPending = await db.collection("products")
+    .where("status", "==", "pending_payment")
+    .where("createdAt", "<", oneHourAgo)
+    .get();
+
   const batch = db.batch();
-  snap.docs.forEach(d => batch.update(d.ref, { status: "archived" }));
+
+  // Archive expired active adverts
+  expiredActive.docs.forEach((doc) => {
+    batch.update(doc.ref, {
+      status: "archived",
+    });
+  });
+
+  // Delete abandoned pending adverts
+  expiredPending.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
   await batch.commit();
-  return { archived: snap.size };
+
+  return {
+    archived: expiredActive.size,
+    deletedPending: expiredPending.size,
+  };
 }
 
 
