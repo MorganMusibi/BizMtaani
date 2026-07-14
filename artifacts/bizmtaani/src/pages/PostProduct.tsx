@@ -338,19 +338,19 @@ pricingBasis,
       toast({ title: "Advert published!", description: "Your free listing is now live." });
       navigate(`/product/${result.data.productId}`);
     }
-  } catch (error) {
-    console.error(error);
+  // Inside handlePublishFree
+} catch (error: any) {
+  console.error(error);
+  if (error.code === 'failed-precondition') {
+    toast({ 
+      title: "Limit reached", 
+      description: "You have reached the maximum of 5 active free advertisements.",
+      variant: "destructive" 
+    });
+  } else {
     toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
-  } finally {
-    setPublishingFree(false);
   }
 }
-  function goNext() {
-  if (validateStep()) {
-    if (step < 5) {
-      setStep((s) => (s + 1) as Step);
-    }
-  }
 }
 
   const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
