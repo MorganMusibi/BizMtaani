@@ -138,14 +138,15 @@ export const mpesaCallback = onRequest(async (req, res) => {
             completedAt: admin.firestore.FieldValue.serverTimestamp() 
         });
 
-        const productRef = db.collection("products").doc(paymentData.productId);
-        await productRef.update({ 
-          status: "active", 
-          // Dynamically calculate expiry based on the specific plan duration
-          expiresAt: admin.firestore.Timestamp.fromDate(
-            new Date(Date.now() + durationDays * 86_400_000)
-          ) 
-        });
+        // Add this in mpesaCallback
+await db.collection("users").doc(paymentData.buyerId)
+  .collection("subscription").doc("active").set({
+    planType: plan,
+    premiumEndsAt: admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + durationDays * 86_400_000)
+    ),
+    updatedAt: admin.firestore.FieldValue.serverTimestamp()
+  });
       }
     }
   } catch (err) { console.error(err); }
@@ -157,41 +158,19 @@ export const mpesaCallback = onRequest(async (req, res) => {
 // ═══════════════════════════════════════════════════════════════════════════
 async function runCleanup() {
   const now = admin.firestore.Timestamp.now();
-  const productsRef = db.collection("products");
-
-  // 1. Handle Downgrades (Premium -> Free)
-  // Query all active premium ads where expiresAt is passed
-  const premiumSnap = await productsRef
+  
+  // Just find ads where the "Hard Expiry" date has passed
+  const snap = await db.collection("products")
     .where("status", "==", "active")
-    .where("plan", "in", ["premium_weekly", "premium_monthly"])
     .where("expiresAt", "<", now)
     .get();
 
   const batch = db.batch();
-  
-  premiumSnap.docs.forEach(doc => {
-    // Downgrade to Free: Set new expiry 7 days from NOW
-    const newExpiry = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 86_400_000));
-    batch.update(doc.ref, { 
-      plan: "free", 
-      expiresAt: newExpiry 
-    });
-  });
-
-  // 2. Handle Free Expiry (Free -> Archived)
-  const freeSnap = await productsRef
-    .where("status", "==", "active")
-    .where("plan", "==", "free")
-    .where("expiresAt", "<", now)
-    .get();
-
-  freeSnap.docs.forEach(doc => {
-    batch.update(doc.ref, { status: "archived", archivedAt: now });
-  });
-
+  snap.docs.forEach(d => batch.update(d.ref, { status: "archived" }));
   await batch.commit();
-  return { downgraded: premiumSnap.size, archived: freeSnap.size };
+  return { archived: snap.size };
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
@@ -208,38 +187,30 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const productData = request.data; // Expecting { ..., plan: 'free' | 'premium_weekly' | 'premium_monthly' }
+  const { plan, ...productData } = request.data;
   const uid = request.auth.uid;
 
-  // Enforce 5-ad limit for Free plan
-  if (productData.plan === 'free') {
-    const userAds = await db.collection("products")
-      .where("ownerId", "==", uid)
-      .where("plan", "==", "free")
-      .where("status", "in", ["active", "pending_payment"]) // Count active ads
-      .get();
-      
+  // 1. Enforce 5-ad limit for Free plan
+  if (plan === 'free') {
+    const userAds = await db.collection("products").where("ownerId", "==", uid).where("status", "==", "active").get();
     if (userAds.size >= 5) {
-      throw new HttpsError("failed-precondition", "You have reached the maximum of 5 free advertisements.");
+      throw new HttpsError("failed-precondition", "You have reached the maximum of 5 free ads.");
     }
   }
 
-  // Proceed with saving...
-  const status = productData.plan === 'free' ? 'active' : 'pending_payment';
-  
-  // Set expiry here for free ads immediately
-  const expiryDate = productData.plan === 'free' 
-    ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + 7 * 86_400_000))
-    : null;
+  // 2. Set Hard Expiry (30 days for Monthly, 7 days for others)
+  const durationDays = plan === 'premium_monthly' ? 30 : 7;
+  const expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
 
-  const newProductRef = await db.collection("products").add({
+  // 3. Save Ad
+  await db.collection("products").add({
     ...productData,
+    plan, 
     ownerId: uid,
-    status,
+    status: 'active',
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    expiresAt: expiryDate 
+    expiresAt
   });
 
-  return { success: true, productId: newProductRef.id };
+  return { success: true };
 });
-
