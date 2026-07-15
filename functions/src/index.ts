@@ -161,6 +161,30 @@ await db.collection("users").doc(paymentData.buyerId)
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
 
+async function deleteCloudinaryImage(publicId: string) {
+  const timestamp = Math.floor(Date.now() / 1000);
+
+  const signature = crypto
+    .createHash("sha1")
+    .update(`public_id=${publicId}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`)
+    .digest("hex");
+
+  const form = new URLSearchParams();
+
+  form.append("public_id", publicId);
+  form.append("timestamp", String(timestamp));
+  form.append("api_key", cloudinaryApiKey.value());
+  form.append("signature", signature);
+
+  await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudinaryCloudName.value()}/image/destroy`,
+    {
+      method: "POST",
+      body: form,
+    }
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CLEANUP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -197,9 +221,20 @@ async function runCleanup() {
   });
 
   // Delete abandoned pending adverts
-  expiredPending.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
+  for (const doc of expiredPending.docs) {
+
+  const data = doc.data();
+
+  if (Array.isArray(data.imageUrls)) {
+    for (const img of data.imageUrls) {
+      if (img.public_id) {
+        await deleteCloudinaryImage(img.public_id);
+      }
+    }
+  }
+
+  batch.delete(doc.ref);
+}
   // Delete abandoned pending payment records
 expiredPayments.docs.forEach((doc) => {
   batch.delete(doc.ref);
