@@ -220,15 +220,22 @@ async function runCleanup() {
     });
   });
 
-  // Delete abandoned pending adverts
-  for (const doc of expiredPending.docs) {
+  // Delete abandoned pending adverts and their Cloudinary images
+for (const doc of expiredPending.docs) {
 
   const data = doc.data();
 
   if (Array.isArray(data.imageUrls)) {
+
     for (const img of data.imageUrls) {
-      if (img.public_id) {
-        await deleteCloudinaryImage(img.public_id);
+
+      const publicId =
+        typeof img === "string"
+          ? null
+          : img.public_id;
+
+      if (publicId) {
+        await deleteCloudinaryImage(publicId);
       }
     }
   }
@@ -250,7 +257,14 @@ expiredPayments.docs.forEach((doc) => {
 }
 
 export const scheduledCleanup = onSchedule(
-  "every 1 hours",
+  {
+    schedule: "every 1 hours",
+    secrets: [
+      cloudinaryApiKey,
+      cloudinaryApiSecret,
+      cloudinaryCloudName,
+    ],
+  },
   async () => {
     try {
       const result = await runCleanup();
