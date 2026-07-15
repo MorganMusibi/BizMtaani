@@ -35,8 +35,8 @@ const PLAN_AMOUNTS: Record<string, number> = {
 // If you are using limits in your backend, update them here:
 const MAX_PHOTO_LIMIT: Record<string, number> = {
   free: 1,
-  premium_weekly: Infinity,
-  premium_monthly: Infinity,
+  premium_weekly: Infinity, // Unlimited
+  premium_monthly: Infinity, // Unlimited
 };
 // Add this in your Constants section
 const LISTING_DURATIONS: Record<string, number> = {
