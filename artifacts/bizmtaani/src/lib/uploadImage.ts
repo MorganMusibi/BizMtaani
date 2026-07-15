@@ -30,7 +30,7 @@ export async function uploadImage(
   url: string;
   public_id: string;
 }> {
-  const functions = getFunctions(app);
+  const functions = getFunctions(app, "us-central1");
   const getSignature = httpsCallable<
     { uploadType: string },
     CloudinarySignatureResult
