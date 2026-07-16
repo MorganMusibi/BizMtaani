@@ -296,11 +296,19 @@ async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: 
 
   // 2. Prepare data
   const docData: any = {
-  title: title.trim(),
-  description: description.trim(),
-  price: ...,
-  category: selectedCategory,
-  subcategory: ...,
+      title: title.trim(),
+      description: description.trim(),
+      price: isAccommodation
+        ? parseFloat(rentPerMonth) || 0
+        : pricingBasis === "quote_only"
+          ? 0
+          : parseFloat(price) || 0,
+
+      category: selectedCategory,
+      subcategory:
+        selectedSubcategory === "Other"
+          ? customSubcategory.trim() || "Other"
+          : selectedSubcategory || selectedCategory,
   imageUrl: uploadedImages[0]?.url ?? "",
   imageUrls: uploadedImages,
   lat: coords.lat,
