@@ -303,61 +303,104 @@ pricingBasis,
 /**
  * Corrected handlePublishFree
  */
-async function handlePublishFree() {
-  if (!user || !coords) return;
+
+  async function handlePublishFree() {
+  if (!user || !coords) {
+    toast({
+      title: "Location not ready",
+      description: "Please wait for your location to be detected.",
+      variant: "destructive",
+    });
+    return;
+  }
+
   setPublishingFree(true);
 
   try {
-    // 1. Upload images
+    // Upload images
     const uploadedImages = await Promise.all(
-  imageFiles.map(file => uploadImage(file, "product"))
-);
+      imageFiles.map((file) => uploadImage(file, "product"))
+    );
 
-    // 2. Prepare data
+    // Prepare advert data
     const docData: any = {
       title: title.trim(),
       description: description.trim(),
-      price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
+      price: isAccommodation
+        ? parseFloat(rentPerMonth) || 0
+        : pricingBasis === "quote_only"
+          ? 0
+          : parseFloat(price) || 0,
+
       category: selectedCategory,
-      subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
+      subcategory:
+        selectedSubcategory === "Other"
+          ? customSubcategory.trim() || "Other"
+          : selectedSubcategory || selectedCategory,
+
       imageUrl: uploadedImages[0]?.url ?? "",
       imageUrls: uploadedImages,
+
       lat: coords.lat,
       lng: coords.lng,
       ward: wardInfo?.wardName ?? "",
-constituency: wardInfo?.constituency ?? "",
-county: wardInfo?.county ?? "",
-geohash: encodeGeohash(coords.lat, coords.lng),
-sellerId: user.uid,
-sellerName: userProfile?.displayName ?? user.displayName ?? "",
-sellerType: userProfile?.businessId ? "business" : "individual",
-priceType,
-pricingBasis,
+      constituency: wardInfo?.constituency ?? "",
+      county: wardInfo?.county ?? "",
+      geohash: encodeGeohash(coords.lat, coords.lng),
+
+      sellerId: user.uid,
+      sellerName:
+        userProfile?.displayName ??
+        user.displayName ??
+        "",
+
+      sellerType: userProfile?.businessId
+        ? "business"
+        : "individual",
+
+      priceType,
+      pricingBasis,
+
       plan: "free",
+
       phone: phone.trim(),
     };
 
-    // 3. Call backend
+    // Publish advert through Cloud Function
     const publishAdvert = httpsCallable(functions, "publishAdvert");
     const result: any = await publishAdvert(docData);
 
     if (result.data.success) {
-      toast({ title: "Advert published!", description: "Your free listing is now live." });
+      toast({
+        title: "Advert published!",
+        description: "Your free listing is now live.",
+      });
+
       navigate(`/product/${result.data.productId}`);
+    } else {
+      throw new Error("Publishing failed.");
     }
-  // Inside handlePublishFree
-} catch (error: any) {
-  console.error(error);
-  if (error.code === 'failed-precondition') {
-    toast({ 
-      title: "Limit reached", 
-      description: "You have reached the maximum of 5 active free advertisements.",
-      variant: "destructive" 
-    });
-  } else {
-    toast({ title: "Error", description: "Failed to publish.", variant: "destructive" });
+  } catch (error: any) {
+    console.error("Publish free advert failed:", error);
+
+    if (error.code === "failed-precondition") {
+      toast({
+        title: "Limit reached",
+        description:
+          "You have reached the maximum of 5 active free advertisements.",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Failed to publish",
+        description:
+          error.message || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+    }
+  } finally {
+    setPublishingFree(false);
   }
-}
 }
 
   const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
