@@ -313,7 +313,7 @@ async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: 
   imageUrls: uploadedImages,
   lat: coords.lat,
   lng: coords.lng,
-  ward: wardInfo?.wardName ?? "",
+  ward: locationName || wardInfo?.wardName || "",
   constituency: wardInfo?.constituency ?? "",
   county: wardInfo?.county ?? "",
   geohash: encodeGeohash(coords.lat, coords.lng),
@@ -398,7 +398,7 @@ return {
 
       lat: coords.lat,
       lng: coords.lng,
-      ward: wardInfo?.wardName ?? "",
+      ward: locationName || wardInfo?.wardName || "",
       constituency: wardInfo?.constituency ?? "",
       county: wardInfo?.county ?? "",
       geohash: encodeGeohash(coords.lat, coords.lng),
