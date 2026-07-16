@@ -303,6 +303,23 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
 
   const { plan, title, price, imageUrls, ...otherData } = request.data;
   const uid = request.auth.uid;
+  
+  // Check if the user has an active premium subscription
+const userSnap = await db.collection("users").doc(uid).get();
+
+let effectivePlan = plan;
+
+if (userSnap.exists) {
+  const userData = userSnap.data();
+
+  if (
+    userData?.subscriptionPlan &&
+    userData?.premiumEndsAt &&
+    userData.premiumEndsAt.toDate() > new Date()
+  ) {
+    effectivePlan = userData.subscriptionPlan;
+  }
+}
 
   // 1. Validation: Plan Existence
   if (!PLAN_AMOUNTS.hasOwnProperty(plan)) {
