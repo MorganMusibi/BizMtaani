@@ -383,5 +383,10 @@ if (userSnap.exists) {
   });
 
   // 8. Return the generated productId
-  return { success: true, productId: newProductRef.id };
-});
+  return {
+  success: true,
+  productId: newProductRef.id,
+  status,
+  requiresPayment: status === "pending_payment",
+  plan: effectivePlan,
+};
