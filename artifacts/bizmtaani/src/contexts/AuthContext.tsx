@@ -115,7 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => unsubscribe();
   }, [loadProfile]);
-  const subscriptionPlan =
+  const subscriptionPlan: "free" | "premium_weekly" | "premium_monthly" =
   userProfile?.subscriptionPlan ?? "free";
 
 const premiumEndsAt =
