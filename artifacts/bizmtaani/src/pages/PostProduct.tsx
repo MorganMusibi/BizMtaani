@@ -968,9 +968,13 @@ const data = result.data as PublishAdvertResponse;
           <Button
   className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
   onClick={handlePublishPremiumSubscriber}
-  disabled={"Publish Advert"}
+  disabled={publishingFree}
 >
-  {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
+  {publishingFree ? (
+    <Loader2 size={18} className="animate-spin" />
+  ) : (
+    "Publish Advert"
+  )}
 </Button>
         ) : (
           <Button
