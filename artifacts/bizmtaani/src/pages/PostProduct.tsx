@@ -976,16 +976,28 @@ const data = result.data as PublishAdvertResponse;
     "Publish Advert"
   )}
 </Button>
-        ) : (
-          <Button
-            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
-            style={{ backgroundColor: "#00A651" }}
-            onClick={() => setShowPaymentModal(true)}
-          >
-            <Smartphone size={18} />
-            Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
-          </Button>
-        )}
+        ) : plan === "free" ? (
+  <Button
+    className="w-full h-12 font-black text-base rounded-2xl shadow-lg"
+    onClick={handlePublishFree}
+    disabled={publishingFree}
+  >
+    {publishingFree ? (
+      <Loader2 size={18} className="animate-spin" />
+    ) : (
+      "Publish Free"
+    )}
+  </Button>
+) : (
+  <Button
+    className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+    style={{ backgroundColor: "#00A651" }}
+    onClick={() => setShowPaymentModal(true)}
+  >
+    <Smartphone size={18} />
+    Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
+  </Button>
+)}
       </div>
 
       {/* Image source picker sheet */}
