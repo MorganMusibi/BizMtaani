@@ -404,10 +404,15 @@ const result = await publishAdvert(docData);
 
 const data = result.data as PublishAdvertResponse;
 
-if (data.success) {
-    ...
-    navigate(`/product/${data.productId}`);
-} else {
+ if (data.success) {
+  toast({
+    title: "Advert published!",
+    description: "Your advert is now live.",
+  });
+
+  navigate(`/product/${data.productId}`);
+ }
+    else {
       throw new Error("Publishing failed.");
     }
   } catch (error: any) {
