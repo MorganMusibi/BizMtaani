@@ -308,6 +308,7 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
 const userSnap = await db.collection("users").doc(uid).get();
 
 let effectivePlan = plan;
+  let hasActiveSubscription = false;
 
 if (userSnap.exists) {
   const userData = userSnap.data();
