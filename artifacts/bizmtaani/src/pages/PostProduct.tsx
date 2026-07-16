@@ -88,6 +88,11 @@ export default function PostProduct() {
 
   // Step 4 — Plan & payment
   const [plan, setPlan] = useState<ListingPlan>("free");
+  useEffect(() => {
+  if (hasActivePremium) {
+    setPlan(subscriptionPlan);
+  }
+}, [hasActivePremium, subscriptionPlan]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [publishingFree, setPublishingFree] = useState(false);
 
