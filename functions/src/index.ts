@@ -155,6 +155,15 @@ await db.collection("users").doc(paymentData.buyerId)
     ),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   });
+        await db.collection("users").doc(paymentData.buyerId).set(
+  {
+    subscriptionPlan: plan,
+    premiumEndsAt: admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + durationDays * 86_400_000)
+    ),
+  },
+  { merge: true }
+);
       }
     }
   } catch (err) { console.error(err); }
