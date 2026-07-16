@@ -944,8 +944,14 @@ const data = result.data as PublishAdvertResponse;
             </div>
 
             <p className="text-xs text-center text-muted-foreground px-4">
-              By clicking {plan === 'free' ? 'Publish Free' : 'Pay & Publish'}, you agree to our terms and conditions.
-            </p>
+  By clicking{" "}
+  {hasActivePremium
+    ? "Publish Advert"
+    : plan === "free"
+      ? "Publish Free"
+      : "Pay & Publish"}
+  , you agree to our terms and conditions.
+</p>
           </div>
         )}
         </div>
