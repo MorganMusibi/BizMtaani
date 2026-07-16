@@ -296,29 +296,27 @@ async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: 
 
   // 2. Prepare data
   const docData: any = {
-    title: title.trim(),
-    description: description.trim(),
-    price: isAccommodation ? parseFloat(rentPerMonth) || 0 : (pricingBasis === "quote_only" ? 0 : parseFloat(price) || 0),
-    category: selectedCategory,
-    subcategory: selectedSubcategory === "Other" ? (customSubcategory.trim() || "Other") : (selectedSubcategory || selectedCategory),
-    imageUrl: uploadedImages[0]?.url ?? "",
-    imageUrls: uploadedImages,
-    lat: coords.lat,
-    lng: coords.lng,
-    ward: wardInfo?.wardName ?? "",
-constituency: wardInfo?.constituency ?? "",
-county: wardInfo?.county ?? "",
-geohash: encodeGeohash(coords.lat, coords.lng),
-sellerId: user.uid,
-sellerName: userProfile?.displayName ?? user.displayName ?? "",
-sellerType: userProfile?.isBusinessOwner
-  ? "business"
-  : "individual",
-priceType,
-pricingBasis,
-    plan: plan,
-    phone: phone.trim(),
-  };
+  title: title.trim(),
+  description: description.trim(),
+  price: ...,
+  category: selectedCategory,
+  subcategory: ...,
+  imageUrl: uploadedImages[0]?.url ?? "",
+  imageUrls: uploadedImages,
+  lat: coords.lat,
+  lng: coords.lng,
+  ward: wardInfo?.wardName ?? "",
+  constituency: wardInfo?.constituency ?? "",
+  county: wardInfo?.county ?? "",
+  geohash: encodeGeohash(coords.lat, coords.lng),
+  sellerId: user.uid,
+  sellerName: userProfile?.displayName ?? user.displayName ?? "",
+  sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
+  priceType,
+  pricingBasis,
+  plan: plan,
+  phone: phone.trim(),
+};
 
   // 3. Call Backend Gatekeeper
   const publishAdvert = httpsCallable(functions, "publishAdvert");
