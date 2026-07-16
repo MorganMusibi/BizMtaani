@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { type User, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, Timestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 
 export interface HomeLocation {
@@ -17,25 +17,38 @@ export interface UserProfile {
   businessName?: string;
   homeLocation?: HomeLocation;
   createdAt?: string;
+
+  subscriptionPlan?: "free" | "premium_weekly" | "premium_monthly";
+  premiumEndsAt?: Timestamp;
 }
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+
   userProfile: UserProfile | null;
   profileLoading: boolean;
+
+  subscriptionPlan: "free" | "premium_weekly" | "premium_monthly";
+  premiumEndsAt: Timestamp | null;
+  hasActivePremium: boolean;
+
   refreshProfile: () => Promise<void>;
-  /** Immediately update the in-memory profile without a Firestore round-trip */
   setProfileDirectly: (profile: UserProfile) => void;
-  /** Re-fetches the Firebase Auth user object to pick up emailVerified changes */
   reloadUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+
   userProfile: null,
   profileLoading: true,
+
+  subscriptionPlan: "free",
+  premiumEndsAt: null,
+  hasActivePremium: false,
+
   refreshProfile: async () => {},
   setProfileDirectly: () => {},
   reloadUser: async () => {},
