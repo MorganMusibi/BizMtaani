@@ -14,8 +14,13 @@ import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
 import { getWardInfo, type ResolvedLocation } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, MAX_ACTIVE_ADVERTS, LISTING_DURATION_DAYS, type ListingPlan, type PaidListingPlan } from "@/lib/mpesa";
-
+import {
+  initiateStkPush,
+  MAX_PHOTO_LIMIT,
+  PLAN_AMOUNTS,
+  type ListingPlan,
+  type PaidListingPlan,
+} from "@/lib/mpesa";
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 
 interface MenuItem { name: string; price: number; }
