@@ -322,7 +322,7 @@ if (userSnap.exists) {
 }
 
   // 1. Validation: Plan Existence
-  if (!PLAN_AMOUNTS.hasOwnProperty(plan)) {
+  if (!PLAN_AMOUNTS.hasOwnProperty(effectivePlan)) {
     throw new HttpsError("invalid-argument", "Invalid plan selected.");
   }
 
@@ -332,13 +332,13 @@ if (userSnap.exists) {
   }
 
   // 3. Validation: Photo Limits
-  const limit = MAX_PHOTO_LIMIT[plan] ?? 0;
+  const limit = MAX_PHOTO_LIMIT[effectivePlan] ?? 0;
   if (imageUrls.length > limit) {
     throw new HttpsError("failed-precondition", `Your plan allows a maximum of ${limit} photos.`);
   }
 
   // 4. Logic: Free Ad Limit Enforcement
-  if (plan === 'free') {
+  if (effectivePlan === "free") {
     const userAds = await db.collection("products").where("ownerId", "==", uid).where("status", "==", "active").get();
     if (userAds.size >= 5) {
       throw new HttpsError("failed-precondition", "You have reached the maximum of 5 free ads.");
@@ -347,10 +347,13 @@ if (userSnap.exists) {
 
   // 5. Logic: Status Determination
   // Paid plans start as 'pending_payment'; Free plans start as 'active'
-  const status = plan === 'free' ? 'active' : 'pending_payment';
+  const status =
+  effectivePlan === "free"
+    ? "active"
+    : "active";
 
   // 6. Logic: Dynamic Expiry (Only if active immediately)
-  const durationDays = LISTING_DURATIONS[plan] ?? 7;
+  const durationDays = LISTING_DURATIONS[effectivePlan] ?? 7;
   const expiresAt = status === 'active' 
     ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000))
     : null;
@@ -361,7 +364,7 @@ if (userSnap.exists) {
     title,
     price,
     imageUrls,
-    plan,
+    plan: effectivePlan,
     ownerId: uid,
     sellerId: uid,
     status,
