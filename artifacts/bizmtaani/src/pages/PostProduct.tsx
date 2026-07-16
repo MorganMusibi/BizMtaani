@@ -328,10 +328,25 @@ const data = result.data as PublishAdvertResponse;
 
 const productId = data.productId;
 
-  // 4. Initiate STK push
-  const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
-  return { checkoutRequestId: stkResult.checkoutRequestId, productId };
+// Existing premium users should not pay again
+if (hasActivePremium) {
+  return {
+    checkoutRequestId: "",
+    productId,
+  };
 }
+
+// Initiate STK Push for non-premium users
+const stkResult = await initiateStkPush({
+  phone: mpesaPhone,
+  plan: plan as PaidListingPlan,
+  productId,
+});
+
+return {
+  checkoutRequestId: stkResult.checkoutRequestId,
+  productId,
+};
 
 /**
  * Corrected handlePublishFree
