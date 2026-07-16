@@ -341,7 +341,7 @@ if (!isValidKenyanPhone(cleanedPhone)) {
   priceType,
   pricingBasis,
   plan: plan,
-  phone: phone.trim(),
+  phone: cleanedPhone,
 };
 
   // 3. Call Backend Gatekeeper
@@ -447,7 +447,7 @@ if (!isValidKenyanPhone(cleanedPhone)) {
 
       plan: "free",
 
-      phone: phone.trim(),
+      phone: cleanedPhone,
     };
 
     // Publish advert through Cloud Function
