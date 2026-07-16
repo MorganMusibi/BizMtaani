@@ -135,7 +135,7 @@ export default function PostProduct() {
   }, [user, userProfile]);
 
   // Auto-upgrade to premium if photos exceed basic limit
-  // Replace lines 132-136
+
 useEffect(() => {
   if (
     imageFiles.length > MAX_PHOTO_LIMIT.free &&
@@ -276,6 +276,13 @@ useEffect(() => {
     }
     return true;
   }
+
+  function isValidKenyanPhone(phone: string): boolean {
+  const cleaned = phone.replace(/\s+/g, "").trim();
+
+  return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
+  }
+  
   function goNext() {
   if (!validateStep()) return;
 
@@ -288,6 +295,17 @@ useEffect(() => {
  */
 async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
   if (!user || !coords) throw new Error("Not ready");
+  const cleanedPhone = phone.replace(/\s+/g, "").trim();
+
+if (!isValidKenyanPhone(cleanedPhone)) {
+  toast({
+    title: "Invalid phone number",
+    description: "Enter a valid Kenyan mobile number.",
+    variant: "destructive",
+  });
+
+  throw new Error("Invalid phone number");
+}
 
   // 1. Upload images
   const uploadedImages = await Promise.all(
@@ -361,6 +379,18 @@ return {
 
   async function handlePublishFree() {
   if (!user || !coords) {
+    const cleanedPhone = phone.replace(/\s+/g, "").trim();
+
+if (!isValidKenyanPhone(cleanedPhone)) {
+  toast({
+    title: "Invalid phone number",
+    description: "Enter a valid Kenyan mobile number.",
+    variant: "destructive",
+  });
+
+  setPublishingFree(false);
+  return;
+}
     toast({
       title: "Location not ready",
       description: "Please wait for your location to be detected.",
