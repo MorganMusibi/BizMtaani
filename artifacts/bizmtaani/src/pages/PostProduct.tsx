@@ -44,7 +44,12 @@ const PRICING_BASIS_OPTIONS = [
 type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function PostProduct() {
-  const { user, userProfile } = useAuth();
+  const {
+  user,
+  userProfile,
+  subscriptionPlan,
+  hasActivePremium,
+} = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -123,11 +128,22 @@ export default function PostProduct() {
   // Auto-upgrade to premium if photos exceed basic limit
   // Replace lines 132-136
 useEffect(() => {
-  if (imageFiles.length > MAX_PHOTO_LIMIT.free && plan === "free") {
-    // Automatically suggest/switch to weekly if they go over free limit
-    setPlan("premium_weekly");
+  if (
+    imageFiles.length > MAX_PHOTO_LIMIT.free &&
+    plan === "free"
+  ) {
+    if (hasActivePremium) {
+      setPlan(subscriptionPlan);
+    } else {
+      setPlan("premium_weekly");
+    }
   }
-}, [imageFiles.length, plan]);
+}, [
+  imageFiles.length,
+  plan,
+  hasActivePremium,
+  subscriptionPlan,
+]);
 
   const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
   const isAccommodation = selectedCategory === "Accommodation";
