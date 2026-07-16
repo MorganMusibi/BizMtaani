@@ -115,9 +115,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => unsubscribe();
   }, [loadProfile]);
+  const subscriptionPlan =
+  userProfile?.subscriptionPlan ?? "free";
+
+const premiumEndsAt =
+  userProfile?.premiumEndsAt ?? null;
+
+const hasActivePremium =
+  subscriptionPlan !== "free" &&
+  premiumEndsAt !== null &&
+  premiumEndsAt.toMillis() > Date.now();
 
   return (
-    <AuthContext.Provider value={{ user, loading, userProfile, profileLoading, refreshProfile, setProfileDirectly, reloadUser }}>
+    <AuthContext.Provider
+  value={{
+    user,
+    loading,
+
+    userProfile,
+    profileLoading,
+
+    subscriptionPlan,
+    premiumEndsAt,
+    hasActivePremium,
+
+    refreshProfile,
+    setProfileDirectly,
+    reloadUser,
+  }}
+>
       {!loading && children}
     </AuthContext.Provider>
   );
