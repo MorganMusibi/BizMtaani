@@ -25,6 +25,10 @@ const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
+interface PublishAdvertResponse {
+  success: boolean;
+  productId: string;
+}
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -318,8 +322,11 @@ pricingBasis,
 
   // 3. Call Backend Gatekeeper
   const publishAdvert = httpsCallable(functions, "publishAdvert");
-  const result: any = await publishAdvert(docData);
-  const productId = result.data.productId;
+const result = await publishAdvert(docData);
+
+const data = result.data as PublishAdvertResponse;
+
+const productId = data.productId;
 
   // 4. Initiate STK push
   const stkResult = await initiateStkPush({ phone: mpesaPhone, plan: plan as PaidListingPlan, productId });
@@ -392,17 +399,15 @@ pricingBasis,
     };
 
     // Publish advert through Cloud Function
-    const publishAdvert = httpsCallable(functions, "publishAdvert");
-    const result: any = await publishAdvert(docData);
+     const publishAdvert = httpsCallable(functions, "publishAdvert");
+const result = await publishAdvert(docData);
 
-    if (result.data.success) {
-      toast({
-        title: "Advert published!",
-        description: "Your free listing is now live.",
-      });
+const data = result.data as PublishAdvertResponse;
 
-      navigate(`/product/${result.data.productId}`);
-    } else {
+if (data.success) {
+    ...
+    navigate(`/product/${data.productId}`);
+} else {
       throw new Error("Publishing failed.");
     }
   } catch (error: any) {
