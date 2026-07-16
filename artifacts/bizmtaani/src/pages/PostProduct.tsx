@@ -452,6 +452,8 @@ const data = result.data as PublishAdvertResponse;
   }
 }
   async function handlePublishPremiumSubscriber() {
+  setPublishingFree(true);
+
   try {
     const result = await handleInitiate(phone);
 
@@ -467,8 +469,10 @@ const data = result.data as PublishAdvertResponse;
       description: error.message || "An unexpected error occurred.",
       variant: "destructive",
     });
+  } finally {
+    setPublishingFree(false);
   }
-  }
+}
 
   const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
