@@ -347,6 +347,7 @@ return {
   checkoutRequestId: stkResult.checkoutRequestId,
   productId,
 };
+}
 
 /**
  * Corrected handlePublishFree
