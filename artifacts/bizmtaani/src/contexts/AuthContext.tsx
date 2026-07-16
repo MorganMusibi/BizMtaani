@@ -122,7 +122,8 @@ const premiumEndsAt =
   userProfile?.premiumEndsAt ?? null;
 
 const hasActivePremium =
-  subscriptionPlan !== "free" &&
+  (subscriptionPlan === "premium_weekly" ||
+    subscriptionPlan === "premium_monthly") &&
   premiumEndsAt !== null &&
   premiumEndsAt.toMillis() > Date.now();
 
