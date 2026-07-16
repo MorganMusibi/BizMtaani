@@ -378,19 +378,18 @@ return {
  */
 
   async function handlePublishFree() {
+  const cleanedPhone = phone.replace(/\s+/g, "").trim();
+
+  if (!isValidKenyanPhone(cleanedPhone)) {
+    toast({
+      title: "Invalid phone number",
+      description: "Enter a valid Kenyan mobile number.",
+      variant: "destructive",
+    });
+    return;
+  }
+
   if (!user || !coords) {
-    const cleanedPhone = phone.replace(/\s+/g, "").trim();
-
-if (!isValidKenyanPhone(cleanedPhone)) {
-  toast({
-    title: "Invalid phone number",
-    description: "Enter a valid Kenyan mobile number.",
-    variant: "destructive",
-  });
-
-  setPublishingFree(false);
-  return;
-}
     toast({
       title: "Location not ready",
       description: "Please wait for your location to be detected.",
