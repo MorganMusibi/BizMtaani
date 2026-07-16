@@ -308,7 +308,7 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
 const userSnap = await db.collection("users").doc(uid).get();
 
 let effectivePlan = plan;
-  let hasActiveSubscription = false;
+let hasActiveSubscription = false;
 
 if (userSnap.exists) {
   const userData = userSnap.data();
@@ -319,6 +319,7 @@ if (userSnap.exists) {
     userData.premiumEndsAt.toDate() > new Date()
   ) {
     effectivePlan = userData.subscriptionPlan;
+    hasActiveSubscription = true;
   }
 }
 
@@ -349,9 +350,9 @@ if (userSnap.exists) {
   // 5. Logic: Status Determination
   // Paid plans start as 'pending_payment'; Free plans start as 'active'
   const status =
-  effectivePlan === "free"
+  effectivePlan === "free" || hasActiveSubscription
     ? "active"
-    : "active";
+    : "pending_payment";
 
   // 6. Logic: Dynamic Expiry (Only if active immediately)
   const durationDays = LISTING_DURATIONS[effectivePlan] ?? 7;
