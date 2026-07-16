@@ -302,7 +302,9 @@ county: wardInfo?.county ?? "",
 geohash: encodeGeohash(coords.lat, coords.lng),
 sellerId: user.uid,
 sellerName: userProfile?.displayName ?? user.displayName ?? "",
-sellerType: userProfile?.businessId ? "business" : "individual",
+sellerType: userProfile?.isBusinessOwner
+  ? "business"
+  : "individual",
 priceType,
 pricingBasis,
     plan: plan,
@@ -373,10 +375,9 @@ pricingBasis,
         user.displayName ??
         "",
 
-      sellerType: userProfile?.businessId
-        ? "business"
-        : "individual",
-
+      sellerType: userProfile?.isBusinessOwner
+  ? "business"
+  : "individual",
       priceType,
       pricingBasis,
 
