@@ -924,14 +924,14 @@ const data = result.data as PublishAdvertResponse;
           <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
             Next
           </Button>
-        ) : plan === "free" ? (
+        ) : hasActivePremium ? (
           <Button
-            className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
-            onClick={handlePublishFree}
-            disabled={publishingFree}
-          >
-            {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
-          </Button>
+  className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+  onClick={handlePublishFree}
+  disabled={publishingFree}
+>
+  {publishingFree ? <Loader2 size={18} className="animate-spin" /> : "Publish Free"}
+</Button>
         ) : (
           <Button
             className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
