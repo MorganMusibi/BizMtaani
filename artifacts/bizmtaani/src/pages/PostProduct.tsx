@@ -775,7 +775,36 @@ const data = result.data as PublishAdvertResponse;
 
         {/* ========== STEP 4: Choose Plan & Publish ========== */}
 {step === 4 && (
-  <>
+  hasActivePremium ? (
+    <>
+      <div>
+        <h2 className="font-black text-lg">Premium Subscription Active</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Your advert will be published using your active premium subscription.
+          No additional payment is required.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border-2 border-[#00A651] bg-[#00A651]/5 p-4">
+        <div className="flex items-center gap-3">
+          <Shield className="text-[#00A651]" size={22} />
+
+          <div>
+            <p className="font-black text-base">
+              {subscriptionPlan === "premium_monthly"
+                ? "Monthly Premium"
+                : "Weekly Premium"}
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              Your subscription is active.
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : (
+    <>
     <div>
       <h2 className="font-black text-lg">Choose Your Plan</h2>
       <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
@@ -838,7 +867,8 @@ const data = result.data as PublishAdvertResponse;
         </p>
       </div>
     )}
-  </>
+    </>
+  )
 )}
         
               {/* ========== STEP 5: Review and Publish ========== */}
