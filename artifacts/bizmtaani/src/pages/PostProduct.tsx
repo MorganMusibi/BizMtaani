@@ -85,7 +85,6 @@ export default function PostProduct() {
   const [plan, setPlan] = useState<ListingPlan>("free");
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [publishingFree, setPublishingFree] = useState(false);
-  const pendingProductIdRef = useRef<string | null>(null);
 
   const [showImageMenu, setShowImageMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
