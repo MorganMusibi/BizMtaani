@@ -453,6 +453,24 @@ const data = result.data as PublishAdvertResponse;
     setPublishingFree(false);
   }
 }
+  async function handlePublishPremiumSubscriber() {
+  try {
+    const result = await handleInitiate(phone);
+
+    toast({
+      title: "Advert published!",
+      description: "Published using your Premium subscription.",
+    });
+
+    navigate(`/product/${result.productId}`);
+  } catch (error: any) {
+    toast({
+      title: "Failed to publish",
+      description: error.message || "An unexpected error occurred.",
+      variant: "destructive",
+    });
+  }
+  }
 
   const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
