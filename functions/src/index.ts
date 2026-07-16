@@ -390,3 +390,4 @@ if (userSnap.exists) {
   requiresPayment: status === "pending_payment",
   plan: effectivePlan,
 };
+  });
