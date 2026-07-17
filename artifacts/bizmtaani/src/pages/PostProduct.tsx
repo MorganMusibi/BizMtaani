@@ -799,11 +799,7 @@ const data = result.data as PublishAdvertResponse;
     {option.label}
   </button>
 ))}
-                    <button key={t} onClick={() => setPriceType(t)}
-                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
-                        priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                      }`}>{t}</button>
-                  ))}
+                    
                 </div>
               </div>
             ) : null}
