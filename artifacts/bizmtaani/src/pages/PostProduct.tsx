@@ -338,6 +338,7 @@ if (!isValidKenyanPhone(cleanedPhone)) {
   sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
   priceType,
   pricingBasis,
+  hotelMenu: isEatery ? hotelMenu : null,
   plan: plan,
   phone: cleanedPhone,
 };
@@ -441,7 +442,7 @@ return {
   : "individual",
       priceType,
       pricingBasis,
-
+      hotelMenu: isEatery ? hotelMenu : null,
       plan: "free",
 
       phone: cleanedPhone,
