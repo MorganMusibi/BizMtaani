@@ -735,26 +735,21 @@ const data = result.data as PublishAdvertResponse;
                 <label className="text-sm font-bold">Monthly Rent (KES) *</label>
                 <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
                   value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
-                <div className="flex gap-2 mt-2">
-                  {getPriceOptions().map((option) => (
-  <button
-    key={option.value}
-    onClick={() => setPriceDisplay(option.value as PriceDisplay)}
-    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-      priceDisplay === option.value
-        ? "border-primary bg-primary/5 text-primary"
-        : "border-border text-muted-foreground"
-    }`}
-  >
-    {option.label}
-  </button>
-))}
-                    <button key={t} onClick={() => setPriceType(t)}
-                      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
-                        priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                      }`}>{t}</button>
-                  ))}
-                </div>
+                <div className="flex gap-2">
+  {getPriceOptions().map((option) => (
+    <button
+      key={option.value}
+      onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+        priceDisplay === option.value
+          ? "border-primary bg-primary/5 text-primary"
+          : "border-border text-muted-foreground"
+      }`}
+    >
+      {option.label}
+    </button>
+  ))}
+</div>
               </div>
             ) : isTransport ? (
               <div className="space-y-3">
