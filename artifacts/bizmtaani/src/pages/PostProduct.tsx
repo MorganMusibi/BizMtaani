@@ -175,9 +175,19 @@ useEffect(() => {
     selectedSubcategory === "Restaurants & Cooked Food";
   const isTransport = selectedSubcategory === "Delivery & Transport";
   const subcategories = catDef?.subcategories ?? [];
-  const showPriceInput =
-  priceDisplay === "fixed" ||
-  priceDisplay === "negotiable";
+  {showPriceInput && (
+  <div className="space-y-1.5">
+    <label className="text-sm font-bold">Price (KES)</label>
+    <Input
+      type="number"
+      inputMode="numeric"
+      placeholder="e.g. 1500"
+      value={price}
+      onChange={(e) => setPrice(e.target.value)}
+      className="h-12 text-base"
+    />
+  </div>
+)}
   function getPriceOptions() {
   if (isAccommodation) return [];
 
@@ -735,7 +745,7 @@ const data = result.data as PublishAdvertResponse;
                 <label className="text-sm font-bold">Monthly Rent (KES) *</label>
                 <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
                   value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
-                <div className="flex gap-2">
+            <div className="flex gap-2">
   {getPriceOptions().map((option) => (
     <button
       key={option.value}
