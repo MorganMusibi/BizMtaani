@@ -153,6 +153,12 @@ useEffect(() => {
   hasActivePremium,
   subscriptionPlan,
 ]);
+  // Cleanup preview URLs when component unmounts
+useEffect(() => {
+  return () => {
+    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+  };
+}, [imagePreviews]);
 
   const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
   const isAccommodation = selectedCategory === "Accommodation";
