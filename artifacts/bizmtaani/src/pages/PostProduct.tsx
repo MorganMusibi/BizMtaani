@@ -69,7 +69,15 @@ export default function PostProduct() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [rentPerMonth, setRentPerMonth] = useState("");
-  const [priceType, setPriceType] = useState<"fixed" | "negotiable">("fixed");
+  type PriceDisplay =
+  | "fixed"
+  | "negotiable"
+  | "contact"
+  | "quote"
+  | "free";
+
+const [priceDisplay, setPriceDisplay] =
+  useState<PriceDisplay>("fixed");
   const [pricingBasis, setPricingBasis] = useState("per_trip");
   const [phone, setPhone] = useState("");
 
@@ -167,6 +175,29 @@ useEffect(() => {
     selectedSubcategory === "Restaurants & Cooked Food";
   const isTransport = selectedSubcategory === "Delivery & Transport";
   const subcategories = catDef?.subcategories ?? [];
+  function getPriceOptions() {
+  if (isAccommodation) return [];
+
+  if (isTransport) {
+    return [
+      { value: "fixed", label: "Fixed Price" },
+      { value: "negotiable", label: "Negotiable" },
+      { value: "contact", label: "Contact for Price" },
+    ];
+  }
+
+  if (selectedCategory === "Services") {
+    return [
+      { value: "contact", label: "Contact for Price" },
+      { value: "quote", label: "Request Quote" },
+    ];
+  }
+
+  return [
+    { value: "fixed", label: "Fixed Price" },
+    { value: "negotiable", label: "Negotiable" },
+  ];
+  }
 
   function handleImageFiles(files: FileList | null) {
   if (!files) return;
@@ -668,7 +699,19 @@ const data = result.data as PublishAdvertResponse;
                 <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
                   value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
                 <div className="flex gap-2 mt-2">
-                  {(["fixed", "negotiable"] as const).map((t) => (
+                  {getPriceOptions().map((option) => (
+  <button
+    key={option.value}
+    onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+      priceDisplay === option.value
+        ? "border-primary bg-primary/5 text-primary"
+        : "border-border text-muted-foreground"
+    }`}
+  >
+    {option.label}
+  </button>
+))}
                     <button key={t} onClick={() => setPriceType(t)}
                       className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
                         priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
@@ -706,7 +749,19 @@ const data = result.data as PublishAdvertResponse;
                     value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
                 </div>
                 <div className="flex gap-2">
-                  {(["fixed", "negotiable"] as const).map((t) => (
+                  {getPriceOptions().map((option) => (
+  <button
+    key={option.value}
+    onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+      priceDisplay === option.value
+        ? "border-primary bg-primary/5 text-primary"
+        : "border-border text-muted-foreground"
+    }`}
+  >
+    {option.label}
+  </button>
+))}
                     <button key={t} onClick={() => setPriceType(t)}
                       className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold capitalize transition-all ${
                         priceType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
