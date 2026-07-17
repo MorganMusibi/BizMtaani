@@ -377,7 +377,10 @@ if (userSnap.exists) {
     : null;
 
   // 7. Save Ad
-  const newProductRef = await db.collection("products").add({
+  let newProductRef;
+
+try {
+  newProductRef = await db.collection("products").add({
     ...otherData,
     title,
     price,
@@ -387,8 +390,24 @@ if (userSnap.exists) {
     sellerId: uid,
     status,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    expiresAt
+    expiresAt,
   });
+} catch (error) {
+
+  // Delete uploaded Cloudinary images
+  for (const image of imageUrls) {
+    if (image?.public_id) {
+      await deleteCloudinaryImage(image.public_id);
+    }
+  }
+
+  console.error("Advert creation failed:", error);
+
+  throw new HttpsError(
+    "internal",
+    "Failed to create advert."
+  );
+}
 
   // 8. Return the generated productId
   return {
