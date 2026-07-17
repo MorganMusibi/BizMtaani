@@ -348,12 +348,15 @@ if (userSnap.exists) {
   }
 
   // 4. Logic: Free Ad Limit Enforcement
+  // --- UPDATED BACKEND CODE ---
   if (effectivePlan === "free") {
-  const userAds = await db
-    .collection("products")
-    .where("ownerId", "==", uid)
-    .where("status", "==", "active")
-    .get();
+    const userAds = await db
+      .collection("products")
+      .where("sellerId", "==", uid) // <--- Use sellerId
+      .where("status", "==", "active")
+      .get();
+// ----------------------------
+
 
   if (userAds.size >= 5) {
     throw new HttpsError(
