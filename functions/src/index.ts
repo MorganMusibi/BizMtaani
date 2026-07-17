@@ -329,9 +329,17 @@ if (userSnap.exists) {
   }
 
   // 2. Validation: Required Fields
-  if (!title || !price || !imageUrls || !Array.isArray(imageUrls)) {
-    throw new HttpsError("invalid-argument", "Missing required product details.");
-  }
+  if (
+  !title ||
+  price === undefined ||
+  price === null ||
+  !Array.isArray(imageUrls)
+) {
+  throw new HttpsError(
+    "invalid-argument",
+    "Missing required product details."
+  );
+}
 
   // 3. Validation: Photo Limits
   const limit = MAX_PHOTO_LIMIT[effectivePlan] ?? 0;
