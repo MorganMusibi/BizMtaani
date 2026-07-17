@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
 import { type User, onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc, Timestamp } from "firebase/firestore";
+import { doc, onSnapshot, Timestamp } from "firebase/firestore"; // Added onSnapshot, removed getDoc
 import { auth, db } from "@/lib/firebase";
 
 export interface HomeLocation {
@@ -33,7 +33,6 @@ interface AuthContextType {
   premiumEndsAt: Timestamp | null;
   hasActivePremium: boolean;
 
-  refreshProfile: () => Promise<void>;
   setProfileDirectly: (profile: UserProfile) => void;
   reloadUser: () => Promise<void>;
 }
@@ -49,7 +48,6 @@ const AuthContext = createContext<AuthContextType>({
   premiumEndsAt: null,
   hasActivePremium: false,
 
-  refreshProfile: async () => {},
   setProfileDirectly: () => {},
   reloadUser: async () => {},
 });
@@ -62,34 +60,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
 
-  const loadProfile = useCallback(async (uid: string) => {
-    setProfileLoading(true);
-    try {
-      // Race Firestore against an 8-second timeout so a blocked/slow
-      // connection never leaves the app in an infinite loading state.
-      const snap = await Promise.race([
-        getDoc(doc(db, "users", uid)),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("profile-load-timeout")), 8000)
-        ),
-      ]);
-      setUserProfile(snap.exists() ? (snap.data() as UserProfile) : null);
-    } catch {
-      setUserProfile(null);
-    } finally {
-      setProfileLoading(false);
-    }
-  }, []);
-
-  const refreshProfile = useCallback(async () => {
-    if (user) await loadProfile(user.uid);
-  }, [user, loadProfile]);
-
-  /**
-   * Call auth.currentUser.reload() to refresh the in-memory user object
-   * (picks up emailVerified = true after the user clicks the link).
-   * Then force a re-render by cloning the user reference.
-   */
   const setProfileDirectly = useCallback((profile: UserProfile) => {
     setUserProfile(profile);
   }, []);
@@ -98,53 +68,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const current = auth.currentUser;
     if (!current) return;
     await current.reload();
-    // Create a new reference so React re-renders components that depend on user
     setUser(Object.assign(Object.create(Object.getPrototypeOf(current)), current));
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    let unsubscribeProfile: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      if (unsubscribeProfile) {
+        unsubscribeProfile();
+        unsubscribeProfile = undefined;
+      }
+
       if (currentUser) {
-        void loadProfile(currentUser.uid);
+        setProfileLoading(true);
+        const docRef = doc(db, "users", currentUser.uid);
+        
+        unsubscribeProfile = onSnapshot(
+          docRef,
+          (snap) => {
+            setUserProfile(snap.exists() ? (snap.data() as UserProfile) : null);
+            setProfileLoading(false);
+          },
+          (error) => {
+            console.error("Profile subscription error:", error);
+            setUserProfile(null);
+            setProfileLoading(false);
+          }
+        );
       } else {
         setUserProfile(null);
         setProfileLoading(false);
       }
     });
-    return () => unsubscribe();
-  }, [loadProfile]);
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeProfile) unsubscribeProfile();
+    };
+  }, []);
+
   const subscriptionPlan: "free" | "premium_weekly" | "premium_monthly" =
-  userProfile?.subscriptionPlan ?? "free";
+    userProfile?.subscriptionPlan ?? "free";
 
-const premiumEndsAt =
-  userProfile?.premiumEndsAt ?? null;
+  const premiumEndsAt = userProfile?.premiumEndsAt ?? null;
 
-const hasActivePremium =
-  (subscriptionPlan === "premium_weekly" ||
-    subscriptionPlan === "premium_monthly") &&
-  premiumEndsAt !== null &&
-  premiumEndsAt.toMillis() > Date.now();
+  const hasActivePremium =
+    (subscriptionPlan === "premium_weekly" ||
+      subscriptionPlan === "premium_monthly") &&
+    premiumEndsAt !== null &&
+    premiumEndsAt.toMillis() > Date.now();
 
   return (
     <AuthContext.Provider
-  value={{
-    user,
-    loading,
-
-    userProfile,
-    profileLoading,
-
-    subscriptionPlan,
-    premiumEndsAt,
-    hasActivePremium,
-
-    refreshProfile,
-    setProfileDirectly,
-    reloadUser,
-  }}
->
+      value={{
+        user,
+        loading,
+        userProfile,
+        profileLoading,
+        subscriptionPlan,
+        premiumEndsAt,
+        hasActivePremium,
+        setProfileDirectly,
+        reloadUser,
+      }}
+    >
       {!loading && children}
     </AuthContext.Provider>
   );
