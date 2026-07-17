@@ -175,6 +175,9 @@ useEffect(() => {
     selectedSubcategory === "Restaurants & Cooked Food";
   const isTransport = selectedSubcategory === "Delivery & Transport";
   const subcategories = catDef?.subcategories ?? [];
+  const showPriceInput =
+  priceDisplay === "fixed" ||
+  priceDisplay === "negotiable";
   function getPriceOptions() {
   if (isAccommodation) return [];
 
@@ -300,10 +303,44 @@ useEffect(() => {
       return true;
     }
     if (step === 2) {
-      if (!title.trim()) { toast({ title: "Enter a title", variant: "destructive" }); return false; }
-      if (isAccommodation && !rentPerMonth) { toast({ title: "Enter monthly rent", variant: "destructive" }); return false; }
-      return true;
-    }
+  if (!title.trim()) {
+    toast({
+      title: "Enter a title",
+      variant: "destructive",
+    });
+    return false;
+  }
+
+  // Accommodation must always have rent
+  if (isAccommodation && !rentPerMonth) {
+    toast({
+      title: "Enter monthly rent",
+      variant: "destructive",
+    });
+    return false;
+  }
+
+  // Only require a price when using Fixed or Negotiable pricing
+  const requiresPrice =
+    priceDisplay === "fixed" ||
+    priceDisplay === "negotiable";
+
+  if (
+    requiresPrice &&
+    !isAccommodation &&
+    !isEatery &&
+    (!price || parseFloat(price) <= 0)
+  ) {
+    toast({
+      title: "Enter a valid price",
+      description: "Or choose 'Contact for Price' or 'Request Quote'.",
+      variant: "destructive",
+    });
+    return false;
+  }
+
+  return true;
+}
     if (step === 3) {
        
       if (!coords) { toast({ title: "Location not ready", variant: "destructive" }); return false; }
@@ -373,7 +410,7 @@ if (!isValidKenyanPhone(cleanedPhone)) {
   sellerId: user.uid,
   sellerName: userProfile?.displayName ?? user.displayName ?? "",
   sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
-  priceType,
+  priceDisplay,
   pricingBasis,
   hotelMenu: isEatery ? hotelMenu : null,
   plan: plan,
@@ -477,7 +514,7 @@ return {
       sellerType: userProfile?.isBusinessOwner
   ? "business"
   : "individual",
-      priceType,
+      priceDisplay,
       pricingBasis,
       hotelMenu: isEatery ? hotelMenu : null,
       plan: "free",
