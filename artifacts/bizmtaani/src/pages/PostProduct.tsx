@@ -175,19 +175,7 @@ useEffect(() => {
     selectedSubcategory === "Restaurants & Cooked Food";
   const isTransport = selectedSubcategory === "Delivery & Transport";
   const subcategories = catDef?.subcategories ?? [];
-  {showPriceInput && (
-  <div className="space-y-1.5">
-    <label className="text-sm font-bold">Price (KES)</label>
-    <Input
-      type="number"
-      inputMode="numeric"
-      placeholder="e.g. 1500"
-      value={price}
-      onChange={(e) => setPrice(e.target.value)}
-      className="h-12 text-base"
-    />
-  </div>
-)}
+  
   function getPriceOptions() {
   if (isAccommodation) return [];
 
@@ -785,11 +773,23 @@ const data = result.data as PublishAdvertResponse;
               </div>
             ) : !isEatery ? (
               <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold">Price (KES)</label>
-                  <Input type="number" inputMode="numeric" placeholder="e.g. 1500"
-                    value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
-                </div>
+                {(priceDisplay === "fixed" ||
+  priceDisplay === "negotiable") && (
+  <div className="space-y-1.5">
+    <label className="text-sm font-bold">
+      Price (KES)
+    </label>
+
+    <Input
+      type="number"
+      inputMode="numeric"
+      placeholder="e.g. 1500"
+      value={price}
+      onChange={(e) => setPrice(e.target.value)}
+      className="h-12 text-base"
+    />
+  </div>
+)}
                 <div className="flex gap-2">
                   {getPriceOptions().map((option) => (
   <button
@@ -1063,7 +1063,17 @@ const data = result.data as PublishAdvertResponse;
               </div>
 
               <div className="flex items-center justify-between border-t border-border pt-4">
-                <span className="text-sm font-semibold">Category</span>
+                <span className="text-sm font-bold text-primary">
+  {isAccommodation
+    ? `KES ${rentPerMonth}/mo`
+    : priceDisplay === "contact"
+    ? "Contact for Price"
+    : priceDisplay === "quote"
+    ? "Request Quote"
+    : priceDisplay === "negotiable"
+    ? `KES ${price} (Negotiable)`
+    : `KES ${price}`}
+</span>
                 <span className="text-sm text-muted-foreground">{selectedCategory} / {selectedSubcategory}</span>
               </div>
 
