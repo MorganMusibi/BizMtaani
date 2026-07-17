@@ -377,7 +377,7 @@ useEffect(() => {
  */
 async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
   if (!user || !coords) throw new Error("Not ready");
-  const cleanedPhone = phone.replace(/\s+/g, "").trim();
+  const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
 if (!isValidKenyanPhone(cleanedPhone)) {
   toast({
