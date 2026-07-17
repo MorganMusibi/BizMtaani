@@ -268,9 +268,7 @@ useEffect(() => {
       return true;
     }
     if (step === 3) {
-      if (!isEatery && imageFiles.length === 0) {
-        toast({ title: "Add at least one photo", variant: "destructive" }); return false;
-      }
+       
       if (!coords) { toast({ title: "Location not ready", variant: "destructive" }); return false; }
       return true;
     }
