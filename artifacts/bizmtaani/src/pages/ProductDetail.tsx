@@ -426,6 +426,7 @@ const handleReply = () => {
         {/* --- OPTIONS MODAL END --- */}
 
       </div> {/* This closes the main padding div (px-4...) */}
+        </div> {/* closes the outer long-press wrapper */}
       
       {/* Bottom action bar follows here... */}
 
