@@ -122,8 +122,30 @@ export default function ProductDetail() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    // ... (Your existing useEffect)
-  }, [id]);
+  if (!id) return;
+
+  getDoc(doc(db, "products", id)).then((snap) => {
+    if (snap.exists()) {
+      setProduct({ id: snap.id, ...snap.data() } as Product);
+    }
+    setLoading(false);
+  });
+
+  navigator.geolocation.getCurrentPosition(
+    (pos) => {
+      setUserCoords({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+      });
+    },
+    () => {},
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0,
+    }
+  );
+}, [id]);
 
   // MOVE IMAGES CALCULATION UP HERE
   const images = product 
