@@ -85,20 +85,22 @@ function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
 
 function ImageGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
-  if (images.length === 0) return (
+  
+  if (!images || images.length === 0) return (
     <div className="w-full aspect-square bg-muted flex items-center justify-center">
       <Store size={48} className="text-muted-foreground" />
     </div>
   );
+
   return (
     <div>
-      <img src={images[active]} alt="" className="w-full aspect-square object-cover" />
+      <img src={images[active]} alt="Product" className="w-full aspect-square object-cover" />
       {images.length > 1 && (
         <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar bg-card border-b border-border">
           {images.map((url, i) => (
             <button key={i} onClick={() => setActive(i)}
               className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${i === active ? "border-primary" : "border-transparent opacity-60"}`}>
-              <img src={url} alt="" className="w-full h-full object-cover" />
+              <img src={url} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" />
             </button>
           ))}
         </div>
@@ -106,6 +108,7 @@ function ImageGallery({ images }: { images: string[] }) {
     </div>
   );
 }
+
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -172,7 +175,9 @@ export default function ProductDetail() {
   const distance = userCoords
     ? getDistanceKm(userCoords.lat, userCoords.lng, product.lat, product.lng)
     : null;
-  const images = product.imageUrls?.length ? product.imageUrls : product.imageUrl ? [product.imageUrl] : [];
+  const images = Array.isArray(product.imageUrls) 
+  ? product.imageUrls.map((img: any) => (typeof img === 'string' ? img : img.url)) 
+  : product.imageUrl ? [product.imageUrl] : [];
 
   // Seller role label
   const roleLabel = isAccommodation ? "Landlord / Agent"
