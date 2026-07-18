@@ -279,12 +279,13 @@ const handleReply = () => {
     </header>
 
     <div
-      onTouchStart={handlePressStart}
-      onTouchEnd={handlePressEnd}
-      onMouseDown={handlePressStart}
-      onMouseUp={handlePressEnd}
-    >
-      <ImageGallery images={images} />
+  onTouchStart={handlePressStart}
+  onTouchEnd={handlePressEnd}
+  onMouseDown={handlePressStart}
+  onMouseUp={handlePressEnd}
+>
+  <ImageGallery images={images} />
+</div>
 
       <div className="px-4 pt-4 pb-4 space-y-4">
   
@@ -428,7 +429,6 @@ const handleReply = () => {
         {/* --- OPTIONS MODAL END --- */}
 
       </div> {/* This closes the main padding div (px-4...) */}
-        </div> {/* closes the outer long-press wrapper */}
       
       {/* Bottom action bar follows here... */}
 
