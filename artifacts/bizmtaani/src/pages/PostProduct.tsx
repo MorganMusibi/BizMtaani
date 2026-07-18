@@ -1060,10 +1060,17 @@ const data = result.data as PublishAdvertResponse;
             <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
               <div className="aspect-video bg-muted rounded-xl overflow-hidden">
                 {imagePreviews[0] ? (
-                  <img src={imagePreviews[0]} className="w-full h-full object-cover" alt="Preview" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">No image</div>
-                )}
+  <img
+    src={imagePreviews[0]}
+    className="w-full h-full object-cover"
+    alt="Preview"
+  />
+) : (
+  <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
+    <Camera size={40} />
+    <p className="mt-2 text-xs font-medium">No photo added</p>
+  </div>
+)}
               </div>
               
               <div>
