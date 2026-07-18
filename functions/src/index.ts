@@ -466,9 +466,10 @@ export const deleteAdvert = onCall({ cors: true }, async (request) => {
   }
 }
 
-  // Firestore deletion will go here
+// Delete the advert from Firestore
+await productRef.delete();
 
-  return {
-    success: true,
-  };
-});
+return {
+  success: true,
+  message: "Advert deleted successfully.",
+};
