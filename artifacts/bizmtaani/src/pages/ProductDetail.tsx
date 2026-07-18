@@ -371,8 +371,20 @@ export default function ProductDetail() {
       {/* Bottom action bar */}
       <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
         {isSeller ? (
-          <div className="text-center text-sm text-muted-foreground py-2">This is your listing</div>
-        ) : (
+  <div className="space-y-2">
+    <div className="text-center text-sm text-muted-foreground">
+      This is your listing
+    </div>
+
+    <Button
+      variant="destructive"
+      className="w-full"
+      onClick={handleDeleteProduct}
+    >
+      Delete Advert
+    </Button>
+  </div>
+) (
           <div className="flex gap-2">
             {product.phone && (
               <a href={`tel:${product.phone}`}
