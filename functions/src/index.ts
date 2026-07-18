@@ -473,3 +473,4 @@ return {
   success: true,
   message: "Advert deleted successfully.",
 };
+});
