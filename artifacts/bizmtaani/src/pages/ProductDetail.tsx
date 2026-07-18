@@ -333,22 +333,6 @@ const handleReply = () => {
 {/* Hotel/eatery menu */}
 {isEatery && product.hotelMenu && <HotelMenuDisplay menu={product.hotelMenu} />}
 
-{/* Seller card */}
-
-        <div
-          className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
-          onClick={() => setLocation(`/shop/${product.sellerId}`)}
-        >
-          {product.sellerAvatar ? (
-            <img src={product.sellerAvatar} alt={product.sellerName}
-              className="w-10 h-10 rounded-full object-cover" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-primary font-bold text-lg">{product.sellerName[0]?.toUpperCase()}</span>
-            </div>
-          )}
-          <div className="flex-1">
-            <p data-testid="text-seller-name" className="font-semibold text-sm">{product.sellerName}</p>
         {/*Title, Price, Description, Menu) ... */}
 
         {/* --- WRAPPER START: Wrap the Seller Card, Shop Link, and Phone --- */}
