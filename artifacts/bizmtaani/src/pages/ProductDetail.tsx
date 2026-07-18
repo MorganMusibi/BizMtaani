@@ -228,7 +228,7 @@ const handleReply = () => {
       <Button onClick={() => setLocation("/")}>Go back</Button>
     </div>
   );
-    async function handleDeleteProduct() {
+      async function handleDeleteProduct() {
     if (!product || !user) return;
 
     const confirmDelete = window.confirm("Are you sure you want to delete this advert?");
@@ -253,10 +253,7 @@ const handleReply = () => {
     }
   }
 
-  // Ensure this is the ONLY code here before the 'isSeller' check
   const isSeller = user?.uid === product.sellerId;
-
-
   const isSeller = user?.uid === product.sellerId;
   const isAccommodation = product.category === "Accommodation";
   const isEatery = product.subcategory === "Hotels / Eateries" || product.subcategory === "Restaurants & Cooked Food";
