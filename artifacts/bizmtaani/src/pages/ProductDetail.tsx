@@ -134,27 +134,39 @@ export default function ProductDetail() {
     );
   }, [id]);
 
-  async function handleChat() {
-    if (!user) return setLocation("/login");
-    if (!product || product.sellerId === user.uid) return;
-    setChatLoading(true);
-    try {
-      const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
-      const existing = await getDocs(q);
-      if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
-      const chatDoc = await addDoc(collection(db, "chats"), {
-        productId: product.id, productTitle: product.title,
-        productImage: product.imageUrls?.[0] ?? product.imageUrl,
-        buyerId: user.uid, buyerName: user.displayName || "Buyer",
-        sellerId: product.sellerId, sellerName: product.sellerName,
-        participants: [user.uid, product.sellerId],
-        lastMessage: "", lastMessageAt: serverTimestamp(),
-      });
-      setLocation(`/chat/${chatDoc.id}`);
-    } catch (err: unknown) {
-      toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-    } finally { setChatLoading(false); }
-  }
+  
+async function handleChat() {
+  if (!user) return setLocation("/login");
+  if (!product || product.sellerId === user.uid) return;
+  setChatLoading(true);
+  try {
+    const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
+    const existing = await getDocs(q);
+    if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
+    
+    // Determine the cover image safely
+    const coverImage = Array.isArray(product.imageUrls) && product.imageUrls.length > 0
+      ? (typeof product.imageUrls[0] === 'string' ? product.imageUrls[0] : (product.imageUrls[0] as any).url)
+      : product.imageUrl;
+
+    const chatDoc = await addDoc(collection(db, "chats"), {
+      productId: product.id, 
+      productTitle: product.title,
+      productImage: coverImage, // Updated to use the safe coverImage variable
+      buyerId: user.uid, 
+      buyerName: user.displayName || "Buyer",
+      sellerId: product.sellerId, 
+      sellerName: product.sellerName,
+      participants: [user.uid, product.sellerId],
+      lastMessage: "", 
+      lastMessageAt: serverTimestamp(),
+    });
+    setLocation(`/chat/${chatDoc.id}`);
+  } catch (err: unknown) {
+    toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+  } finally { setChatLoading(false); }
+}
+
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
