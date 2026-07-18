@@ -184,11 +184,11 @@ const priceLabel = isAccommodation
   loading="lazy"
   className="w-full aspect-square object-cover"
   onError={(e) => {
-    console.error("Image failed:", displayImage);
+  console.error("Image failed:", displayImage);
 
-    (e.currentTarget as HTMLImageElement).src =
-      "/placeholder-image.png";
-  }}
+  e.currentTarget.onerror = null;
+  e.currentTarget.src = "/placeholder-image.png";
+}}
 />
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
