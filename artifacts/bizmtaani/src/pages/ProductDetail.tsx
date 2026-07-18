@@ -267,19 +267,27 @@ const handleReply = () => {
     : "Seller";
 
   return (
-    <div className="min-h-screen bg-background pb-36">
-      <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
-        <button data-testid="button-back" onClick={() => setLocation("/")}
-          className="p-2 rounded-full bg-card/80 backdrop-blur-sm shadow">
-          <ChevronLeft size={20} />
-        </button>
-      </header>
+  <div className="min-h-screen bg-background pb-36">
+    <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
+      <button
+        data-testid="button-back"
+        onClick={() => setLocation("/")}
+        className="p-2 rounded-full bg-card/80 backdrop-blur-sm shadow"
+      >
+        <ChevronLeft size={20} />
+      </button>
+    </header>
 
+    <div
+      onTouchStart={handlePressStart}
+      onTouchEnd={handlePressEnd}
+      onMouseDown={handlePressStart}
+      onMouseUp={handlePressEnd}
+    >
+      <ImageGallery images={images} />
+
+      <div className="px-4 pt-4 pb-4 space-y-4">
   
-    <ImageGallery images={images} />
-  </div>
-
-  <div className="px-4 pt-4 pb-4 space-y-4">
         {/* Title + price + badge */}
 <div className="flex items-start justify-between gap-3">
   <div className="flex-1">
