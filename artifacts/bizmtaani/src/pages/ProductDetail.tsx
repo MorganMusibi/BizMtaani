@@ -342,7 +342,7 @@ const handleReply = () => {
 
         {/*Title, Price, Description, Menu) ... */}
 
-        {/* --- WRAPPER START: Wrap the Seller Card, Shop Link, and Phone --- */}
+        
         <div
           onTouchStart={handlePressStart}
           onTouchEnd={handlePressEnd}
@@ -406,7 +406,6 @@ const handleReply = () => {
             </a>
           )}
         </div>
-        {/* --- WRAPPER END --- */}
 
         {/* --- OPTIONS MODAL START --- */}
         {showOptions && (
