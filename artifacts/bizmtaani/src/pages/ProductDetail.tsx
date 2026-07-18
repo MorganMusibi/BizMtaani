@@ -351,13 +351,7 @@ const handleReply = () => {
         {/*Title, Price, Description, Menu) ... */}
 
         
-        <div
-          onTouchStart={handlePressStart}
-          onTouchEnd={handlePressEnd}
-          onMouseDown={handlePressStart}
-          onMouseUp={handlePressEnd}
-          className="space-y-4"
-        >
+        <div className="space-y-4">
           {/* Seller card */}
           <div
             className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
