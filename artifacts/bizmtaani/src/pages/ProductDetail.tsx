@@ -275,13 +275,7 @@ const handleReply = () => {
         </button>
       </header>
 
-      <div
-  onTouchStart={handlePressStart}
-  onTouchEnd={handlePressEnd}
-  onMouseDown={handlePressStart}
-  onMouseUp={handlePressEnd}
->
-  <div className="-mt-14">
+  
     <ImageGallery images={images} />
   </div>
 
