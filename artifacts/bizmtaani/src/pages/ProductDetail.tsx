@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
-import {
-  doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
