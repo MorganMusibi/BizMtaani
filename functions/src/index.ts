@@ -422,55 +422,43 @@ try {
 };
   });
 
-export const deleteAdvert = onCall({ cors: true }, async (request) => {
+export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in");
   }
 
   const { productId } = request.data as { productId: string };
-
-  if (!productId) {
-    throw new HttpsError("invalid-argument", "Product ID is required.");
-  }
+  if (!productId) throw new HttpsError("invalid-argument", "Product ID is required.");
 
   const productRef = db.collection("products").doc(productId);
   const productSnap = await productRef.get();
 
-  if (!productSnap.exists) {
-    throw new HttpsError("not-found", "Advert not found.");
-  }
-
+  if (!productSnap.exists) throw new HttpsError("not-found", "Advert not found.");
   const product = productSnap.data()!;
 
   // Check ownership
-  if (
-    product.sellerId !== request.auth.uid &&
-    product.ownerId !== request.auth.uid
-  ) {
-    throw new HttpsError(
-      "permission-denied",
-      "You can only delete your own adverts."
-    );
+  if (product.sellerId !== request.auth.uid && product.ownerId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "You can only delete your own adverts.");
   }
 
+  // 1. Delete Cloudinary Images
   if (Array.isArray(product.imageUrls)) {
-  for (const image of product.imageUrls) {
-    const publicId =
-      typeof image === "string"
-        ? null
-        : image.public_id;
-
-    if (publicId) {
-      await deleteCloudinaryImage(publicId);
+    for (const image of product.imageUrls) {
+      const publicId = typeof image === "string" ? null : image.public_id;
+      if (publicId) await deleteCloudinaryImage(publicId);
     }
   }
-}
 
-// Delete the advert from Firestore
-await productRef.delete();
+  // 2. NEW: Delete associated chats (Avoid ghost chats)
+  const chatQuery = await db.collection("chats").where("productId", "==", productId).get();
+  const batch = db.batch();
+  chatQuery.docs.forEach((doc) => batch.delete(doc.ref));
 
-return {
-  success: true,
-  message: "Advert deleted successfully.",
-};
+  // 3. Delete the advert
+  batch.delete(productRef);
+  
+  await batch.commit();
+
+  return { success: true, message: "Advert and associated data removed." };
 });
+
