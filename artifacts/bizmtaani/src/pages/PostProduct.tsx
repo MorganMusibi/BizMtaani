@@ -632,7 +632,16 @@ const data = result.data as PublishAdvertResponse;
                 return (
                   <div key={cat.key}>
                     <button
-                      onClick={() => { setSelectedCategory(cat.key); setSelectedSubcategory(""); setCustomSubcategory(""); }}
+                      onClick={() => {
+  setSelectedCategory(cat.key);
+  setSelectedSubcategory("");
+  setCustomSubcategory("");
+
+  // Reset pricing basis when leaving Services
+  if (cat.key !== "Services") {
+    setPricingBasis("per_trip");
+  }
+}}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
                         isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
                       }`}
