@@ -111,7 +111,7 @@ function ImageGallery({ images }: { images: string[] }) {
 
 export default function ProductDetail() {
 const [showOptions, setShowOptions] = useState(false);
-const pressTimer = useRef<NodeJS.Timeout | null>(null);
+const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 function handlePressStart() {
   pressTimer.current = setTimeout(() => {
@@ -124,10 +124,17 @@ function handlePressEnd() {
 }
 
 // Logic for actions
-const handleShare = () => {
+const handleShare = async () => {
+  if (!product) return;
+
   if (navigator.share) {
-    navigator.share({ title: product.title, url: window.location.href });
+    await navigator.share({
+      title: product.title,
+      text: product.description,
+      url: window.location.href,
+    });
   }
+
   setShowOptions(false);
 };
 
@@ -268,11 +275,17 @@ const handleReply = () => {
         </button>
       </header>
 
-      <div className="-mt-14">
-        <ImageGallery images={images} />
-      </div>
+      <div
+  onTouchStart={handlePressStart}
+  onTouchEnd={handlePressEnd}
+  onMouseDown={handlePressStart}
+  onMouseUp={handlePressEnd}
+>
+  <div className="-mt-14">
+    <ImageGallery images={images} />
+  </div>
 
-      <div className="px-4 pt-4 pb-4 space-y-4">
+  <div className="px-4 pt-4 pb-4 space-y-4">
         {/* Title + price + badge */}
 <div className="flex items-start justify-between gap-3">
   <div className="flex-1">
