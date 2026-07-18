@@ -34,33 +34,51 @@ const FILTER_CHIPS = [
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
 
+interface ProductImage {
+  url: string;
+  public_id?: string;
+}
+
 interface Product {
   id: string;
   title: string;
   price: number;
   rentPerMonth?: number;
+
   category: string;
   subcategory?: string;
-  imageUrl: string;
-  imageUrls?: string[];
+
+  // Supports both old and new image formats
+  imageUrl?: string;
+  imageUrls?: (string | ProductImage)[];
+
   lat: number;
   lng: number;
+
   ward?: string;
+
+  // Supports both old and new pricing fields
   priceType?: "fixed" | "negotiable";
+  priceDisplay?: "fixed" | "negotiable";
+
   pricingBasis?: string;
+
   sellerId: string;
   sellerName: string;
   sellerType?: "business" | "individual";
+
   phone?: string;
   geohash?: string;
+
   createdAt?: { seconds: number } | null;
   expiresAt?: { seconds: number } | null;
+
   status?: string;
   plan?: string;
+
   isPremium?: boolean;
   verified?: boolean;
 }
-
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
 function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -96,31 +114,54 @@ function ProductCard({
   onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const distance = userCoords
-    ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
-    : null;
+  ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
+  : null;
 
-  const badgeColor = getCategoryBadgeColor(product.category);
-  const isAccommodation = product.category === "Accommodation";
-  const isEatery =
-    product.subcategory === "Hotels / Eateries" ||
-    product.subcategory === "Restaurants & Cooked Food";
-  const displayImage = product.imageUrls?.[0] ?? product.imageUrl ?? "";
+const badgeColor = getCategoryBadgeColor(product.category);
 
-  const negotiable = product.priceType === "negotiable";
-  const basisLabel: Record<string, string> = {
-    per_km: "/km", per_hour: "/hr", per_day: "/day",
-    per_trip: "/trip", per_session: "/session",
-  };
-  const basisSuffix = product.pricingBasis ? (basisLabel[product.pricingBasis] ?? "") : "";
-  const priceLabel = isAccommodation
-    ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
-    : isEatery
-    ? null
-    : product.pricingBasis === "quote_only"
-    ? "Quote only"
-    : product.price > 0
-    ? `KES ${product.price.toLocaleString()}${basisSuffix}${negotiable ? " · Neg." : ""}`
-    : negotiable ? "Negotiable" : null;
+const isAccommodation =
+  product.category === "Accommodation";
+
+const isEatery =
+  product.subcategory === "Hotels / Eateries" ||
+  product.subcategory === "Restaurants & Cooked Food";
+
+// Support BOTH old string arrays and new object arrays
+const firstImage = product.imageUrls?.[0];
+
+const displayImage =
+  typeof firstImage === "string"
+    ? firstImage
+    : firstImage?.url || product.imageUrl || "";
+
+const negotiable =
+  (product.priceDisplay ?? product.priceType) === "negotiable";
+
+const basisLabel: Record<string, string> = {
+  per_km: "/km",
+  per_hour: "/hr",
+  per_day: "/day",
+  per_trip: "/trip",
+  per_session: "/session",
+};
+
+const basisSuffix = product.pricingBasis
+  ? basisLabel[product.pricingBasis] ?? ""
+  : "";
+
+const priceLabel = isAccommodation
+  ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
+  : isEatery
+  ? null
+  : product.pricingBasis === "quote_only"
+  ? "Quote only"
+  : product.price > 0
+  ? `KES ${product.price.toLocaleString()}${basisSuffix}${
+      negotiable ? " · Neg." : ""
+    }`
+  : negotiable
+  ? "Negotiable"
+  : null;
 
   return (
     <div
@@ -138,9 +179,17 @@ function ProductCard({
 
         {displayImage ? (
           <img
-            src={displayImage} alt={product.title} loading="lazy"
-            className="w-full aspect-square object-cover"
-          />
+  src={displayImage}
+  alt={product.title}
+  loading="lazy"
+  className="w-full aspect-square object-cover"
+  onError={(e) => {
+    console.error("Image failed:", displayImage);
+
+    (e.currentTarget as HTMLImageElement).src =
+      "/placeholder-image.png";
+  }}
+/>
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
             <Package size={28} className="text-muted-foreground" />
@@ -165,12 +214,13 @@ function ProductCard({
           </div>
         )}
         
-        {isAccommodation && (product.imageUrls?.length ?? 0) > 1 && (
-          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
-            +{(product.imageUrls?.length ?? 1) - 1} photos
-          </div>
-        )}
-      </div>
+        {isAccommodation &&
+  Array.isArray(product.imageUrls) &&
+  product.imageUrls.length > 1 && (
+    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
+      +{product.imageUrls.length - 1} photos
+    </div>
+)}
       
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
