@@ -145,9 +145,21 @@ const basisLabel: Record<string, string> = {
   per_session: "/session",
 };
 
-const basisSuffix = product.pricingBasis
-  ? basisLabel[product.pricingBasis] ?? ""
-  : "";
+const serviceCategories = [
+  "Services",
+  "Transport",
+  "Delivery",
+  "Cleaning",
+  "Repairs",
+];
+
+const showPricingBasis =
+  serviceCategories.includes(product.category);
+
+const basisSuffix =
+  showPricingBasis && product.pricingBasis
+    ? basisLabel[product.pricingBasis] ?? ""
+    : "";
 
 const priceLabel = isAccommodation
   ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
