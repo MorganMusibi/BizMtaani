@@ -409,7 +409,7 @@ if (!isValidKenyanPhone(cleanedPhone)) {
   sellerName: userProfile?.displayName ?? user.displayName ?? "",
   sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
   priceDisplay,
-  pricingBasis,
+pricingBasis: isTransport ? pricingBasis : null,
   hotelMenu: isEatery ? hotelMenu : null,
   plan: plan,
   phone: cleanedPhone,
@@ -513,7 +513,7 @@ return {
   ? "business"
   : "individual",
       priceDisplay,
-      pricingBasis,
+     pricingBasis: isTransport ? pricingBasis : null,
       hotelMenu: isEatery ? hotelMenu : null,
       plan: "free",
 
