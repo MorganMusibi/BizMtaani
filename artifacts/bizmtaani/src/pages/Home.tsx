@@ -221,7 +221,7 @@ const priceLabel = isAccommodation
       +{product.imageUrls.length - 1} photos
     </div>
 )}
-      
+      </div>
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
         <div className="flex items-center justify-between mt-1.5 gap-1">
