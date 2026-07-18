@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -229,19 +231,20 @@ const handleReply = () => {
   async function handleDeleteProduct() {
   if (!product || !user) return;
 
-  const confirmDelete = window.confirm(
-    "Are you sure you want to delete this advert?"
-  );
-
+  const confirmDelete = window.confirm("Are you sure you want to delete this advert?");
   if (!confirmDelete) return;
 
   try {
-    await deleteDoc(doc(db, "products", product.id));
+    const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+    await deleteAdvert({ productId: product.id });
 
-    toast({
-      title: "Advert deleted",
-      description: "Your advert has been removed.",
-    });
+    toast({ title: "Advert deleted", description: "Your advert has been removed." });
+    setLocation("/");
+  } catch (error) {
+    toast({ title: "Delete failed", description: "Please try again.", variant: "destructive" });
+  }
+}
+
 
     setLocation("/");
   } catch (error) {
