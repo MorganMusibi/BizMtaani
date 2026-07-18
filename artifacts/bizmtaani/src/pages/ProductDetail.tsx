@@ -8,8 +8,9 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, MessageCircle, MapPin, Tag, Loader2, Store, Phone, ChevronRight } from "lucide-react";
+import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
 
 interface MenuItem { name: string; price: number; }
@@ -32,6 +33,8 @@ interface Product {
   sellerAvatar: string;
   phone?: string;
   priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free";
+  ward?: string;
+  county?: string;
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
   createdAt: { seconds: number } | null;
@@ -49,6 +52,33 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function timeAgo(createdAt: { seconds: number } | null) {
+  if (!createdAt) return "";
+
+  const seconds = Math.floor(Date.now() / 1000) - createdAt.seconds;
+
+  if (seconds < 60) return "Just now";
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60)
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24)
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 30)
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+
+  const months = Math.floor(days / 30);
+  if (months < 12)
+    return `${months} month${months === 1 ? "" : "s"} ago`;
+
+  const years = Math.floor(months / 12);
+  return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
 function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
