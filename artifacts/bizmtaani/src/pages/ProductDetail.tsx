@@ -111,6 +111,32 @@ function ImageGallery({ images }: { images: string[] }) {
 
 
 export default function ProductDetail() {
+const [showOptions, setShowOptions] = useState(false);
+const pressTimer = useRef<NodeJS.Timeout | null>(null);
+
+function handlePressStart() {
+  pressTimer.current = setTimeout(() => {
+    setShowOptions(true);
+  }, 600);
+}
+
+function handlePressEnd() {
+  if (pressTimer.current) clearTimeout(pressTimer.current);
+}
+
+// Logic for actions
+const handleShare = () => {
+  if (navigator.share) {
+    navigator.share({ title: product.title, url: window.location.href });
+  }
+  setShowOptions(false);
+};
+
+const handleReply = () => {
+  handleChat();
+  setShowOptions(false);
+};
+
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
   const { user } = useAuth();
