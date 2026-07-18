@@ -122,50 +122,43 @@ export default function ProductDetail() {
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    if (!id) return;
-    getDoc(doc(db, "products", id)).then((snap) => {
-      if (snap.exists()) setProduct({ id: snap.id, ...snap.data() } as Product);
-      setLoading(false);
-    });
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setUserCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    // ... (Your existing useEffect)
   }, [id]);
 
-  
-async function handleChat() {
-  if (!user) return setLocation("/login");
-  if (!product || product.sellerId === user.uid) return;
-  setChatLoading(true);
-  try {
-    const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
-    const existing = await getDocs(q);
-    if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
-    
-    // Determine the cover image safely
-    const coverImage = Array.isArray(product.imageUrls) && product.imageUrls.length > 0
-      ? (typeof product.imageUrls[0] === 'string' ? product.imageUrls[0] : (product.imageUrls[0] as any).url)
-      : product.imageUrl;
+  // MOVE IMAGES CALCULATION UP HERE
+  const images = product 
+    ? (Array.isArray(product.imageUrls) 
+        ? product.imageUrls.map((img: any) => (typeof img === 'string' ? img : img.url)) 
+        : product.imageUrl ? [product.imageUrl] : [])
+    : [];
 
-    const chatDoc = await addDoc(collection(db, "chats"), {
-      productId: product.id, 
-      productTitle: product.title,
-      productImage: coverImage, // Updated to use the safe coverImage variable
-      buyerId: user.uid, 
-      buyerName: user.displayName || "Buyer",
-      sellerId: product.sellerId, 
-      sellerName: product.sellerName,
-      participants: [user.uid, product.sellerId],
-      lastMessage: "", 
-      lastMessageAt: serverTimestamp(),
-    });
-    setLocation(`/chat/${chatDoc.id}`);
-  } catch (err: unknown) {
-    toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-  } finally { setChatLoading(false); }
-}
+  // NOW handleChat CAN SAFELY USE "images"
+  async function handleChat() {
+    if (!user) return setLocation("/login");
+    if (!product || product.sellerId === user.uid) return;
+    setChatLoading(true);
+    try {
+      const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
+      const existing = await getDocs(q);
+      if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
+      
+      const chatDoc = await addDoc(collection(db, "chats"), {
+        productId: product.id, 
+        productTitle: product.title,
+        productImage: images.length > 0 ? images[0] : "", // Now defined and accessible
+        buyerId: user.uid, 
+        buyerName: user.displayName || "Buyer",
+        sellerId: product.sellerId, 
+        sellerName: product.sellerName,
+        participants: [user.uid, product.sellerId],
+        lastMessage: "", 
+        lastMessageAt: serverTimestamp(),
+      });
+      setLocation(`/chat/${chatDoc.id}`);
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+    } finally { setChatLoading(false); }
+  }
 
 
   if (loading) return (
