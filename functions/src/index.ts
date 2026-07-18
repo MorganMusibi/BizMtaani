@@ -421,3 +421,54 @@ try {
   plan: effectivePlan,
 };
   });
+
+export const deleteAdvert = onCall({ cors: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in");
+  }
+
+  const { productId } = request.data as { productId: string };
+
+  if (!productId) {
+    throw new HttpsError("invalid-argument", "Product ID is required.");
+  }
+
+  const productRef = db.collection("products").doc(productId);
+  const productSnap = await productRef.get();
+
+  if (!productSnap.exists) {
+    throw new HttpsError("not-found", "Advert not found.");
+  }
+
+  const product = productSnap.data()!;
+
+  // Check ownership
+  if (
+    product.sellerId !== request.auth.uid &&
+    product.ownerId !== request.auth.uid
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only delete your own adverts."
+    );
+  }
+
+  if (Array.isArray(product.imageUrls)) {
+  for (const image of product.imageUrls) {
+    const publicId =
+      typeof image === "string"
+        ? null
+        : image.public_id;
+
+    if (publicId) {
+      await deleteCloudinaryImage(publicId);
+    }
+  }
+}
+
+  // Firestore deletion will go here
+
+  return {
+    success: true,
+  };
+});
