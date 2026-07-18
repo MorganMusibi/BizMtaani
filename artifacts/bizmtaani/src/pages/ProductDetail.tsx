@@ -349,52 +349,96 @@ const handleReply = () => {
           )}
           <div className="flex-1">
             <p data-testid="text-seller-name" className="font-semibold text-sm">{product.sellerName}</p>
-            <p className="text-xs text-muted-foreground">{roleLabel}</p>
-          </div>
-          <div className="flex items-center gap-2 text-muted-foreground">
-            {distance !== null && (
-              <div className="flex items-center gap-1 text-xs">
-                <MapPin size={12} />
-                <span data-testid="text-distance">
-                  {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`}
-                </span>
+        {/*Title, Price, Description, Menu) ... */}
+
+        {/* --- WRAPPER START: Wrap the Seller Card, Shop Link, and Phone --- */}
+        <div
+          onTouchStart={handlePressStart}
+          onTouchEnd={handlePressEnd}
+          onMouseDown={handlePressStart}
+          onMouseUp={handlePressEnd}
+          className="space-y-4"
+        >
+          {/* Seller card */}
+          <div
+            className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
+            onClick={() => setLocation(`/shop/${product.sellerId}`)}
+          >
+            {product.sellerAvatar ? (
+              <img src={product.sellerAvatar} alt={product.sellerName} className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                <span className="text-primary font-bold text-lg">{product.sellerName[0]?.toUpperCase()}</span>
               </div>
             )}
-            <ChevronRight size={16} />
-          </div>
-        </div>
-        {/* View shop link */}
-        <div className="flex justify-end px-1">
-          <button
-            onClick={() => setLocation(`/shop/${product.sellerId}`)}
-            className="flex items-center gap-1.5 text-xs text-primary font-semibold"
-          >
-            <Store size={12} />
-            {isSeller ? "View my shop" : `See all from ${product.sellerName.split(" ")[0]}`}
-            <ChevronRight size={12} />
-          </button>
-        </div>
-
-        {/* Phone */}
-        {product.phone && (
-          <a href={`tel:${product.phone}`} data-testid="link-phone"
-            className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-secondary transition-colors">
-            <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
-              <Phone size={18} className="text-secondary" />
-            </div>
             <div className="flex-1">
-              <p className="text-xs text-muted-foreground">
-                {isAccommodation ? "Landlord's number" : "WhatsApp / Phone"}
-              </p>
-              <p className="font-bold text-sm">{product.phone}</p>
+              <p data-testid="text-seller-name" className="font-semibold text-sm">{product.sellerName}</p>
+              <p className="text-xs text-muted-foreground">{roleLabel}</p>
             </div>
-            <span className="text-xs font-semibold text-secondary px-3 py-1.5 bg-secondary/10 rounded-xl">Call</span>
-          </a>
-        )}
-      </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              {distance !== null && (
+                <div className="flex items-center gap-1 text-xs">
+                  <MapPin size={12} />
+                  <span data-testid="text-distance">
+                    {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`}
+                  </span>
+                </div>
+              )}
+              <ChevronRight size={16} />
+            </div>
+          </div>
 
-      {/* Bottom action bar */}
-      {/* Bottom action bar */}
+          {/* View shop link */}
+          <div className="flex justify-end px-1">
+            <button
+              onClick={() => setLocation(`/shop/${product.sellerId}`)}
+              className="flex items-center gap-1.5 text-xs text-primary font-semibold"
+            >
+              <Store size={12} />
+              {isSeller ? "View my shop" : `See all from ${product.sellerName.split(" ")[0]}`}
+              <ChevronRight size={12} />
+            </button>
+          </div>
+
+          {/* Phone */}
+          {product.phone && (
+            <a href={`tel:${product.phone}`} data-testid="link-phone"
+              className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-secondary transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                <Phone size={18} className="text-secondary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">{isAccommodation ? "Landlord's number" : "WhatsApp / Phone"}</p>
+                <p className="font-bold text-sm">{product.phone}</p>
+              </div>
+              <span className="text-xs font-semibold text-secondary px-3 py-1.5 bg-secondary/10 rounded-xl">Call</span>
+            </a>
+          )}
+        </div>
+        {/* --- WRAPPER END --- */}
+
+        {/* --- OPTIONS MODAL START --- */}
+        {showOptions && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-end animate-in fade-in duration-200">
+            <div className="bg-background w-full rounded-t-3xl p-5 space-y-3 shadow-2xl">
+              <h3 className="font-bold text-center mb-2">Advert Options</h3>
+              <Button variant="ghost" className="w-full justify-start" onClick={handleShare}>Share Advert</Button>
+              <Button variant="ghost" className="w-full justify-start" onClick={handleReply}>Reply to Advert</Button>
+              {isSeller && (
+                <Button variant="destructive" className="w-full justify-start" onClick={() => { handleDeleteProduct(); setShowOptions(false); }}>
+                  Delete Advert
+                </Button>
+              )}
+              <Button variant="outline" className="w-full mt-2" onClick={() => setShowOptions(false)}>Cancel</Button>
+            </div>
+          </div>
+        )}
+        {/* --- OPTIONS MODAL END --- */}
+
+      </div> {/* This closes the main padding div (px-4...) */}
+      
+      {/* Bottom action bar follows here... */}
+
 <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
   {isSeller ? (
     <div className="space-y-2">
