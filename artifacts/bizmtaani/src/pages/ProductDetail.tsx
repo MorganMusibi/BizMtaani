@@ -180,9 +180,6 @@ export default function ProductDetail() {
   const distance = userCoords
     ? getDistanceKm(userCoords.lat, userCoords.lng, product.lat, product.lng)
     : null;
-  const images = Array.isArray(product.imageUrls) 
-  ? product.imageUrls.map((img: any) => (typeof img === 'string' ? img : img.url)) 
-  : product.imageUrl ? [product.imageUrl] : [];
 
   // Seller role label
   const roleLabel = isAccommodation ? "Landlord / Agent"
