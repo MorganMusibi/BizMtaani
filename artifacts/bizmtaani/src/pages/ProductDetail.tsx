@@ -369,38 +369,56 @@ export default function ProductDetail() {
       </div>
 
       {/* Bottom action bar */}
-      <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
-        {isSeller ? (
-  <div className="space-y-2">
-    <div className="text-center text-sm text-muted-foreground">
-      This is your listing
-    </div>
-
-    <Button
-      variant="destructive"
-      className="w-full"
-      onClick={handleDeleteProduct}
-    >
-      Delete Advert
-    </Button>
-  </div>
-) (
-          <div className="flex gap-2">
-            {product.phone && (
-              <a href={`tel:${product.phone}`}
-                className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg">
-                <Phone size={17} />Call
-              </a>
-            )}
-            <Button data-testid="button-chat-seller"
-              className={`h-12 font-bold gap-2 shadow-xl ${product.phone ? "flex-1" : "w-full"}`}
-              onClick={handleChat} disabled={chatLoading}>
-              {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
-              {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
-            </Button>
-          </div>
-        )}
+      {/* Bottom action bar */}
+<div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
+  {isSeller ? (
+    <div className="space-y-2">
+      <div className="text-center text-sm text-muted-foreground">
+        This is your listing
       </div>
+
+      <Button
+        variant="destructive"
+        className="w-full"
+        onClick={handleDeleteProduct}
+      >
+        Delete Advert
+      </Button>
+    </div>
+  ) : (
+    <div className="flex gap-2">
+      {product.phone && (
+        <a
+          href={`tel:${product.phone}`}
+          className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg"
+        >
+          <Phone size={17} /> Call
+        </a>
+      )}
+
+      <Button
+        data-testid="button-chat-seller"
+        className={`h-12 font-bold gap-2 shadow-xl ${
+          product.phone ? "flex-1" : "w-full"
+        }`}
+        onClick={handleChat}
+        disabled={chatLoading}
+      >
+        {chatLoading ? (
+          <Loader2 size={18} className="animate-spin" />
+        ) : (
+          <MessageCircle size={18} />
+        )}
+
+        {isAccommodation
+          ? "Message Landlord"
+          : isEatery
+          ? "Contact Restaurant"
+          : "Chat with Seller"}
+      </Button>
+    </div>
+  )}
+</div>
 
       <BottomNav />
     </div>
