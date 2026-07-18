@@ -30,7 +30,7 @@ interface Product {
   sellerName: string;
   sellerAvatar: string;
   phone?: string;
-  priceType?: "fixed" | "negotiable";
+  priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free";
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
   createdAt: { seconds: number } | null;
