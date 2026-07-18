@@ -23,7 +23,7 @@ interface Product {
   category: string;
   subcategory?: string;
   imageUrl: string;
-  imageUrls?: string[];
+  imageUrls?: (string | { url: string; public_id?: string })[];
   lat: number;
   lng: number;
   sellerId: string;
