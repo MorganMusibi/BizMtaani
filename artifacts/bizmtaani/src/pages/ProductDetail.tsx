@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import {
-  doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp
+  doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -194,6 +194,32 @@ export default function ProductDetail() {
       <Button onClick={() => setLocation("/")}>Go back</Button>
     </div>
   );
+  async function handleDeleteProduct() {
+  if (!product || !user) return;
+
+  const confirmDelete = window.confirm(
+    "Are you sure you want to delete this advert?"
+  );
+
+  if (!confirmDelete) return;
+
+  try {
+    await deleteDoc(doc(db, "products", product.id));
+
+    toast({
+      title: "Advert deleted",
+      description: "Your advert has been removed.",
+    });
+
+    setLocation("/");
+  } catch (error) {
+    toast({
+      title: "Delete failed",
+      description: "Please try again.",
+      variant: "destructive",
+    });
+  }
+  }
 
   const isSeller = user?.uid === product.sellerId;
   const isAccommodation = product.category === "Accommodation";
