@@ -194,74 +194,67 @@ export default function ProductDetail() {
 
       <div className="px-4 pt-4 pb-4 space-y-4">
         {/* Title + price + badge */}
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1">
-            <h1 data-testid="text-product-title" className="text-2xl font-black leading-tight">{product.title}</h1>
-            {isAccommodation ? (
-              <div className="mt-1 flex items-center gap-2 flex-wrap">
-                <p data-testid="text-product-price" className="text-xl font-bold text-indigo-600">
-                  KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
-                </p>
-                {product.priceType === "negotiable" && (
-                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">Negotiable</span>
-                )}
-              </div>
-            ) : !isEatery ? (
-              <div className="mt-1 space-y-1">
-                {product.pricingBasis === "quote_only" ? (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
-                    Quote on request
-                  </p>
-                ) : product.price > 0 ? (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
-                    KES {product.price.toLocaleString()}
-                    {product.pricingBasis && product.pricingBasis !== "per_trip" && (
-                      <span className="text-base font-semibold text-muted-foreground ml-1">
-                        {{
-                          per_km: "per km",
-                          per_hour: "per hour",
-                          per_day: "per day",
-                          per_session: "per session",
-                        }[product.pricingBasis]}
-                      </span>
-                    )}
-                  </p>
-                ) : (
-                  <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
-                    Price on request
-                  </p>
-                )}
-                {product.pricingBasis !== "quote_only" && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                      product.priceType === "negotiable"
-                        ? "bg-amber-100 text-amber-700"
-                        : "bg-green-100 text-green-700"
-                    }`}>
-                      {product.priceType === "negotiable" ? "Negotiable" : "Fixed price"}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ) : null}
-          </div>
-          <div className="flex flex-col items-end gap-1 flex-shrink-0">
-            <span className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 ${badgeColor}`}>
-              <Tag size={11} />{product.subcategory ?? product.category}
+<div className="flex items-start justify-between gap-3">
+  <div className="flex-1">
+    <h1 data-testid="text-product-title" className="text-2xl font-black leading-tight">{product.title}</h1>
+    
+    <div className="mt-1 space-y-1">
+      {isAccommodation ? (
+        <p data-testid="text-product-price" className="text-xl font-bold text-indigo-600">
+          KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
+        </p>
+      ) : product.priceDisplay === "contact" ? (
+        <p className="text-2xl font-bold text-primary">Contact for Price</p>
+      ) : product.priceDisplay === "quote" ? (
+        <p className="text-2xl font-bold text-primary">Request Quote</p>
+      ) : product.priceDisplay === "free" ? (
+        <p className="text-2xl font-bold text-green-600">Free</p>
+      ) : (
+        <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
+          KES {product.price.toLocaleString()}
+          {product.pricingBasis && product.pricingBasis !== "per_trip" && (
+            <span className="text-base font-semibold text-muted-foreground ml-1">
+              {{
+                per_km: "per km",
+                per_hour: "per hour",
+                per_day: "per day",
+                per_trip: "",
+                per_session: "per session",
+              }[product.pricingBasis]}
             </span>
-          </div>
+          )}
+        </p>
+      )}
+
+      {/* Badge for Negotiable items */}
+      {product.priceDisplay === "negotiable" && (
+        <div className="flex items-center gap-2">
+          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
+            Negotiable
+          </span>
         </div>
+      )}
+    </div>
+  </div>
+  
+  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+    <span className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 ${badgeColor}`}>
+      <Tag size={11} />{product.subcategory ?? product.category}
+    </span>
+  </div>
+</div>
 
-        {product.description && (
-          <p data-testid="text-product-description" className="text-muted-foreground leading-relaxed">
-            {product.description}
-          </p>
-        )}
+{product.description && (
+  <p data-testid="text-product-description" className="text-muted-foreground leading-relaxed">
+    {product.description}
+  </p>
+)}
 
-        {/* Hotel/eatery menu */}
-        {isEatery && product.hotelMenu && <HotelMenuDisplay menu={product.hotelMenu} />}
+{/* Hotel/eatery menu */}
+{isEatery && product.hotelMenu && <HotelMenuDisplay menu={product.hotelMenu} />}
 
-        {/* Seller card */}
+{/* Seller card */}
+
         <div
           className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
           onClick={() => setLocation(`/shop/${product.sellerId}`)}
