@@ -228,33 +228,34 @@ const handleReply = () => {
       <Button onClick={() => setLocation("/")}>Go back</Button>
     </div>
   );
-  async function handleDeleteProduct() {
-  if (!product || !user) return;
+    async function handleDeleteProduct() {
+    if (!product || !user) return;
 
-  const confirmDelete = window.confirm("Are you sure you want to delete this advert?");
-  if (!confirmDelete) return;
+    const confirmDelete = window.confirm("Are you sure you want to delete this advert?");
+    if (!confirmDelete) return;
 
-  try {
-    const deleteAdvert = httpsCallable(functions, "deleteAdvert");
-    await deleteAdvert({ productId: product.id });
+    try {
+      const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      await deleteAdvert({ productId: product.id });
 
-    toast({ title: "Advert deleted", description: "Your advert has been removed." });
-    setLocation("/");
-  } catch (error) {
-    toast({ title: "Delete failed", description: "Please try again.", variant: "destructive" });
+      toast({ 
+        title: "Advert deleted", 
+        description: "Your advert has been removed." 
+      });
+      setLocation("/");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({ 
+        title: "Delete failed", 
+        description: "Please try again.", 
+        variant: "destructive" 
+      });
+    }
   }
-}
 
+  // Ensure this is the ONLY code here before the 'isSeller' check
+  const isSeller = user?.uid === product.sellerId;
 
-    setLocation("/");
-  } catch (error) {
-    toast({
-      title: "Delete failed",
-      description: "Please try again.",
-      variant: "destructive",
-    });
-  }
-  }
 
   const isSeller = user?.uid === product.sellerId;
   const isAccommodation = product.category === "Accommodation";
