@@ -316,62 +316,102 @@ const handleReply = () => {
   onMouseDown={handlePressStart}
   onMouseUp={handlePressEnd}
 >
-  <ImageGallery images={images} />
+  <div className="aspect-video w-full overflow-hidden rounded-b-2xl bg-muted">
+    {images.length > 0 ? (
+      <img
+        src={images[0]}
+        alt={product.title}
+        className="w-full h-full object-cover"
+      />
+    ) : (
+      <div className="w-full h-full flex items-center justify-center">
+        <Store size={48} className="text-muted-foreground" />
+      </div>
+    )}
+  </div>
 </div>
-
       <div className="px-4 pt-4 pb-4 space-y-4">
   
         {/* Title + price + badge */}
-<div className="flex items-start justify-between gap-3">
-  <div className="flex-1">
-    <h1 data-testid="text-product-title" className="text-2xl font-black leading-tight">{product.title}</h1>
-    
-    <div className="mt-1 space-y-1">
-      {isAccommodation ? (
-        <p data-testid="text-product-price" className="text-xl font-bold text-indigo-600">
-          KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
-        </p>
-      ) : product.priceDisplay === "contact" ? (
-        <p className="text-2xl font-bold text-primary">Contact for Price</p>
-      ) : product.priceDisplay === "quote" ? (
-        <p className="text-2xl font-bold text-primary">Request Quote</p>
-      ) : product.priceDisplay === "free" ? (
-        <p className="text-2xl font-bold text-green-600">Free</p>
-      ) : (
-        <p data-testid="text-product-price" className="text-2xl font-bold text-primary">
-          KES {product.price.toLocaleString()}
-          {product.pricingBasis && product.pricingBasis !== "per_trip" && (
-            <span className="text-base font-semibold text-muted-foreground ml-1">
-              {{
-                per_km: "per km",
-                per_hour: "per hour",
-                per_day: "per day",
-                per_trip: "",
-                per_session: "per session",
-              }[product.pricingBasis]}
-            </span>
-          )}
-        </p>
-      )}
+<div>
 
-      {/* Badge for Negotiable items */}
-      {product.priceDisplay === "negotiable" && (
-        <div className="flex items-center gap-2">
-          <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-700">
-            Negotiable
-          </span>
-        </div>
-      )}
+  <h1
+    data-testid="text-product-title"
+    className="text-3xl font-bold mt-5"
+  >
+    {product.title}
+  </h1>
+
+  <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+
+    <div className="flex items-center gap-1">
+      <MapPin size={16} />
+      <span>
+        {product.ward
+          ? `${product.ward}, ${product.county ?? ""}`
+          : distance !== null
+          ? `${distance.toFixed(1)} km away`
+          : ""}
+      </span>
     </div>
+
+    <div className="flex items-center gap-1">
+      <Clock size={16} />
+      <span>{timeAgo(product.createdAt)}</span>
+    </div>
+
   </div>
-  
-  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-    <span className={`px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1 ${badgeColor}`}>
-      <Tag size={11} />{product.subcategory ?? product.category}
+
+  <div className="mt-3 flex justify-end">
+    <span
+      className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1 ${badgeColor}`}
+    >
+      <Tag size={12} />
+      {product.subcategory ?? product.category}
     </span>
   </div>
+
 </div>
 
+<Card className="mt-5 p-5">
+
+  {isAccommodation ? (
+    <h2 className="text-3xl font-bold text-orange-600">
+      KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
+    </h2>
+
+  ) : product.priceDisplay === "contact" ? (
+    <h2 className="text-3xl font-bold text-orange-600">
+      Contact for Price
+    </h2>
+
+  ) : product.priceDisplay === "quote" ? (
+    <h2 className="text-3xl font-bold text-orange-600">
+      Request Quote
+    </h2>
+
+  ) : product.priceDisplay === "free" ? (
+    <h2 className="text-3xl font-bold text-green-600">
+      Free
+    </h2>
+
+  ) : (
+    <h2 className="text-3xl font-bold text-orange-600">
+      KES {product.price.toLocaleString()}
+    </h2>
+  )}
+
+  {product.priceDisplay === "negotiable" && (
+    <div className="mt-3">
+      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+        Negotiable
+      </span>
+    </div>
+  )}
+
+</Card>
+
+        
 {product.description && (
   <p data-testid="text-product-description" className="text-muted-foreground leading-relaxed">
     {product.description}
