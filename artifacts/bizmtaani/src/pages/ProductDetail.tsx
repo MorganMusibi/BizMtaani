@@ -323,22 +323,6 @@ const handleReply = () => {
   onMouseUp={handlePressEnd}
 >
   <ImageGallery images={images} />
-</div>
->
-  <div className="aspect-video w-full overflow-hidden rounded-b-2xl bg-muted">
-    {images.length > 0 ? (
-      <img
-        src={images[0]}
-        alt={product.title}
-        className="w-full h-full object-cover"
-      />
-    ) : (
-      <div className="w-full h-full flex items-center justify-center">
-        <Store size={48} className="text-muted-foreground" />
-      </div>
-    )}
-  </div>
-</div>
       <div className="px-4 pt-4 pb-4 space-y-4">
   
         {/* Title + price + badge */}
