@@ -118,7 +118,7 @@ function ImageGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
   
   if (!images || images.length === 0) return (
-    <div className="w-full aspect-square bg-muted flex items-center justify-center">
+    <div className="aspect-video w-full bg-muted flex items-center justify-center">
       <Store size={48} className="text-muted-foreground" />
     </div>
   );
