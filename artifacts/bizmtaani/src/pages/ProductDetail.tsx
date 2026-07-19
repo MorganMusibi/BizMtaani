@@ -125,7 +125,13 @@ function ImageGallery({ images }: { images: string[] }) {
 
   return (
     <div>
-      <img src={images[active]} alt="Product" className="w-full aspect-square object-cover" />
+      <div className="aspect-video w-full overflow-hidden rounded-b-2xl bg-muted">
+  <img
+    src={images[active]}
+    alt="Product"
+    className="w-full h-full object-cover"
+  />
+</div>
       {images.length > 1 && (
         <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar bg-card border-b border-border">
           {images.map((url, i) => (
@@ -315,6 +321,9 @@ const handleReply = () => {
   onTouchEnd={handlePressEnd}
   onMouseDown={handlePressStart}
   onMouseUp={handlePressEnd}
+>
+  <ImageGallery images={images} />
+</div>
 >
   <div className="aspect-video w-full overflow-hidden rounded-b-2xl bg-muted">
     {images.length > 0 ? (
