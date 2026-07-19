@@ -330,7 +330,7 @@ const handleReply = () => {
 >
   <ImageGallery images={images} />
       </div>
-      <div className="px-4 pt-4 pb-4 space-y-4">
+      <div className="px-4 pt-4 pb-4 space-y-6">
     
   
         {/* Title + price + badge */}
@@ -413,10 +413,19 @@ const handleReply = () => {
 </Card>
 
         
-{product.description && (
-  <p data-testid="text-product-description" className="text-muted-foreground leading-relaxed">
-    {product.description}
-  </p>
+        {product.description && (
+  <Card>
+    <div className="p-5 space-y-3">
+      <h2 className="text-lg font-bold">Description</h2>
+
+      <p
+        data-testid="text-product-description"
+        className="leading-7 text-muted-foreground"
+      >
+        {product.description}
+      </p>
+    </div>
+  </Card>
 )}
 
 {/* Hotel/eatery menu */}
@@ -425,64 +434,62 @@ const handleReply = () => {
         {/*Title, Price, Description, Menu) ... */}
 
         
-        <div className="space-y-4">
-          {/* Seller card */}
-          <div
-            className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border cursor-pointer active:bg-muted transition-colors"
-            onClick={() => setLocation(`/shop/${product.sellerId}`)}
-          >
-            {product.sellerAvatar ? (
-              <img src={product.sellerAvatar} alt={product.sellerName} className="w-10 h-10 rounded-full object-cover" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-primary font-bold text-lg">{product.sellerName[0]?.toUpperCase()}</span>
-              </div>
-            )}
-            <div className="flex-1">
-              <p data-testid="text-seller-name" className="font-semibold text-sm">{product.sellerName}</p>
-              <p className="text-xs text-muted-foreground">{roleLabel}</p>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              {distance !== null && (
-                <div className="flex items-center gap-1 text-xs">
-                  <MapPin size={12} />
-                  <span data-testid="text-distance">
-                    {distance < 1 ? `${(distance * 1000).toFixed(0)}m` : `${distance.toFixed(1)}km`}
-                  </span>
-                </div>
-              )}
-              <ChevronRight size={16} />
-            </div>
-          </div>
+        <Card className="p-5">
+  <h2 className="text-lg font-bold mb-4">Seller</h2>
 
-          {/* View shop link */}
-          <div className="flex justify-end px-1">
-            <button
-              onClick={() => setLocation(`/shop/${product.sellerId}`)}
-              className="flex items-center gap-1.5 text-xs text-primary font-semibold"
-            >
-              <Store size={12} />
-              {isSeller ? "View my shop" : `See all from ${product.sellerName.split(" ")[0]}`}
-              <ChevronRight size={12} />
-            </button>
-          </div>
+  <div
+    onClick={() => setLocation(`/shop/${product.sellerId}`)}
+    className="flex items-center gap-4 cursor-pointer"
+  >
+    {product.sellerAvatar ? (
+      <img
+        src={product.sellerAvatar}
+        alt={product.sellerName}
+        className="w-14 h-14 rounded-full object-cover"
+      />
+    ) : (
+      <div className="w-14 h-14 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-xl">
+        {product.sellerName[0]?.toUpperCase()}
+      </div>
+    )}
 
-          {/* Phone */}
-          {product.phone && (
-            <a href={`tel:${product.phone}`} data-testid="link-phone"
-              className="flex items-center gap-3 p-3 bg-card rounded-2xl border border-border hover:border-secondary transition-colors">
-              <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center flex-shrink-0">
-                <Phone size={18} className="text-secondary" />
-              </div>
-              <div className="flex-1">
-                <p className="text-xs text-muted-foreground">{isAccommodation ? "Landlord's number" : "WhatsApp / Phone"}</p>
-                <p className="font-bold text-sm">{product.phone}</p>
-              </div>
-              <span className="text-xs font-semibold text-secondary px-3 py-1.5 bg-secondary/10 rounded-xl">Call</span>
-            </a>
-          )}
-        </div>
+    <div className="flex-1">
+      <h3
+        data-testid="text-seller-name"
+        className="font-bold text-base"
+      >
+        {product.sellerName}
+      </h3>
 
+      <p className="text-sm text-green-600">
+        ✓ Verified Seller
+      </p>
+
+      <p className="text-sm text-muted-foreground">
+        ⭐ 4.8 • 24 Listings
+      </p>
+
+      {distance !== null && (
+        <p className="text-xs text-muted-foreground mt-1">
+          <MapPin className="inline w-3 h-3 mr-1" />
+          {distance < 1
+            ? `${(distance * 1000).toFixed(0)}m away`
+            : `${distance.toFixed(1)} km away`}
+        </p>
+      )}
+    </div>
+
+    <ChevronRight className="text-muted-foreground" />
+  </div>
+
+  <Button
+    variant="outline"
+    className="w-full mt-5"
+    onClick={() => setLocation(`/shop/${product.sellerId}`)}
+  >
+    {isSeller ? "View My Shop" : "View Shop"}
+  </Button>
+</Card>
         {/* --- OPTIONS MODAL START --- */}
         {showOptions && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-end animate-in fade-in duration-200">
@@ -521,7 +528,7 @@ const handleReply = () => {
       </Button>
     </div>
   ) : (
-    <div className="flex gap-2">
+    <div className="grid grid-cols-3 gap-3">
       {product.phone && (
         <a
           href={`tel:${product.phone}`}
