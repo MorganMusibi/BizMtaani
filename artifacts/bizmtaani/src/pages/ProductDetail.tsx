@@ -2,8 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc
-} from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -526,8 +525,8 @@ const handleReply = () => {
         {relatedProducts.length > 0 && (
   <Card className="p-5">
     <h2 className="text-lg font-bold mb-4">
-      More {product.category} nearby
-    </h2>
+  More {product.subcategory ?? product.category} nearby
+</h2>
 
     <div className="grid grid-cols-2 gap-3">
       {relatedProducts.map((item) => {
