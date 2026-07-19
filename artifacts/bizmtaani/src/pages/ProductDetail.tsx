@@ -323,8 +323,9 @@ const handleReply = () => {
   onMouseUp={handlePressEnd}
 >
   <ImageGallery images={images} />
+      </div>
       <div className="px-4 pt-4 pb-4 space-y-4">
-        </div>
+    
   
         {/* Title + price + badge */}
 <div>
