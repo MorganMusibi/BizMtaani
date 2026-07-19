@@ -309,7 +309,13 @@ const handleReply = () => {
     <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
       <button
         data-testid="button-back"
-        onClick={() => setLocation("/")}
+        onClick={() => {
+  if (window.history.length > 1) {
+    window.history.back();
+  } else {
+    setLocation("/");
+  }
+}}
         className="p-2 rounded-full bg-card/80 backdrop-blur-sm shadow"
       >
         <ChevronLeft size={20} />
