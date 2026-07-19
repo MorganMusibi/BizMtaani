@@ -190,16 +190,49 @@ const handleReply = () => {
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
   if (!id) return;
 
-  getDoc(doc(db, "products", id)).then((snap) => {
-    if (snap.exists()) {
-      setProduct({ id: snap.id, ...snap.data() } as Product);
-    }
+  (async () => {
+  const snap = await getDoc(doc(db, "products", id));
+
+  if (!snap.exists()) {
     setLoading(false);
-  });
+    return;
+  }
+
+  const currentProduct = {
+    id: snap.id,
+    ...snap.data(),
+  } as Product;
+
+  setProduct(currentProduct);
+
+  const relatedQuery = query(
+  collection(db, "products"),
+  where(
+    currentProduct.subcategory ? "subcategory" : "category",
+    "==",
+    currentProduct.subcategory ?? currentProduct.category
+  ),
+  where("status", "==", "active"),
+  limit(6)
+);
+  const relatedSnap = await getDocs(relatedQuery);
+
+  setRelatedProducts(
+    relatedSnap.docs
+      .filter((doc) => doc.id !== currentProduct.id)
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Product))
+  );
+
+  setLoading(false);
+})();
 
   navigator.geolocation.getCurrentPosition(
     (pos) => {
@@ -490,6 +523,67 @@ const handleReply = () => {
     {isSeller ? "View My Shop" : "View Shop"}
   </Button>
 </Card>
+        {relatedProducts.length > 0 && (
+  <Card className="p-5">
+    <h2 className="text-lg font-bold mb-4">
+      More {product.category} nearby
+    </h2>
+
+    <div className="grid grid-cols-2 gap-3">
+      {relatedProducts.map((item) => {
+        const itemImages = Array.isArray(item.imageUrls)
+          ? item.imageUrls.map((img: any) =>
+              typeof img === "string" ? img : img.url
+            )
+          : item.imageUrl
+          ? [item.imageUrl]
+          : [];
+
+        return (
+          <div
+            key={item.id}
+            onClick={() => setLocation(`/product/${item.id}`)}
+            className="cursor-pointer rounded-xl border border-border overflow-hidden bg-card hover:shadow-md transition"
+          >
+            <div className="aspect-square bg-muted">
+              {itemImages.length > 0 ? (
+                <img
+                  src={itemImages[0]}
+                  alt={item.title}
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Store className="text-muted-foreground" size={32} />
+                </div>
+              )}
+            </div>
+
+            <div className="p-3">
+              <h3 className="font-semibold text-sm line-clamp-1">
+                {item.title}
+              </h3>
+
+              <p className="text-primary font-bold mt-1">
+                {item.priceDisplay === "contact"
+                  ? "Contact for Price"
+                  : item.priceDisplay === "quote"
+                  ? "Request Quote"
+                  : item.priceDisplay === "free"
+                  ? "Free"
+                  : `KES ${item.price.toLocaleString()}`}
+              </p>
+
+              <p className="text-xs text-muted-foreground mt-1">
+                {item.ward}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </Card>
+)}
         {/* --- OPTIONS MODAL START --- */}
         {showOptions && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-end animate-in fade-in duration-200">
