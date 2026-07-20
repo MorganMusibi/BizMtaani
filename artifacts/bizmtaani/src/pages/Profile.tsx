@@ -41,10 +41,11 @@ export default function Profile() {
   try {
     // Compress image before upload
 const compressedFile = await imageCompression(file, {
-  maxSizeMB: 0.2,           // Target around 200 KB
-  maxWidthOrHeight: 600,    // Better quality on modern phones
+  maxSizeMB: 0.2,
+  maxWidthOrHeight: 600,
   useWebWorker: true,
   initialQuality: 0.8,
+  fileType: "image/jpeg",
 });
 
     // Store profile picture as avatars/{uid}
