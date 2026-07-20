@@ -30,7 +30,7 @@ export default function Profile() {
   if (file.size > 5 * 1024 * 1024) {
     toast({
       title: "Image too large",
-      description: "Maximum 10 MB.",
+      description: "Maximum 5 MB.",
       variant: "destructive",
     });
     return;
@@ -50,7 +50,9 @@ const compressedFile = await imageCompression(file, {
     // Store profile picture as avatars/{uid}
     const storageRef = ref(storage, `avatars/${user.uid}`);
 
-    await uploadBytes(storageRef, compressedFile);
+    await uploadBytes(storageRef, compressedFile, {
+  contentType: compressedFile.type,
+});
 
     const photoURL = await getDownloadURL(storageRef);
 
