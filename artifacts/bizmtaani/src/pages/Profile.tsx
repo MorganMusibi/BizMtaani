@@ -52,9 +52,10 @@ export default function Profile() {
     });
 
     // Update Firestore user document
-    await updateDoc(doc(db, "Users", user.uid), {
-      photoURL,
-    });
+    // Update Firestore user document
+await updateDoc(doc(db, "users", user.uid), {
+  photoURL,
+});
 
     toast({
       title: "Profile photo updated",
