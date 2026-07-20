@@ -1,6 +1,6 @@
-import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { signOut, updateProfile } from "firebase/auth";
@@ -38,7 +38,6 @@ export default function Profile() {
   setUploading(true);
 
   try {
-    const storage = getStorage();
 
     // Store profile picture as avatars/{uid}
     const storageRef = ref(storage, `avatars/${user.uid}`);
