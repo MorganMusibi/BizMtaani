@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
+import imageCompression from "browser-image-compression";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -26,7 +27,7 @@ export default function Profile() {
 
   if (!file || !user) return;
 
-  if (file.size > 10 * 1024 * 1024) {
+  if (file.size > 5 * 1024 * 1024) {
     toast({
       title: "Image too large",
       description: "Maximum 10 MB.",
@@ -38,11 +39,18 @@ export default function Profile() {
   setUploading(true);
 
   try {
+    // Compress image before upload
+const compressedFile = await imageCompression(file, {
+  maxSizeMB: 0.15,          // Target about 150 KB
+  maxWidthOrHeight: 500,    // Resize if larger than 500px
+  useWebWorker: true,
+  initialQuality: 0.7,
+});
 
     // Store profile picture as avatars/{uid}
     const storageRef = ref(storage, `avatars/${user.uid}`);
 
-    await uploadBytes(storageRef, file);
+    await uploadBytes(storageRef, compressedFile);
 
     const photoURL = await getDownloadURL(storageRef);
 
