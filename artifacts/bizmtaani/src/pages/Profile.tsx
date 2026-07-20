@@ -1,8 +1,10 @@
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { signOut, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -20,22 +22,58 @@ export default function Profile() {
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-    if (file.size > 10 * 1024 * 1024) {
-      toast({ title: "Image too large", description: "Maximum 10 MB.", variant: "destructive" });
-      return;
-    }
-    setUploading(true);
-    try {
-      const photoURL = await uploadImage(file, "avatar");
-      await updateProfile(user, { photoURL });
-      window.location.reload();
-    } catch {
-      toast({ title: "Upload failed", description: "Please try again.", variant: "destructive" });
-      setUploading(false);
-    }
+  const file = e.target.files?.[0];
+
+  if (!file || !user) return;
+
+  if (file.size > 10 * 1024 * 1024) {
+    toast({
+      title: "Image too large",
+      description: "Maximum 10 MB.",
+      variant: "destructive",
+    });
+    return;
   }
+
+  setUploading(true);
+
+  try {
+    const storage = getStorage();
+
+    // Store profile picture as avatars/{uid}
+    const storageRef = ref(storage, `avatars/${user.uid}`);
+
+    await uploadBytes(storageRef, file);
+
+    const photoURL = await getDownloadURL(storageRef);
+
+    // Update Firebase Authentication profile
+    await updateProfile(user, {
+      photoURL,
+    });
+
+    // Update Firestore user document
+    await updateDoc(doc(db, "Users", user.uid), {
+      photoURL,
+    });
+
+    toast({
+      title: "Profile photo updated",
+    });
+
+    window.location.reload();
+  } catch (error) {
+    console.error(error);
+
+    toast({
+      title: "Upload failed",
+      description: "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setUploading(false);
+  }
+}
 
   async function handleSignOut() {
     await signOut(auth);
