@@ -90,6 +90,38 @@ await updateDoc(doc(db, "users", user.uid), {
 if (cameraRef.current) cameraRef.current.value = "";
   }
 }
+  async function handleDeleteAvatar() {
+  if (!user) return;
+
+  try {
+    const storageRef = ref(storage, `avatars/${user.uid}`);
+
+    await deleteObject(storageRef).catch(() => {});
+
+    await updateProfile(user, {
+      photoURL: "",
+    });
+
+    await updateDoc(doc(db, "users", user.uid), {
+      photoURL: "",
+    });
+
+    setShowAvatarMenu(false);
+
+    toast({
+      title: "Profile photo removed",
+    });
+
+    window.location.reload();
+  } catch (error) {
+    console.error(error);
+
+    toast({
+      title: "Failed to remove photo",
+      variant: "destructive",
+    });
+  }
+}
 
   async function handleSignOut() {
     await signOut(auth);
@@ -186,7 +218,9 @@ if (cameraRef.current) cameraRef.current.value = "";
               )}
             </div>
             <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Tap photo to change</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+  Tap photo to view • Tap camera to change
+</p>
           </div>
         </div>
 
@@ -218,6 +252,14 @@ if (cameraRef.current) cameraRef.current.value = "";
                   onClick={() => setShowAvatarMenu(false)}
                   className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground"
                 >
+                  {hasPhoto && (
+  <button
+    onClick={handleDeleteAvatar}
+    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-red-50 text-red-600 font-semibold text-sm"
+  >
+    Delete photo
+  </button>
+)}
                   Cancel
                 </button>
               </div>
