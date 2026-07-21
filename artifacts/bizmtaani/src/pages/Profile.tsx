@@ -42,10 +42,9 @@ export default function Profile() {
     // Compress image before upload
 const compressedFile = await imageCompression(file, {
   maxSizeMB: 0.2,
-  maxWidthOrHeight: 600,
+  maxWidthOrHeight: 512,
   useWebWorker: true,
-  initialQuality: 0.8,
-  fileType: "image/jpeg",
+  initialQuality: 0.75,
 });
 
     // Store profile picture as avatars/{uid}
@@ -53,6 +52,7 @@ const compressedFile = await imageCompression(file, {
 
     await uploadBytes(storageRef, compressedFile, {
   contentType: compressedFile.type,
+  cacheControl: "public,max-age=31536000",
 });
 
     const photoURL = await getDownloadURL(storageRef);
@@ -83,6 +83,8 @@ await updateDoc(doc(db, "users", user.uid), {
     });
   } finally {
     setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+if (cameraRef.current) cameraRef.current.value = "";
   }
 }
 
