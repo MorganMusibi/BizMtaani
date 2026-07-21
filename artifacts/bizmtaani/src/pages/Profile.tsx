@@ -45,6 +45,7 @@ const compressedFile = await imageCompression(file, {
   maxWidthOrHeight: 512,
   useWebWorker: true,
   initialQuality: 0.75,
+  fileType: "image/jpeg",
 });
 
     // Store profile picture as avatars/{uid}
