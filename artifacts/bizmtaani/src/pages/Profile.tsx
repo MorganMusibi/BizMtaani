@@ -128,7 +128,7 @@ if (cameraRef.current) cameraRef.current.value = "";
 
         {/* Avatar + info */}
         <div className="flex items-center gap-4">
-          <button
+           <button
   type="button"
   onClick={() => {
     if (uploading) return;
@@ -139,44 +139,37 @@ if (cameraRef.current) cameraRef.current.value = "";
       setShowAvatarMenu(true);
     }
   }}
-            disabled={uploading}
-            className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 focus:outline-none"
-            aria-label="Change profile picture"
-          >
-            {user.photoURL ? (
-              <img
-                src={user.photoURL}
-                alt={displayName}
-                className="w-full h-full object-cover"
-                data-testid="img-avatar"
-              />
-            ) : (
-              <div
-                data-testid="avatar-initials"
-                className="w-full h-full bg-primary flex items-center justify-center"
-              >
-                <span className="text-white text-2xl font-black">{initials}</span>
-              </div>
-            )}
-            <button
-  type="button"
-  onClick={(e) => {
-    e.stopPropagation();
-    setShowAvatarMenu(true);
-  }}
-  className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center border-2 border-white"
+  disabled={uploading}
+  className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 focus:outline-none"
 >
-  {uploading ? (
-    <Loader2 size={14} className="animate-spin text-white" />
+  {user.photoURL ? (
+    <img
+      src={user.photoURL}
+      alt={displayName}
+      className="w-full h-full object-cover"
+    />
   ) : (
-    <Camera size={14} className="text-white" />
+    <div className="w-full h-full bg-primary flex items-center justify-center">
+      <span className="text-white text-2xl font-black">
+        {initials}
+      </span>
+    </div>
   )}
+
+  <div
+    onClick={(e) => {
+      e.stopPropagation();
+      setShowAvatarMenu(true);
+    }}
+    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary border-2 border-white flex items-center justify-center cursor-pointer"
+  >
+    {uploading ? (
+      <Loader2 size={14} className="animate-spin text-white" />
+    ) : (
+      <Camera size={14} className="text-white" />
+    )}
+  </div>
 </button>
-              {uploading
-                ? <Loader2 size={18} className="text-white animate-spin" />
-                : <Camera size={18} className="text-white" />}
-            </div>
-          </button>
 
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
@@ -297,30 +290,36 @@ if (cameraRef.current) cameraRef.current.value = "";
         </Button>
       </div>
     {showPhotoViewer && (
-  <>
-    <div
-      className="fixed inset-0 z-50 bg-black"
+  <div
+    className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+    onClick={() => setShowPhotoViewer(false)}
+  >
+    <img
+      src={user.photoURL!}
+      alt={displayName}
+      className="max-w-full max-h-full object-contain"
+      onClick={(e) => e.stopPropagation()}
+    />
+
+    <button
+      className="absolute top-5 right-5 text-white text-4xl"
       onClick={() => setShowPhotoViewer(false)}
     >
-      <img
-        src={user.photoURL!}
-        alt={displayName}
-        className="w-full h-full object-contain"
-      />
+      ✕
+    </button>
 
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowPhotoViewer(false);
-        }}
-        className="absolute top-5 right-5 text-white text-3xl"
-      >
-        ✕
-      </button>
-    </div>
-  </>
+    <button
+      className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-primary text-white px-6 py-3 rounded-xl"
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowPhotoViewer(false);
+        setShowAvatarMenu(true);
+      }}
+    >
+      Change Photo
+    </button>
+  </div>
 )}
-
       <BottomNav />
     </div>
   );
