@@ -25,46 +25,55 @@ export default function ChatList() {
   const [loading, setLoading] = useState(true);
 const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!user) {
-      setLocation("/login");
-      return;
+ useEffect(() => {
+  if (!user) {
+    setLocation("/login");
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+
+  const q = query(
+    collection(db, "chats"),
+    where("participants", "array-contains", user.uid),
+    orderBy("lastMessageAt", "desc")
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      setChats(
+        snap.docs.map(
+          (d) =>
+            ({
+              id: d.id,
+              ...d.data(),
+            } as Chat)
+        )
+      );
+
+      // Important: stop loading after successful Firebase response
+      setLoading(false);
+    },
+    (error) => {
+      console.error(
+        "Error loading chats:",
+        error
+      );
+
+      setError(
+        error.message ||
+          "Unable to load your messages."
+      );
+
+      // Important: stop loading even when Firebase returns an error
+      setLoading(false);
     }
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid),
-      orderBy("lastMessageAt", "desc")
-    );
-    const unsub = onSnapshot(
-  q,
-  (snap) => {
-    setChats(
-      snap.docs.map(
-        (d) =>
-          ({
-            id: d.id,
-            ...d.data(),
-          } as Chat)
-      )
-    );
-
-  (error) => {
-  console.error(
-    "Error loading chats:",
-    error
   );
 
-  setError(
-    error.message ||
-      "Unable to load your messages."
-  );
-
-  setLoading(false);
-}
-  
-);
-    return unsub;
-  }, [user, setLocation]);
+  return unsub;
+}, [user, setLocation]);
 
   function getOtherParty(chat: Chat) {
     if (!user) return "";
