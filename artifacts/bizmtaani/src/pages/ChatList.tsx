@@ -23,6 +23,7 @@ export default function ChatList() {
   const { user } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
+const [error, setError] = useState("");
 
   useEffect(() => {
     if (!user) {
@@ -34,10 +35,34 @@ export default function ChatList() {
       where("participants", "array-contains", user.uid),
       orderBy("lastMessageAt", "desc")
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setChats(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Chat)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+  q,
+  (snap) => {
+    setChats(
+      snap.docs.map(
+        (d) =>
+          ({
+            id: d.id,
+            ...d.data(),
+          } as Chat)
+      )
+    );
+
+  (error) => {
+  console.error(
+    "Error loading chats:",
+    error
+  );
+
+  setError(
+    error.message ||
+      "Unable to load your messages."
+  );
+
+  setLoading(false);
+}
+  
+);
     return unsub;
   }, [user, setLocation]);
 
@@ -64,10 +89,32 @@ export default function ChatList() {
       </header>
 
       {loading ? (
-        <div className="flex justify-center py-20">
-          <Loader2 size={28} className="animate-spin text-primary" />
-        </div>
-      ) : chats.length === 0 ? (
+  <div className="flex flex-col items-center justify-center py-20 gap-3">
+    <Loader2
+      size={28}
+      className="animate-spin text-primary"
+    />
+
+    <p className="text-sm text-muted-foreground">
+      Loading messages...
+    </p>
+  </div>
+) : error ? (
+  <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
+    <MessageCircle
+      size={40}
+      className="text-muted-foreground mb-3"
+    />
+
+    <p className="font-bold text-lg">
+      Unable to load messages
+    </p>
+
+    <p className="text-sm text-muted-foreground mt-2">
+      {error}
+    </p>
+  </div>
+) : chats.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4 px-6">
           <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center">
             <MessageCircle size={36} className="text-muted-foreground" />
