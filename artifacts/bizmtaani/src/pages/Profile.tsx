@@ -232,37 +232,47 @@ if (cameraRef.current) cameraRef.current.value = "";
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
             >
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-              <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
-              <div className="space-y-2">
-                <button
-                  onClick={() => { setShowAvatarMenu(false); cameraRef.current?.click(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
-                >
-                  <Camera size={20} className="text-primary" />
-                  Take a photo
-                </button>
-                <button
-                  onClick={() => { setShowAvatarMenu(false); fileRef.current?.click(); }}
-                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
-                >
-                  <Package size={20} className="text-primary" />
-                  Choose from gallery
-                </button>
-                <button
-                  onClick={() => setShowAvatarMenu(false)}
-                  className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground"
-                >
-                  {hasPhoto && (
+<p className="font-bold text-sm text-center mb-4">Change profile photo</p>
+
+<div className="space-y-2">
   <button
-    onClick={handleDeleteAvatar}
-    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-red-50 text-red-600 font-semibold text-sm"
+    onClick={() => {
+      setShowAvatarMenu(false);
+      cameraRef.current?.click();
+    }}
+    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
   >
-    Delete photo
+    <Camera size={20} className="text-primary" />
+    Take a photo
   </button>
-)}
-                  Cancel
-                </button>
-              </div>
+
+  <button
+    onClick={() => {
+      setShowAvatarMenu(false);
+      fileRef.current?.click();
+    }}
+    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
+  >
+    <Package size={20} className="text-primary" />
+    Choose from gallery
+  </button>
+
+  {hasPhoto && (
+    <button
+      onClick={handleDeleteAvatar}
+      className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-red-50 text-red-600 font-semibold text-sm"
+    >
+      Delete Photo
+    </button>
+  )}
+
+  <button
+    onClick={() => setShowAvatarMenu(false)}
+    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground"
+  >
+    Cancel
+  </button>
+</div>
             </div>
           </>
         )}
