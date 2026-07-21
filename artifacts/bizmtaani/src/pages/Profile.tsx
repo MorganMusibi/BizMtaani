@@ -1,4 +1,4 @@
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject, } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
 import { doc, updateDoc } from "firebase/firestore";
 import { useRef, useState } from "react";
