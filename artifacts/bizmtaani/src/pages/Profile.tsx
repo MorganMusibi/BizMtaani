@@ -21,6 +21,8 @@ export default function Profile() {
   const cameraRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
+  const [showPhotoViewer, setShowPhotoViewer] = useState(false);
+const hasPhoto = !!user?.photoURL;
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
   const file = e.target.files?.[0];
@@ -127,8 +129,16 @@ if (cameraRef.current) cameraRef.current.value = "";
         {/* Avatar + info */}
         <div className="flex items-center gap-4">
           <button
-            type="button"
-            onClick={() => !uploading && setShowAvatarMenu(true)}
+  type="button"
+  onClick={() => {
+    if (uploading) return;
+
+    if (hasPhoto) {
+      setShowPhotoViewer(true);
+    } else {
+      setShowAvatarMenu(true);
+    }
+  }}
             disabled={uploading}
             className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 focus:outline-none"
             aria-label="Change profile picture"
@@ -148,7 +158,20 @@ if (cameraRef.current) cameraRef.current.value = "";
                 <span className="text-white text-2xl font-black">{initials}</span>
               </div>
             )}
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <button
+  type="button"
+  onClick={(e) => {
+    e.stopPropagation();
+    setShowAvatarMenu(true);
+  }}
+  className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary flex items-center justify-center border-2 border-white"
+>
+  {uploading ? (
+    <Loader2 size={14} className="animate-spin text-white" />
+  ) : (
+    <Camera size={14} className="text-white" />
+  )}
+</button>
               {uploading
                 ? <Loader2 size={18} className="text-white animate-spin" />
                 : <Camera size={18} className="text-white" />}
@@ -273,6 +296,30 @@ if (cameraRef.current) cameraRef.current.value = "";
           Sign Out
         </Button>
       </div>
+    {showPhotoViewer && (
+  <>
+    <div
+      className="fixed inset-0 z-50 bg-black"
+      onClick={() => setShowPhotoViewer(false)}
+    >
+      <img
+        src={user.photoURL!}
+        alt={displayName}
+        className="w-full h-full object-contain"
+      />
+
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowPhotoViewer(false);
+        }}
+        className="absolute top-5 right-5 text-white text-3xl"
+      >
+        ✕
+      </button>
+    </div>
+  </>
+)}
 
       <BottomNav />
     </div>
