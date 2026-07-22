@@ -98,14 +98,15 @@ const hasPhoto = !!user?.photoURL;
     });
 
     window.location.reload();
-  } catch (error) {
-    console.error(error);
+  } catch (error: any) {
+  console.error("PROFILE PHOTO ERROR:", error);
 
-    toast({
-      title: "Upload failed",
-      description: "Please try again.",
-      variant: "destructive",
-    });
+  toast({
+    title: "Upload failed",
+    description: error?.message || "Unknown error",
+    variant: "destructive",
+  });
+}
   } finally {
     setUploading(false);
 
