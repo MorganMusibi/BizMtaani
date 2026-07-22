@@ -51,18 +51,12 @@ interface Chat {
   participants?: string[];
 }
 
-const chatContext =
-  chat.type === "job_application"
-    ? `Application: ${chat.jobTitle}`
-    : chat.productTitle || "New message";
-
-sendPushNotification(
-  recipientUid,
-  `${senderName} — ${chatContext}`,
-  msgText,
-  chatId
-);
-{
+async function sendPushNotification(
+  recipientUid: string,
+  title: string,
+  body: string,
+  chatId: string
+) {
   try {
     const tokenDoc = await getDoc(
       doc(db, "fcmTokens", recipientUid)
@@ -397,18 +391,23 @@ export default function ChatThread() {
           : chat.buyerId;
 
       const senderName =
-        user.displayName ||
-        "Someone";
+  user.displayName ||
+  "Someone";
 
-      // Don't await this.
-      // The message should remain successful
-      // even if notification fails.
-      sendPushNotification(
-        recipientUid,
-        `${senderName} — ${chat.productTitle}`,
-        msgText,
-        chatId
-      );
+const chatContext =
+  chat.type === "job_application"
+    ? `Application: ${chat.jobTitle || "Job application"}`
+    : chat.productTitle || "New message";
+
+// Don't await this.
+// The message should remain successful
+// even if notification fails.
+sendPushNotification(
+  recipientUid,
+  `${senderName} — ${chatContext}`,
+  msgText,
+  chatId
+);
     } catch (error: any) {
       console.error(
         "Error sending message:",
