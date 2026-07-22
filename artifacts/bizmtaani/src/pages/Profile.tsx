@@ -105,45 +105,62 @@ async function handleAvatarChange(
       photoURL,
     });
 
-    console.log(
-      "STEP 5 SUCCESS: Auth profile updated"
-    );
+// Make sure `setDoc` is imported from "firebase/firestore" at the top of your file:
+// import { doc, setDoc } from "firebase/firestore";
 
-    // STEP 6: Update Firestore
-    await updateDoc(
-      doc(db, "users", user.uid),
-      {
-        photoURL,
-        photoStoragePath:
-          newStoragePath,
-      }
-    );
+async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0];
 
-    console.log(
-      "STEP 6 SUCCESS: Firestore updated"
-    );
+  if (!file || !user) return;
 
-    // STEP 7: Delete old photo
-    if (
-      oldStoragePath &&
-      oldStoragePath !== newStoragePath
-    ) {
+  if (file.size > 5 * 1024 * 1024) {
+    toast({
+      title: "Image too large",
+      description: "Maximum 5 MB.",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  setUploading(true);
+
+  try {
+    const compressedFile = await imageCompression(file, {
+      maxSizeMB: 0.4,
+      maxWidthOrHeight: 800,
+      useWebWorker: true,
+      initialQuality: 0.85,
+      fileType: "image/jpeg",
+    });
+
+    const oldStoragePath = userProfile?.photoStoragePath;
+    const newStoragePath = `avatars/${user.uid}/${Date.now()}.jpg`;
+    const storageRef = ref(storage, newStoragePath);
+
+    await uploadBytes(storageRef, compressedFile, {
+      contentType: "image/jpeg",
+      cacheControl: "public,max-age=31536000,immutable",
+    });
+
+    const photoURL = await getDownloadURL(storageRef);
+
+    await updateProfile(user, {
+      photoURL,
+    });
+
+    // Use setDoc with { merge: true } instead of updateDoc.
+    // This prevents errors if the user's Firestore document hasn't been initialized yet.
+    await setDoc(doc(db, "users", user.uid), {
+      photoURL,
+      photoStoragePath: newStoragePath,
+    }, { merge: true });
+
+    if (oldStoragePath && oldStoragePath !== newStoragePath) {
       try {
-        const oldStorageRef =
-          ref(storage, oldStoragePath);
-
-        await deleteObject(
-          oldStorageRef
-        );
-
-        console.log(
-          "STEP 7 SUCCESS: Old photo deleted"
-        );
+        const oldStorageRef = ref(storage, oldStoragePath);
+        await deleteObject(oldStorageRef);
       } catch (deleteError) {
-        console.warn(
-          "Old photo could not be deleted:",
-          deleteError
-        );
+        console.warn("Could not delete old profile photo:", deleteError);
       }
     }
 
@@ -152,34 +169,15 @@ async function handleAvatarChange(
     });
 
     window.location.reload();
-
-  } catch (error: any) {
-
-    console.error(
-      "PROFILE PHOTO ERROR:",
-      error
-    );
-
-    console.error(
-      "ERROR CODE:",
-      error?.code
-    );
-
-    console.error(
-      "ERROR MESSAGE:",
-      error?.message
-    );
+  } catch (error) {
+    console.error("Profile photo upload error:", error);
 
     toast({
       title: "Upload failed",
-      description:
-        error?.message ||
-        "Something went wrong.",
+      description: "Please check your Storage rules and try again.",
       variant: "destructive",
     });
-
   } finally {
-
     setUploading(false);
 
     if (fileRef.current) {
@@ -189,7 +187,6 @@ async function handleAvatarChange(
     if (cameraRef.current) {
       cameraRef.current.value = "";
     }
-
   }
 }
  
