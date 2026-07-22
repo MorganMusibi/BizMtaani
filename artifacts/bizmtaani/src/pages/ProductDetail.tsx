@@ -258,31 +258,80 @@ const handleReply = () => {
 
   // NOW handleChat CAN SAFELY USE "images"
   async function handleChat() {
-    if (!user) return setLocation("/login");
-    if (!product || product.sellerId === user.uid) return;
-    setChatLoading(true);
-    try {
-      const q = query(collection(db, "chats"), where("productId", "==", product.id), where("buyerId", "==", user.uid));
-      const existing = await getDocs(q);
-      if (!existing.empty) { setLocation(`/chat/${existing.docs[0].id}`); return; }
-      
-      const chatDoc = await addDoc(collection(db, "chats"), {
-        productId: product.id, 
-        productTitle: product.title,
-        productImage: images.length > 0 ? images[0] : "", // Now defined and accessible
-        buyerId: user.uid, 
-        buyerName: user.displayName || "Buyer",
-        sellerId: product.sellerId, 
-        sellerName: product.sellerName,
-        participants: [user.uid, product.sellerId],
-        lastMessage: "", 
-        lastMessageAt: serverTimestamp(),
-      });
-      setLocation(`/chat/${chatDoc.id}`);
-    } catch (err: unknown) {
-      toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
-    } finally { setChatLoading(false); }
+  if (!user) {
+    setLocation("/login");
+    return;
   }
+
+  if (!product || product.sellerId === user.uid) {
+    return;
+  }
+
+  setChatLoading(true);
+
+  try {
+    // Check if this buyer already has a chat
+    // with this seller for this product.
+    const q = query(
+      collection(db, "chats"),
+      where("productId", "==", product.id),
+      where("buyerId", "==", user.uid),
+      where("sellerId", "==", product.sellerId),
+      limit(1)
+    );
+
+    const existing = await getDocs(q);
+
+    // Open existing chat if found.
+    if (!existing.empty) {
+      setLocation(`/chat/${existing.docs[0].id}`);
+      return;
+    }
+
+    // Create new product chat.
+    const chatDoc = await addDoc(collection(db, "chats"), {
+      type: "product",
+
+      productId: product.id,
+      productTitle: product.title,
+      productImage: images.length > 0 ? images[0] : "",
+
+      buyerId: user.uid,
+      buyerName: user.displayName || "Buyer",
+
+      sellerId: product.sellerId,
+      sellerName: product.sellerName,
+
+      participants: [
+        user.uid,
+        product.sellerId,
+      ],
+
+      lastMessage: "",
+      lastMessageAt: serverTimestamp(),
+
+      createdAt: serverTimestamp(),
+    });
+
+    // Open the new chat.
+    setLocation(`/chat/${chatDoc.id}`);
+
+  } catch (err: unknown) {
+    console.error("Error opening chat:", err);
+
+    toast({
+      title: "Unable to start chat",
+      description:
+        err instanceof Error
+          ? err.message
+          : "Please try again.",
+      variant: "destructive",
+    });
+
+  } finally {
+    setChatLoading(false);
+  }
+}
 
 
   if (loading) return (
