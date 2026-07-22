@@ -106,7 +106,6 @@ const hasPhoto = !!user?.photoURL;
     description: error?.message || "Unknown error",
     variant: "destructive",
   });
-}
   } finally {
     setUploading(false);
 
