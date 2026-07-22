@@ -188,8 +188,9 @@ export default function ChatThread() {
         */
 
         const isParticipant =
-          chatData.buyerId === user.uid ||
-          chatData.sellerId === user.uid;
+  chatData.participants?.includes(user.uid) ||
+  chatData.buyerId === user.uid ||
+  chatData.sellerId === user.uid;
 
         if (!isParticipant) {
           setError(
