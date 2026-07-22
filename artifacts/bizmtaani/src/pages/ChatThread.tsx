@@ -32,22 +32,37 @@ interface Message {
 }
 
 interface Chat {
-  productId: string;
-  productTitle: string;
-  productImage: string;
+  type?: "product" | "job_application";
+
+  productId?: string;
+  productTitle?: string;
+  productImage?: string;
+
+  jobId?: string;
+  jobTitle?: string;
+  company?: string;
+
   buyerId: string;
   buyerName: string;
+
   sellerId: string;
   sellerName: string;
+
   participants?: string[];
 }
 
-async function sendPushNotification(
-  recipientUid: string,
-  title: string,
-  body: string,
-  chatId: string
-) {
+async function const chatContext =
+  chat.type === "job_application"
+    ? `Application: ${chat.jobTitle}`
+    : chat.productTitle || "New message";
+
+sendPushNotification(
+  recipientUid,
+  `${senderName} — ${chatContext}`,
+  msgText,
+  chatId
+);
+{
   try {
     const tokenDoc = await getDoc(
       doc(db, "fcmTokens", recipientUid)
