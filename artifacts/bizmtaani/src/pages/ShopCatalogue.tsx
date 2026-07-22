@@ -3,6 +3,7 @@ import { useParams, useLocation, Link } from "wouter";
 import { collection, query, where, orderBy, getDocs, limit, addDoc, serverTimestamp, } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { BottomNav } from "@/components/BottomNav";
 import { ChevronLeft, Phone, MessageCircle, Package, Store, MapPin, Loader2 } from "lucide-react";
 import { getCategoryBadgeColor } from "@/lib/categories";
@@ -43,7 +44,8 @@ function priceDisplay(p: ShopProduct): string {
 
 export default function ShopCatalogue() {
   const { userId } = useParams<{ userId: string }>();
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
+  const { toast } = useToast();
   const [, navigate] = useLocation();
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -81,9 +83,11 @@ const [chatLoading, setChatLoading] = useState(false);
 
   try {
     /*
-     * Check whether a general seller conversation
-     * already exists between this buyer and seller.
-     */
+    |--------------------------------------------------------------------------
+    | STEP 1: CHECK IF SELLER CHAT ALREADY EXISTS
+    |--------------------------------------------------------------------------
+    */
+
     const q = query(
       collection(db, "chats"),
       where("type", "==", "seller"),
@@ -95,27 +99,44 @@ const [chatLoading, setChatLoading] = useState(false);
     const existing = await getDocs(q);
 
     /*
-     * If a conversation already exists,
-     * open that conversation instead of creating another one.
-     */
+    |--------------------------------------------------------------------------
+    | STEP 2: OPEN EXISTING CHAT
+    |--------------------------------------------------------------------------
+    */
+
     if (!existing.empty) {
       navigate(`/chat/${existing.docs[0].id}`);
       return;
     }
 
     /*
-     * Create a new general seller conversation.
-     */
+    |--------------------------------------------------------------------------
+    | STEP 3: GET BUYER NAME
+    |--------------------------------------------------------------------------
+    */
+
+    const buyerName =
+      userProfile?.businessName ||
+      userProfile?.displayName ||
+      user.displayName ||
+      "Buyer";
+
+    /*
+    |--------------------------------------------------------------------------
+    | STEP 4: CREATE NEW SELLER CHAT
+    |--------------------------------------------------------------------------
+    */
+
     const chatDoc = await addDoc(
       collection(db, "chats"),
       {
         type: "seller",
 
         buyerId: user.uid,
-        buyerName: user.displayName || "Buyer",
+        buyerName,
 
         sellerId: userId,
-        sellerName: sellerName,
+        sellerName,
 
         participants: [
           user.uid,
@@ -124,28 +145,38 @@ const [chatLoading, setChatLoading] = useState(false);
 
         lastMessage: "",
         lastMessageAt: serverTimestamp(),
+        lastSenderId: "",
 
         createdAt: serverTimestamp(),
       }
     );
 
     /*
-     * Open the new conversation.
-     */
+    |--------------------------------------------------------------------------
+    | STEP 5: OPEN CHAT
+    |--------------------------------------------------------------------------
+    */
+
     navigate(`/chat/${chatDoc.id}`);
 
-  } catch (error) {
+  } catch (error: any) {
     console.error(
       "Error opening seller chat:",
       error
     );
 
-    alert("Unable to start chat. Please try again.");
+    toast({
+      title: "Unable to start chat",
+      description:
+        error?.message ||
+        "Please try again.",
+      variant: "destructive",
+    });
 
   } finally {
     setChatLoading(false);
   }
-  }
+}
 
   const sellerName = products[0]?.sellerName ?? "Seller";
   const sellerAvatar = products[0]?.sellerAvatar ?? "";
