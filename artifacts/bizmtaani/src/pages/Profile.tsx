@@ -63,7 +63,7 @@ const hasPhoto = !!user?.photoURL;
     // Upload the new compressed photo.
     await uploadBytes(storageRef, compressedFile, {
       contentType: "image/jpeg",
-      cacheControl: "public,max-age=31536000",
+      cacheControl: "public,max-age=31536000,immutable",
     });
 
     // Get the new download URL.
