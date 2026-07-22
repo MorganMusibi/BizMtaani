@@ -540,13 +540,20 @@ sendPushNotification(
         </button>
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          {chat?.productImage ? (
-            <img
-              src={chat.productImage}
-              alt=""
-              className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-            />
-          ) : null}
+          {chat?.type === "job_application" ? (
+  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+    <MessageCircle
+      size={16}
+      className="text-primary"
+    />
+  </div>
+) : chat?.productImage ? (
+  <img
+    src={chat.productImage}
+    alt=""
+    className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
+  />
+) : null}
 
           <div className="min-w-0">
             <p
@@ -556,15 +563,22 @@ sendPushNotification(
               {getOtherName()}
             </p>
 
-            {chat?.productTitle ? (
-              <Link
-                href={`/product/${chat.productId}`}
-                className="text-xs text-primary truncate block"
-                data-testid="link-product"
-              >
-                {chat.productTitle}
-              </Link>
-            ) : null}
+            {chat?.type === "job_application" ? (
+  <Link
+    href={`/jobs/${chat.jobId}`}
+    className="text-xs text-primary truncate block"
+  >
+    {chat.jobTitle} · {chat.company}
+  </Link>
+) : chat?.productTitle ? (
+  <Link
+    href={`/product/${chat.productId}`}
+    className="text-xs text-primary truncate block"
+    data-testid="link-product"
+  >
+    {chat.productTitle}
+  </Link>
+) : null}
           </div>
         </div>
       </header>
