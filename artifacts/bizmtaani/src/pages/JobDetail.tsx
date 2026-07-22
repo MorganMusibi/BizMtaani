@@ -193,7 +193,10 @@ async function handleApplyViaChat() {
   }
 
   const isOwner = user?.uid === job.posterId;
-  const isExpired = job.deadline && new Date(job.deadline) < new Date();
+
+const isExpired = job.deadline
+  ? new Date(`${job.deadline}T23:59:59`) < new Date()
+  : false;
   const ApplyIcon = job.contactMethod === "email" ? Mail : job.contactMethod === "whatsapp" ? MessageSquare : Phone;
   const applyLabel = job.contactMethod === "email" ? "Apply via Email" : job.contactMethod === "whatsapp" ? "Apply on WhatsApp" : "Call to Apply";
 
@@ -292,41 +295,52 @@ async function handleApplyViaChat() {
       )}
 
       {isExpired ? (
-  <Button disabled className="w-full">
+  <Button
+    disabled
+    className="w-full h-12"
+  >
     Job Expired
   </Button>
+) : isOwner ? (
+  <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
+    <p className="text-sm text-muted-foreground">
+      You posted this job.
+    </p>
+  </div>
 ) : (
-  <div className="space-y-3">
-    {user?.uid !== job.posterId && (
-      <>
-        {/* ALWAYS AVAILABLE: BIZMTAANI CHAT */}
+  <div className="space-y-3 pt-2">
+
+    {/* ALWAYS AVAILABLE */}
+    <Button
+      type="button"
+      className="w-full h-12 font-bold"
+      onClick={handleApplyViaChat}
+    >
+      <MessageSquare
+        className="mr-2"
+        size={18}
+      />
+      Apply via BizMtaani Chat
+    </Button>
+
+    {/* OPTIONAL EXTERNAL CONTACT */}
+    {job.contactMethod &&
+      job.contactMethod !== "none" &&
+      job.contact?.trim() && (
         <Button
+          type="button"
+          variant="outline"
           className="w-full h-12"
-          onClick={handleApplyViaChat}
+          onClick={handleApply}
         >
-          <MessageSquare
+          <ApplyIcon
             className="mr-2"
             size={18}
           />
-          Apply via BizMtaani Chat
+          {applyLabel}
         </Button>
+      )}
 
-        {/* OPTIONAL EXTERNAL APPLICATION METHOD */}
-        {job.contactMethod !== "none" && job.contact && (
-          <Button
-            variant="outline"
-            className="w-full h-12"
-            onClick={handleApply}
-          >
-            <ApplyIcon
-              className="mr-2"
-              size={18}
-            />
-            {applyLabel}
-          </Button>
-        )}
-      </>
-    )}
   </div>
 )}
     </div>
