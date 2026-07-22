@@ -49,10 +49,19 @@ export default function ShopCatalogue() {
   const [, navigate] = useLocation();
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
-const [loading, setLoading] = useState(true);
-const [chatLoading, setChatLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [chatLoading, setChatLoading] = useState(false);
 
   const isOwn = user?.uid === userId;
+  const sellerName = products[0]?.sellerName ?? "Seller";
+  const sellerAvatar = products[0]?.sellerAvatar ?? "";
+  const sellerWard = products[0]?.ward ?? "";
+  const sellerPhone = products[0]?.phone ?? "";
+
+  const initial = sellerName.charAt(0).toUpperCase();
+  const categories = Array.from(
+  new Set(products.map((p) => p.category))
+);
 
   useEffect(() => {
     if (!userId) return;
@@ -177,14 +186,6 @@ const [chatLoading, setChatLoading] = useState(false);
     setChatLoading(false);
   }
 }
-
-  const sellerName = products[0]?.sellerName ?? "Seller";
-  const sellerAvatar = products[0]?.sellerAvatar ?? "";
-  const sellerWard = products[0]?.ward ?? "";
-  const sellerPhone = products[0]?.phone ?? "";
-
-  const initial = sellerName.charAt(0).toUpperCase();
-  const categories = Array.from(new Set(products.map((p) => p.category)));
 
   return (
     <div className="min-h-screen bg-background pb-24">
