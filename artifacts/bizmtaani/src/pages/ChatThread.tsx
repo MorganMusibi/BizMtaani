@@ -51,7 +51,7 @@ interface Chat {
   participants?: string[];
 }
 
-async function const chatContext =
+const chatContext =
   chat.type === "job_application"
     ? `Application: ${chat.jobTitle}`
     : chat.productTitle || "New message";
