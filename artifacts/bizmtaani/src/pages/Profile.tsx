@@ -41,37 +41,57 @@ const hasPhoto = !!user?.photoURL;
   setUploading(true);
 
   try {
-    // Compress image before upload
-const compressedFile = await imageCompression(file, {
-  maxSizeMB: 0.4,
-  maxWidthOrHeight: 800,
-  useWebWorker: true,
-  initialQuality: 0.85,
-  fileType: "image/jpeg",
-});
+    // Compress profile photo for a good balance between
+    // storage efficiency and visual clarity.
+    const compressedFile = await imageCompression(file, {
+      maxSizeMB: 0.4,
+      maxWidthOrHeight: 800,
+      useWebWorker: true,
+      initialQuality: 0.85,
+      fileType: "image/jpeg",
+    });
 
-    // Store profile picture as avatars/{uid}
-    const storageRef = ref(
-  storage,
-  `avatars/${user.uid}/${Date.now()}.jpg`
-);
+    // Get the user's existing profile photo path
+    // so we can delete it after the new upload succeeds.
+    const oldStoragePath = userProfile?.photoStoragePath;
+
+    // Create a unique path for the new photo.
+    const newStoragePath = `avatars/${user.uid}/${Date.now()}.jpg`;
+
+    const storageRef = ref(storage, newStoragePath);
+
+    // Upload the new compressed photo.
     await uploadBytes(storageRef, compressedFile, {
-  contentType: compressedFile.type,
-  cacheControl: "public,max-age=31536000",
-});
+      contentType: "image/jpeg",
+      cacheControl: "public,max-age=31536000",
+    });
 
+    // Get the new download URL.
     const photoURL = await getDownloadURL(storageRef);
 
-    // Update Firebase Authentication profile
+    // Update Firebase Authentication.
     await updateProfile(user, {
       photoURL,
     });
 
-    // Update Firestore user document
-    // Update Firestore user document
-await updateDoc(doc(db, "users", user.uid), {
-  photoURL,
-});
+    // Update Firestore with both the URL and Storage path.
+    await updateDoc(doc(db, "users", user.uid), {
+      photoURL,
+      photoStoragePath: newStoragePath,
+    });
+
+    // Delete the old profile photo only after
+    // the new photo has been uploaded successfully.
+    if (oldStoragePath && oldStoragePath !== newStoragePath) {
+      try {
+        const oldStorageRef = ref(storage, oldStoragePath);
+        await deleteObject(oldStorageRef);
+      } catch (deleteError) {
+        // Don't fail the profile update if the old file
+        // no longer exists.
+        console.warn("Could not delete old profile photo:", deleteError);
+      }
+    }
 
     toast({
       title: "Profile photo updated",
@@ -88,24 +108,41 @@ await updateDoc(doc(db, "users", user.uid), {
     });
   } finally {
     setUploading(false);
-    if (fileRef.current) fileRef.current.value = "";
-if (cameraRef.current) cameraRef.current.value = "";
+
+    if (fileRef.current) {
+      fileRef.current.value = "";
+    }
+
+    if (cameraRef.current) {
+      cameraRef.current.value = "";
+    }
   }
 }
   async function handleDeleteAvatar() {
   if (!user) return;
 
   try {
-    const storageRef = ref(storage, `avatars/${user.uid}`);
+    const storagePath = userProfile?.photoStoragePath;
 
-    await deleteObject(storageRef).catch(() => {});
+    // Delete the actual current profile photo from Storage.
+    if (storagePath) {
+      try {
+        const storageRef = ref(storage, storagePath);
+        await deleteObject(storageRef);
+      } catch (deleteError) {
+        console.warn("Could not delete profile photo:", deleteError);
+      }
+    }
 
+    // Remove the photo from Firebase Authentication.
     await updateProfile(user, {
       photoURL: "",
     });
 
+    // Remove the photo information from Firestore.
     await updateDoc(doc(db, "users", user.uid), {
       photoURL: "",
+      photoStoragePath: "",
     });
 
     setShowAvatarMenu(false);
