@@ -298,6 +298,8 @@ async function handleApplyViaChat() {
 ) : (
   <div className="space-y-3">
     {user?.uid !== job.posterId && (
+  <>
+    {job.contactMethod === "bizmtaani_chat" ? (
       <Button
         className="w-full"
         onClick={handleApplyViaChat}
@@ -308,19 +310,20 @@ async function handleApplyViaChat() {
         />
         Apply via BizMtaani Chat
       </Button>
+    ) : (
+      <Button
+        className="w-full"
+        onClick={handleApply}
+      >
+        <ApplyIcon
+          className="mr-2"
+          size={18}
+        />
+        {applyLabel}
+      </Button>
     )}
-
-    <Button
-      variant="outline"
-      className="w-full"
-      onClick={handleApply}
-    >
-      <ApplyIcon
-        className="mr-2"
-        size={18}
-      />
-      {applyLabel}
-    </Button>
+  </>
+)}
   </div>
 )}
 
