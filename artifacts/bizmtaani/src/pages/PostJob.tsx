@@ -14,6 +14,7 @@ import { JOB_CATEGORIES, JOB_TYPES } from "./Jobs";
 
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 const CONTACT_METHODS = [
+  { value: "bizmtaani_chat", label: "BizMtaani Chat" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "phone", label: "Phone Call" },
   { value: "email", label: "Email" },
@@ -33,7 +34,8 @@ export default function PostJob() {
   const [description, setDescription] = useState("");
   const [requirements, setRequirements] = useState("");
   const [contact, setContact] = useState("");
-  const [contactMethod, setContactMethod] = useState<"whatsapp" | "phone" | "email">("whatsapp");
+  const [contactMethod, setContactMethod] = useState< "bizmtaani_chat" | "whatsapp" | "phone" | "email"
+>("bizmtaani_chat");
   const [ward, setWard] = useState("");
   const [county, setCounty] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -75,7 +77,13 @@ export default function PostJob() {
       toast({ title: "Please select an application deadline", variant: "destructive" }); 
       return; 
     }
-    if (!contact.trim()) { toast({ title: "Enter contact details", variant: "destructive" }); return; }
+    if (contactMethod !== "bizmtaani_chat" && !contact.trim()) {
+  toast({
+    title: "Enter contact details",
+    variant: "destructive",
+  });
+  return;
+}
     if (!user) return;
 
     setSubmitting(true);
@@ -216,32 +224,54 @@ export default function PostJob() {
         </div>
 
         {/* Contact method */}
-        <div className="space-y-2">
-          <Label>How should applicants contact you? *</Label>
-          <div className="flex gap-2">
-            {CONTACT_METHODS.map(({ value, label }) => (
-              <button
-                key={value} type="button"
-                onClick={() => setContactMethod(value)}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
-                  contactMethod === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                }`}
-              >
-                {contactMethod === value && <Check size={11} />}
-                {label}
-              </button>
-            ))}
-          </div>
-          <Input
-            placeholder={
-              contactMethod === "email" ? "your@email.com"
-              : contactMethod === "whatsapp" ? "07XXXXXXXX (WhatsApp number)"
-              : "07XXXXXXXX"
-            }
-            value={contact} onChange={(e) => setContact(e.target.value)}
-            className="h-12" required
-          />
-        </div>
+<div className="space-y-2">
+  <Label>How should applicants contact you? *</Label>
+
+  <div className="grid grid-cols-2 gap-2">
+    {CONTACT_METHODS.map(({ value, label }) => (
+      <button
+        key={value}
+        type="button"
+        onClick={() => setContactMethod(value)}
+        className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 text-xs font-semibold transition-all ${
+          contactMethod === value
+            ? "border-primary bg-primary/5 text-primary"
+            : "border-border text-muted-foreground"
+        }`}
+      >
+        {contactMethod === value && <Check size={11} />}
+        {label}
+      </button>
+    ))}
+  </div>
+
+  {contactMethod === "bizmtaani_chat" ? (
+    <div className="rounded-xl bg-primary/5 border border-primary/20 px-4 py-3">
+      <p className="text-sm font-semibold text-primary">
+        Applicants will contact you through BizMtaani Chat
+      </p>
+
+      <p className="text-xs text-muted-foreground mt-1">
+        Job seekers can apply directly through BizMtaani and chat with you
+        without needing your phone number or email.
+      </p>
+    </div>
+  ) : (
+    <Input
+      placeholder={
+        contactMethod === "email"
+          ? "your@email.com"
+          : contactMethod === "whatsapp"
+          ? "07XXXXXXXX (WhatsApp number)"
+          : "07XXXXXXXX"
+      }
+      value={contact}
+      onChange={(e) => setContact(e.target.value)}
+      className="h-12"
+      required
+    />
+  )}
+</div>
 
         {/* Location info */}
         {(ward || county) && (
