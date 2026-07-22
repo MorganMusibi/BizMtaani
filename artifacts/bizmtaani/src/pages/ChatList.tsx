@@ -23,6 +23,8 @@ interface Chat {
 
   sellerId: string;
   sellerName: string;
+  
+  participants?: string[];
 
   lastMessage: string;
   lastMessageAt: { seconds: number } | null;
