@@ -188,8 +188,8 @@ const [error, setError] = useState("");
                 </div>
                 <p className="text-xs text-muted-foreground truncate mt-0.5">
   {chat.type === "job_application"
-    ? `${chat.jobTitle} · ${chat.company}`
-    : chat.productTitle}
+    ? `Job Application · ${chat.jobTitle || "Job"}`
+    : chat.productTitle || "Product chat"}
 </p>
                 {chat.lastMessage ? (
                   <p data-testid={`text-last-message-${chat.id}`} className="text-sm text-muted-foreground truncate mt-0.5">
