@@ -24,7 +24,9 @@ export default function Profile() {
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
 const hasPhoto = !!user?.photoURL;
 
-  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+async function handleAvatarChange(
+  e: React.ChangeEvent<HTMLInputElement>
+) {
   const file = e.target.files?.[0];
 
   if (!file || !user) return;
@@ -41,8 +43,9 @@ const hasPhoto = !!user?.photoURL;
   setUploading(true);
 
   try {
-    // Compress profile photo for a good balance between
-    // storage efficiency and visual clarity.
+    // STEP 1: Compress image
+    console.log("STEP 1: Compressing image...");
+
     const compressedFile = await imageCompression(file, {
       maxSizeMB: 0.4,
       maxWidthOrHeight: 800,
@@ -51,45 +54,96 @@ const hasPhoto = !!user?.photoURL;
       fileType: "image/jpeg",
     });
 
-    // Get the user's existing profile photo path
-    // so we can delete it after the new upload succeeds.
-    const oldStoragePath = userProfile?.photoStoragePath;
+    console.log(
+      "STEP 1 SUCCESS:",
+      compressedFile.size,
+      "bytes"
+    );
 
-    // Create a unique path for the new photo.
-    const newStoragePath = `avatars/${user.uid}/${Date.now()}.jpg`;
+    // STEP 2: Create Storage path
+    const oldStoragePath =
+      userProfile?.photoStoragePath;
 
-    const storageRef = ref(storage, newStoragePath);
+    const newStoragePath =
+      `avatars/${user.uid}/${Date.now()}.jpg`;
 
-    // Upload the new compressed photo.
-    await uploadBytes(storageRef, compressedFile, {
-      contentType: "image/jpeg",
-      cacheControl: "public,max-age=31536000,immutable",
-    });
+    console.log(
+      "STEP 2: Uploading to:",
+      newStoragePath
+    );
 
-    // Get the new download URL.
-    const photoURL = await getDownloadURL(storageRef);
+    const storageRef = ref(
+      storage,
+      newStoragePath
+    );
 
-    // Update Firebase Authentication.
+    // STEP 3: Upload to Firebase Storage
+    await uploadBytes(
+      storageRef,
+      compressedFile,
+      {
+        contentType: "image/jpeg",
+        cacheControl:
+          "public,max-age=31536000,immutable",
+      }
+    );
+
+    console.log(
+      "STEP 3 SUCCESS: Storage upload complete"
+    );
+
+    // STEP 4: Get download URL
+    const photoURL =
+      await getDownloadURL(storageRef);
+
+    console.log(
+      "STEP 4 SUCCESS: Got photo URL"
+    );
+
+    // STEP 5: Update Firebase Auth
     await updateProfile(user, {
       photoURL,
     });
 
-    // Update Firestore with both the URL and Storage path.
-    await updateDoc(doc(db, "users", user.uid), {
-      photoURL,
-      photoStoragePath: newStoragePath,
-    });
+    console.log(
+      "STEP 5 SUCCESS: Auth profile updated"
+    );
 
-    // Delete the old profile photo only after
-    // the new photo has been uploaded successfully.
-    if (oldStoragePath && oldStoragePath !== newStoragePath) {
+    // STEP 6: Update Firestore
+    await updateDoc(
+      doc(db, "users", user.uid),
+      {
+        photoURL,
+        photoStoragePath:
+          newStoragePath,
+      }
+    );
+
+    console.log(
+      "STEP 6 SUCCESS: Firestore updated"
+    );
+
+    // STEP 7: Delete old photo
+    if (
+      oldStoragePath &&
+      oldStoragePath !== newStoragePath
+    ) {
       try {
-        const oldStorageRef = ref(storage, oldStoragePath);
-        await deleteObject(oldStorageRef);
+        const oldStorageRef =
+          ref(storage, oldStoragePath);
+
+        await deleteObject(
+          oldStorageRef
+        );
+
+        console.log(
+          "STEP 7 SUCCESS: Old photo deleted"
+        );
       } catch (deleteError) {
-        // Don't fail the profile update if the old file
-        // no longer exists.
-        console.warn("Could not delete old profile photo:", deleteError);
+        console.warn(
+          "Old photo could not be deleted:",
+          deleteError
+        );
       }
     }
 
@@ -98,15 +152,34 @@ const hasPhoto = !!user?.photoURL;
     });
 
     window.location.reload();
-  } catch (error: any) {
-  console.error("PROFILE PHOTO ERROR:", error);
 
-  toast({
-    title: "Upload failed",
-    description: error?.message || "Unknown error",
-    variant: "destructive",
-  });
+  } catch (error: any) {
+
+    console.error(
+      "PROFILE PHOTO ERROR:",
+      error
+    );
+
+    console.error(
+      "ERROR CODE:",
+      error?.code
+    );
+
+    console.error(
+      "ERROR MESSAGE:",
+      error?.message
+    );
+
+    toast({
+      title: "Upload failed",
+      description:
+        error?.message ||
+        "Something went wrong.",
+      variant: "destructive",
+    });
+
   } finally {
+
     setUploading(false);
 
     if (fileRef.current) {
@@ -116,8 +189,10 @@ const hasPhoto = !!user?.photoURL;
     if (cameraRef.current) {
       cameraRef.current.value = "";
     }
+
   }
 }
+ 
   async function handleDeleteAvatar() {
   if (!user) return;
 
