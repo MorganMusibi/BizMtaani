@@ -1,6 +1,6 @@
-import { ref, uploadBytes, getDownloadURL, deleteObject, } from "firebase/storage";
+import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
 import { db, storage } from "@/lib/firebase";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { signOut, updateProfile } from "firebase/auth";
@@ -22,217 +22,145 @@ export default function Profile() {
   const [uploading, setUploading] = useState(false);
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
-const hasPhoto = !!user?.photoURL;
+  const hasPhoto = !!user?.photoURL;
 
-async function handleAvatarChange(
-  e: React.ChangeEvent<HTMLInputElement>
-) {
-  const file = e.target.files?.[0];
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
 
-  if (!file || !user) return;
+    if (!file || !user) return;
 
-  if (file.size > 5 * 1024 * 1024) {
-    toast({
-      title: "Image too large",
-      description: "Maximum 5 MB.",
-      variant: "destructive",
-    });
-    return;
-  }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "Image too large",
+        description: "Maximum 5 MB.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  setUploading(true);
+    setUploading(true);
 
-  try {
-    // STEP 1: Compress image
-    console.log("STEP 1: Compressing image...");
+    try {
+      console.log("STEP 1: Compressing image...");
 
-    const compressedFile = await imageCompression(file, {
-      maxSizeMB: 0.4,
-      maxWidthOrHeight: 800,
-      useWebWorker: true,
-      initialQuality: 0.85,
-      fileType: "image/jpeg",
-    });
+      const compressedFile = await imageCompression(file, {
+        maxSizeMB: 0.4,
+        maxWidthOrHeight: 800,
+        useWebWorker: true,
+        initialQuality: 0.85,
+        fileType: "image/jpeg",
+      });
 
-    console.log(
-      "STEP 1 SUCCESS:",
-      compressedFile.size,
-      "bytes"
-    );
+      console.log("STEP 1 SUCCESS:", compressedFile.size, "bytes");
 
-    // STEP 2: Create Storage path
-    const oldStoragePath =
-      userProfile?.photoStoragePath;
+      const oldStoragePath = userProfile?.photoStoragePath;
+      const newStoragePath = `avatars/${user.uid}/${Date.now()}.jpg`;
 
-    const newStoragePath =
-      `avatars/${user.uid}/${Date.now()}.jpg`;
+      console.log("STEP 2: Uploading to:", newStoragePath);
 
-    console.log(
-      "STEP 2: Uploading to:",
-      newStoragePath
-    );
+      const storageRef = ref(storage, newStoragePath);
 
-    const storageRef = ref(
-      storage,
-      newStoragePath
-    );
-
-    // STEP 3: Upload to Firebase Storage
-    await uploadBytes(
-      storageRef,
-      compressedFile,
-      {
+      await uploadBytes(storageRef, compressedFile, {
         contentType: "image/jpeg",
-        cacheControl:
-          "public,max-age=31536000,immutable",
+        cacheControl: "public,max-age=31536000,immutable",
+      });
+
+      console.log("STEP 3 SUCCESS: Storage upload complete");
+
+      const photoURL = await getDownloadURL(storageRef);
+
+      console.log("STEP 4 SUCCESS: Got photo URL");
+
+      await updateProfile(user, {
+        photoURL,
+      });
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          photoURL,
+          photoStoragePath: newStoragePath,
+        },
+        { merge: true }
+      );
+
+      console.log("STEP 5 SUCCESS: Firestore updated");
+
+      if (oldStoragePath && oldStoragePath !== newStoragePath) {
+        try {
+          const oldStorageRef = ref(storage, oldStoragePath);
+          await deleteObject(oldStorageRef);
+        } catch (deleteError) {
+          console.warn("Could not delete old profile photo:", deleteError);
+        }
       }
-    );
 
-    console.log(
-      "STEP 3 SUCCESS: Storage upload complete"
-    );
+      toast({
+        title: "Profile photo updated",
+      });
 
-    // STEP 4: Get download URL
-    const photoURL =
-      await getDownloadURL(storageRef);
+      window.location.reload();
+    } catch (error) {
+      console.error("Profile photo upload error:", error);
 
-    console.log(
-      "STEP 4 SUCCESS: Got photo URL"
-    );
+      toast({
+        title: "Upload failed",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(false);
 
-    // STEP 5: Update Firebase Auth
-    await updateProfile(user, {
-      photoURL,
-    });
+      if (fileRef.current) {
+        fileRef.current.value = "";
+      }
 
-// Make sure `setDoc` is imported from "firebase/firestore" at the top of your file:
-// import { doc, setDoc } from "firebase/firestore";
-
-async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0];
-
-  if (!file || !user) return;
-
-  if (file.size > 5 * 1024 * 1024) {
-    toast({
-      title: "Image too large",
-      description: "Maximum 5 MB.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  setUploading(true);
-
-  try {
-    const compressedFile = await imageCompression(file, {
-      maxSizeMB: 0.4,
-      maxWidthOrHeight: 800,
-      useWebWorker: true,
-      initialQuality: 0.85,
-      fileType: "image/jpeg",
-    });
-
-    const oldStoragePath = userProfile?.photoStoragePath;
-    const newStoragePath = `avatars/${user.uid}/${Date.now()}.jpg`;
-    const storageRef = ref(storage, newStoragePath);
-
-    await uploadBytes(storageRef, compressedFile, {
-      contentType: "image/jpeg",
-      cacheControl: "public,max-age=31536000,immutable",
-    });
-
-    const photoURL = await getDownloadURL(storageRef);
-
-    await updateProfile(user, {
-      photoURL,
-    });
-
-    // Use setDoc with { merge: true } instead of updateDoc.
-    // This prevents errors if the user's Firestore document hasn't been initialized yet.
-    await setDoc(doc(db, "users", user.uid), {
-      photoURL,
-      photoStoragePath: newStoragePath,
-    }, { merge: true });
-
-    if (oldStoragePath && oldStoragePath !== newStoragePath) {
-      try {
-        const oldStorageRef = ref(storage, oldStoragePath);
-        await deleteObject(oldStorageRef);
-      } catch (deleteError) {
-        console.warn("Could not delete old profile photo:", deleteError);
+      if (cameraRef.current) {
+        cameraRef.current.value = "";
       }
     }
-
-    toast({
-      title: "Profile photo updated",
-    });
-
-    window.location.reload();
-  } catch (error) {
-    console.error("Profile photo upload error:", error);
-
-    toast({
-      title: "Upload failed",
-      description: "Please check your Storage rules and try again.",
-      variant: "destructive",
-    });
-  } finally {
-    setUploading(false);
-
-    if (fileRef.current) {
-      fileRef.current.value = "";
-    }
-
-    if (cameraRef.current) {
-      cameraRef.current.value = "";
-    }
   }
-}
- 
+
   async function handleDeleteAvatar() {
-  if (!user) return;
+    if (!user) return;
 
-  try {
-    const storagePath = userProfile?.photoStoragePath;
+    try {
+      const storagePath = userProfile?.photoStoragePath;
 
-    // Delete the actual current profile photo from Storage.
-    if (storagePath) {
-      try {
-        const storageRef = ref(storage, storagePath);
-        await deleteObject(storageRef);
-      } catch (deleteError) {
-        console.warn("Could not delete profile photo:", deleteError);
+      if (storagePath) {
+        try {
+          const storageRef = ref(storage, storagePath);
+          await deleteObject(storageRef);
+        } catch (deleteError) {
+          console.warn("Could not delete profile photo:", deleteError);
+        }
       }
+
+      await updateProfile(user, {
+        photoURL: "",
+      });
+
+      await updateDoc(doc(db, "users", user.uid), {
+        photoURL: "",
+        photoStoragePath: "",
+      });
+
+      setShowAvatarMenu(false);
+
+      toast({
+        title: "Profile photo removed",
+      });
+
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+
+      toast({
+        title: "Failed to remove photo",
+        variant: "destructive",
+      });
     }
-
-    // Remove the photo from Firebase Authentication.
-    await updateProfile(user, {
-      photoURL: "",
-    });
-
-    // Remove the photo information from Firestore.
-    await updateDoc(doc(db, "users", user.uid), {
-      photoURL: "",
-      photoStoragePath: "",
-    });
-
-    setShowAvatarMenu(false);
-
-    toast({
-      title: "Profile photo removed",
-    });
-
-    window.location.reload();
-  } catch (error) {
-    console.error(error);
-
-    toast({
-      title: "Failed to remove photo",
-      variant: "destructive",
-    });
   }
-}
 
   async function handleSignOut() {
     await signOut(auth);
@@ -259,7 +187,11 @@ async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
   const isBusinessOwner = userProfile?.isBusinessOwner ?? false;
 
   const initials = displayName
-    .split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase();
+    .split(" ")
+    .map((n: string) => n[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -268,51 +200,44 @@ async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
       </header>
 
       <div className="px-4 py-6 max-w-lg mx-auto space-y-6">
-
         {/* Avatar + info */}
         <div className="flex items-center gap-4">
-           <button
-  type="button"
-  onClick={() => {
-    if (uploading) return;
+          <button
+            type="button"
+            onClick={() => {
+              if (uploading) return;
 
-    if (hasPhoto) {
-      setShowPhotoViewer(true);
-    } else {
-      setShowAvatarMenu(true);
-    }
-  }}
-  disabled={uploading}
-  className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 focus:outline-none"
->
-  {user.photoURL ? (
-    <img
-      src={user.photoURL}
-      alt={displayName}
-      className="w-full h-full object-cover"
-    />
-  ) : (
-    <div className="w-full h-full bg-primary flex items-center justify-center">
-      <span className="text-white text-2xl font-black">
-        {initials}
-      </span>
-    </div>
-  )}
+              if (hasPhoto) {
+                setShowPhotoViewer(true);
+              } else {
+                setShowAvatarMenu(true);
+              }
+            }}
+            disabled={uploading}
+            className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 focus:outline-none"
+          >
+            {user.photoURL ? (
+              <img src={user.photoURL} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-primary flex items-center justify-center">
+                <span className="text-white text-2xl font-black">{initials}</span>
+              </div>
+            )}
 
-  <div
-    onClick={(e) => {
-      e.stopPropagation();
-      setShowAvatarMenu(true);
-    }}
-    className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary border-2 border-white flex items-center justify-center cursor-pointer"
-  >
-    {uploading ? (
-      <Loader2 size={14} className="animate-spin text-white" />
-    ) : (
-      <Camera size={14} className="text-white" />
-    )}
-  </div>
-</button>
+            <div
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAvatarMenu(true);
+              }}
+              className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary border-2 border-white flex items-center justify-center cursor-pointer"
+            >
+              {uploading ? (
+                <Loader2 size={14} className="animate-spin text-white" />
+              ) : (
+                <Camera size={14} className="text-white" />
+              )}
+            </div>
+          </button>
 
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
@@ -330,8 +255,8 @@ async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
             </div>
             <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-  Tap photo to view • Tap camera to change
-</p>
+              Tap photo to view • Tap camera to change
+            </p>
           </div>
         </div>
 
@@ -343,47 +268,47 @@ async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
             >
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-<p className="font-bold text-sm text-center mb-4">Change profile photo</p>
+              <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
 
-<div className="space-y-2">
-  <button
-    onClick={() => {
-      setShowAvatarMenu(false);
-      cameraRef.current?.click();
-    }}
-    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
-  >
-    <Camera size={20} className="text-primary" />
-    Take a photo
-  </button>
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    setShowAvatarMenu(false);
+                    cameraRef.current?.click();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
+                >
+                  <Camera size={20} className="text-primary" />
+                  Take a photo
+                </button>
 
-  <button
-    onClick={() => {
-      setShowAvatarMenu(false);
-      fileRef.current?.click();
-    }}
-    className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
-  >
-    <Package size={20} className="text-primary" />
-    Choose from gallery
-  </button>
+                <button
+                  onClick={() => {
+                    setShowAvatarMenu(false);
+                    fileRef.current?.click();
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm"
+                >
+                  <Package size={20} className="text-primary" />
+                  Choose from gallery
+                </button>
 
-  {hasPhoto && (
-    <button
-      onClick={handleDeleteAvatar}
-      className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-red-50 text-red-600 font-semibold text-sm"
-    >
-      Delete Photo
-    </button>
-  )}
+                {hasPhoto && (
+                  <button
+                    onClick={handleDeleteAvatar}
+                    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl bg-red-50 text-red-600 font-semibold text-sm"
+                  >
+                    Delete Photo
+                  </button>
+                )}
 
-  <button
-    onClick={() => setShowAvatarMenu(false)}
-    className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground"
-  >
-    Cancel
-  </button>
-</div>
+                <button
+                  onClick={() => setShowAvatarMenu(false)}
+                  className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground"
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </>
         )}
@@ -452,37 +377,38 @@ async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
           Sign Out
         </Button>
       </div>
-    {showPhotoViewer && (
-  <div
-    className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-    onClick={() => setShowPhotoViewer(false)}
-  >
-    <img
-      src={user.photoURL!}
-      alt={displayName}
-      className="max-w-full max-h-full object-contain"
-      onClick={(e) => e.stopPropagation()}
-    />
 
-    <button
-      className="absolute top-5 right-5 text-white text-4xl"
-      onClick={() => setShowPhotoViewer(false)}
-    >
-      ✕
-    </button>
+      {showPhotoViewer && (
+        <div
+          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+          onClick={() => setShowPhotoViewer(false)}
+        >
+          <img
+            src={user.photoURL!}
+            alt={displayName}
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
 
-    <button
-      className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-primary text-white px-6 py-3 rounded-xl"
-      onClick={(e) => {
-        e.stopPropagation();
-        setShowPhotoViewer(false);
-        setShowAvatarMenu(true);
-      }}
-    >
-      Change Photo
-    </button>
-  </div>
-)}
+          <button
+            className="absolute top-5 right-5 text-white text-4xl"
+            onClick={() => setShowPhotoViewer(false)}
+          >
+            ✕
+          </button>
+
+          <button
+            className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-primary text-white px-6 py-3 rounded-xl"
+            onClick={(e) => {
+              e.stopPropagation();
+              setShowPhotoViewer(false);
+              setShowAvatarMenu(true);
+            }}
+          >
+            Change Photo
+          </button>
+        </div>
+      )}
       <BottomNav />
     </div>
   );
