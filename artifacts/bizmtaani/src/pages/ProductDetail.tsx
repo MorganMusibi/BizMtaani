@@ -271,7 +271,7 @@ const handleReply = () => {
 
   try {
     // Check if this buyer already has a chat
-    // with this seller for this product.
+    // with this seller for this specific product.
     const q = query(
       collection(db, "chats"),
       where("productId", "==", product.id),
@@ -282,13 +282,13 @@ const handleReply = () => {
 
     const existing = await getDocs(q);
 
-    // Open existing chat if found.
+    // Open existing conversation.
     if (!existing.empty) {
       setLocation(`/chat/${existing.docs[0].id}`);
       return;
     }
 
-    // Create new product chat.
+    // Create new product conversation.
     const chatDoc = await addDoc(collection(db, "chats"), {
       type: "product",
 
@@ -313,7 +313,7 @@ const handleReply = () => {
       createdAt: serverTimestamp(),
     });
 
-    // Open the new chat.
+    // Open the new conversation.
     setLocation(`/chat/${chatDoc.id}`);
 
   } catch (err: unknown) {
