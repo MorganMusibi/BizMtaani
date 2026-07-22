@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useLocation, Link } from "wouter";
-import {
-  collection, query, where, orderBy, getDocs,
-} from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, limit, addDoc, serverTimestamp, } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { BottomNav } from "@/components/BottomNav";
@@ -49,7 +47,8 @@ export default function ShopCatalogue() {
   const [, navigate] = useLocation();
 
   const [products, setProducts] = useState<ShopProduct[]>([]);
-  const [loading, setLoading] = useState(true);
+const [loading, setLoading] = useState(true);
+const [chatLoading, setChatLoading] = useState(false);
 
   const isOwn = user?.uid === userId;
 
@@ -66,6 +65,87 @@ export default function ShopCatalogue() {
       })
       .finally(() => setLoading(false));
   }, [userId]);
+  async function handleChat() {
+  // User must be logged in
+  if (!user) {
+    navigate("/login");
+    return;
+  }
+
+  // Cannot chat with yourself
+  if (!userId || user.uid === userId) {
+    return;
+  }
+
+  setChatLoading(true);
+
+  try {
+    /*
+     * Check whether a general seller conversation
+     * already exists between this buyer and seller.
+     */
+    const q = query(
+      collection(db, "chats"),
+      where("type", "==", "seller"),
+      where("buyerId", "==", user.uid),
+      where("sellerId", "==", userId),
+      limit(1)
+    );
+
+    const existing = await getDocs(q);
+
+    /*
+     * If a conversation already exists,
+     * open that conversation instead of creating another one.
+     */
+    if (!existing.empty) {
+      navigate(`/chat/${existing.docs[0].id}`);
+      return;
+    }
+
+    /*
+     * Create a new general seller conversation.
+     */
+    const chatDoc = await addDoc(
+      collection(db, "chats"),
+      {
+        type: "seller",
+
+        buyerId: user.uid,
+        buyerName: user.displayName || "Buyer",
+
+        sellerId: userId,
+        sellerName: sellerName,
+
+        participants: [
+          user.uid,
+          userId,
+        ],
+
+        lastMessage: "",
+        lastMessageAt: serverTimestamp(),
+
+        createdAt: serverTimestamp(),
+      }
+    );
+
+    /*
+     * Open the new conversation.
+     */
+    navigate(`/chat/${chatDoc.id}`);
+
+  } catch (error) {
+    console.error(
+      "Error opening seller chat:",
+      error
+    );
+
+    alert("Unable to start chat. Please try again.");
+
+  } finally {
+    setChatLoading(false);
+  }
+  }
 
   const sellerName = products[0]?.sellerName ?? "Seller";
   const sellerAvatar = products[0]?.sellerAvatar ?? "";
@@ -122,26 +202,53 @@ export default function ShopCatalogue() {
               </div>
             </div>
 
-            {!isOwn && sellerPhone && (
-              <div className="flex gap-2">
-                <a
-                  href={`tel:${sellerPhone}`}
-                  className="flex-1 h-10 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white text-sm font-bold"
-                >
-                  <Phone size={15} />
-                  Call
-                </a>
-                <a
-                  href={`https://wa.me/${sellerPhone.replace(/\D/g, "").replace(/^0/, "254")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 h-10 flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white text-sm font-bold"
-                >
-                  <MessageCircle size={15} />
-                  WhatsApp
-                </a>
-              </div>
-            )}
+            {!isOwn && (
+  <div
+    className={`grid gap-2 ${
+      sellerPhone
+        ? "grid-cols-3"
+        : "grid-cols-1"
+    }`}
+  >
+    {sellerPhone && (
+      <a
+        href={`tel:${sellerPhone}`}
+        className="h-10 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white text-sm font-bold"
+      >
+        <Phone size={15} />
+        Call
+      </a>
+    )}
+
+    {sellerPhone && (
+      <a
+        href={`https://wa.me/${sellerPhone
+          .replace(/\D/g, "")
+          .replace(/^0/, "254")}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="h-10 flex items-center justify-center gap-2 rounded-xl bg-green-600 text-white text-sm font-bold"
+      >
+        <MessageCircle size={15} />
+        WhatsApp
+      </a>
+    )}
+
+    <button
+      onClick={handleChat}
+      disabled={chatLoading}
+      className="h-10 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground text-sm font-bold disabled:opacity-60"
+    >
+      {chatLoading ? (
+        <Loader2 size={15} className="animate-spin" />
+      ) : (
+        <MessageCircle size={15} />
+      )}
+      Message
+    </button>
+  </div>
+)}
+            
           </div>
 
           <div className="h-2 bg-muted" />
