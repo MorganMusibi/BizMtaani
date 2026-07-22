@@ -387,9 +387,9 @@ export default function ChatThread() {
         */
 
       const recipientUid =
-        user.uid === chat.buyerId
-          ? chat.sellerId
-          : chat.buyerId;
+  user.uid === chat.buyerId
+    ? chat.sellerId
+    : chat.buyerId;
 
       const senderName =
   user.displayName ||
@@ -529,65 +529,47 @@ sendPushNotification(
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* HEADER */}
-      <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center gap-3 z-40">
-        <button
-          data-testid="button-back"
-          onClick={() =>
-            setLocation("/chats")
-          }
-          className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors"
-        >
-          <ChevronLeft size={22} />
-        </button>
+<header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center gap-3 z-40">
+  <button
+    data-testid="button-back"
+    onClick={() =>
+      setLocation("/chats")
+    }
+    className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors"
+  >
+    <ChevronLeft size={22} />
+  </button>
 
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          {chat?.type === "job_application" ? (
-  <Link
-    href={`/jobs/${chat.jobId}`}
-    className="text-xs text-primary truncate block"
-  >
-    {chat.jobTitle} · {chat.company}
-  </Link>
-) : chat?.type === "product" && chat?.productTitle ? (
-  <Link
-    href={`/product/${chat.productId}`}
-    className="text-xs text-primary truncate block"
-  >
-    {chat.productTitle}
-  </Link>
-) : (
-  <span className="text-xs text-muted-foreground">
-    Seller
-  </span>
-)}
+  <div className="flex-1 min-w-0">
+    <p
+      data-testid="text-chat-header-name"
+      className="font-bold text-sm truncate"
+    >
+      {getOtherName()}
+    </p>
 
-          <div className="min-w-0">
-            <p
-              data-testid="text-chat-header-name"
-              className="font-bold text-sm truncate"
-            >
-              {getOtherName()}
-            </p>
-
-            {chat?.type === "job_application" ? (
-  <Link
-    href={`/jobs/${chat.jobId}`}
-    className="text-xs text-primary truncate block"
-  >
-    {chat.jobTitle} · {chat.company}
-  </Link>
-) : chat?.productTitle ? (
-  <Link
-    href={`/product/${chat.productId}`}
-    className="text-xs text-primary truncate block"
-    data-testid="link-product"
-  >
-    {chat.productTitle}
-  </Link>
-) : null}
-          </div>
-        </div>
-      </header>
+    {chat?.type === "job_application" ? (
+      <Link
+        href={`/jobs/${chat.jobId}`}
+        className="text-xs text-primary truncate block"
+      >
+        {chat.jobTitle} · {chat.company}
+      </Link>
+    ) : chat?.type === "product" && chat?.productTitle ? (
+      <Link
+        href={`/product/${chat.productId}`}
+        className="text-xs text-primary truncate block"
+        data-testid="link-product"
+      >
+        {chat.productTitle}
+      </Link>
+    ) : (
+      <span className="text-xs text-muted-foreground">
+        Seller
+      </span>
+    )}
+  </div>
+</header>
 
       {/* MESSAGES */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
