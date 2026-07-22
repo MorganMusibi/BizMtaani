@@ -1,18 +1,7 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { doc, getDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc, deleteDoc, collection, addDoc, setDoc, serverTimestamp, } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -77,7 +66,93 @@ export default function JobDetail() {
   }
 }
 
+async function handleApplyViaChat() {
+  if (!job || !user) return;
 
+  if (user.uid === job.posterId) {
+    toast({
+      title: "You cannot apply to your own job",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
+
+    const chatRef = doc(db, "chats", chatId);
+
+    const existingChat = await getDoc(chatRef);
+
+    if (!existingChat.exists()) {
+      await setDoc(chatRef, {
+        type: "job_application",
+
+        jobId: job.id,
+        jobTitle: job.title,
+        company: job.company,
+
+        buyerId: user.uid,
+        buyerName:
+          user.displayName || "Job Seeker",
+
+        sellerId: job.posterId,
+        sellerName:
+          job.posterName || job.company,
+
+        participants: [
+          user.uid,
+          job.posterId,
+        ],
+
+        lastMessage:
+          `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
+
+        lastMessageAt:
+          serverTimestamp(),
+
+        lastSenderId:
+          user.uid,
+      });
+
+      await addDoc(
+        collection(
+          db,
+          "chats",
+          chatId,
+          "messages"
+        ),
+        {
+          senderId: user.uid,
+
+          senderName:
+            user.displayName ||
+            "Job Seeker",
+
+          text:
+            `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
+
+          createdAt:
+            serverTimestamp(),
+        }
+      );
+    }
+
+    navigate(`/chat/${chatId}`);
+  } catch (error) {
+    console.error(
+      "Failed to start job application chat:",
+      error
+    );
+
+    toast({
+      title: "Unable to start chat",
+      description:
+        "Please try again.",
+      variant: "destructive",
+    });
+  }
+}
   function handleApply() {
     if (!job) return;
     if (job.contactMethod === "email") {
@@ -217,15 +292,37 @@ export default function JobDetail() {
       )}
 
       {isExpired ? (
-        <Button disabled className="w-full">
-          Job Expired
-        </Button>
-      ) : (
-        <Button className="w-full" onClick={handleApply}>
-          <ApplyIcon className="mr-2" size={18} />
-          {applyLabel}
-        </Button>
-      )}
+  <Button disabled className="w-full">
+    Job Expired
+  </Button>
+) : (
+  <div className="space-y-3">
+    {user?.uid !== job.posterId && (
+      <Button
+        className="w-full"
+        onClick={handleApplyViaChat}
+      >
+        <MessageSquare
+          className="mr-2"
+          size={18}
+        />
+        Apply via BizMtaani Chat
+      </Button>
+    )}
+
+    <Button
+      variant="outline"
+      className="w-full"
+      onClick={handleApply}
+    >
+      <ApplyIcon
+        className="mr-2"
+        size={18}
+      />
+      {applyLabel}
+    </Button>
+  </div>
+)}
 
     </div>
   </div>
