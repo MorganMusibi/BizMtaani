@@ -43,16 +43,18 @@ const hasPhoto = !!user?.photoURL;
   try {
     // Compress image before upload
 const compressedFile = await imageCompression(file, {
-  maxSizeMB: 0.2,
-  maxWidthOrHeight: 512,
+  maxSizeMB: 0.4,
+  maxWidthOrHeight: 800,
   useWebWorker: true,
-  initialQuality: 0.75,
+  initialQuality: 0.85,
   fileType: "image/jpeg",
 });
 
     // Store profile picture as avatars/{uid}
-    const storageRef = ref(storage, `avatars/${user.uid}`);
-
+    const storageRef = ref(
+  storage,
+  `avatars/${user.uid}/${Date.now()}.jpg`
+);
     await uploadBytes(storageRef, compressedFile, {
   contentType: compressedFile.type,
   cacheControl: "public,max-age=31536000",
