@@ -3,17 +3,27 @@ import { useLocation, Link } from "wouter";
 import { collection, query, where, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { MessageCircle, Loader2 } from "lucide-react";
+import { MessageCircle, Loader2, Briefcase, } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
 interface Chat {
   id: string;
-  productTitle: string;
-  productImage: string;
+
+  type?: "product" | "job_application";
+
+  productTitle?: string;
+  productImage?: string;
+
+  jobId?: string;
+  jobTitle?: string;
+  company?: string;
+
   buyerId: string;
   buyerName: string;
+
   sellerId: string;
   sellerName: string;
+
   lastMessage: string;
   lastMessageAt: { seconds: number } | null;
 }
@@ -144,17 +154,27 @@ const [error, setError] = useState("");
               data-testid={`chat-item-${chat.id}`}
               className="flex items-center gap-3 px-4 py-3.5 hover:bg-muted/50 transition-colors"
             >
-              {chat.productImage ? (
-                <img
-                  src={chat.productImage}
-                  alt={chat.productTitle}
-                  className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
-                />
-              ) : (
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
-                  <MessageCircle size={20} className="text-muted-foreground" />
-                </div>
-              )}
+              {chat.type === "job_application" ? (
+  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+    <Briefcase
+      size={20}
+      className="text-primary"
+    />
+  </div>
+) : chat.productImage ? (
+  <img
+    src={chat.productImage}
+    alt={chat.productTitle || ""}
+    className="w-12 h-12 rounded-xl object-cover flex-shrink-0"
+  />
+) : (
+  <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+    <MessageCircle
+      size={20}
+      className="text-muted-foreground"
+    />
+  </div>
+)}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <p data-testid={`text-chat-party-${chat.id}`} className="font-bold text-sm truncate">
@@ -164,7 +184,11 @@ const [error, setError] = useState("");
                     {formatTime(chat.lastMessageAt)}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{chat.productTitle}</p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+  {chat.type === "job_application"
+    ? `${chat.jobTitle} · ${chat.company}`
+    : chat.productTitle}
+</p>
                 {chat.lastMessage ? (
                   <p data-testid={`text-last-message-${chat.id}`} className="text-sm text-muted-foreground truncate mt-0.5">
                     {chat.lastMessage}
