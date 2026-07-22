@@ -32,7 +32,7 @@ interface Message {
 }
 
 interface Chat {
-  type?: "product" | "job_application";
+  type?: "product" | "job_application" | "seller";
 
   productId?: string;
   productTitle?: string;
@@ -541,19 +541,24 @@ sendPushNotification(
 
         <div className="flex items-center gap-2 flex-1 min-w-0">
           {chat?.type === "job_application" ? (
-  <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-    <MessageCircle
-      size={16}
-      className="text-primary"
-    />
-  </div>
-) : chat?.productImage ? (
-  <img
-    src={chat.productImage}
-    alt=""
-    className="w-8 h-8 rounded-lg object-cover flex-shrink-0"
-  />
-) : null}
+  <Link
+    href={`/jobs/${chat.jobId}`}
+    className="text-xs text-primary truncate block"
+  >
+    {chat.jobTitle} · {chat.company}
+  </Link>
+) : chat?.type === "product" && chat?.productTitle ? (
+  <Link
+    href={`/product/${chat.productId}`}
+    className="text-xs text-primary truncate block"
+  >
+    {chat.productTitle}
+  </Link>
+) : (
+  <span className="text-xs text-muted-foreground">
+    Seller
+  </span>
+)}
 
           <div className="min-w-0">
             <p
