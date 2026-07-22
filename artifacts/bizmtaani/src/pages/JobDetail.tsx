@@ -299,7 +299,7 @@ async function handleApplyViaChat() {
   <div className="space-y-3">
     {user?.uid !== job.posterId && (
       <>
-        {/* PRIMARY APPLICATION METHOD */}
+        {/* ALWAYS AVAILABLE: BIZMTAANI CHAT */}
         <Button
           className="w-full h-12"
           onClick={handleApplyViaChat}
@@ -312,21 +312,19 @@ async function handleApplyViaChat() {
         </Button>
 
         {/* OPTIONAL EXTERNAL APPLICATION METHOD */}
-        {job.contactMethod &&
-          job.contactMethod !== "none" &&
-          job.contact && (
-            <Button
-              variant="outline"
-              className="w-full h-12"
-              onClick={handleApply}
-            >
-              <ApplyIcon
-                className="mr-2"
-                size={18}
-              />
-              {applyLabel}
-            </Button>
-          )}
+        {job.contactMethod !== "none" && job.contact && (
+          <Button
+            variant="outline"
+            className="w-full h-12"
+            onClick={handleApply}
+          >
+            <ApplyIcon
+              className="mr-2"
+              size={18}
+            />
+            {applyLabel}
+          </Button>
+        )}
       </>
     )}
   </div>
