@@ -54,120 +54,78 @@ export default function JobDetail() {
   }, [params?.id]);
 
   async function handleDelete() {
-  if (!job) return; // Removed the 'confirm()' check
-  setDeleting(true);
-  try {
-    await deleteDoc(doc(db, "jobs", job.id));
-    toast({ title: "Job deleted" });
-    navigate("/jobs");
-  } catch (e) {
-    toast({ title: "Failed to delete", variant: "destructive" });
-    setDeleting(false);
-  }
-}
-
-
-async function handleApplyViaChat() {
-  if (!job || !user) return;
-
-  if (user.uid === job.posterId) {
-    toast({
-      title: "You cannot apply to your own job",
-      variant: "destructive",
-    });
-    return;
+    if (!job) return;
+    setDeleting(true);
+    try {
+      await deleteDoc(doc(db, "jobs", job.id));
+      toast({ title: "Job deleted" });
+      navigate("/jobs");
+    } catch (e) {
+      toast({ title: "Failed to delete", variant: "destructive" });
+      setDeleting(false);
+    }
   }
 
-  try {
-    const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
-
-    const chatRef = doc(db, "chats", chatId);
-
-    console.log("STEP 1: Checking chat", chatId);
-
-    const existingChat = await getDoc(chatRef);
-
-    console.log("STEP 2: Existing chat check passed");
-
-    if (!existingChat.exists()) {
-      console.log("STEP 3: Creating chat");
-
-      await setDoc(chatRef, {
-        type: "job_application",
-        jobId: job.id,
-        jobTitle: job.title,
-        company: job.company,
-
-        buyerId: user.uid,
-        buyerName: user.displayName || "Job Seeker",
-
-        sellerId: job.posterId,
-        sellerName: job.posterName || job.company,
-
-        participants: [
-          user.uid,
-          job.posterId,
-        ],
-async function handleApplyViaChat() {
-  if (!job || !user) {
-    toast({
-      title: "Authentication required",
-      description: "Please log in to apply via chat.",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  if (user.uid === job.posterId) {
-    toast({
-      title: "You cannot apply to your own job",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  try {
-    const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
-    const chatRef = doc(db, "chats", chatId);
-
-    const existingChat = await getDoc(chatRef);
-
-    if (!existingChat.exists()) {
-      // 1. Create the chat room document
-      await setDoc(chatRef, {
-        type: "job_application",
-        jobId: job.id,
-        jobTitle: job.title || "Job Position",
-        company: job.company || "Company",
-        buyerId: user.uid,
-        buyerName: user.displayName || user.email || "Job Seeker",
-        sellerId: job.posterId,
-        sellerName: job.posterName || job.company || "Employer",
-        participants: [user.uid, job.posterId],
-        lastMessage: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}.`,
-        lastMessageAt: serverTimestamp(),
-        lastSenderId: user.uid,
+  async function handleApplyViaChat() {
+    if (!job || !user) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to apply via chat.",
+        variant: "destructive",
       });
-
-      // 2. Add the initial message to the subcollection
-      await addDoc(collection(db, "chats", chatId, "messages"), {
-        senderId: user.uid,
-        senderName: user.displayName || user.email || "Job Seeker",
-        text: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
-        createdAt: serverTimestamp(),
-      });
+      return;
     }
 
-    navigate(`/chat/${chatId}`);
-  } catch (error: any) {
-    console.error("CHAT ERROR:", error);
-    toast({
-      title: "Chat Error",
-      description: error?.message || "Failed to initiate chat. Check permissions.",
-      variant: "destructive",
-    });
+    if (user.uid === job.posterId) {
+      toast({
+        title: "You cannot apply to your own job",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
+      const chatRef = doc(db, "chats", chatId);
+
+      const existingChat = await getDoc(chatRef);
+
+      if (!existingChat.exists()) {
+        // 1. Create the chat room document
+        await setDoc(chatRef, {
+          type: "job_application",
+          jobId: job.id,
+          jobTitle: job.title || "Job Position",
+          company: job.company || "Company",
+          buyerId: user.uid,
+          buyerName: user.displayName || user.email || "Job Seeker",
+          sellerId: job.posterId,
+          sellerName: job.posterName || job.company || "Employer",
+          participants: [user.uid, job.posterId],
+          lastMessage: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}.`,
+          lastMessageAt: serverTimestamp(),
+          lastSenderId: user.uid,
+        });
+
+        // 2. Add the initial message to the subcollection
+        await addDoc(collection(db, "chats", chatId, "messages"), {
+          senderId: user.uid,
+          senderName: user.displayName || user.email || "Job Seeker",
+          text: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      navigate(`/chat/${chatId}`);
+    } catch (error: any) {
+      console.error("CHAT ERROR:", error);
+      toast({
+        title: "Chat Error",
+        description: error?.message || "Failed to initiate chat. Check permissions.",
+        variant: "destructive",
+      });
+    }
   }
-}
 
   function handleApply() {
     if (!job) return;
@@ -190,7 +148,6 @@ async function handleApplyViaChat() {
     }
   }
 
-  // --- PASTED YOUR CODE FROM HERE DOWN ---
   if (loading) {
     return (
       <div className="flex flex-col h-screen items-center justify-center gap-3">
@@ -209,157 +166,141 @@ async function handleApplyViaChat() {
   }
 
   const isOwner = user?.uid === job.posterId;
-
-const isExpired = job.deadline
-  ? new Date(`${job.deadline}T23:59:59`) < new Date()
-  : false;
+  const isExpired = job.deadline
+    ? new Date(`${job.deadline}T23:59:59`) < new Date()
+    : false;
   const ApplyIcon = job.contactMethod === "email" ? Mail : job.contactMethod === "whatsapp" ? MessageSquare : Phone;
   const applyLabel = job.contactMethod === "email" ? "Apply via Email" : job.contactMethod === "whatsapp" ? "Apply on WhatsApp" : "Call to Apply";
 
   return (
-  <div className="min-h-screen bg-background">
-    <header className="flex items-center gap-3 border-b p-4">
-      <button onClick={() => navigate("/jobs")}>
-        <ChevronLeft size={22} />
-      </button>
+    <div className="min-h-screen bg-background">
+      <header className="flex items-center gap-3 border-b p-4">
+        <button onClick={() => navigate("/jobs")}>
+          <ChevronLeft size={22} />
+        </button>
 
-      <div className="flex-1">
-        <h1 className="font-bold text-lg">Job Details</h1>
-      </div>
-
-      <button onClick={handleShare}>
-        <Share2 size={20} />
-      </button>
-
-            {isOwner && (
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <button>
-              <Trash2 size={20} />
-            </button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete this job?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently remove your job posting from BizMtaani.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDelete} 
-                className="bg-destructive hover:bg-destructive/90 text-white"
-              >
-                {deleting ? <Loader2 className="animate-spin" /> : "Delete Job"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-
-    </header>
-
-    <div className="p-4 space-y-5">
-
-      <div>
-        <h2 className="text-2xl font-bold">{job.title}</h2>
-        <p className="text-muted-foreground">{job.company}</p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <span className={`px-3 py-1 rounded-full text-xs font-bold ${TYPE_COLORS[job.jobType] ?? "bg-muted"}`}>
-          {job.jobType}
-        </span>
-
-        <span className="px-3 py-1 rounded-full bg-muted text-xs">
-          {job.category}
-        </span>
-      </div>
-
-      {job.salary && (
-        <div className="flex items-center gap-2">
-          <Banknote size={18} />
-          <span>{job.salary}</span>
+        <div className="flex-1">
+          <h1 className="font-bold text-lg">Job Details</h1>
         </div>
-      )}
 
-      {(job.ward || job.county) && (
-        <div className="flex items-center gap-2">
-          <MapPin size={18} />
-          <span>{job.ward || job.county}</span>
-        </div>
-      )}
+        <button onClick={handleShare}>
+          <Share2 size={20} />
+        </button>
 
-      {job.createdAt && (
-        <div className="flex items-center gap-2">
-          <Clock size={18} />
-          <span>{timeAgo(job.createdAt.seconds)}</span>
-        </div>
-      )}
+        {isOwner && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <button>
+                <Trash2 size={20} />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently remove your job posting from BizMtaani.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={handleDelete} 
+                  className="bg-destructive hover:bg-destructive/90 text-white"
+                >
+                  {deleting ? <Loader2 className="animate-spin" /> : "Delete Job"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </header>
 
-      <div>
-        <h3 className="font-semibold mb-2">Description</h3>
-        <p>{job.description}</p>
-      </div>
-
-      {job.requirements && (
+      <div className="p-4 space-y-5">
         <div>
-          <h3 className="font-semibold mb-2">Requirements</h3>
-          <p>{job.requirements}</p>
+          <h2 className="text-2xl font-bold">{job.title}</h2>
+          <p className="text-muted-foreground">{job.company}</p>
         </div>
-      )}
 
-      {isExpired ? (
-  <Button
-    disabled
-    className="w-full h-12"
-  >
-    Job Expired
-  </Button>
-) : isOwner ? (
-  <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-    <p className="text-sm text-muted-foreground">
-      You posted this job.
-    </p>
-  </div>
-) : (
-  <div className="space-y-3 pt-2">
+        <div className="flex flex-wrap gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold ${TYPE_COLORS[job.jobType] ?? "bg-muted"}`}>
+            {job.jobType}
+          </span>
 
-    {/* ALWAYS AVAILABLE */}
-    <Button
-      type="button"
-      className="w-full h-12 font-bold"
-      onClick={handleApplyViaChat}
-    >
-      <MessageSquare
-        className="mr-2"
-        size={18}
-      />
-      Apply via BizMtaani Chat
-    </Button>
+          <span className="px-3 py-1 rounded-full bg-muted text-xs">
+            {job.category}
+          </span>
+        </div>
 
-    {/* OPTIONAL EXTERNAL CONTACT */}
-    {job.contactMethod &&
-      job.contactMethod !== "none" &&
-      job.contact?.trim() && (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full h-12"
-          onClick={handleApply}
-        >
-          <ApplyIcon
-            className="mr-2"
-            size={18}
-          />
-          {applyLabel}
-        </Button>
-      )}
+        {job.salary && (
+          <div className="flex items-center gap-2">
+            <Banknote size={18} />
+            <span>{job.salary}</span>
+          </div>
+        )}
 
-  </div>
-)}
+        {(job.ward || job.county) && (
+          <div className="flex items-center gap-2">
+            <MapPin size={18} />
+            <span>{job.ward || job.county}</span>
+          </div>
+        )}
+
+        {job.createdAt && (
+          <div className="flex items-center gap-2">
+            <Clock size={18} />
+            <span>{timeAgo(job.createdAt.seconds)}</span>
+          </div>
+        )}
+
+        <div>
+          <h3 className="font-semibold mb-2">Description</h3>
+          <p>{job.description}</p>
+        </div>
+
+        {job.requirements && (
+          <div>
+            <h3 className="font-semibold mb-2">Requirements</h3>
+            <p>{job.requirements}</p>
+          </div>
+        )}
+
+        {isExpired ? (
+          <Button disabled className="w-full h-12">
+            Job Expired
+          </Button>
+        ) : isOwner ? (
+          <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
+            <p className="text-sm text-muted-foreground">
+              You posted this job.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3 pt-2">
+            <Button
+              type="button"
+              className="w-full h-12 font-bold"
+              onClick={handleApplyViaChat}
+            >
+              <MessageSquare className="mr-2" size={18} />
+              Apply via BizMtaani Chat
+            </Button>
+
+            {job.contactMethod &&
+              job.contactMethod !== "none" &&
+              job.contact?.trim() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-12"
+                  onClick={handleApply}
+                >
+                  <ApplyIcon className="mr-2" size={18} />
+                  {applyLabel}
+                </Button>
+              )}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
-}  
+  );
+}
