@@ -11,11 +11,11 @@
 import { useState, useEffect, useRef } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { normalizePhone, PLAN_AMOUNTS, type PaidListingPlan } from "@/lib/mpesa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import {
   X, Smartphone, Loader2, CheckCircle2, XCircle,
   AlertCircle, Clock, ArrowLeft, Image as ImageIcon,
@@ -110,46 +110,114 @@ const duration = LISTING_DURATION_DAYS[plan];
   }, [stage]);
 
   useEffect(() => {
-    if (!checkoutId) return;
-    unsubRef.current?.();
-    unsubRef.current = onSnapshot(doc(db, "payments", checkoutId), (snap) => {
+  if (!checkoutId) return;
+
+  unsubRef.current?.();
+
+  unsubRef.current = onSnapshot(
+    doc(db, "payments", checkoutId),
+    (snap) => {
       if (!snap.exists()) return;
+
       const data = snap.data() as PaymentDoc;
+
       if (data.status === "completed") {
-        clearInterval(timerRef.current!);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+
         setMpesaCode(data.mpesaCode ?? null);
         setStage("success");
       } else if (data.status === "failed") {
-        clearInterval(timerRef.current!);
-        setFailReason(data.failureReason ?? "Payment failed");
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+
+        setFailReason(
+          data.failureReason ||
+            "We couldn't complete your M-Pesa payment. Please try again."
+        );
+
         setStage("failed");
       } else if (data.status === "cancelled") {
-        clearInterval(timerRef.current!);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+
         setStage("cancelled");
       }
-    });
-    return () => unsubRef.current?.();
-  }, [checkoutId]);
+    },
+    (error: unknown) => {
+      console.error("Payment status listener failed:", error);
+
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+
+      setFailReason(
+        getFirebaseErrorMessage(
+          error,
+          "We couldn't check the payment status. Please try again."
+        )
+      );
+
+      setStage("failed");
+    }
+  );
+
+  return () => {
+    unsubRef.current?.();
+    unsubRef.current = null;
+  };
+}, [checkoutId]);
+  
 
   async function handlePay() {
-    setPhoneError("");
-    try {
-      normalizePhone(phone);
-    } catch {
-      setPhoneError("Enter a valid Safaricom number e.g. 0712 345 678");
-      return;
-    }
-    setStage("initiating");
-    try {
-      const { checkoutRequestId, productId: pid } = await onInitiate(phone);
-      setCheckoutId(checkoutRequestId);
-      setProductId(pid);
-      setStage("awaiting_pin");
-    } catch (err) {
-      setStage("idle");
-      toast({ title: "Payment failed to start", description: (err as Error).message, variant: "destructive" });
-    }
+  setPhoneError("");
+
+  try {
+    normalizePhone(phone);
+  } catch {
+    setPhoneError("Enter a valid Safaricom number e.g. 0712 345 678");
+    return;
   }
+
+  setStage("initiating");
+
+  try {
+    const {
+      checkoutRequestId,
+      productId: pid,
+    } = await onInitiate(phone);
+
+    setCheckoutId(checkoutRequestId);
+    setProductId(pid);
+
+    // Free/subscription-based publishing may not create an STK request.
+    // For this modal, paid listings should always have a checkout ID.
+    if (!checkoutRequestId) {
+      throw new Error("Payment request was not created.");
+    }
+
+    setStage("awaiting_pin");
+  } catch (error: unknown) {
+    console.error("M-Pesa payment initiation failed:", error);
+
+    setStage("idle");
+
+    const message = getFirebaseErrorMessage(
+      error,
+      "We couldn't start your M-Pesa payment. Please check your phone number and try again."
+    );
+
+    toast({
+      title: "Payment failed to start",
+      description: message,
+      variant: "destructive",
+    });
+  }
+}
+  
 
   if (!open) return null;
 
