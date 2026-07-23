@@ -9,7 +9,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
-import { getFirebaseErrorMessage } from "@/lib/firebaseerrors";
+import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { getWardInfo } from "@/lib/location";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import { SiGoogle } from "react-icons/si";
 import { Loader2, ChevronLeft, Store, User, MapPin } from "lucide-react";
 
 const googleProvider = new GoogleAuthProvider();
+type Step = 1 | 2;
 
 interface HomeLocation {
   lat: number; lng: number;
