@@ -17,8 +17,14 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import {
-  X, Smartphone, Loader2, CheckCircle2, XCircle,
-  AlertCircle, Clock, ArrowLeft, Image as ImageIcon,
+  X,
+  Smartphone,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Clock,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   normalizePhone,
@@ -134,9 +140,8 @@ const duration = LISTING_DURATION_DAYS[plan];
         }
 
         setFailReason(
-          data.failureReason ||
-            "We couldn't complete your M-Pesa payment. Please try again."
-        );
+  "We couldn't complete your M-Pesa payment. Please try again."
+);
 
         setStage("failed");
       } else if (data.status === "cancelled") {
@@ -376,7 +381,9 @@ const duration = LISTING_DURATION_DAYS[plan];
             </div>
             <div className="text-center">
               <p className="font-black text-xl" style={{ color: "#00A651" }}>Listing is live!</p>
-              <p className="text-sm text-muted-foreground mt-1">Your advert is now visible for 7 days.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+  Your advert is now visible for {duration} days.
+</p>
             </div>
             {mpesaCode && (
               <div className="bg-[#00A651]/5 border border-[#00A651]/20 rounded-2xl px-4 py-3 text-center w-full">
