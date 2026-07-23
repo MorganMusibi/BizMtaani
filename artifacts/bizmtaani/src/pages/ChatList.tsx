@@ -9,8 +9,9 @@ import { BottomNav } from "@/components/BottomNav";
 interface Chat {
   id: string;
 
-  type?: "product" | "job_application";
+  type?: "product" | "job_application" | "general";
 
+  productId?: string;
   productTitle?: string;
   productImage?: string;
 
@@ -18,16 +19,19 @@ interface Chat {
   jobTitle?: string;
   company?: string;
 
-  buyerId: string;
-  buyerName: string;
+  buyerId?: string;
+  buyerName?: string;
 
-  sellerId: string;
-  sellerName: string;
-  
+  sellerId?: string;
+  sellerName?: string;
+
   participants?: string[];
 
-  lastMessage: string;
-  lastMessageAt: { seconds: number } | null;
+  lastMessage?: string;
+  lastMessageAt?: { seconds: number } | null;
+
+  createdAt?: { seconds: number } | null;
+  updatedAt?: { seconds: number } | null;
 }
 
 export default function ChatList() {
@@ -88,9 +92,18 @@ const [error, setError] = useState("");
 }, [user, setLocation]);
 
   function getOtherParty(chat: Chat) {
-    if (!user) return "";
-    return user.uid === chat.buyerId ? chat.sellerName : chat.buyerName;
+  if (!user) return "";
+
+  if (user.uid === chat.buyerId) {
+    return chat.sellerName || "User";
   }
+
+  if (user.uid === chat.sellerId) {
+    return chat.buyerName || "User";
+  }
+
+  return "User";
+}
 
   function formatTime(ts: { seconds: number } | null) {
     if (!ts) return "";
