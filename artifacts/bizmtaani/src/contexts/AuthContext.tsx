@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import { type User, onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot, Timestamp } from "firebase/firestore"; // Added onSnapshot, removed getDoc
 import { auth, db } from "@/lib/firebase";
+import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 
 export interface HomeLocation {
   lat: number;
@@ -94,7 +95,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfileLoading(false);
           },
           (error) => {
-  console.error("Profile subscription error:", error);
+  console.error(
+    "Profile subscription error:",
+    getFirebaseErrorMessage(
+      error,
+      "Unable to load your profile. Please try again."
+    )
+  );
 
   // Don't expose technical Firebase errors to the user.
   // The app can continue using the default free plan.
