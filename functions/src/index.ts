@@ -502,3 +502,66 @@ export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, clo
   return { success: true, message: "Advert and associated data removed." };
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 6. ADMIN MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const setAdminRole = onCall({ cors: true }, async (request) => {
+  // The caller must be signed in
+  if (!request.auth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "You must be signed in."
+    );
+  }
+
+  // Only the initial owner account is allowed to grant admin access.
+  // IMPORTANT: Replace this with YOUR Firebase Auth UID.
+  const OWNER_UID = "REPLACE_WITH_YOUR_FIREBASE_UID";
+
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only the BizMtaani owner can manage administrator access."
+    );
+  }
+
+  const { uid } = request.data as { uid?: string };
+
+  if (!uid) {
+    throw new HttpsError(
+      "invalid-argument",
+      "A user UID is required."
+    );
+  }
+
+  try {
+    // Set the admin custom claim
+    await admin.auth().setCustomUserClaims(uid, {
+      admin: true,
+    });
+
+    // Also record the role in Firestore for easy display/management.
+    // Security rules should still rely on the custom claim.
+    await db.collection("users").doc(uid).set(
+      {
+        role: "admin",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      success: true,
+      message: "Admin role granted successfully.",
+      uid,
+    };
+  } catch (error) {
+    console.error("Failed to set admin role:", error);
+
+    throw new HttpsError(
+      "internal",
+      "Failed to grant administrator access."
+    );
+  }
+});
