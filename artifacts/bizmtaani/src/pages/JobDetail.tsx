@@ -139,16 +139,12 @@ async function handleApplyViaChat() {
     }
 
     navigate(`/chat/${chatId}`);
-  } catch (error) {
-    console.error(
-      "Failed to start job application chat:",
-      error
-    );
+    } catch (error: any) {
+    console.error("Failed to start job application chat:", error);
 
     toast({
       title: "Unable to start chat",
-      description:
-        "Please try again.",
+      description: error?.message || "Please try again.",
       variant: "destructive",
     });
   }
