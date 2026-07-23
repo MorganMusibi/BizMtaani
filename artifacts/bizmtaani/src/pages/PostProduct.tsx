@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
 import { uploadImage } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
+import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -537,24 +538,19 @@ const data = result.data as PublishAdvertResponse;
     else {
       throw new Error("Publishing failed.");
     }
-  } catch (error: any) {
-    console.error("Publish free advert failed:", error);
+  } catch (error: unknown) {
+  console.error("Publish free advert failed:", error);
 
-    if (error.code === "failed-precondition") {
-      toast({
-        title: "Limit reached",
-        description:
-          "You have reached the maximum of 5 active free advertisements.",
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Failed to publish",
-        description:
-          error.message || "An unexpected error occurred.",
-        variant: "destructive",
-      });
-    }
+  const message = getFirebaseErrorMessage(
+    error,
+    "Unable to publish your advert. Please try again."
+  );
+
+  toast({
+    title: "Failed to publish",
+    description: message,
+    variant: "destructive",
+  });
   } finally {
     setPublishingFree(false);
   }
@@ -571,13 +567,19 @@ const data = result.data as PublishAdvertResponse;
     });
 
     navigate(`/product/${result.productId}`);
-  } catch (error: any) {
-    toast({
-      title: "Failed to publish",
-      description: error.message || "An unexpected error occurred.",
-      variant: "destructive",
-    });
-  } finally {
+  } catch (error: unknown) {
+  console.error("Publish premium advert failed:", error);
+
+  toast({
+    title: "Failed to publish",
+    description: getFirebaseErrorMessage(
+      error,
+      "Unable to publish your advert using your Premium subscription. Please try again."
+    ),
+    variant: "destructive",
+  });
+    }
+   finally {
     setPublishingFree(false);
   }
 }
