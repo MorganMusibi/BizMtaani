@@ -11,6 +11,7 @@
  */
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 
 // --- TYPES ---
 export type ListingPlan = "free" | "premium_weekly" | "premium_monthly";
@@ -58,18 +59,41 @@ export interface StkPushResult {
 /** Normalize a Kenyan phone number to 254XXXXXXXXX format */
 export function normalizePhone(raw: string): string {
   const p = raw.replace(/[\s\-+]/g, "");
-  if (p.startsWith("254") && p.length === 12) return p;
-  if ((p.startsWith("07") || p.startsWith("01")) && p.length === 10) return "254" + p.slice(1);
-  if (p.startsWith("7") && p.length === 9) return "254" + p;
-  throw new Error(`Invalid Kenyan number: ${raw}`);
+
+  if (p.startsWith("254") && p.length === 12) {
+    return p;
+  }
+
+  if (
+    (p.startsWith("07") || p.startsWith("01")) &&
+    p.length === 10
+  ) {
+    return "254" + p.slice(1);
+  }
+
+  if (p.startsWith("7") && p.length === 9) {
+    return "254" + p;
+  }
+
+  throw new Error("Invalid Kenyan phone number.");
 }
 
-export async function initiateStkPush(params: StkPushParams): Promise<StkPushResult> {
+export async function initiateStkPush(
+  params: StkPushParams
+): Promise<StkPushResult> {
   const functions = getFunctions(app);
+
+  const normalizedPhone = normalizePhone(params.phone);
+
   const initiate = httpsCallable<StkPushParams, StkPushResult>(
     functions,
     "initiateMpesaPayment"
   );
-  const { data } = await initiate(params);
+
+  const { data } = await initiate({
+    ...params,
+    phone: normalizedPhone,
+  });
+
   return data;
 }
