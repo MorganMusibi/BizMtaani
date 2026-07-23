@@ -7,7 +7,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { doc, doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseerrors";
 import { getWardInfo } from "@/lib/location";
@@ -18,7 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { SiGoogle } from "react-icons/si";
 import { Loader2, ChevronLeft, Store, User, MapPin } from "lucide-react";
 
-type Step = 1 | 2;
+const googleProvider = new GoogleAuthProvider();
 
 interface HomeLocation {
   lat: number; lng: number;
@@ -179,7 +179,7 @@ export default function Register() {
 
       const result = await signInWithPopup(
   auth,
-  new GoogleAuthProvider()
+  googleProvider
 );
 
 const userRef = doc(db, "users", result.user.uid);
