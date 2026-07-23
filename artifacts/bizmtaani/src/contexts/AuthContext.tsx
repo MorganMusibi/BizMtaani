@@ -6,18 +6,16 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-
 import {
   type User,
   onAuthStateChanged,
+  getIdTokenResult,
 } from "firebase/auth";
-
 import {
   doc,
   onSnapshot,
   Timestamp,
 } from "firebase/firestore";
-
 import { auth, db } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 
@@ -39,9 +37,10 @@ export interface UserProfile {
   subscriptionPlan?: "free" | "premium_weekly" | "premium_monthly";
   premiumEndsAt?: Timestamp;
 
-  // Admin role stored in Firestore for display/management.
-  // Actual security should rely on Firebase Custom Claims.
-  role?: "user" | "admin";
+  // Optional Firestore role for display/reference.
+  // Actual admin authorization should rely on
+  // the Firebase Authentication custom claim.
+  role?: string;
 }
 
 interface AuthContextType {
@@ -51,11 +50,15 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   profileLoading: boolean;
 
-  subscriptionPlan: "free" | "premium_weekly" | "premium_monthly";
+  subscriptionPlan:
+    | "free"
+    | "premium_weekly"
+    | "premium_monthly";
+
   premiumEndsAt: Timestamp | null;
   hasActivePremium: boolean;
 
-  // Admin status
+  // Admin access
   isAdmin: boolean;
   adminLoading: boolean;
 
@@ -98,9 +101,7 @@ export function AuthProvider({
     useState(false);
 
   // Admin state
-  const [isAdmin, setIsAdmin] =
-    useState(false);
-
+  const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] =
     useState(true);
 
@@ -114,7 +115,9 @@ export function AuthProvider({
   const reloadUser = useCallback(async () => {
     const current = auth.currentUser;
 
-    if (!current) return;
+    if (!current) {
+      return;
+    }
 
     await current.reload();
 
@@ -127,9 +130,26 @@ export function AuthProvider({
       )
     );
 
-    // Force refresh of Firebase ID token
-    // so newly-added custom claims become available.
-    await current.getIdToken(true);
+    // Force Firebase to refresh the ID token.
+    // This is important after an admin custom claim
+    // has been added to the account.
+    try {
+      await current.getIdToken(true);
+
+      const tokenResult =
+        await getIdTokenResult(current);
+
+      setIsAdmin(
+        tokenResult.claims.admin === true
+      );
+    } catch (error) {
+      console.error(
+        "Failed to refresh admin claim:",
+        error
+      );
+
+      setIsAdmin(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -137,88 +157,95 @@ export function AuthProvider({
       | (() => void)
       | undefined;
 
-    const unsubscribeAuth = onAuthStateChanged(
-      auth,
-      async (currentUser) => {
-        setUser(currentUser);
-        setLoading(false);
+    const unsubscribeAuth =
+      onAuthStateChanged(
+        auth,
+        async (currentUser) => {
+          setUser(currentUser);
+          setLoading(false);
 
-        if (unsubscribeProfile) {
-          unsubscribeProfile();
-          unsubscribeProfile = undefined;
-        }
-
-        // Reset admin state when logged out
-        if (!currentUser) {
-          setUserProfile(null);
-          setProfileLoading(false);
+          // Reset admin state whenever auth changes.
           setIsAdmin(false);
-          setAdminLoading(false);
-          return;
-        }
 
-        // ─────────────────────────────────────────
-        // Check Firebase Custom Claims
-        // ─────────────────────────────────────────
+          if (unsubscribeProfile) {
+            unsubscribeProfile();
+            unsubscribeProfile = undefined;
+          }
 
-        setAdminLoading(true);
-
-        try {
-          const tokenResult =
-            await currentUser.getIdTokenResult();
-
-          setIsAdmin(
-            tokenResult.claims.admin === true
-          );
-        } catch (error) {
-          console.error(
-            "Failed to check admin status:",
-            error
-          );
-
-          setIsAdmin(false);
-        } finally {
-          setAdminLoading(false);
-        }
-
-        // ─────────────────────────────────────────
-        // Load Firestore User Profile
-        // ─────────────────────────────────────────
-
-        setProfileLoading(true);
-
-        const docRef = doc(
-          db,
-          "users",
-          currentUser.uid
-        );
-
-        unsubscribeProfile = onSnapshot(
-          docRef,
-          (snap) => {
-            setUserProfile(
-              snap.exists()
-                ? (snap.data() as UserProfile)
-                : null
-            );
-
-            setProfileLoading(false);
-          },
-          (error) => {
-            console.error(
-              "Profile subscription error:",
-              getFirebaseErrorMessage(
-                error,
-                "Unable to load your profile. Please try again."
-              )
-            );
-
+          // No logged-in user
+          if (!currentUser) {
             setUserProfile(null);
             setProfileLoading(false);
+            setAdminLoading(false);
+            return;
           }
-        );
-      }
-    );
+
+          // --------------------------------------------------
+          // ADMIN CLAIM CHECK
+          // --------------------------------------------------
+
+          setAdminLoading(true);
+
+          try {
+            const tokenResult =
+              await getIdTokenResult(currentUser);
+
+            setIsAdmin(
+              tokenResult.claims.admin === true
+            );
+          } catch (error) {
+            console.error(
+              "Failed to check administrator access:",
+              error
+            );
+
+            setIsAdmin(false);
+          } finally {
+            setAdminLoading(false);
+          }
+
+          // --------------------------------------------------
+          // USER PROFILE
+          // --------------------------------------------------
+
+          setProfileLoading(true);
+
+          const docRef = doc(
+            db,
+            "users",
+            currentUser.uid
+          );
+
+          unsubscribeProfile = onSnapshot(
+            docRef,
+            (snap) => {
+              setUserProfile(
+                snap.exists()
+                  ? (snap.data() as UserProfile)
+                  : null
+              );
+
+              setProfileLoading(false);
+            },
+            (error) => {
+              console.error(
+                "Profile subscription error:",
+                getFirebaseErrorMessage(
+                  error,
+                  "Unable to load your profile. Please try again."
+                )
+              );
+
+              // Don't expose technical Firebase
+              // errors to the user.
+              // The app can continue using
+              // the default free plan.
+              setUserProfile(null);
+              setProfileLoading(false);
+            }
+          );
+        }
+      );
 
     return () => {
       unsubscribeAuth();
@@ -267,4 +294,4 @@ export function AuthProvider({
       {!loading && children}
     </AuthContext.Provider>
   );
-}
+  }
