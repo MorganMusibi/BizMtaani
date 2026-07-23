@@ -20,6 +20,12 @@ import {
   X, Smartphone, Loader2, CheckCircle2, XCircle,
   AlertCircle, Clock, ArrowLeft, Image as ImageIcon,
 } from "lucide-react";
+import {
+  normalizePhone,
+  PLAN_AMOUNTS,
+  LISTING_DURATION_DAYS,
+  type PaidListingPlan,
+} from "@/lib/mpesa";
 
 interface Props {
   open: boolean;
@@ -61,7 +67,13 @@ export function MpesaPaymentModal({ open, onClose, plan, defaultPhone = "", onIn
   const unsubRef = useRef<(() => void) | null>(null);
 
   const amount = PLAN_AMOUNTS[plan];
-  const planLabel = plan === "premium" ? "Premium" : "Basic";
+
+  const planLabel =
+  plan === "premium_weekly"
+    ? "Weekly Premium"
+    : "Monthly Premium";
+
+const duration = LISTING_DURATION_DAYS[plan];
 
   useEffect(() => {
     if (!open) {
@@ -163,7 +175,9 @@ export function MpesaPaymentModal({ open, onClose, plan, defaultPhone = "", onIn
               </div>
               <div>
                 <p className="font-black text-base">Activate Listing</p>
-                <p className="text-xs text-muted-foreground">Pay to post your advert for 7 days</p>
+                <p className="text-xs text-muted-foreground">
+  Pay to post your advert for {duration} days
+</p>
               </div>
             </div>
 
@@ -174,7 +188,7 @@ export function MpesaPaymentModal({ open, onClose, plan, defaultPhone = "", onIn
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Duration</span>
-                <span className="font-semibold">7 days</span>
+                <span className="font-semibold">{duration} days</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Amount</span>
