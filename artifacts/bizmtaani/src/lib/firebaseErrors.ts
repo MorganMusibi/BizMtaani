@@ -61,9 +61,14 @@ export function getFirebaseErrorMessage(
       return "This sign-in method is currently unavailable. Please try again later.";
 
     // Password reset
-    case "auth/missing-email":
-      return "Please enter your email address.";
+case "auth/missing-email":
+  return "Please enter your email address.";
 
+case "auth/expired-action-code":
+  return "This password reset link has expired. Please request a new one.";
+
+case "auth/invalid-action-code":
+  return "This password reset link is invalid or has already been used. Please request a new one.";
     // Google / OAuth
     case "auth/popup-closed-by-user":
       return "The sign-in window was closed before authentication was completed.";
