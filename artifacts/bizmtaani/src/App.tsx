@@ -64,6 +64,7 @@ function Router() {
       <Route path="/chats" component={ChatList} />
       <Route path="/chat/:chatId" component={ChatThread} />
       <Route path="/profile" component={Profile} />
+      <Route path="/admin" component={AdminDashboard} />
       <Route path="/business" component={Business} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/jobs/post" component={PostJob} />
