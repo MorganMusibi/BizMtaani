@@ -25,6 +25,7 @@ import PostJob from "@/pages/PostJob";
 import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 import ResetPassword from "@/pages/ResetPassword";
+import AdminDashboard from "@/pages/AdminDashboard";
 
 // Configuration for API requests
 // Updated path to correctly reach the root lib folder
