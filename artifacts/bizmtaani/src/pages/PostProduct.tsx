@@ -29,6 +29,9 @@ interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem
 interface PublishAdvertResponse {
   success: boolean;
   productId: string;
+  status: "active" | "pending_payment";
+  requiresPayment: boolean;
+  plan: ListingPlan;
 }
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
