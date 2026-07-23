@@ -2,38 +2,121 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+
     <title>BizMtaani</title>
-    <meta name="description" content="Kenya's local ward marketplace — discover, buy, sell and rent near you." />
+
+    <meta
+      name="description"
+      content="Kenya's local ward marketplace — discover, buy, sell and rent near you."
+    />
+
     <meta name="robots" content="index, follow" />
 
+    <!-- PWA Manifest -->
     <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme -->
     <meta name="theme-color" content="#F97316" />
+
+    <!-- Android / PWA -->
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Apple / iOS -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="BizMtaani" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="default"
+    />
+    <meta
+      name="apple-mobile-web-app-title"
+      content="BizMtaani"
+    />
 
-    <link rel="icon" type="image/png" href="/bizmtaani-icon.png" />
-    <link rel="apple-touch-icon" href="/bizmtaani-icon.png" />
+    <!-- BizMtaani App Icon -->
+    <link
+      rel="icon"
+      type="image/png"
+      href="/bizmtaani-icon.png"
+    />
 
+    <link
+      rel="apple-touch-icon"
+      href="/bizmtaani-icon.png"
+    />
+
+    <!-- Open Graph -->
     <meta property="og:title" content="BizMtaani" />
-    <meta property="og:description" content="Kenya's local ward marketplace — discover, buy, sell and rent near you." />
-    <meta property="og:type" content="website" />
-    <meta property="og:image" content="/bizmtaani-icon.png" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="BizMtaani" />
-    <meta name="twitter:description" content="Kenya's local ward marketplace — discover, buy, sell and rent near you." />
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+    <meta
+      property="og:description"
+      content="Kenya's local ward marketplace — discover, buy, sell and rent near you."
+    />
+
+    <meta property="og:type" content="website" />
+
+    <meta
+      property="og:image"
+      content="/bizmtaani-icon.png"
+    />
+
+    <!-- Twitter -->
+    <meta
+      name="twitter:card"
+      content="summary_large_image"
+    />
+
+    <meta
+      name="twitter:title"
+      content="BizMtaani"
+    />
+
+    <meta
+      name="twitter:description"
+      content="Kenya's local ward marketplace — discover, buy, sell and rent near you."
+    />
+
+    <meta
+      name="twitter:image"
+      content="/bizmtaani-icon.png"
+    />
+
+    <!-- Google Fonts -->
+    <link
+      rel="preconnect"
+      href="https://fonts.googleapis.com"
+    />
+
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin
+    />
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
+      rel="stylesheet"
+    />
 
     <style>
-      html, body { overscroll-behavior: none; -webkit-overflow-scrolling: touch; }
+      html,
+      body {
+        overscroll-behavior: none;
+        -webkit-overflow-scrolling: touch;
+      }
     </style>
   </head>
+
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+
+    <script
+      type="module"
+      src="/src/main.tsx"
+    ></script>
   </body>
 </html>
