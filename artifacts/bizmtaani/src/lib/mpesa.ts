@@ -9,40 +9,68 @@
  * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
  * which calls the Daraja STK push API server-side.
  */
+
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 
-// --- TYPES ---
-export type ListingPlan = "free" | "premium_weekly" | "premium_monthly";
-export type PaidListingPlan = "premium_weekly" | "premium_monthly";
+// ============================================================
+// TYPES
+// ============================================================
 
-// --- EXPIRY LOGIC (Days until ad expires) ---
+export type ListingPlan =
+  | "free"
+  | "premium_weekly"
+  | "premium_monthly";
+
+export type PaidListingPlan =
+  | "premium_weekly"
+  | "premium_monthly";
+
+// ============================================================
+// LISTING EXPIRY
+// ============================================================
+
 export const LISTING_DURATION_DAYS: Record<ListingPlan, number> = {
   free: 7,
   premium_weekly: 7,
   premium_monthly: 30,
 };
 
-// --- AD LIMITS (Max active adverts) ---
+// ============================================================
+// ACTIVE ADVERT LIMITS
+// ============================================================
+
 export const MAX_ACTIVE_ADVERTS: Record<ListingPlan, number> = {
   free: 5,
-  premium_weekly: Infinity, // 'Infinity' means no limit
+  premium_weekly: Infinity,
   premium_monthly: Infinity,
 };
 
-// --- PHOTO LIMITS (Photos per advert) ---
+// ============================================================
+// PHOTO LIMITS
+// ============================================================
+
 export const MAX_PHOTO_LIMIT: Record<ListingPlan, number> = {
   free: 1,
   premium_weekly: Infinity,
   premium_monthly: Infinity,
 };
 
-// --- PRICING ---
-export const PLAN_AMOUNTS: Record<PaidListingPlan, number> = {
+// ============================================================
+// PLAN PRICES
+// Must match functions/src/index.ts
+// ============================================================
+
+export const PLAN_AMOUNTS: Record<ListingPlan, number> = {
+  free: 0,
   premium_weekly: 100,
   premium_monthly: 350,
 };
+
+// ============================================================
+// STK PUSH TYPES
+// ============================================================
 
 export interface StkPushParams {
   phone: string;
@@ -52,11 +80,22 @@ export interface StkPushParams {
 
 export interface StkPushResult {
   checkoutRequestId: string;
-  merchantRequestId: string;
   customerMessage?: string;
 }
 
-/** Normalize a Kenyan phone number to 254XXXXXXXXX format */
+// ============================================================
+// NORMALIZE KENYAN PHONE NUMBER
+// Converts:
+// 0712345678
+// 0112345678
+// +254712345678
+// 254712345678
+// 712345678
+//
+// Into:
+// 254712345678
+// ============================================================
+
 export function normalizePhone(raw: string): string {
   const p = raw.replace(/[\s\-+]/g, "");
 
@@ -78,30 +117,46 @@ export function normalizePhone(raw: string): string {
   throw new Error("Invalid Kenyan phone number.");
 }
 
+// ============================================================
+// INITIATE M-PESA STK PUSH
+// ============================================================
+
 export async function initiateStkPush(
   params: StkPushParams
 ): Promise<StkPushResult> {
+
   const functions = getFunctions(app);
 
   const normalizedPhone = normalizePhone(params.phone);
 
-  const initiate = httpsCallable<StkPushParams, StkPushResult>(
+  const initiate = httpsCallable<
+    StkPushParams,
+    StkPushResult
+  >(
     functions,
     "initiateMpesaPayment"
   );
 
   try {
-  const { data } = await initiate({
-    ...params,
-    phone: normalizedPhone,
-  });
+    const { data } = await initiate({
+      ...params,
+      phone: normalizedPhone,
+    });
 
-  return data;
-} catch (error: unknown) {
-  throw new Error(
-    getFirebaseErrorMessage(
-      error,
-      "We couldn't start the M-Pesa payment. Please try again."
-    )
-  );
+    return data;
+
+  } catch (error: unknown) {
+
+    console.error(
+      "M-Pesa STK Push failed:",
+      error
+    );
+
+    throw new Error(
+      getFirebaseErrorMessage(
+        error,
+        "We couldn't start the M-Pesa payment. Please try again."
+      )
+    );
+  }
 }
