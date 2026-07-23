@@ -24,6 +24,7 @@ import Jobs from "@/pages/Jobs";
 import PostJob from "@/pages/PostJob";
 import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
+import ResetPassword from "@/pages/ResetPassword";
 
 // Configuration for API requests
 // Updated path to correctly reach the root lib folder
@@ -54,6 +55,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
+      <Route path="/reset-password" component={ResetPassword} />
       <Route path="/register" component={Register} />
       <Route path="/post" component={PostProduct} />
       <Route path="/product/:id" component={ProductDetail} />
