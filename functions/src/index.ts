@@ -517,7 +517,7 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
 
   // Only the initial owner account is allowed to grant admin access.
   // IMPORTANT: Replace this with YOUR Firebase Auth UID.
-  const OWNER_UID = "REPLACE_WITH_YOUR_FIREBASE_UID";
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
 
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError(
