@@ -434,7 +434,7 @@ if (hasActivePremium) {
 
 // Initiate STK Push for non-premium users
 const stkResult = await initiateStkPush({
-  phone: mpesaPhone,
+  phone: cleanedPhone,
   plan: plan as PaidListingPlan,
   productId,
 });
