@@ -128,15 +128,28 @@ export const mpesaCallback = onRequest(async (req, res) => {
     
     if (paymentSnap.exists && paymentSnap.data()?.callbackToken === req.query["cbtoken"]) {
       if (callback.ResultCode === 0) {
-        const paymentData = paymentSnap.data()!;
-        // Retrieve the plan from the payment record to determine duration
-        const plan = paymentData.plan ?? "free";
-        const durationDays = LISTING_DURATIONS[plan] ?? 7;
+  const paymentData = paymentSnap.data()!;
 
-        await paymentRef.update({ 
-            status: "completed", 
-            completedAt: admin.firestore.FieldValue.serverTimestamp() 
-        });
+  // Retrieve the plan from the payment record to determine duration
+  const plan = paymentData.plan ?? "free";
+  const durationDays = LISTING_DURATIONS[plan] ?? 7;
+
+  // Extract M-Pesa receipt number from Safaricom callback
+  const callbackMetadata =
+    callback.CallbackMetadata?.Item ?? [];
+
+  const mpesaCode =
+    callbackMetadata.find(
+      (item: { Name: string; Value?: unknown }) =>
+        item.Name === "MpesaReceiptNumber"
+    )?.Value ?? null;
+
+  // Mark payment as completed and save M-Pesa receipt
+  await paymentRef.update({
+    status: "completed",
+    mpesaCode,
+    completedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
         // Activate the advert
 await db.collection("products").doc(paymentData.productId).update({
   status: "active",
