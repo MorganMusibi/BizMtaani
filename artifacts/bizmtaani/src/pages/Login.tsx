@@ -90,7 +90,14 @@ export default function Login() {
     setResetLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, resetEmail.trim());
+      await sendPasswordResetEmail(
+  auth,
+  resetEmail.trim(),
+  {
+    url: `${window.location.origin}/reset-password`,
+    handleCodeInApp: true,
+  }
+);
 
       toast({
         title: "Password reset email sent",
