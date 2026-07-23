@@ -14,13 +14,30 @@ export default function AdminDashboard() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
 
-  // Temporary protection.
-  // We will replace this with Firebase Custom Claims
-  // in the next step.
-  if (!user) {
-    navigate("/login");
-    return null;
-  }
+
+  const {
+  user,
+  isAdmin,
+  adminLoading,
+} = useAuth();
+
+if (adminLoading) {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <p>Checking administrator access...</p>
+    </div>
+  );
+}
+
+if (!user) {
+  navigate("/login");
+  return null;
+}
+
+if (!isAdmin) {
+  navigate("/");
+  return null;
+}
 
   const stats = [
     {
