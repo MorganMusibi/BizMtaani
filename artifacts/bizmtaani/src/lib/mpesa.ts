@@ -90,10 +90,18 @@ export async function initiateStkPush(
     "initiateMpesaPayment"
   );
 
+  try {
   const { data } = await initiate({
     ...params,
     phone: normalizedPhone,
   });
 
   return data;
+} catch (error: unknown) {
+  throw new Error(
+    getFirebaseErrorMessage(
+      error,
+      "We couldn't start the M-Pesa payment. Please try again."
+    )
+  );
 }
