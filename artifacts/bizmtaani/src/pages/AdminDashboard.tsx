@@ -19,8 +19,7 @@ export default function AdminDashboard() {
 
   const [, navigate] = useLocation();
 
-  // Check administrator status while Firebase
-  // is loading the user's custom claims.
+  // Wait while Firebase checks the admin custom claim
   if (adminLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -33,13 +32,13 @@ export default function AdminDashboard() {
     );
   }
 
-  // User is not logged in.
+  // User is not logged in
   if (!user) {
     navigate("/login");
     return null;
   }
 
-  // User is logged in but is not an administrator.
+  // User is logged in but is not an admin
   if (!isAdmin) {
     navigate("/");
     return null;
@@ -111,7 +110,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Administrator information */}
+            {/* Admin account */}
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium">
                 {user.displayName || "Administrator"}
@@ -136,7 +135,7 @@ export default function AdminDashboard() {
       </header>
 
       <div className="flex">
-        {/* Sidebar */}
+        {/* Desktop Sidebar */}
         <aside className="hidden min-h-[calc(100vh-4rem)] w-64 border-r bg-background md:block">
           <nav className="space-y-1 p-4">
             {menuItems.map((item) => {
@@ -148,4 +147,69 @@ export default function AdminDashboard() {
                   type="button"
                   className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
                 >
-                  <Icon className="h-5 w-
+                  <Icon className="h-5 w-5" />
+                  <span>{item.title}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Main Content */}
+        <main className="flex-1 p-4 md:p-8">
+          {/* Page heading */}
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold">
+              Dashboard Overview
+            </h2>
+
+            <p className="mt-1 text-muted-foreground">
+              Monitor and manage the BizMtaani marketplace.
+            </p>
+          </div>
+
+          {/* Statistics */}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((stat) => {
+              const Icon = stat.icon;
+
+              return (
+                <div
+                  key={stat.title}
+                  className="rounded-xl border bg-card p-6 shadow-sm"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        {stat.title}
+                      </p>
+
+                      <p className="mt-2 text-3xl font-bold">
+                        {stat.value}
+                      </p>
+                    </div>
+
+                    <div className="rounded-lg bg-muted p-3">
+                      <Icon className="h-6 w-6" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Recent Activity */}
+          <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm">
+            <h3 className="text-lg font-semibold">
+              Recent Activity
+            </h3>
+
+            <div className="mt-6 flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
+              Recent platform activity will appear here.
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}
