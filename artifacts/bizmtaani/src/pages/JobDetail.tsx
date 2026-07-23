@@ -133,18 +133,83 @@ async function handleApplyViaChat() {
             `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
 
           createdAt:
-            serverTimestamp(),
+async function handleApplyViaChat() {
+  if (!job || !user) return;
+
+  if (user.uid === job.posterId) {
+    toast({
+      title: "You cannot apply to your own job",
+      variant: "destructive",
+    });
+    return;
+  }
+
+  try {
+    const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
+
+    const chatRef = doc(db, "chats", chatId);
+
+    console.log("STEP 1: Checking chat", chatId);
+
+    const existingChat = await getDoc(chatRef);
+
+    console.log("STEP 2: Existing chat check passed");
+
+    if (!existingChat.exists()) {
+      console.log("STEP 3: Creating chat");
+
+      await setDoc(chatRef, {
+        type: "job_application",
+        jobId: job.id,
+        jobTitle: job.title,
+        company: job.company,
+
+        buyerId: user.uid,
+        buyerName: user.displayName || "Job Seeker",
+
+        sellerId: job.posterId,
+        sellerName: job.posterName || job.company,
+
+        participants: [
+          user.uid,
+          job.posterId,
+        ],
+
+        lastMessage: "",
+        lastMessageAt: serverTimestamp(),
+        lastSenderId: user.uid,
+      });
+
+      console.log("STEP 4: Chat created successfully");
+
+      await addDoc(
+        collection(
+          db,
+          "chats",
+          chatId,
+          "messages"
+        ),
+        {
+          senderId: user.uid,
+          senderName: user.displayName || "Job Seeker",
+          text: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
+          createdAt: serverTimestamp(),
         }
       );
+
+      console.log("STEP 5: Message created successfully");
     }
 
+    console.log("STEP 6: Navigating to chat");
+
     navigate(`/chat/${chatId}`);
-    } catch (error: any) {
-    console.error("Failed to start job application chat:", error);
+
+  } catch (error: any) {
+    console.error("CHAT ERROR:", error);
 
     toast({
-      title: "Unable to start chat",
-      description: error?.message || "Please try again.",
+      title: "Chat Error",
+      description: error?.message || "Unknown error",
       variant: "destructive",
     });
   }
