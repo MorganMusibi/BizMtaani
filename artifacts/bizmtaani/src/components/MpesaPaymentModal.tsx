@@ -338,9 +338,21 @@ const duration = LISTING_DURATION_DAYS[plan];
             </div>
             <div className="text-center">
               <p className="font-black text-base">Request timed out</p>
-              <p className="text-sm text-muted-foreground mt-1">You were not charged. Try again.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+  The payment prompt took too long. If you completed the payment,
+  please wait a moment while we confirm it.
+</p>
             </div>
-            <Button onClick={() => setStage("idle")} className="w-full h-11 rounded-xl">Try Again</Button>
+            <Button
+  onClick={() => {
+    setCheckoutId(null);
+    setProductId(null);
+    setStage("idle");
+  }}
+  className="w-full h-11 rounded-xl"
+>
+  Try Again
+</Button>
           </div>
         )}
 
