@@ -7,8 +7,9 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
 } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { getFirebaseErrorMessage } from "@/lib/firebaseerrors";
 import { getWardInfo } from "@/lib/location";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -66,12 +67,10 @@ async function saveUserProfile(
   await setDoc(doc(db, "users", uid), {
     displayName: opts.displayName,
     isBusinessOwner: opts.isBusinessOwner,
-    // --- ADD THESE LINES BELOW ---
-    subscription: {
-      planType: "freemium",
-      expiryDate: null
-    },
-    // -----------------------------
+    
+    subscriptionPlan: "free",
+premiumEndsAt: null,
+    
     ...(opts.isBusinessOwner && opts.businessName
       ? { businessName: opts.businessName }
       : {}),
@@ -147,12 +146,17 @@ export default function Register() {
       });
 
       setLocation("/");
-    } catch (err: unknown) {
-      toast({
-        title: "Registration failed",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
+      } catch (err: unknown) {
+  console.error("Registration failed:", err);
+
+  toast({
+    title: "Registration failed",
+    description: getFirebaseErrorMessage(
+      err,
+      "Unable to create your account. Please try again."
+    ),
+    variant: "destructive",
+  });
     } finally {
       setLoading(false);
     }
@@ -173,20 +177,47 @@ export default function Register() {
         county: "",
       };
 
-      const result = await signInWithPopup(auth, new GoogleAuthProvider());
-      await saveUserProfile(result.user.uid, {
-        displayName: result.user.displayName ?? "BizMtaani User",
-        isBusinessOwner: isBusinessOwner ?? false,
-        businessName: isBusinessOwner ? (result.user.displayName ?? undefined) : undefined,
-        homeLocation,
-      });
+      const result = await signInWithPopup(
+  auth,
+  new GoogleAuthProvider()
+);
+
+const userRef = doc(db, "users", result.user.uid);
+const existingProfile = await getDoc(userRef);
+
+if (!existingProfile.exists()) {
+  await saveUserProfile(result.user.uid, {
+    displayName:
+      result.user.displayName ?? "BizMtaani User",
+    isBusinessOwner: isBusinessOwner ?? false,
+    businessName: isBusinessOwner
+      ? (result.user.displayName ?? undefined)
+      : undefined,
+    homeLocation,
+  });
+} else {
+  // Update only the location.
+  // Do not overwrite subscription or existing profile data.
+  await setDoc(
+    userRef,
+    {
+      homeLocation,
+    },
+    { merge: true }
+  );
+}
       setLocation("/");
-    } catch (err: unknown) {
-      toast({
-        title: "Google sign-in failed",
-        description: err instanceof Error ? err.message : "Please try again.",
-        variant: "destructive",
-      });
+      } catch (err: unknown) {
+  console.error("Google sign-in failed:", err);
+
+  toast({
+    title: "Google sign-in failed",
+    description: getFirebaseErrorMessage(
+      err,
+      "Unable to sign in with Google. Please try again."
+    ),
+    variant: "destructive",
+  });
     } finally {
       setGoogleLoading(false);
     }
