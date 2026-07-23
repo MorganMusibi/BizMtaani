@@ -146,24 +146,51 @@ await db.collection("products").doc(paymentData.productId).update({
   )
 });
 
-        // Add this in mpesaCallback
-await db.collection("users").doc(paymentData.buyerId)
-  .collection("subscription").doc("active").set({
-    planType: plan,
-    premiumEndsAt: admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + durationDays * 86_400_000)
-    ),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp()
-  });
-        await db.collection("users").doc(paymentData.buyerId).set(
+        // Extend existing premium subscription instead of resetting it
+const userRef = db.collection("users").doc(paymentData.buyerId);
+const userSnap = await userRef.get();
+
+const userData = userSnap.exists ? userSnap.data() : null;
+
+const existingPremiumEndsAt =
+  userData?.premiumEndsAt?.toDate?.() ?? null;
+
+const now = new Date();
+
+// If the user already has an active subscription,
+// add the new duration to the existing expiry date.
+// Otherwise, start from now.
+const subscriptionStartDate =
+  existingPremiumEndsAt && existingPremiumEndsAt > now
+    ? existingPremiumEndsAt
+    : now;
+
+const newPremiumEndsAt = new Date(
+  subscriptionStartDate.getTime() +
+    durationDays * 86_400_000
+);
+
+const premiumEndsTimestamp =
+  admin.firestore.Timestamp.fromDate(newPremiumEndsAt);
+
+// Update main user subscription fields
+await userRef.set(
   {
     subscriptionPlan: plan,
-    premiumEndsAt: admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + durationDays * 86_400_000)
-    ),
+    premiumEndsAt: premiumEndsTimestamp,
   },
   { merge: true }
 );
+
+// Update detailed subscription document
+await userRef
+  .collection("subscription")
+  .doc("active")
+  .set({
+    planType: plan,
+    premiumEndsAt: premiumEndsTimestamp,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
       }
     }
   } catch (err) { console.error(err); }
