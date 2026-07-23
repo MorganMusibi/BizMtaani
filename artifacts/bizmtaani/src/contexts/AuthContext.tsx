@@ -94,10 +94,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setProfileLoading(false);
           },
           (error) => {
-            console.error("Profile subscription error:", error);
-            setUserProfile(null);
-            setProfileLoading(false);
-          }
+  console.error("Profile subscription error:", error);
+
+  // Don't expose technical Firebase errors to the user.
+  // The app can continue using the default free plan.
+  setUserProfile(null);
+  setProfileLoading(false);
+}
         );
       } else {
         setUserProfile(null);
