@@ -364,85 +364,115 @@ useEffect(() => {
 /**
  * Corrected handleInitiate
  */
-async function handleInitiate(mpesaPhone: string): Promise<{ checkoutRequestId: string; productId: string }> {
-  if (!user || !coords) throw new Error("Not ready");
+async function handleInitiate(
+  mpesaPhone: string
+): Promise<{
+  checkoutRequestId: string;
+  productId: string;
+}> {
+  if (!user || !coords) {
+    throw new Error("Not ready");
+  }
+
   const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
-if (!isValidKenyanPhone(cleanedPhone)) {
-  toast({
-    title: "Invalid phone number",
-    description: "Enter a valid Kenyan mobile number.",
-    variant: "destructive",
-  });
+  if (!isValidKenyanPhone(cleanedPhone)) {
+    toast({
+      title: "Invalid phone number",
+      description: "Enter a valid Kenyan mobile number.",
+      variant: "destructive",
+    });
 
-  throw new Error("Invalid phone number");
-}
+    throw new Error("Invalid phone number");
+  }
 
   // 1. Upload images
   const uploadedImages = await Promise.all(
-  imageFiles.map(file => uploadImage(file, "product"))
-);
+    imageFiles.map((file) => uploadImage(file, "product"))
+  );
 
-  // 2. Prepare data
-  const docData: any = {
-      title: title.trim(),
-      description: description.trim(),
-      price: isAccommodation
-        ? parseFloat(rentPerMonth) || 0
-        : pricingBasis === "quote_only"
-          ? 0
-          : parseFloat(price) || 0,
+  // 2. Prepare advert data
+  const docData = {
+    title: title.trim(),
+    description: description.trim(),
 
-      category: selectedCategory,
-      subcategory:
-        selectedSubcategory === "Other"
-          ? customSubcategory.trim() || "Other"
-          : selectedSubcategory || selectedCategory,
-  imageUrl: uploadedImages[0]?.url ?? "",
-  imageUrls: uploadedImages,
-  lat: coords.lat,
-  lng: coords.lng,
-  ward: locationName || wardInfo?.wardName || "",
-  constituency: wardInfo?.constituency ?? "",
-  county: wardInfo?.county ?? "",
-  geohash: encodeGeohash(coords.lat, coords.lng),
-  sellerId: user.uid,
-  sellerName: userProfile?.displayName ?? user.displayName ?? "",
-  sellerType: userProfile?.isBusinessOwner ? "business" : "individual",
-  priceDisplay,
-pricingBasis: isTransport ? pricingBasis : null,
-  hotelMenu: isEatery ? hotelMenu : null,
-  plan: plan,
-  phone: cleanedPhone,
-};
+    price: isAccommodation
+      ? parseFloat(rentPerMonth) || 0
+      : pricingBasis === "quote_only"
+        ? 0
+        : parseFloat(price) || 0,
 
-  // 3. Call Backend Gatekeeper
-  const publishAdvert = httpsCallable(functions, "publishAdvert");
-const result = await publishAdvert(docData);
+    category: selectedCategory,
 
-const data = result.data as PublishAdvertResponse;
+    subcategory:
+      selectedSubcategory === "Other"
+        ? customSubcategory.trim() || "Other"
+        : selectedSubcategory || selectedCategory,
 
-const productId = data.productId;
+    imageUrl: uploadedImages[0]?.url ?? "",
+    imageUrls: uploadedImages,
 
-// Existing premium users should not pay again
-if (hasActivePremium) {
-  return {
-    checkoutRequestId: "",
-    productId,
+    lat: coords.lat,
+    lng: coords.lng,
+
+    ward: locationName || wardInfo?.wardName || "",
+    constituency: wardInfo?.constituency ?? "",
+    county: wardInfo?.county ?? "",
+
+    geohash: encodeGeohash(coords.lat, coords.lng),
+
+    sellerId: user.uid,
+    sellerName:
+      userProfile?.displayName ??
+      user.displayName ??
+      "",
+
+    sellerType: userProfile?.isBusinessOwner
+      ? "business"
+      : "individual",
+
+    priceDisplay,
+
+    pricingBasis: isTransport
+      ? pricingBasis
+      : null,
+
+    hotelMenu: isEatery
+      ? hotelMenu
+      : null,
+
+    plan,
+    phone: cleanedPhone,
   };
-}
 
-// Initiate STK Push for non-premium users
-const stkResult = await initiateStkPush({
-  phone: cleanedPhone,
-  plan: plan as PaidListingPlan,
-  productId,
-});
+  // 3. Ask backend to create the advert
+  const publishAdvert = httpsCallable<
+    typeof docData,
+    PublishAdvertResponse
+  >(functions, "publishAdvert");
 
-return {
-  checkoutRequestId: stkResult.checkoutRequestId,
-  productId,
-};
+  const result = await publishAdvert(docData);
+  const data = result.data;
+
+  // 4. Backend says advert is already active
+  if (!data.requiresPayment) {
+    return {
+      checkoutRequestId: "",
+      productId: data.productId,
+    };
+  }
+
+  // 5. Backend says payment is required
+  const stkResult = await initiateStkPush({
+    phone: cleanedPhone,
+    plan: data.plan as PaidListingPlan,
+    productId: data.productId,
+  });
+
+  return {
+    checkoutRequestId: stkResult.checkoutRequestId,
+    productId: data.productId,
+  };
 }
 
 /**
