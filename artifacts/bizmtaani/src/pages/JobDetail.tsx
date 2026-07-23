@@ -66,73 +66,7 @@ export default function JobDetail() {
   }
 }
 
-async function handleApplyViaChat() {
-  if (!job || !user) return;
 
-  if (user.uid === job.posterId) {
-    toast({
-      title: "You cannot apply to your own job",
-      variant: "destructive",
-    });
-    return;
-  }
-
-  try {
-    const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
-
-    const chatRef = doc(db, "chats", chatId);
-
-    const existingChat = await getDoc(chatRef);
-
-    if (!existingChat.exists()) {
-      await setDoc(chatRef, {
-        type: "job_application",
-
-        jobId: job.id,
-        jobTitle: job.title,
-        company: job.company,
-
-        buyerId: user.uid,
-        buyerName:
-          user.displayName || "Job Seeker",
-
-        sellerId: job.posterId,
-        sellerName:
-          job.posterName || job.company,
-
-        participants: [
-          user.uid,
-          job.posterId,
-        ],
-
-        lastMessage:
-          `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
-
-        lastMessageAt:
-          serverTimestamp(),
-
-        lastSenderId:
-          user.uid,
-      });
-
-      await addDoc(
-        collection(
-          db,
-          "chats",
-          chatId,
-          "messages"
-        ),
-        {
-          senderId: user.uid,
-
-          senderName:
-            user.displayName ||
-            "Job Seeker",
-
-          text:
-            `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
-
-          createdAt:
 async function handleApplyViaChat() {
   if (!job || !user) return;
 
