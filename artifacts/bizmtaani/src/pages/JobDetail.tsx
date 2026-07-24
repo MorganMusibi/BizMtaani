@@ -11,6 +11,10 @@ import {
   Building2, MapPin, Banknote, Clock, Mail, 
   MessageSquare, Phone 
 } from "lucide-react";
+import {
+  startJobApplicationChat,
+  ChatParticipant,
+} from "@/lib/chatService";
 import type { JobPost } from "./Jobs";
 
 // Helper function needed for your component
@@ -67,65 +71,83 @@ export default function JobDetail() {
   }
 
   async function handleApplyViaChat() {
-    if (!job || !user) {
-      toast({
-        title: "Authentication required",
-        description: "Please log in to apply via chat.",
-        variant: "destructive",
-      });
-      return;
-    }
+  if (!job || !user) {
+    toast({
+      title: "Authentication required",
+      description:
+        "Please log in to apply via chat.",
+      variant: "destructive",
+    });
 
-    if (user.uid === job.posterId) {
-      toast({
-        title: "You cannot apply to your own job",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const chatId = `job_${job.id}_${user.uid}_${job.posterId}`;
-      const chatRef = doc(db, "chats", chatId);
-
-      const existingChat = await getDoc(chatRef);
-
-      if (!existingChat.exists()) {
-        // 1. Create the chat room document
-        await setDoc(chatRef, {
-          type: "job_application",
-          jobId: job.id,
-          jobTitle: job.title || "Job Position",
-          company: job.company || "Company",
-          buyerId: user.uid,
-          buyerName: user.displayName || user.email || "Job Seeker",
-          sellerId: job.posterId,
-          sellerName: job.posterName || job.company || "Employer",
-          participants: [user.uid, job.posterId],
-          lastMessage: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}.`,
-          lastMessageAt: serverTimestamp(),
-          lastSenderId: user.uid,
-        });
-
-        // 2. Add the initial message to the subcollection
-        await addDoc(collection(db, "chats", chatId, "messages"), {
-          senderId: user.uid,
-          senderName: user.displayName || user.email || "Job Seeker",
-          text: `Hello, I'm interested in applying for the ${job.title} position at ${job.company}. I'd like to know more about the opportunity and how I can apply.`,
-          createdAt: serverTimestamp(),
-        });
-      }
-
-      navigate(`/chat/${chatId}`);
-    } catch (error: any) {
-      console.error("CHAT ERROR:", error);
-      toast({
-        title: "Chat Error",
-        description: error?.message || "Failed to initiate chat. Check permissions.",
-        variant: "destructive",
-      });
-    }
+    return;
   }
+
+  if (user.uid === job.posterId) {
+    toast({
+      title:
+        "You cannot apply to your own job",
+      variant: "destructive",
+    });
+
+    return;
+  }
+
+  try {
+    const applicant: ChatParticipant = {
+      uid: user.uid,
+      name:
+        user.displayName ||
+        user.email ||
+        "Job Seeker",
+      photoURL:
+        user.photoURL || "",
+    };
+
+    const employer: ChatParticipant = {
+      uid: job.posterId,
+      name:
+        job.posterName ||
+        job.company ||
+        "Employer",
+      photoURL: "",
+    };
+
+    const result =
+      await startJobApplicationChat({
+        applicant,
+        employer,
+
+        jobId:
+          job.id,
+
+        jobTitle:
+          job.title ||
+          "Job Position",
+
+        company:
+          job.company ||
+          "Company",
+      });
+
+    navigate(
+      `/chat/${result.chatId}`
+    );
+  } catch (error: any) {
+    console.error(
+      "CHAT ERROR:",
+      error
+    );
+
+    toast({
+      title: "Chat Error",
+      description:
+        error?.message ||
+        "Failed to initiate chat. Check permissions.",
+      variant: "destructive",
+    });
+  }
+}
+  
 
   function handleApply() {
     if (!job) return;
