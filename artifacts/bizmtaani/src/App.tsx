@@ -26,6 +26,7 @@ import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 import ResetPassword from "@/pages/ResetPassword";
 import AdminDashboard from "@/pages/AdminDashboard";
+import SetupAdmin from "@/pages/SetupAdmin";
 
 // Configuration for API requests
 // Updated path to correctly reach the root lib folder
@@ -65,6 +66,7 @@ function Router() {
       <Route path="/chat/:chatId" component={ChatThread} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin" component={AdminDashboard} />
+      <Route path="/setup-admin" component={SetupAdmin} />
       <Route path="/business" component={Business} />
       <Route path="/jobs" component={Jobs} />
       <Route path="/jobs/post" component={PostJob} />
