@@ -42,50 +42,135 @@ export default function AdminDashboard() {
     }
 
     async function loadDashboardStats() {
-      try {
-        setStatsLoading(true);
-        setStatsError("");
+  try {
+    setStatsLoading(true);
+    setStatsError("");
 
-        // Total registered users
-        const usersSnapshot = await getCountFromServer(
-          collection(db, "users")
-        );
+    // =====================================
+    // TEST 1: USERS
+    // =====================================
+    try {
+      const usersSnapshot = await getCountFromServer(
+        collection(db, "users")
+      );
 
-        // Active adverts only
-        const activeAdvertsSnapshot = await getCountFromServer(
-          query(
-            collection(db, "products"),
-            where("status", "==", "active")
-          )
-        );
+      const count = usersSnapshot.data().count;
+      setTotalUsers(count);
 
-        // Total jobs posted
-        const jobsSnapshot = await getCountFromServer(
-          collection(db, "jobs")
-        );
-
-        // Successful M-Pesa payments only
-        const paymentsSnapshot = await getCountFromServer(
-          query(
-            collection(db, "payments"),
-            where("status", "==", "success")
-          )
-        );
-
-        setTotalUsers(usersSnapshot.data().count);
-        setActiveAdverts(activeAdvertsSnapshot.data().count);
-        setTotalJobs(jobsSnapshot.data().count);
-        setSuccessfulPayments(paymentsSnapshot.data().count);
-      } catch (error) {
-        console.error("Error loading admin dashboard statistics:", error);
-
-        setStatsError(
-          "Unable to load dashboard statistics. Please check your Firestore permissions."
-        );
-      } finally {
-        setStatsLoading(false);
-      }
+      console.log("ADMIN DASHBOARD - USERS SUCCESS:", count);
+    } catch (error) {
+      console.error("ADMIN DASHBOARD - USERS FAILED:", error);
+      throw new Error(
+        `Users query failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
+
+
+    // =====================================
+    // TEST 2: PRODUCTS / ACTIVE ADVERTS
+    // =====================================
+    try {
+      const activeAdvertsSnapshot = await getCountFromServer(
+        query(
+          collection(db, "products"),
+          where("status", "==", "active")
+        )
+      );
+
+      const count = activeAdvertsSnapshot.data().count;
+      setActiveAdverts(count);
+
+      console.log(
+        "ADMIN DASHBOARD - ACTIVE PRODUCTS SUCCESS:",
+        count
+      );
+    } catch (error) {
+      console.error(
+        "ADMIN DASHBOARD - ACTIVE PRODUCTS FAILED:",
+        error
+      );
+
+      throw new Error(
+        `Products query failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+
+
+    // =====================================
+    // TEST 3: JOBS
+    // =====================================
+    try {
+      const jobsSnapshot = await getCountFromServer(
+        collection(db, "jobs")
+      );
+
+      const count = jobsSnapshot.data().count;
+      setTotalJobs(count);
+
+      console.log("ADMIN DASHBOARD - JOBS SUCCESS:", count);
+    } catch (error) {
+      console.error("ADMIN DASHBOARD - JOBS FAILED:", error);
+
+      throw new Error(
+        `Jobs query failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+
+
+    // =====================================
+    // TEST 4: PAYMENTS
+    // =====================================
+    try {
+      const paymentsSnapshot = await getCountFromServer(
+        query(
+          collection(db, "payments"),
+          where("status", "==", "success")
+        )
+      );
+
+      const count = paymentsSnapshot.data().count;
+      setSuccessfulPayments(count);
+
+      console.log(
+        "ADMIN DASHBOARD - PAYMENTS SUCCESS:",
+        count
+      );
+    } catch (error) {
+      console.error(
+        "ADMIN DASHBOARD - PAYMENTS FAILED:",
+        error
+      );
+
+      throw new Error(
+        `Payments query failed: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+
+  } catch (error) {
+    console.error(
+      "ADMIN DASHBOARD - FINAL ERROR:",
+      error
+    );
+
+    setStatsError(
+      error instanceof Error
+        ? error.message
+        : "Unable to load dashboard statistics."
+    );
+
+  } finally {
+    setStatsLoading(false);
+  }
+}
+    
 
     loadDashboardStats();
   }, [adminLoading, user, isAdmin]);
