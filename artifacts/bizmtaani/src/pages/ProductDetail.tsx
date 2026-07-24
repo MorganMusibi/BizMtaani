@@ -11,6 +11,10 @@ import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, 
 import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
+import {
+  startProductChat,
+  ChatParticipant,
+} from "@/lib/chatService";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -257,7 +261,8 @@ const handleReply = () => {
     : [];
 
   // NOW handleChat CAN SAFELY USE "images"
-  async function handleChat() {
+  
+      async function handleChat() {
   if (!user) {
     setLocation("/login");
     return;
@@ -270,69 +275,64 @@ const handleReply = () => {
   setChatLoading(true);
 
   try {
-    // Check if this buyer already has a chat
-    // with this seller for this specific product.
-    const q = query(
-      collection(db, "chats"),
-      where("productId", "==", product.id),
-      where("buyerId", "==", user.uid),
-      where("sellerId", "==", product.sellerId),
-      limit(1)
+    const currentUser: ChatParticipant = {
+      uid: user.uid,
+      name:
+        user.displayName ||
+        user.email ||
+        "User",
+      photoURL:
+        user.photoURL || "",
+    };
+
+    const seller: ChatParticipant = {
+      uid: product.sellerId,
+      name:
+        product.sellerName ||
+        "Seller",
+      photoURL:
+        product.sellerAvatar ||
+        "",
+    };
+
+    const result =
+      await startProductChat({
+        currentUser,
+        seller,
+
+        productId:
+          product.id,
+
+        productTitle:
+          product.title,
+
+        productImage:
+          images.length > 0
+            ? images[0]
+            : "",
+      });
+
+    setLocation(
+      `/chat/${result.chatId}`
     );
-
-    const existing = await getDocs(q);
-
-    // Open existing conversation.
-    if (!existing.empty) {
-      setLocation(`/chat/${existing.docs[0].id}`);
-      return;
-    }
-
-    // Create new product conversation.
-    const chatDoc = await addDoc(collection(db, "chats"), {
-      type: "product",
-
-      productId: product.id,
-      productTitle: product.title,
-      productImage: images.length > 0 ? images[0] : "",
-
-      buyerId: user.uid,
-      buyerName: user.displayName || "Buyer",
-
-      sellerId: product.sellerId,
-      sellerName: product.sellerName,
-
-      participants: [
-        user.uid,
-        product.sellerId,
-      ],
-
-      lastMessage: "",
-      lastMessageAt: serverTimestamp(),
-
-      createdAt: serverTimestamp(),
-    });
-
-    // Open the new conversation.
-    setLocation(`/chat/${chatDoc.id}`);
-
-  } catch (err: unknown) {
-    console.error("Error opening chat:", err);
+  } catch (error: unknown) {
+    console.error(
+      "Error opening product chat:",
+      error
+    );
 
     toast({
       title: "Unable to start chat",
       description:
-        err instanceof Error
-          ? err.message
+        error instanceof Error
+          ? error.message
           : "Please try again.",
       variant: "destructive",
     });
-
   } finally {
     setChatLoading(false);
   }
 }
-
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
