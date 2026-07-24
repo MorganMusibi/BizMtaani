@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import {
@@ -9,6 +10,13 @@ import {
   LayoutDashboard,
   LogOut,
 } from "lucide-react";
+import {
+  collection,
+  getCountFromServer,
+  query,
+  where,
+} from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function AdminDashboard() {
   const {
@@ -18,6 +26,69 @@ export default function AdminDashboard() {
   } = useAuth();
 
   const [, navigate] = useLocation();
+
+  const [totalUsers, setTotalUsers] = useState<number | null>(null);
+  const [activeAdverts, setActiveAdverts] = useState<number | null>(null);
+  const [totalJobs, setTotalJobs] = useState<number | null>(null);
+  const [successfulPayments, setSuccessfulPayments] = useState<number | null>(null);
+
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState("");
+
+  // Load real dashboard statistics from Firestore
+  useEffect(() => {
+    if (adminLoading || !user || !isAdmin) {
+      return;
+    }
+
+    async function loadDashboardStats() {
+      try {
+        setStatsLoading(true);
+        setStatsError("");
+
+        // Total registered users
+        const usersSnapshot = await getCountFromServer(
+          collection(db, "users")
+        );
+
+        // Active adverts only
+        const activeAdvertsSnapshot = await getCountFromServer(
+          query(
+            collection(db, "products"),
+            where("status", "==", "active")
+          )
+        );
+
+        // Total jobs posted
+        const jobsSnapshot = await getCountFromServer(
+          collection(db, "jobs")
+        );
+
+        // Successful M-Pesa payments only
+        const paymentsSnapshot = await getCountFromServer(
+          query(
+            collection(db, "payments"),
+            where("status", "==", "success")
+          )
+        );
+
+        setTotalUsers(usersSnapshot.data().count);
+        setActiveAdverts(activeAdvertsSnapshot.data().count);
+        setTotalJobs(jobsSnapshot.data().count);
+        setSuccessfulPayments(paymentsSnapshot.data().count);
+      } catch (error) {
+        console.error("Error loading admin dashboard statistics:", error);
+
+        setStatsError(
+          "Unable to load dashboard statistics. Please check your Firestore permissions."
+        );
+      } finally {
+        setStatsLoading(false);
+      }
+    }
+
+    loadDashboardStats();
+  }, [adminLoading, user, isAdmin]);
 
   // Wait while Firebase checks the admin custom claim
   if (adminLoading) {
@@ -47,22 +118,22 @@ export default function AdminDashboard() {
   const stats = [
     {
       title: "Total Users",
-      value: "—",
+      value: totalUsers,
       icon: Users,
     },
     {
       title: "Active Adverts",
-      value: "—",
+      value: activeAdverts,
       icon: Package,
     },
     {
       title: "Jobs",
-      value: "—",
+      value: totalJobs,
       icon: Briefcase,
     },
     {
       title: "Payments",
-      value: "—",
+      value: successfulPayments,
       icon: CreditCard,
     },
   ];
@@ -185,7 +256,9 @@ export default function AdminDashboard() {
                       </p>
 
                       <p className="mt-2 text-3xl font-bold">
-                        {stat.value}
+                        {statsLoading
+                          ? "..."
+                          : stat.value ?? "—"}
                       </p>
                     </div>
 
@@ -197,6 +270,15 @@ export default function AdminDashboard() {
               );
             })}
           </div>
+
+          {/* Error message */}
+          {statsError && (
+            <div className="mt-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+              <p className="text-sm text-destructive">
+                {statsError}
+              </p>
+            </div>
+          )}
 
           {/* Recent Activity */}
           <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm">
