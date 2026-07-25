@@ -313,8 +313,22 @@ export default function ChatThread() {
             );
 
           setMessages(
-            loadedMessages
-          );
+  loadedMessages
+);
+
+if (user) {
+  markMessagesAsDelivered(
+    chatId,
+    user.uid
+  ).catch((deliveryError) => {
+
+    console.error(
+      "Unable to mark messages as delivered:",
+      deliveryError
+    );
+
+  });
+}
         },
 
         (firebaseError) => {
