@@ -5,7 +5,7 @@ import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendChatMessage, markChatAsRead, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
+import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
 } from "@/lib/chatService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
