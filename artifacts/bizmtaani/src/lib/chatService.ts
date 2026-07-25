@@ -8,6 +8,7 @@ import {
   writeBatch,
   Timestamp,
 } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
 
 /*
@@ -29,9 +30,11 @@ export interface ChatParticipant {
 
 export interface ChatData {
   type: ChatType;
+
   participants: string[];
 
   participantNames?: Record<string, string>;
+
   participantPhotos?: Record<string, string>;
 
   productId?: string;
@@ -52,13 +55,6 @@ export interface ChatData {
   updatedAt?: Timestamp | null;
 }
 
-export interface ChatMessage {
-  senderId: string;
-  senderName: string;
-  text: string;
-  createdAt?: Timestamp | null;
-}
-
 export interface StartChatResult {
   chatId: string;
   created: boolean;
@@ -77,31 +73,31 @@ function sortedParticipants(
   return [uidA, uidB].sort();
 }
 
-function createParticipantNames(
+function participantNames(
   users: ChatParticipant[]
 ): Record<string, string> {
   return Object.fromEntries(
     users.map((user) => [
       user.uid,
-      user.name?.trim() || "User",
+      user.name || "User",
     ])
   );
 }
 
-function createParticipantPhotos(
+function participantPhotos(
   users: ChatParticipant[]
 ): Record<string, string> {
   return Object.fromEntries(
     users
-      .filter((user) => Boolean(user.photoURL))
+      .filter((user) => user.photoURL)
       .map((user) => [
         user.uid,
-        user.photoURL!,
+        user.photoURL as string,
       ])
   );
 }
 
-function createUnreadCounts(
+function unreadCounts(
   users: ChatParticipant[]
 ): Record<string, number> {
   return Object.fromEntries(
@@ -118,43 +114,15 @@ function validateUsers(
 ): void {
   if (!userA?.uid || !userB?.uid) {
     throw new Error(
-      "Both chat participants are required."
+      "Both users are required."
     );
   }
 
   if (userA.uid === userB.uid) {
     throw new Error(
-      "You cannot start a conversation with yourself."
+      "You cannot chat with yourself."
     );
   }
-}
-
-function validateMessage(
-  chatId: string,
-  senderId: string,
-  text: string
-): string {
-  if (!chatId || !senderId) {
-    throw new Error(
-      "Chat and sender are required."
-    );
-  }
-
-  const cleanText = text.trim();
-
-  if (!cleanText) {
-    throw new Error(
-      "Message cannot be empty."
-    );
-  }
-
-  if (cleanText.length > 5000) {
-    throw new Error(
-      "Message cannot exceed 5000 characters."
-    );
-  }
-
-  return cleanText;
 }
 
 /*
@@ -197,46 +165,7 @@ export function getJobChatId(
 
 /*
 |--------------------------------------------------------------------------
-| CREATE OR GET CHAT
-|--------------------------------------------------------------------------
-*/
-
-async function createOrGetChat(
-  chatId: string,
-  chatData: Record<string, unknown>
-): Promise<StartChatResult> {
-  const chatRef =
-    doc(db, "chats", chatId);
-
-  const result =
-    await runTransaction(
-      db,
-      async (transaction) => {
-        const existingChat =
-          await transaction.get(chatRef);
-
-        if (existingChat.exists()) {
-          return false;
-        }
-
-        transaction.set(
-          chatRef,
-          chatData
-        );
-
-        return true;
-      }
-    );
-
-  return {
-    chatId,
-    created: result,
-  };
-}
-
-/*
-|--------------------------------------------------------------------------
-| DIRECT CHAT
+| START DIRECT CHAT
 |--------------------------------------------------------------------------
 */
 
@@ -244,6 +173,7 @@ export async function startDirectChat(
   currentUser: ChatParticipant,
   otherUser: ChatParticipant
 ): Promise<StartChatResult> {
+
   validateUsers(
     currentUser,
     otherUser
@@ -254,48 +184,68 @@ export async function startDirectChat(
     otherUser,
   ];
 
+  const participants =
+    sortedParticipants(
+      currentUser.uid,
+      otherUser.uid
+    );
+
   const chatId =
     getDirectChatId(
       currentUser.uid,
       otherUser.uid
     );
 
-  return createOrGetChat(
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  await setDoc(chatRef, {
+    type: "direct",
+
+    participants,
+
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    lastMessage: "",
+
+    lastMessageAt:
+      serverTimestamp(),
+
+    lastSenderId: "",
+
+    unreadCount:
+      unreadCounts(users),
+
+    createdAt:
+      serverTimestamp(),
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  return {
     chatId,
-    {
-      type: "direct",
-
-      participants:
-        sortedParticipants(
-          currentUser.uid,
-          otherUser.uid
-        ),
-
-      participantNames:
-        createParticipantNames(users),
-
-      participantPhotos:
-        createParticipantPhotos(users),
-
-      lastMessage: "",
-      lastMessageAt: null,
-      lastSenderId: "",
-
-      unreadCount:
-        createUnreadCounts(users),
-
-      createdAt:
-        serverTimestamp(),
-
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
+    created: true,
+  };
 }
 
 /*
 |--------------------------------------------------------------------------
-| PRODUCT CHAT
+| START PRODUCT CHAT
 |--------------------------------------------------------------------------
 */
 
@@ -306,6 +256,7 @@ export async function startProductChat(params: {
   productTitle: string;
   productImage?: string;
 }): Promise<StartChatResult> {
+
   const {
     currentUser,
     seller,
@@ -314,67 +265,15 @@ export async function startProductChat(params: {
     productImage,
   } = params;
 
-  // Validate users
-  validateUsers(currentUser, seller);
+  validateUsers(
+    currentUser,
+    seller
+  );
 
-  // Validate product
   if (!productId) {
     throw new Error(
       "The product could not be identified."
     );
-  }
-
-  // The currently signed-in user MUST be one of the participants
-  if (!currentUser.uid) {
-    throw new Error(
-      "You must be signed in to start a chat."
-    );
-  }
-
-  // Create a deterministic chat ID
-  const participants = sortedParticipants(
-    currentUser.uid,
-    seller.uid
-  );
-
-  const chatId = getProductChatId(
-    productId,
-    currentUser.uid,
-    seller.uid
-  );
-
-  const chatRef = doc(
-    db,
-    "chats",
-    chatId
-  );
-
-  // Check if chat already exists
-  const existingChat = await getDoc(chatRef);
-
-  if (existingChat.exists()) {
-    const existingData =
-      existingChat.data() as ChatData;
-
-    // Make sure the existing chat is actually between
-    // these two users
-    const validParticipants =
-      Array.isArray(existingData.participants) &&
-      existingData.participants.length === 2 &&
-      participants.every((uid) =>
-        existingData.participants.includes(uid)
-      );
-
-    if (!validParticipants) {
-      throw new Error(
-        "A conflicting chat already exists for this product."
-      );
-    }
-
-    return {
-      chatId,
-      created: false,
-    };
   }
 
   const users = [
@@ -382,7 +281,32 @@ export async function startProductChat(params: {
     seller,
   ];
 
-  // Create the chat
+  const participants =
+    sortedParticipants(
+      currentUser.uid,
+      seller.uid
+    );
+
+  const chatId =
+    getProductChatId(
+      productId,
+      currentUser.uid,
+      seller.uid
+    );
+
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
   await setDoc(chatRef, {
     type: "product",
 
@@ -404,7 +328,7 @@ export async function startProductChat(params: {
     lastMessage: "",
 
     lastMessageAt:
-      null,
+      serverTimestamp(),
 
     lastSenderId: "",
 
@@ -424,22 +348,20 @@ export async function startProductChat(params: {
   };
 }
 
-
 /*
 |--------------------------------------------------------------------------
-| JOB APPLICATION CHAT
+| START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
 
-export async function startJobApplicationChat(
-  params: {
-    applicant: ChatParticipant;
-    employer: ChatParticipant;
-    jobId: string;
-    jobTitle: string;
-    company: string;
-  }
-): Promise<StartChatResult> {
+export async function startJobApplicationChat(params: {
+  applicant: ChatParticipant;
+  employer: ChatParticipant;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+}): Promise<StartChatResult> {
+
   const {
     applicant,
     employer,
@@ -475,15 +397,15 @@ export async function startJobApplicationChat(
   const chatRef =
     doc(db, "chats", chatId);
 
-  const messageRef =
-    doc(
-      collection(
-        db,
-        "chats",
-        chatId,
-        "messages"
-      )
-    );
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
 
   const initialMessage =
     `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
@@ -493,134 +415,47 @@ export async function startJobApplicationChat(
     employer,
   ];
 
-  const created =
-    await runTransaction(
-      db,
-      async (transaction) => {
-        const existingChat =
-          await transaction.get(chatRef);
+  const batch =
+    writeBatch(db);
 
-        if (existingChat.exists()) {
-          return false;
-        }
+  batch.set(chatRef, {
 
-        transaction.set(
-          chatRef,
-          {
-            type: "job_application",
+    type: "job_application",
 
-            participants,
+    participants,
 
-            participantNames:
-              createParticipantNames(users),
+    participantNames:
+      participantNames(users),
 
-            participantPhotos:
-              createParticipantPhotos(users),
+    participantPhotos:
+      participantPhotos(users),
 
-            jobId,
+    jobId,
 
-            jobTitle:
-              jobTitle?.trim() ||
-              "Job",
+    jobTitle,
 
-            company:
-              company?.trim() ||
-              "",
+    company,
 
-            lastMessage:
-              initialMessage,
+    lastMessage:
+      initialMessage,
 
-            lastMessageAt:
-              serverTimestamp(),
+    lastMessageAt:
+      serverTimestamp(),
 
-            lastSenderId:
-              applicant.uid,
+    lastSenderId:
+      applicant.uid,
 
-            unreadCount: {
-              [applicant.uid]: 0,
-              [employer.uid]: 1,
-            },
+    unreadCount: {
+      [applicant.uid]: 0,
+      [employer.uid]: 1,
+    },
 
-            createdAt:
-              serverTimestamp(),
+    createdAt:
+      serverTimestamp(),
 
-            updatedAt:
-              serverTimestamp(),
-          }
-        );
-
-        transaction.set(
-          messageRef,
-          {
-            senderId:
-              applicant.uid,
-
-            senderName:
-              applicant.name?.trim() ||
-              "User",
-
-            text:
-              initialMessage,
-
-            createdAt:
-              serverTimestamp(),
-          }
-        );
-
-        return true;
-      }
-    );
-
-  return {
-    chatId,
-    created,
-  };
-}
-
-/*
-|--------------------------------------------------------------------------
-| SEND MESSAGE
-|--------------------------------------------------------------------------
-|
-| Everything is handled in ONE Firestore transaction:
-|
-| 1. Verify chat exists
-| 2. Verify sender is a participant
-| 3. Create message
-| 4. Update chat preview
-| 5. Update lastMessageAt
-| 6. Update lastSenderId
-| 7. Increment recipient unread count
-|
-| This prevents unread counts and chat previews from
-| becoming inconsistent when messages are sent quickly.
-|
-*/
-
-export async function sendChatMessage(
-  params: {
-    chatId: string;
-    senderId: string;
-    senderName: string;
-    text: string;
-  }
-): Promise<void> {
-  const {
-    chatId,
-    senderId,
-    senderName,
-    text,
-  } = params;
-
-  const cleanText =
-    validateMessage(
-      chatId,
-      senderId,
-      text
-    );
-
-  const chatRef =
-    doc(db, "chats", chatId);
+    updatedAt:
+      serverTimestamp(),
+  });
 
   const messageRef =
     doc(
@@ -632,109 +467,172 @@ export async function sendChatMessage(
       )
     );
 
-  await runTransaction(
-    db,
-    async (transaction) => {
-      const chatSnap =
-        await transaction.get(
-          chatRef
-        );
+  batch.set(messageRef, {
 
-      if (!chatSnap.exists()) {
-        throw new Error(
-          "This conversation no longer exists."
-        );
-      }
+    senderId:
+      applicant.uid,
 
-      const chat =
-        chatSnap.data() as ChatData;
+    senderName:
+      applicant.name ||
+      "Job Seeker",
 
-      if (
-        !Array.isArray(
-          chat.participants
-        )
-      ) {
-        throw new Error(
-          "This conversation has invalid participants."
-        );
-      }
+    text:
+      initialMessage,
 
-      if (
-        !chat.participants.includes(
-          senderId
-        )
-      ) {
-        throw new Error(
-          "You are not a participant in this conversation."
-        );
-      }
+    createdAt:
+      serverTimestamp(),
 
-      const recipientUid =
-        chat.participants.find(
-          (uid) =>
-            uid !== senderId
-        );
+    read: false,
+  });
 
-      if (!recipientUid) {
-        throw new Error(
-          "Unable to find the other participant."
-        );
-      }
+  await batch.commit();
 
-      const currentUnread =
-        chat.unreadCount || {};
+  return {
+    chatId,
+    created: true,
+  };
+}
 
-      const recipientUnread =
-        Number(
-          currentUnread[
-            recipientUid
-          ] || 0
-        );
+/*
+|--------------------------------------------------------------------------
+| SEND MESSAGE
+|--------------------------------------------------------------------------
+*/
 
-      transaction.set(
-        messageRef,
-        {
-          senderId,
+export async function sendChatMessage(params: {
+  chatId: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+}): Promise<void> {
 
-          senderName:
-            senderName?.trim() ||
-            "User",
+  const {
+    chatId,
+    senderId,
+    senderName,
+    text,
+  } = params;
 
-          text:
-            cleanText,
+  const cleanText =
+    text.trim();
 
-          createdAt:
-            serverTimestamp(),
-        }
-      );
+  if (!chatId || !senderId) {
+    throw new Error(
+      "Chat and sender are required."
+    );
+  }
 
-      transaction.update(
-        chatRef,
-        {
-          lastMessage:
-            cleanText,
+  if (!cleanText) {
+    throw new Error(
+      "Message cannot be empty."
+    );
+  }
 
-          lastMessageAt:
-            serverTimestamp(),
+  if (cleanText.length > 5000) {
+    throw new Error(
+      "Message cannot exceed 5000 characters."
+    );
+  }
 
-          lastSenderId:
-            senderId,
+  const chatRef =
+    doc(
+      db,
+      "chats",
+      chatId
+    );
 
-          unreadCount: {
-            ...currentUnread,
+  const chatSnap =
+    await getDoc(chatRef);
 
-            [senderId]: 0,
+  if (!chatSnap.exists()) {
+    throw new Error(
+      "This conversation no longer exists."
+    );
+  }
 
-            [recipientUid]:
-              recipientUnread + 1,
-          },
+  const chat =
+    chatSnap.data() as ChatData;
 
-          updatedAt:
-            serverTimestamp(),
-        }
-      );
-    }
-  );
+  if (
+    !chat.participants?.includes(
+      senderId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in this conversation."
+    );
+  }
+
+  const recipientUid =
+    chat.participants.find(
+      (uid) =>
+        uid !== senderId
+    );
+
+  if (!recipientUid) {
+    throw new Error(
+      "Unable to find the other participant."
+    );
+  }
+
+  const unread =
+    chat.unreadCount || {};
+
+  const batch =
+    writeBatch(db);
+
+  const messageRef =
+    doc(
+      collection(
+        db,
+        "chats",
+        chatId,
+        "messages"
+      )
+    );
+
+  batch.set(messageRef, {
+
+    senderId,
+
+    senderName:
+      senderName ||
+      "User",
+
+    text:
+      cleanText,
+
+    createdAt:
+      serverTimestamp(),
+
+    read: false,
+  });
+
+  batch.update(chatRef, {
+
+    lastMessage:
+      cleanText,
+
+    lastMessageAt:
+      serverTimestamp(),
+
+    lastSenderId:
+      senderId,
+
+    unreadCount: {
+      ...unread,
+
+      [senderId]: 0,
+
+      [recipientUid]:
+        (unread[recipientUid] || 0) + 1,
+    },
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  await batch.commit();
 }
 
 /*
@@ -747,60 +645,55 @@ export async function markChatAsRead(
   chatId: string,
   userId: string
 ): Promise<void> {
+
   if (!chatId || !userId) {
     return;
   }
 
   const chatRef =
-    doc(db, "chats", chatId);
+    doc(
+      db,
+      "chats",
+      chatId
+    );
 
-  await runTransaction(
-    db,
-    async (transaction) => {
-      const chatSnap =
-        await transaction.get(
-          chatRef
-        );
+  const chatSnap =
+    await getDoc(chatRef);
 
-      if (!chatSnap.exists()) {
-        return;
-      }
+  if (!chatSnap.exists()) {
+    return;
+  }
 
-      const chat =
-        chatSnap.data() as ChatData;
+  const chat =
+    chatSnap.data() as ChatData;
 
-      if (
-        !Array.isArray(
-          chat.participants
-        ) ||
-        !chat.participants.includes(
-          userId
-        )
-      ) {
-        throw new Error(
-          "You are not a participant in this conversation."
-        );
-      }
+  if (
+    !chat.participants?.includes(
+      userId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in this conversation."
+    );
+  }
 
-      transaction.update(
-        chatRef,
-        {
-          unreadCount: {
-            ...(chat.unreadCount || {}),
-            [userId]: 0,
-          },
+  await updateDoc(
+    chatRef,
+    {
+      unreadCount: {
+        ...(chat.unreadCount || {}),
+        [userId]: 0,
+      },
 
-          updatedAt:
-            serverTimestamp(),
-        }
-      );
+      updatedAt:
+        serverTimestamp(),
     }
   );
 }
 
 /*
 |--------------------------------------------------------------------------
-| CHAT DISPLAY HELPERS
+| DISPLAY HELPERS
 |--------------------------------------------------------------------------
 */
 
@@ -808,16 +701,9 @@ export function getOtherParticipant(
   chat: ChatData,
   currentUserId: string
 ): string | null {
-  if (
-    !Array.isArray(
-      chat.participants
-    )
-  ) {
-    return null;
-  }
 
   return (
-    chat.participants.find(
+    chat.participants?.find(
       (uid) =>
         uid !== currentUserId
     ) || null
@@ -828,6 +714,7 @@ export function getParticipantName(
   chat: ChatData,
   uid: string
 ): string {
+
   return (
     chat.participantNames?.[uid] ||
     "User"
@@ -838,6 +725,7 @@ export function getParticipantPhoto(
   chat: ChatData,
   uid: string
 ): string {
+
   return (
     chat.participantPhotos?.[uid] ||
     ""
