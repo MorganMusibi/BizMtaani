@@ -215,25 +215,19 @@ export default function ChatThread() {
 
           try {
 
-            if (
-              chatData.unreadCount?.[
-                user.uid
-              ] > 0
-            ) {
-              await markChatAsRead(
-                chatId,
-                user.uid
-              );
-            }
+  await markChatAsRead(
+    chatId,
+    user.uid
+  );
 
-          } catch (readError) {
+} catch (readError) {
 
-            console.error(
-              "Unable to mark chat as read:",
-              readError
-            );
+  console.error(
+    "Unable to mark chat as read:",
+    readError
+  );
 
-          }
+}
 
           setLoading(false);
         },
