@@ -1,7 +1,7 @@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { doc, getDoc, deleteDoc, collection, addDoc, setDoc, serverTimestamp, } from "firebase/firestore";
+import { doc, getDoc, deleteDoc,  } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
