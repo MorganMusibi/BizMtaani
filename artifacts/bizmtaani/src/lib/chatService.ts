@@ -4,9 +4,8 @@ import {
   getDoc,
   runTransaction,
   serverTimestamp,
-  updateDoc,
-  writeBatch,
   Timestamp,
+  updateDoc,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -94,9 +93,7 @@ function createParticipantPhotos(
 ): Record<string, string> {
   return Object.fromEntries(
     users
-      .filter(
-        (user) => Boolean(user.photoURL)
-      )
+      .filter((user) => Boolean(user.photoURL))
       .map((user) => [
         user.uid,
         user.photoURL!,
@@ -137,13 +134,13 @@ function validateMessage(
   senderId: string,
   text: string
 ): string {
-  const cleanText = text.trim();
-
   if (!chatId || !senderId) {
     throw new Error(
       "Chat and sender are required."
     );
   }
+
+  const cleanText = text.trim();
 
   if (!cleanText) {
     throw new Error(
@@ -164,11 +161,6 @@ function validateMessage(
 |--------------------------------------------------------------------------
 | CHAT IDS
 |--------------------------------------------------------------------------
-|
-| IDs are deterministic.
-| This ensures the same two users have one conversation
-| for the same direct/product/job context.
-|
 */
 
 export function getDirectChatId(
@@ -216,36 +208,29 @@ async function createOrGetChat(
   const chatRef =
     doc(db, "chats", chatId);
 
-  const existingChat =
-    await getDoc(chatRef);
+  const result =
+    await runTransaction(
+      db,
+      async (transaction) => {
+        const existingChat =
+          await transaction.get(chatRef);
 
-  if (existingChat.exists()) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
+        if (existingChat.exists()) {
+          return false;
+        }
 
-  await runTransaction(
-    db,
-    async (transaction) => {
-      const currentChat =
-        await transaction.get(chatRef);
+        transaction.set(
+          chatRef,
+          chatData
+        );
 
-      if (currentChat.exists()) {
-        return;
+        return true;
       }
-
-      transaction.set(
-        chatRef,
-        chatData
-      );
-    }
-  );
+    );
 
   return {
     chatId,
-    created: true,
+    created: result,
   };
 }
 
@@ -428,11 +413,6 @@ export async function startJobApplicationChat(
     );
   }
 
-  const users = [
-    applicant,
-    employer,
-  ];
-
   const participants =
     sortedParticipants(
       applicant.uid,
@@ -459,85 +439,95 @@ export async function startJobApplicationChat(
       )
     );
 
-  const existingChat =
-    await getDoc(chatRef);
-
-  if (existingChat.exists()) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
-
   const initialMessage =
     `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
 
-  const batch =
-    writeBatch(db);
+  const users = [
+    applicant,
+    employer,
+  ];
 
-  batch.set(chatRef, {
-    type: "job_application",
+  const created =
+    await runTransaction(
+      db,
+      async (transaction) => {
+        const existingChat =
+          await transaction.get(chatRef);
 
-    participants,
+        if (existingChat.exists()) {
+          return false;
+        }
 
-    participantNames:
-      createParticipantNames(users),
+        transaction.set(
+          chatRef,
+          {
+            type: "job_application",
 
-    participantPhotos:
-      createParticipantPhotos(users),
+            participants,
 
-    jobId,
+            participantNames:
+              createParticipantNames(users),
 
-    jobTitle:
-      jobTitle?.trim() || "Job",
+            participantPhotos:
+              createParticipantPhotos(users),
 
-    company:
-      company?.trim() || "",
+            jobId,
 
-    lastMessage:
-      initialMessage,
+            jobTitle:
+              jobTitle?.trim() ||
+              "Job",
 
-    lastMessageAt:
-      serverTimestamp(),
+            company:
+              company?.trim() ||
+              "",
 
-    lastSenderId:
-      applicant.uid,
+            lastMessage:
+              initialMessage,
 
-    unreadCount: {
-      [applicant.uid]: 0,
-      [employer.uid]: 1,
-    },
+            lastMessageAt:
+              serverTimestamp(),
 
-    createdAt:
-      serverTimestamp(),
+            lastSenderId:
+              applicant.uid,
 
-    updatedAt:
-      serverTimestamp(),
-  });
+            unreadCount: {
+              [applicant.uid]: 0,
+              [employer.uid]: 1,
+            },
 
-  batch.set(
-    messageRef,
-    {
-      senderId:
-        applicant.uid,
+            createdAt:
+              serverTimestamp(),
 
-      senderName:
-        applicant.name?.trim() ||
-        "User",
+            updatedAt:
+              serverTimestamp(),
+          }
+        );
 
-      text:
-        initialMessage,
+        transaction.set(
+          messageRef,
+          {
+            senderId:
+              applicant.uid,
 
-      createdAt:
-        serverTimestamp(),
-    }
-  );
+            senderName:
+              applicant.name?.trim() ||
+              "User",
 
-  await batch.commit();
+            text:
+              initialMessage,
+
+            createdAt:
+              serverTimestamp(),
+          }
+        );
+
+        return true;
+      }
+    );
 
   return {
     chatId,
-    created: true,
+    created,
   };
 }
 
@@ -545,6 +535,20 @@ export async function startJobApplicationChat(
 |--------------------------------------------------------------------------
 | SEND MESSAGE
 |--------------------------------------------------------------------------
+|
+| Everything is handled in ONE Firestore transaction:
+|
+| 1. Verify chat exists
+| 2. Verify sender is a participant
+| 3. Create message
+| 4. Update chat preview
+| 5. Update lastMessageAt
+| 6. Update lastSenderId
+| 7. Increment recipient unread count
+|
+| This prevents unread counts and chat previews from
+| becoming inconsistent when messages are sent quickly.
+|
 */
 
 export async function sendChatMessage(
@@ -572,43 +576,6 @@ export async function sendChatMessage(
   const chatRef =
     doc(db, "chats", chatId);
 
-  const chatSnap =
-    await getDoc(chatRef);
-
-  if (!chatSnap.exists()) {
-    throw new Error(
-      "This conversation no longer exists."
-    );
-  }
-
-  const chat =
-    chatSnap.data() as ChatData;
-
-  if (
-    !chat.participants?.includes(
-      senderId
-    )
-  ) {
-    throw new Error(
-      "You are not a participant in this conversation."
-    );
-  }
-
-  const recipientUid =
-    chat.participants.find(
-      (uid) =>
-        uid !== senderId
-    );
-
-  if (!recipientUid) {
-    throw new Error(
-      "Unable to find the other participant."
-    );
-  }
-
-  const currentUnread =
-    chat.unreadCount || {};
-
   const messageRef =
     doc(
       collection(
@@ -619,55 +586,109 @@ export async function sendChatMessage(
       )
     );
 
-  const batch =
-    writeBatch(db);
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const chatSnap =
+        await transaction.get(
+          chatRef
+        );
 
-  batch.set(
-    messageRef,
-    {
-      senderId,
+      if (!chatSnap.exists()) {
+        throw new Error(
+          "This conversation no longer exists."
+        );
+      }
 
-      senderName:
-        senderName?.trim() ||
-        "User",
+      const chat =
+        chatSnap.data() as ChatData;
 
-      text:
-        cleanText,
+      if (
+        !Array.isArray(
+          chat.participants
+        )
+      ) {
+        throw new Error(
+          "This conversation has invalid participants."
+        );
+      }
 
-      createdAt:
-        serverTimestamp(),
-    }
-  );
+      if (
+        !chat.participants.includes(
+          senderId
+        )
+      ) {
+        throw new Error(
+          "You are not a participant in this conversation."
+        );
+      }
 
-  batch.update(
-    chatRef,
-    {
-      lastMessage:
-        cleanText,
+      const recipientUid =
+        chat.participants.find(
+          (uid) =>
+            uid !== senderId
+        );
 
-      lastMessageAt:
-        serverTimestamp(),
+      if (!recipientUid) {
+        throw new Error(
+          "Unable to find the other participant."
+        );
+      }
 
-      lastSenderId:
-        senderId,
+      const currentUnread =
+        chat.unreadCount || {};
 
-      unreadCount: {
-        ...currentUnread,
-
-        [senderId]: 0,
-
-        [recipientUid]:
-          (currentUnread[
+      const recipientUnread =
+        Number(
+          currentUnread[
             recipientUid
-          ] || 0) + 1,
-      },
+          ] || 0
+        );
 
-      updatedAt:
-        serverTimestamp(),
+      transaction.set(
+        messageRef,
+        {
+          senderId,
+
+          senderName:
+            senderName?.trim() ||
+            "User",
+
+          text:
+            cleanText,
+
+          createdAt:
+            serverTimestamp(),
+        }
+      );
+
+      transaction.update(
+        chatRef,
+        {
+          lastMessage:
+            cleanText,
+
+          lastMessageAt:
+            serverTimestamp(),
+
+          lastSenderId:
+            senderId,
+
+          unreadCount: {
+            ...currentUnread,
+
+            [senderId]: 0,
+
+            [recipientUid]:
+              recipientUnread + 1,
+          },
+
+          updatedAt:
+            serverTimestamp(),
+        }
+      );
     }
   );
-
-  await batch.commit();
 }
 
 /*
@@ -687,36 +708,46 @@ export async function markChatAsRead(
   const chatRef =
     doc(db, "chats", chatId);
 
-  const chatSnap =
-    await getDoc(chatRef);
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const chatSnap =
+        await transaction.get(
+          chatRef
+        );
 
-  if (!chatSnap.exists()) {
-    return;
-  }
+      if (!chatSnap.exists()) {
+        return;
+      }
 
-  const chat =
-    chatSnap.data() as ChatData;
+      const chat =
+        chatSnap.data() as ChatData;
 
-  if (
-    !chat.participants?.includes(
-      userId
-    )
-  ) {
-    throw new Error(
-      "You are not a participant in this conversation."
-    );
-  }
+      if (
+        !Array.isArray(
+          chat.participants
+        ) ||
+        !chat.participants.includes(
+          userId
+        )
+      ) {
+        throw new Error(
+          "You are not a participant in this conversation."
+        );
+      }
 
-  await updateDoc(
-    chatRef,
-    {
-      unreadCount: {
-        ...(chat.unreadCount || {}),
-        [userId]: 0,
-      },
+      transaction.update(
+        chatRef,
+        {
+          unreadCount: {
+            ...(chat.unreadCount || {}),
+            [userId]: 0,
+          },
 
-      updatedAt:
-        serverTimestamp(),
+          updatedAt:
+            serverTimestamp(),
+        }
+      );
     }
   );
 }
@@ -731,8 +762,16 @@ export function getOtherParticipant(
   chat: ChatData,
   currentUserId: string
 ): string | null {
+  if (
+    !Array.isArray(
+      chat.participants
+    )
+  ) {
+    return null;
+  }
+
   return (
-    chat.participants?.find(
+    chat.participants.find(
       (uid) =>
         uid !== currentUserId
     ) || null
