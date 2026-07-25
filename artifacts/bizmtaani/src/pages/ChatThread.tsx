@@ -130,6 +130,8 @@ export default function ChatThread() {
 
   const bottomRef =
     useRef<HTMLDivElement>(null);
+  const inputRef =
+  useRef<HTMLInputElement>(null);
 
 
   /*
@@ -396,6 +398,17 @@ export default function ChatThread() {
   }, [
     messages.length,
   ]);
+  useEffect(() => {
+  if (loading || error || !chat || !user) {
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    inputRef.current?.focus();
+  }, 300);
+
+  return () => clearTimeout(timer);
+}, [loading, error, chat, user]);
 
 
   /*
@@ -1003,7 +1016,9 @@ export default function ChatThread() {
       >
 
         <Input
-          data-testid="input-message"
+          <Input
+  ref={inputRef}
+  data-testid="input-message"
           placeholder="Type a message..."
           value={text}
           onChange={(event) =>
