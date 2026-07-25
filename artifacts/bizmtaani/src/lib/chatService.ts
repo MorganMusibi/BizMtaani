@@ -487,7 +487,11 @@ export async function startJobApplicationChat(params: {
     createdAt:
       serverTimestamp(),
 
-    read: false,
+    deliveredAt:
+  null,
+
+readAt:
+  null,
   });
 
   await batch.commit();
