@@ -764,6 +764,116 @@ export async function markChatAsRead(
 
   await batch.commit();
 }
+/*
+|--------------------------------------------------------------------------
+| MARK MESSAGES AS DELIVERED
+|--------------------------------------------------------------------------
+*/
+
+export async function markMessagesAsDelivered(
+  chatId: string,
+  userId: string
+): Promise<void> {
+
+  if (!chatId || !userId) {
+    return;
+  }
+
+  const chatRef =
+    doc(
+      db,
+      "chats",
+      chatId
+    );
+
+  const chatSnap =
+    await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    return;
+  }
+
+  const chat =
+    chatSnap.data() as ChatData;
+
+  if (
+    !chat.participants?.includes(
+      userId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in this conversation."
+    );
+  }
+
+  const otherUserId =
+    chat.participants.find(
+      (uid) =>
+        uid !== userId
+    );
+
+  if (!otherUserId) {
+    return;
+  }
+
+  const messagesRef =
+    collection(
+      db,
+      "chats",
+      chatId,
+      "messages"
+    );
+
+  const messagesQuery =
+    query(
+      messagesRef,
+      where(
+        "senderId",
+        "==",
+        otherUserId
+      )
+    );
+
+  const messagesSnap =
+    await getDocs(
+      messagesQuery
+    );
+
+  const batch =
+    writeBatch(db);
+
+  let hasUpdates =
+    false;
+
+  messagesSnap.forEach(
+    (messageDoc) => {
+
+      const message =
+        messageDoc.data();
+
+      if (
+        !message.deliveredAt
+      ) {
+
+        batch.update(
+          messageDoc.ref,
+          {
+            deliveredAt:
+              serverTimestamp(),
+          }
+        );
+
+        hasUpdates =
+          true;
+      }
+
+    }
+  );
+
+  if (hasUpdates) {
+    await batch.commit();
+  }
+}
 
 /*
 |--------------------------------------------------------------------------
