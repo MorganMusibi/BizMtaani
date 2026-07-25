@@ -314,15 +314,67 @@ export async function startProductChat(params: {
     productImage,
   } = params;
 
-  validateUsers(
-    currentUser,
-    seller
-  );
+  // Validate users
+  validateUsers(currentUser, seller);
 
+  // Validate product
   if (!productId) {
     throw new Error(
       "The product could not be identified."
     );
+  }
+
+  // The currently signed-in user MUST be one of the participants
+  if (!currentUser.uid) {
+    throw new Error(
+      "You must be signed in to start a chat."
+    );
+  }
+
+  // Create a deterministic chat ID
+  const participants = sortedParticipants(
+    currentUser.uid,
+    seller.uid
+  );
+
+  const chatId = getProductChatId(
+    productId,
+    currentUser.uid,
+    seller.uid
+  );
+
+  const chatRef = doc(
+    db,
+    "chats",
+    chatId
+  );
+
+  // Check if chat already exists
+  const existingChat = await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    const existingData =
+      existingChat.data() as ChatData;
+
+    // Make sure the existing chat is actually between
+    // these two users
+    const validParticipants =
+      Array.isArray(existingData.participants) &&
+      existingData.participants.length === 2 &&
+      participants.every((uid) =>
+        existingData.participants.includes(uid)
+      );
+
+    if (!validParticipants) {
+      throw new Error(
+        "A conflicting chat already exists for this product."
+      );
+    }
+
+    return {
+      chatId,
+      created: false,
+    };
   }
 
   const users = [
@@ -330,54 +382,48 @@ export async function startProductChat(params: {
     seller,
   ];
 
-  const chatId =
-    getProductChatId(
-      productId,
-      currentUser.uid,
-      seller.uid
-    );
+  // Create the chat
+  await setDoc(chatRef, {
+    type: "product",
 
-  return createOrGetChat(
+    participants,
+
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    productId,
+
+    productTitle,
+
+    productImage:
+      productImage || "",
+
+    lastMessage: "",
+
+    lastMessageAt:
+      null,
+
+    lastSenderId: "",
+
+    unreadCount:
+      unreadCounts(users),
+
+    createdAt:
+      serverTimestamp(),
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  return {
     chatId,
-    {
-      type: "product",
-
-      participants:
-        sortedParticipants(
-          currentUser.uid,
-          seller.uid
-        ),
-
-      participantNames:
-        createParticipantNames(users),
-
-      participantPhotos:
-        createParticipantPhotos(users),
-
-      productId,
-
-      productTitle:
-        productTitle?.trim() ||
-        "Product",
-
-      productImage:
-        productImage || "",
-
-      lastMessage: "",
-      lastMessageAt: null,
-      lastSenderId: "",
-
-      unreadCount:
-        createUnreadCounts(users),
-
-      createdAt:
-        serverTimestamp(),
-
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
+    created: true,
+  };
 }
+
 
 /*
 |--------------------------------------------------------------------------
