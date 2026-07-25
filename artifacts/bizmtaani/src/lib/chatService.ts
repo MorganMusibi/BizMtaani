@@ -692,7 +692,71 @@ export async function markChatAsRead(
     );
   }
 
-  await updateDoc(
+  const otherUserId =
+    chat.participants.find(
+      (uid) =>
+        uid !== userId
+    );
+
+  if (!otherUserId) {
+    return;
+  }
+
+  const messagesRef =
+    collection(
+      db,
+      "chats",
+      chatId,
+      "messages"
+    );
+
+  const messagesQuery =
+    query(
+      messagesRef,
+      where(
+        "senderId",
+        "==",
+        otherUserId
+      )
+    );
+
+  const messagesSnap =
+    await getDocs(
+      messagesQuery
+    );
+
+  const batch =
+    writeBatch(db);
+
+  let messagesUpdated =
+    false;
+
+  messagesSnap.forEach(
+    (messageDoc) => {
+
+      const message =
+        messageDoc.data();
+
+      if (
+        !message.readAt
+      ) {
+
+        batch.update(
+          messageDoc.ref,
+          {
+            readAt:
+              serverTimestamp(),
+          }
+        );
+
+        messagesUpdated =
+          true;
+      }
+
+    }
+  );
+
+  batch.update(
     chatRef,
     {
       unreadCount: {
@@ -704,6 +768,8 @@ export async function markChatAsRead(
         serverTimestamp(),
     }
   );
+
+  await batch.commit();
 }
 
 /*
