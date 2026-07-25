@@ -287,22 +287,28 @@ export default function ChatThread() {
                   messageDoc.data();
 
                 return {
-                  id:
-                    messageDoc.id,
+  id:
+    messageDoc.id,
 
-                  senderId:
-                    data.senderId || "",
+  senderId:
+    data.senderId || "",
 
-                  senderName:
-                    data.senderName ||
-                    "User",
+  senderName:
+    data.senderName ||
+    "User",
 
-                  text:
-                    data.text || "",
+  text:
+    data.text || "",
 
-                  createdAt:
-                    data.createdAt || null,
-                };
+  createdAt:
+    data.createdAt || null,
+
+  deliveredAt:
+    data.deliveredAt || null,
+
+  readAt:
+    data.readAt || null,
+};
               }
             );
 
