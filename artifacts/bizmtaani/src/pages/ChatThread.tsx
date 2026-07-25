@@ -379,7 +379,7 @@ export default function ChatThread() {
 
   const timer = setTimeout(() => {
     inputRef.current?.focus();
-  }, 300);
+  }, 500);
 
   return () => clearTimeout(timer);
 }, [loading, error, chat, user]);
@@ -846,7 +846,7 @@ export default function ChatThread() {
           MESSAGES
       ================================================================ */}
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4 space-y-2">
 
 
         {messages.length === 0 ? (
