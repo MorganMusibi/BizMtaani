@@ -611,6 +611,28 @@ export default function ChatThread() {
     );
 
   }
+  function getMessageStatus(
+  message: Message
+) {
+  if (message.readAt) {
+    return {
+      icon: "✓✓",
+      className: "text-blue-400",
+    };
+  }
+
+  if (message.deliveredAt) {
+    return {
+      icon: "✓✓",
+      className: "text-white/60",
+    };
+  }
+
+  return {
+    icon: "✓",
+    className: "text-white/60",
+  };
+  }
 
 /*
   |--------------------------------------------------------------------------
@@ -911,18 +933,48 @@ export default function ChatThread() {
                       {message.text}
                     </p>
 
+<div
+  className={`flex items-center gap-1 mt-1 ${
+    isMine
+      ? "justify-end"
+      : "justify-start"
+  }`}
+>
+  <p
+    className={`text-[10px] ${
+      isMine
+        ? "text-white/60"
+        : "text-muted-foreground"
+    }`}
+  >
+    {formatMessageTime(
+      message.createdAt
+    )}
+  </p>
 
-                    <p
-                      className={`text-[10px] mt-1 ${
-                        isMine
-                          ? "text-white/60 text-right"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {formatMessageTime(
-                        message.createdAt
-                      )}
-                    </p>
+  {isMine && (
+    <span
+      className={`text-[11px] font-semibold ${
+        getMessageStatus(
+          message
+        ).className
+      }`}
+      aria-label={
+        message.readAt
+          ? "Read"
+          : message.deliveredAt
+          ? "Delivered"
+          : "Sent"
+      }
+    >
+      {
+        getMessageStatus(
+          message
+        ).icon
+      }
+    </span>
+  )}
+</div>
 
                   </div>
 
