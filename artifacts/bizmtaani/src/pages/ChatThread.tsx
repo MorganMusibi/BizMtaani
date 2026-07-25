@@ -1,42 +1,16 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useEffect, useRef, useState, } from "react";
 
-import {
-  collection,
-  doc,
-  onSnapshot,
-  orderBy,
-  query,
-} from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, } from "firebase/firestore";
 
-import {
-  useLocation,
-  useParams,
-  Link,
-} from "wouter";
+import { useLocation, useParams, Link, } from "wouter";
 
-import {
-  ChevronLeft,
-  Send,
-  Loader2,
-  MessageCircle,
-  Briefcase,
-  User,
+import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
 
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 
-import {
-  sendChatMessage,
-  markChatAsRead,
-  getOtherParticipant,
-  getParticipantName,
-  getParticipantPhoto,
-  type ChatData,
+import { sendChatMessage, markChatAsRead, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
 } from "@/lib/chatService";
 
 import { Button } from "@/components/ui/button";
@@ -1016,21 +990,19 @@ export default function ChatThread() {
       >
 
         <Input
-          <Input
   ref={inputRef}
   data-testid="input-message"
-          placeholder="Type a message..."
-          value={text}
-          onChange={(event) =>
-            setText(
-              event.target.value
-            )
-          }
-          className="flex-1 h-11 rounded-full"
-          autoComplete="off"
-          disabled={sending}
-          maxLength={5000}
-        />
+  placeholder="Type a message..."
+  value={text}
+  onChange={(event) =>
+    setText(event.target.value)
+  }
+  className="flex-1 h-11 rounded-full"
+  autoComplete="off"
+  autoFocus
+  disabled={sending}
+  maxLength={5000}
+/>
 
 
         <Button
