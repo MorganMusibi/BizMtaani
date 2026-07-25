@@ -619,6 +619,58 @@ if (user) {
     );
 
   }
+  function formatMessageDate(
+  timestamp:
+    | {
+        seconds: number;
+        nanoseconds?: number;
+      }
+    | null
+    | undefined
+): string {
+
+  if (!timestamp) {
+    return "";
+  }
+
+  const date =
+    new Date(
+      timestamp.seconds * 1000
+    );
+
+  const today =
+    new Date();
+
+  const yesterday =
+    new Date();
+
+  yesterday.setDate(
+    yesterday.getDate() - 1
+  );
+
+  if (
+    date.toDateString() ===
+    today.toDateString()
+  ) {
+    return "Today";
+  }
+
+  if (
+    date.toDateString() ===
+    yesterday.toDateString()
+  ) {
+    return "Yesterday";
+  }
+
+  return date.toLocaleDateString(
+    [],
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }
+  );
+  }
   function getMessageStatus(
   message: Message
 ) {
