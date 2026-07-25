@@ -284,6 +284,16 @@ const handleReply = () => {
       photoURL:
         user.photoURL || "",
     };
+    
+    console.log("CHAT DEBUG", {
+  authenticatedUser: user.uid,
+  productId: product.id,
+  sellerId: product.sellerId,
+  participants: [
+    user.uid,
+    product.sellerId,
+  ],
+});
 
     const seller: ChatParticipant = {
       uid: product.sellerId,
