@@ -2,12 +2,12 @@ import {
   collection,
   doc,
   getDoc,
-  runTransaction,
-  serverTimestamp,
-  Timestamp,
+  setDoc,
   updateDoc,
+  serverTimestamp,
+  writeBatch,
+  Timestamp,
 } from "firebase/firestore";
-
 import { db } from "@/lib/firebase";
 
 /*
