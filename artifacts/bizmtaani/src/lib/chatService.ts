@@ -1,12 +1,6 @@
-import {
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  serverTimestamp,
-  writeBatch,
-  Timestamp,
+import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, writeBatch, Timestamp,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -728,9 +722,6 @@ export async function markChatAsRead(
   const batch =
     writeBatch(db);
 
-  let messagesUpdated =
-    false;
-
   messagesSnap.forEach(
     (messageDoc) => {
 
@@ -749,8 +740,6 @@ export async function markChatAsRead(
           }
         );
 
-        messagesUpdated =
-          true;
       }
 
     }
