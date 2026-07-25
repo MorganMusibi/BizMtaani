@@ -54,6 +54,17 @@ export interface ChatData {
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
+export interface ChatMessage {
+  senderId: string;
+  senderName?: string;
+  text: string;
+
+  createdAt?: Timestamp | null;
+
+  deliveredAt?: Timestamp | null;
+
+  readAt?: Timestamp | null;
+}
 
 export interface StartChatResult {
   chatId: string;
