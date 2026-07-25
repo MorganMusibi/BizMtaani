@@ -2,13 +2,20 @@ import {
   collection,
   doc,
   getDoc,
-  setDoc,
-  updateDoc,
+  runTransaction,
   serverTimestamp,
+  updateDoc,
   writeBatch,
   Timestamp,
 } from "firebase/firestore";
+
 import { db } from "@/lib/firebase";
+
+/*
+|--------------------------------------------------------------------------
+| TYPES
+|--------------------------------------------------------------------------
+*/
 
 export type ChatType =
   | "direct"
@@ -24,6 +31,7 @@ export interface ChatParticipant {
 export interface ChatData {
   type: ChatType;
   participants: string[];
+
   participantNames?: Record<string, string>;
   participantPhotos?: Record<string, string>;
 
@@ -45,6 +53,13 @@ export interface ChatData {
   updatedAt?: Timestamp | null;
 }
 
+export interface ChatMessage {
+  senderId: string;
+  senderName: string;
+  text: string;
+  createdAt?: Timestamp | null;
+}
+
 export interface StartChatResult {
   chatId: string;
   created: boolean;
@@ -59,27 +74,29 @@ export interface StartChatResult {
 function sortedParticipants(
   uidA: string,
   uidB: string
-) {
+): string[] {
   return [uidA, uidB].sort();
 }
 
-function participantNames(
+function createParticipantNames(
   users: ChatParticipant[]
 ): Record<string, string> {
   return Object.fromEntries(
     users.map((user) => [
       user.uid,
-      user.name || "User",
+      user.name?.trim() || "User",
     ])
   );
 }
 
-function participantPhotos(
+function createParticipantPhotos(
   users: ChatParticipant[]
 ): Record<string, string> {
   return Object.fromEntries(
     users
-      .filter((user) => user.photoURL)
+      .filter(
+        (user) => Boolean(user.photoURL)
+      )
       .map((user) => [
         user.uid,
         user.photoURL!,
@@ -87,7 +104,7 @@ function participantPhotos(
   );
 }
 
-function unreadCounts(
+function createUnreadCounts(
   users: ChatParticipant[]
 ): Record<string, number> {
   return Object.fromEntries(
@@ -101,24 +118,57 @@ function unreadCounts(
 function validateUsers(
   userA: ChatParticipant,
   userB: ChatParticipant
-) {
-  if (!userA.uid || !userB.uid) {
+): void {
+  if (!userA?.uid || !userB?.uid) {
     throw new Error(
-      "Both users are required."
+      "Both chat participants are required."
     );
   }
 
   if (userA.uid === userB.uid) {
     throw new Error(
-      "You cannot chat with yourself."
+      "You cannot start a conversation with yourself."
     );
   }
+}
+
+function validateMessage(
+  chatId: string,
+  senderId: string,
+  text: string
+): string {
+  const cleanText = text.trim();
+
+  if (!chatId || !senderId) {
+    throw new Error(
+      "Chat and sender are required."
+    );
+  }
+
+  if (!cleanText) {
+    throw new Error(
+      "Message cannot be empty."
+    );
+  }
+
+  if (cleanText.length > 5000) {
+    throw new Error(
+      "Message cannot exceed 5000 characters."
+    );
+  }
+
+  return cleanText;
 }
 
 /*
 |--------------------------------------------------------------------------
 | CHAT IDS
 |--------------------------------------------------------------------------
+|
+| IDs are deterministic.
+| This ensures the same two users have one conversation
+| for the same direct/product/job context.
+|
 */
 
 export function getDirectChatId(
@@ -155,6 +205,52 @@ export function getJobChatId(
 
 /*
 |--------------------------------------------------------------------------
+| CREATE OR GET CHAT
+|--------------------------------------------------------------------------
+*/
+
+async function createOrGetChat(
+  chatId: string,
+  chatData: Record<string, unknown>
+): Promise<StartChatResult> {
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  await runTransaction(
+    db,
+    async (transaction) => {
+      const currentChat =
+        await transaction.get(chatRef);
+
+      if (currentChat.exists()) {
+        return;
+      }
+
+      transaction.set(
+        chatRef,
+        chatData
+      );
+    }
+  );
+
+  return {
+    chatId,
+    created: true,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
 | DIRECT CHAT
 |--------------------------------------------------------------------------
 */
@@ -173,53 +269,43 @@ export async function startDirectChat(
     otherUser,
   ];
 
-  const participants =
-    sortedParticipants(
-      currentUser.uid,
-      otherUser.uid
-    );
-
   const chatId =
     getDirectChatId(
       currentUser.uid,
       otherUser.uid
     );
 
-  const chatRef =
-    doc(db, "chats", chatId);
-
-  if (
-    (await getDoc(chatRef)).exists()
-  ) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
-
-  await setDoc(chatRef, {
-    type: "direct",
-    participants,
-    participantNames:
-      participantNames(users),
-    participantPhotos:
-      participantPhotos(users),
-    lastMessage: "",
-    lastMessageAt:
-      serverTimestamp(),
-    lastSenderId: "",
-    unreadCount:
-      unreadCounts(users),
-    createdAt:
-      serverTimestamp(),
-    updatedAt:
-      serverTimestamp(),
-  });
-
-  return {
+  return createOrGetChat(
     chatId,
-    created: true,
-  };
+    {
+      type: "direct",
+
+      participants:
+        sortedParticipants(
+          currentUser.uid,
+          otherUser.uid
+        ),
+
+      participantNames:
+        createParticipantNames(users),
+
+      participantPhotos:
+        createParticipantPhotos(users),
+
+      lastMessage: "",
+      lastMessageAt: null,
+      lastSenderId: "",
+
+      unreadCount:
+        createUnreadCounts(users),
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
 }
 
 /*
@@ -259,12 +345,6 @@ export async function startProductChat(params: {
     seller,
   ];
 
-  const participants =
-    sortedParticipants(
-      currentUser.uid,
-      seller.uid
-    );
-
   const chatId =
     getProductChatId(
       productId,
@@ -272,45 +352,46 @@ export async function startProductChat(params: {
       seller.uid
     );
 
-  const chatRef =
-    doc(db, "chats", chatId);
-
-  if (
-    (await getDoc(chatRef)).exists()
-  ) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
-
-  await setDoc(chatRef, {
-    type: "product",
-    participants,
-    participantNames:
-      participantNames(users),
-    participantPhotos:
-      participantPhotos(users),
-    productId,
-    productTitle,
-    productImage:
-      productImage || "",
-    lastMessage: "",
-    lastMessageAt:
-      serverTimestamp(),
-    lastSenderId: "",
-    unreadCount:
-      unreadCounts(users),
-    createdAt:
-      serverTimestamp(),
-    updatedAt:
-      serverTimestamp(),
-  });
-
-  return {
+  return createOrGetChat(
     chatId,
-    created: true,
-  };
+    {
+      type: "product",
+
+      participants:
+        sortedParticipants(
+          currentUser.uid,
+          seller.uid
+        ),
+
+      participantNames:
+        createParticipantNames(users),
+
+      participantPhotos:
+        createParticipantPhotos(users),
+
+      productId,
+
+      productTitle:
+        productTitle?.trim() ||
+        "Product",
+
+      productImage:
+        productImage || "",
+
+      lastMessage: "",
+      lastMessageAt: null,
+      lastSenderId: "",
+
+      unreadCount:
+        createUnreadCounts(users),
+
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
 }
 
 /*
@@ -319,13 +400,15 @@ export async function startProductChat(params: {
 |--------------------------------------------------------------------------
 */
 
-export async function startJobApplicationChat(params: {
-  applicant: ChatParticipant;
-  employer: ChatParticipant;
-  jobId: string;
-  jobTitle: string;
-  company: string;
-}): Promise<StartChatResult> {
+export async function startJobApplicationChat(
+  params: {
+    applicant: ChatParticipant;
+    employer: ChatParticipant;
+    jobId: string;
+    jobTitle: string;
+    company: string;
+  }
+): Promise<StartChatResult> {
   const {
     applicant,
     employer,
@@ -345,6 +428,11 @@ export async function startJobApplicationChat(params: {
     );
   }
 
+  const users = [
+    applicant,
+    employer,
+  ];
+
   const participants =
     sortedParticipants(
       applicant.uid,
@@ -361,52 +449,6 @@ export async function startJobApplicationChat(params: {
   const chatRef =
     doc(db, "chats", chatId);
 
-  if (
-    (await getDoc(chatRef)).exists()
-  ) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
-
-  const initialMessage =
-    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
-
-  const users = [
-    applicant,
-    employer,
-  ];
-
-  const batch =
-    writeBatch(db);
-
-  batch.set(chatRef, {
-    type: "job_application",
-    participants,
-    participantNames:
-      participantNames(users),
-    participantPhotos:
-      participantPhotos(users),
-    jobId,
-    jobTitle,
-    company,
-    lastMessage:
-      initialMessage,
-    lastMessageAt:
-      serverTimestamp(),
-    lastSenderId:
-      applicant.uid,
-    unreadCount: {
-      [applicant.uid]: 0,
-      [employer.uid]: 1,
-    },
-    createdAt:
-      serverTimestamp(),
-    updatedAt:
-      serverTimestamp(),
-  });
-
   const messageRef =
     doc(
       collection(
@@ -417,18 +459,79 @@ export async function startJobApplicationChat(params: {
       )
     );
 
-  batch.set(messageRef, {
-    senderId:
-      applicant.uid,
-    senderName:
-      applicant.name ||
-      "Job Seeker",
-    text:
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  const initialMessage =
+    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
+
+  const batch =
+    writeBatch(db);
+
+  batch.set(chatRef, {
+    type: "job_application",
+
+    participants,
+
+    participantNames:
+      createParticipantNames(users),
+
+    participantPhotos:
+      createParticipantPhotos(users),
+
+    jobId,
+
+    jobTitle:
+      jobTitle?.trim() || "Job",
+
+    company:
+      company?.trim() || "",
+
+    lastMessage:
       initialMessage,
+
+    lastMessageAt:
+      serverTimestamp(),
+
+    lastSenderId:
+      applicant.uid,
+
+    unreadCount: {
+      [applicant.uid]: 0,
+      [employer.uid]: 1,
+    },
+
     createdAt:
       serverTimestamp(),
-    read: false,
+
+    updatedAt:
+      serverTimestamp(),
   });
+
+  batch.set(
+    messageRef,
+    {
+      senderId:
+        applicant.uid,
+
+      senderName:
+        applicant.name?.trim() ||
+        "User",
+
+      text:
+        initialMessage,
+
+      createdAt:
+        serverTimestamp(),
+    }
+  );
 
   await batch.commit();
 
@@ -444,12 +547,14 @@ export async function startJobApplicationChat(params: {
 |--------------------------------------------------------------------------
 */
 
-export async function sendChatMessage(params: {
-  chatId: string;
-  senderId: string;
-  senderName: string;
-  text: string;
-}): Promise<void> {
+export async function sendChatMessage(
+  params: {
+    chatId: string;
+    senderId: string;
+    senderName: string;
+    text: string;
+  }
+): Promise<void> {
   const {
     chatId,
     senderId,
@@ -458,25 +563,11 @@ export async function sendChatMessage(params: {
   } = params;
 
   const cleanText =
-    text.trim();
-
-  if (!chatId || !senderId) {
-    throw new Error(
-      "Chat and sender are required."
+    validateMessage(
+      chatId,
+      senderId,
+      text
     );
-  }
-
-  if (!cleanText) {
-    throw new Error(
-      "Message cannot be empty."
-    );
-  }
-
-  if (cleanText.length > 5000) {
-    throw new Error(
-      "Message cannot exceed 5000 characters."
-    );
-  }
 
   const chatRef =
     doc(db, "chats", chatId);
@@ -515,11 +606,8 @@ export async function sendChatMessage(params: {
     );
   }
 
-  const unread =
+  const currentUnread =
     chat.unreadCount || {};
-
-  const batch =
-    writeBatch(db);
 
   const messageRef =
     doc(
@@ -531,32 +619,53 @@ export async function sendChatMessage(params: {
       )
     );
 
-  batch.set(messageRef, {
-    senderId,
-    senderName:
-      senderName || "User",
-    text: cleanText,
-    createdAt:
-      serverTimestamp(),
-    read: false,
-  });
+  const batch =
+    writeBatch(db);
 
-  batch.update(chatRef, {
-    lastMessage:
-      cleanText,
-    lastMessageAt:
-      serverTimestamp(),
-    lastSenderId:
+  batch.set(
+    messageRef,
+    {
       senderId,
-    unreadCount: {
-      ...unread,
-      [senderId]: 0,
-      [recipientUid]:
-        (unread[recipientUid] || 0) + 1,
-    },
-    updatedAt:
-      serverTimestamp(),
-  });
+
+      senderName:
+        senderName?.trim() ||
+        "User",
+
+      text:
+        cleanText,
+
+      createdAt:
+        serverTimestamp(),
+    }
+  );
+
+  batch.update(
+    chatRef,
+    {
+      lastMessage:
+        cleanText,
+
+      lastMessageAt:
+        serverTimestamp(),
+
+      lastSenderId:
+        senderId,
+
+      unreadCount: {
+        ...currentUnread,
+
+        [senderId]: 0,
+
+        [recipientUid]:
+          (currentUnread[
+            recipientUid
+          ] || 0) + 1,
+      },
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
 
   await batch.commit();
 }
@@ -605,6 +714,7 @@ export async function markChatAsRead(
         ...(chat.unreadCount || {}),
         [userId]: 0,
       },
+
       updatedAt:
         serverTimestamp(),
     }
@@ -647,4 +757,4 @@ export function getParticipantPhoto(
     chat.participantPhotos?.[uid] ||
     ""
   );
-}        
+}
