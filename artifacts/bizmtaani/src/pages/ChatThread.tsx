@@ -3,17 +3,13 @@ import { useLocation, useParams, Link } from "wouter";
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
-  addDoc,
-  updateDoc,
-  serverTimestamp,
   query,
   orderBy,
-  getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { apiBase } from "@/lib/apiUrl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,77 +17,29 @@ import {
   Send,
   Loader2,
   MessageCircle,
+  Briefcase,
+  User,
 } from "lucide-react";
+
+import {
+  sendChatMessage,
+  markChatAsRead,
+  getOtherParticipant,
+  getParticipantName,
+  getParticipantPhoto,
+  type ChatData,
+} from "@/lib/chatService";
 
 interface Message {
   id: string;
   senderId: string;
-  senderName: string;
+  senderName?: string;
   text: string;
-  createdAt: { seconds: number } | null;
-}
-
-interface Chat {
-  type?: "product" | "job_application" | "seller";
-
-  productId?: string;
-  productTitle?: string;
-  productImage?: string;
-
-  jobId?: string;
-  jobTitle?: string;
-  company?: string;
-
-  buyerId: string;
-  buyerName: string;
-
-  sellerId: string;
-  sellerName: string;
-
-  participants?: string[];
-}
-
-async function sendPushNotification(
-  recipientUid: string,
-  title: string,
-  body: string,
-  chatId: string
-) {
-  try {
-    const tokenDoc = await getDoc(
-      doc(db, "fcmTokens", recipientUid)
-    );
-
-    if (!tokenDoc.exists()) return;
-
-    const { token } = tokenDoc.data() as {
-      token: string;
-    };
-
-    if (!token) return;
-
-    await fetch(`${apiBase()}/api/notify`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        token,
-        title,
-        body,
-        data: {
-          chatUrl: `/chat/${chatId}`,
-        },
-      }),
-    });
-  } catch (error) {
-    // Notifications are best-effort.
-    // A notification failure should never break the chat.
-    console.error(
-      "Push notification failed:",
-      error
-    );
-  }
+  createdAt: {
+    seconds: number;
+    nanoseconds?: number;
+  } | null;
+  read?: boolean;
 }
 
 export default function ChatThread() {
@@ -104,7 +52,7 @@ export default function ChatThread() {
   const { user } = useAuth();
 
   const [chat, setChat] =
-    useState<Chat | null>(null);
+    useState<ChatData | null>(null);
 
   const [messages, setMessages] =
     useState<Message[]>([]);
@@ -126,18 +74,16 @@ export default function ChatThread() {
 
   /*
   |--------------------------------------------------------------------------
-  | LOAD CHAT + MESSAGES
+  | LOAD CHAT
   |--------------------------------------------------------------------------
   */
 
   useEffect(() => {
-    // User is not authenticated yet.
     if (!user) {
       setLoading(false);
       return;
     }
 
-    // Chat ID is missing from the URL.
     if (!chatId) {
       setError("Invalid chat.");
       setLoading(false);
@@ -155,7 +101,7 @@ export default function ChatThread() {
 
         /*
         |--------------------------------------------------------------------------
-        | STEP 1: LOAD CHAT DOCUMENT
+        | GET CHAT DOCUMENT
         |--------------------------------------------------------------------------
         */
 
@@ -168,7 +114,6 @@ export default function ChatThread() {
         const chatSnap =
           await getDoc(chatRef);
 
-        // Chat document doesn't exist.
         if (!chatSnap.exists()) {
           setError(
             "This conversation does not exist or may have been deleted."
@@ -179,17 +124,21 @@ export default function ChatThread() {
         }
 
         const chatData =
-          chatSnap.data() as Chat;
+          chatSnap.data() as ChatData;
 
         /*
         |--------------------------------------------------------------------------
-        | STEP 2: CHECK USER ACCESS
+        | CHECK PARTICIPATION
         |--------------------------------------------------------------------------
         */
 
         const isParticipant =
-  Array.isArray(chatData.participants) &&
-  chatData.participants.includes(user.uid);
+          Array.isArray(
+            chatData.participants
+          ) &&
+          chatData.participants.includes(
+            user.uid
+          );
 
         if (!isParticipant) {
           setError(
@@ -202,7 +151,7 @@ export default function ChatThread() {
 
         /*
         |--------------------------------------------------------------------------
-        | STEP 3: SAVE CHAT DATA
+        | SAVE CHAT
         |--------------------------------------------------------------------------
         */
 
@@ -210,7 +159,28 @@ export default function ChatThread() {
 
         /*
         |--------------------------------------------------------------------------
-        | STEP 4: LISTEN FOR MESSAGES IN REAL TIME
+        | MARK CHAT AS READ
+        |--------------------------------------------------------------------------
+        |
+        | Reset the current user's unread count.
+        |
+        */
+
+        try {
+          await markChatAsRead(
+            chatId,
+            user.uid
+          );
+        } catch (readError) {
+          console.error(
+            "Unable to mark chat as read:",
+            readError
+          );
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | LISTEN FOR MESSAGES
         |--------------------------------------------------------------------------
         */
 
@@ -235,10 +205,10 @@ export default function ChatThread() {
             (snap) => {
               const loadedMessages =
                 snap.docs.map(
-                  (d) =>
+                  (messageDoc) =>
                     ({
-                      id: d.id,
-                      ...d.data(),
+                      id: messageDoc.id,
+                      ...messageDoc.data(),
                     } as Message)
                 );
 
@@ -282,7 +252,7 @@ export default function ChatThread() {
 
     /*
     |--------------------------------------------------------------------------
-    | CLEANUP REAL-TIME LISTENER
+    | CLEANUP
     |--------------------------------------------------------------------------
     */
 
@@ -295,12 +265,16 @@ export default function ChatThread() {
 
   /*
   |--------------------------------------------------------------------------
-  | AUTO-SCROLL TO NEWEST MESSAGE
+  | AUTO-SCROLL TO LATEST MESSAGE
   |--------------------------------------------------------------------------
-  */
+    */
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({
+    if (!bottomRef.current) {
+      return;
+    }
+
+    bottomRef.current.scrollIntoView({
       behavior: "smooth",
     });
   }, [messages]);
@@ -325,105 +299,89 @@ export default function ChatThread() {
       return;
     }
 
-    setSending(true);
-
-    const msgText =
+    const messageText =
       text.trim();
 
-    // Clear input immediately.
+    setSending(true);
+
+    /*
+    |--------------------------------------------------------------------------
+    | CLEAR INPUT IMMEDIATELY
+    |--------------------------------------------------------------------------
+    */
+
     setText("");
 
     try {
       /*
       |--------------------------------------------------------------------------
-      | ADD MESSAGE
+      | SEND THROUGH CHAT SERVICE
       |--------------------------------------------------------------------------
+      |
+      | chatService handles:
+      |
+      | 1. Creating the message
+      | 2. Updating lastMessage
+      | 3. Updating lastMessageAt
+      | 4. Updating lastSenderId
+      | 5. Updating unread counts
+      |
       */
 
-      await addDoc(
-        collection(
-          db,
-          "chats",
-          chatId,
-          "messages"
-        ),
-        {
-          senderId: user.uid,
-          senderName:
-            user.displayName ||
-            "User",
-          text: msgText,
-          createdAt:
-            serverTimestamp(),
-        }
-      );
+      await sendChatMessage({
+        chatId,
+        senderId: user.uid,
+        senderName:
+          user.displayName ||
+          user.email ||
+          "User",
+        text: messageText,
+      });
 
       /*
       |--------------------------------------------------------------------------
-      | UPDATE LAST MESSAGE ON CHAT
+      | CHAT DOCUMENT WILL UPDATE THROUGH FIRESTORE REAL-TIME LISTENER
       |--------------------------------------------------------------------------
       */
 
-      await updateDoc(
-        doc(
-          db,
-          "chats",
-          chatId
-        ),
-        {
-          lastMessage: msgText,
-          lastMessageAt:
-            serverTimestamp(),
-          lastSenderId:
-            user.uid,
-        }
-      );
-
-      /*
-      |--------------------------------------------------------------------------
-      | SEND PUSH NOTIFICATION
-      |--------------------------------------------------------------------------
-        */
-
-      const recipientUid =
-  user.uid === chat.buyerId
-    ? chat.sellerId
-    : chat.buyerId;
-
-      const senderName =
-  user.displayName ||
-  "Someone";
-
-const chatContext =
-  chat.type === "job_application"
-    ? `Application: ${chat.jobTitle || "Job application"}`
-    : chat.productTitle || "New message";
-
-// Don't await this.
-// The message should remain successful
-// even if notification fails.
-sendPushNotification(
-  recipientUid,
-  `${senderName} — ${chatContext}`,
-  msgText,
-  chatId
-);
-    } catch (error: any) {
+    } catch (sendError: any) {
       console.error(
         "Error sending message:",
-        error
+        sendError
       );
 
-      // Restore message text if sending fails.
-      setText(msgText);
+      /*
+      |--------------------------------------------------------------------------
+      | RESTORE MESSAGE IF SEND FAILED
+      |--------------------------------------------------------------------------
+      */
+
+      setText(messageText);
 
       setError(
-        error?.message ||
+        sendError?.message ||
           "Unable to send message."
       );
     } finally {
       setSending(false);
     }
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | GET OTHER PARTICIPANT
+  |--------------------------------------------------------------------------
+  */
+
+  function getOtherUserId() {
+    if (!chat || !user) {
+      return null;
+    }
+
+    return getOtherParticipant(
+      chat,
+      user.uid
+    );
   }
 
   /*
@@ -434,12 +392,50 @@ sendPushNotification(
 
   function getOtherName() {
     if (!chat || !user) {
+      return "User";
+    }
+
+    const otherUserId =
+      getOtherParticipant(
+        chat,
+        user.uid
+      );
+
+    if (!otherUserId) {
+      return "User";
+    }
+
+    return getParticipantName(
+      chat,
+      otherUserId
+    );
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | GET OTHER USER PHOTO
+  |--------------------------------------------------------------------------
+  */
+
+  function getOtherPhoto() {
+    if (!chat || !user) {
       return "";
     }
 
-    return user.uid === chat.buyerId
-      ? chat.sellerName
-      : chat.buyerName;
+    const otherUserId =
+      getOtherParticipant(
+        chat,
+        user.uid
+      );
+
+    if (!otherUserId) {
+      return "";
+    }
+
+    return getParticipantPhoto(
+      chat,
+      otherUserId
+    );
   }
 
   /*
@@ -449,9 +445,17 @@ sendPushNotification(
   */
 
   function formatTime(
-    ts: { seconds: number } | null
+    ts:
+      | {
+          seconds: number;
+          nanoseconds?: number;
+        }
+      | null
+      | undefined
   ) {
-    if (!ts) return "";
+    if (!ts) {
+      return "";
+    }
 
     return new Date(
       ts.seconds * 1000
@@ -459,6 +463,46 @@ sendPushNotification(
       hour: "2-digit",
       minute: "2-digit",
     });
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | GET CHAT CONTEXT
+  |--------------------------------------------------------------------------
+  */
+
+  function getChatContext() {
+    if (!chat) {
+      return null;
+    }
+
+    if (
+      chat.type ===
+      "job_application"
+    ) {
+      return {
+        label: "Job Application",
+        title:
+          chat.jobTitle ||
+          "Job Application",
+      };
+    }
+
+    if (
+      chat.type === "product"
+    ) {
+      return {
+        label: "Product",
+        title:
+          chat.productTitle ||
+          "Product Chat",
+      };
+    }
+
+    return {
+      label: "Direct Message",
+      title: "Conversation",
+    };
   }
 
   /*
@@ -521,68 +565,157 @@ sendPushNotification(
 
   /*
   |--------------------------------------------------------------------------
+  | SAFETY CHECK
+  |--------------------------------------------------------------------------
+  */
+
+  if (!chat || !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-muted-foreground">
+          Conversation unavailable.
+        </p>
+      </div>
+    );
+  }
+
+  const otherName =
+    getOtherName();
+
+  const otherPhoto =
+    getOtherPhoto();
+
+  const chatContext =
+    getChatContext();
+
+  /*
+  |--------------------------------------------------------------------------
   | MAIN CHAT UI
   |--------------------------------------------------------------------------
   */
 
   return (
     <div className="flex flex-col h-screen bg-background">
+
+      {/* ================================================================ */}
       {/* HEADER */}
-<header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center gap-3 z-40">
-  <button
-    data-testid="button-back"
-    onClick={() =>
-      setLocation("/chats")
-    }
-    className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors"
-  >
-    <ChevronLeft size={22} />
-  </button>
+      {/* ================================================================ */}
 
-  <div className="flex-1 min-w-0">
-    <p
-      data-testid="text-chat-header-name"
-      className="font-bold text-sm truncate"
-    >
-      {getOtherName()}
-    </p>
+      <header className="flex-shrink-0 bg-card border-b border-border px-4 h-16 flex items-center gap-3 z-40">
 
-    {chat?.type === "job_application" ? (
-      <Link
-        href={`/jobs/${chat.jobId}`}
-        className="text-xs text-primary truncate block"
-      >
-        {chat.jobTitle} · {chat.company}
-      </Link>
-    ) : chat?.type === "product" && chat?.productTitle ? (
-      <Link
-        href={`/product/${chat.productId}`}
-        className="text-xs text-primary truncate block"
-        data-testid="link-product"
-      >
-        {chat.productTitle}
-      </Link>
-    ) : (
-      <span className="text-xs text-muted-foreground">
-        Seller
-      </span>
-    )}
-  </div>
-</header>
+        {/* BACK BUTTON */}
 
-      {/* MESSAGES */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-        {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground text-sm">
-              Send a message to start the conversation
-            </p>
-          </div>
+        <button
+          data-testid="button-back"
+          onClick={() =>
+            setLocation("/chats")
+          }
+          className="p-1 -ml-1 rounded-lg hover:bg-muted transition-colors"
+        >
+          <ChevronLeft size={22} />
+        </button>
+
+        {/* PROFILE IMAGE */}
+
+        {otherPhoto ? (
+          <img
+            src={otherPhoto}
+            alt={otherName}
+            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+          />
         ) : (
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <User
+              size={20}
+              className="text-primary"
+            />
+          </div>
+        )}
+
+        {/* CHAT INFORMATION */}
+
+        <div className="flex-1 min-w-0">
+
+          <p
+            data-testid="text-chat-header-name"
+            className="font-bold text-sm truncate"
+          >
+            {otherName}
+          </p>
+
+          {chatContext && (
+            <>
+              {chat.type ===
+                "job_application" &&
+              chat.jobId ? (
+                <Link
+                  href={`/jobs/${chat.jobId}`}
+                  className="text-xs text-primary truncate block"
+                >
+                  {chatContext.label} ·{" "}
+                  {chatContext.title}
+                </Link>
+              ) : chat.type ===
+                  "product" &&
+                chat.productId ? (
+                <Link
+                  href={`/product/${chat.productId}`}
+                  className="text-xs text-primary truncate block"
+                  data-testid="link-product"
+                >
+                  {chatContext.label} ·{" "}
+                  {chatContext.title}
+                </Link>
+              ) : (
+                <span className="text-xs text-muted-foreground">
+                  {chatContext.label}
+                </span>
+              )}
+            </>
+          )}
+
+        </div>
+      </header>
+
+      {/* ================================================================ */}
+      {/* MESSAGES */}
+      {/* ================================================================ */}
+
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+
+        {messages.length === 0 ? (
+
+          <div className="flex flex-col items-center justify-center h-full gap-3">
+
+            {chat.type ===
+            "job_application" ? (
+              <Briefcase
+                size={40}
+                className="text-muted-foreground"
+              />
+            ) : (
+              <MessageCircle
+                size={40}
+                className="text-muted-foreground"
+              />
+            )}
+
+            <p className="text-muted-foreground text-sm text-center">
+              {chat.type ===
+              "job_application"
+                ? "Start the conversation about this job application."
+                : "Send a message to start the conversation."}
+            </p>
+
+          </div>
+
+        ) : (
+
           messages.map((msg) => {
+
             const isMine =
               msg.senderId ===
-              user?.uid;
+              user.uid;
 
             return (
               <div
@@ -594,6 +727,7 @@ sendPushNotification(
                     : "justify-start"
                 }`}
               >
+
                 <div
                   className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
                     isMine
@@ -601,9 +735,26 @@ sendPushNotification(
                       : "bg-card border border-border rounded-bl-md"
                   }`}
                 >
-                  <p className="text-sm leading-relaxed break-words">
+
+                  {/* SENDER NAME FOR OTHER USER */}
+
+                  {!isMine && (
+                    <p className="text-[10px] font-bold mb-1 opacity-70">
+                      {msg.senderName ||
+                        getParticipantName(
+                          chat,
+                          msg.senderId
+                        )}
+                    </p>
+                  )}
+
+                  {/* MESSAGE */}
+
+                  <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
                     {msg.text}
                   </p>
+
+                  {/* TIME */}
 
                   <p
                     className={`text-[10px] mt-1 ${
@@ -616,16 +767,35 @@ sendPushNotification(
                       msg.createdAt
                     )}
                   </p>
+
                 </div>
+
               </div>
             );
           })
+
         )}
 
         <div ref={bottomRef} />
+
       </div>
 
+      {/* ================================================================ */}
+      {/* ERROR MESSAGE */}
+      {/* ================================================================ */}
+
+      {error && (
+        <div className="flex-shrink-0 px-4 py-2 bg-destructive/10 border-t border-destructive/20">
+          <p className="text-xs text-destructive text-center">
+            {error}
+          </p>
+        </div>
+      )}
+
+      {/* ================================================================ */}
       {/* MESSAGE INPUT */}
+      {/* ================================================================ */}
+
       <form
         onSubmit={sendMessage}
         className="flex-shrink-0 flex items-center gap-2 px-4 py-3 bg-card border-t border-border"
@@ -634,6 +804,7 @@ sendPushNotification(
             "calc(0.75rem + env(safe-area-inset-bottom))",
         }}
       >
+
         <Input
           data-testid="input-message"
           placeholder="Type a message..."
@@ -643,6 +814,7 @@ sendPushNotification(
           }
           className="flex-1 h-11 rounded-full"
           autoComplete="off"
+          disabled={sending}
         />
 
         <Button
@@ -655,6 +827,7 @@ sendPushNotification(
             sending
           }
         >
+
           {sending ? (
             <Loader2
               size={16}
@@ -663,8 +836,11 @@ sendPushNotification(
           ) : (
             <Send size={16} />
           )}
+
         </Button>
+
       </form>
+
     </div>
   );
-  }
+}
