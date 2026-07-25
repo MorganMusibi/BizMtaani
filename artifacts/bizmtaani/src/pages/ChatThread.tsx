@@ -1,46 +1,47 @@
 import { useEffect, useRef, useState, } from "react";
-
 import { collection, doc, onSnapshot, orderBy, query, } from "firebase/firestore";
-
 import { useLocation, useParams, Link, } from "wouter";
-
 import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
-
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-
 import { sendChatMessage, markChatAsRead, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
 } from "@/lib/chatService";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
 
 /*
 |--------------------------------------------------------------------------
 | TYPES
 |--------------------------------------------------------------------------
 */
-
 interface Message {
   id: string;
   senderId: string;
   senderName?: string;
   text: string;
+
   createdAt?: {
     seconds: number;
     nanoseconds?: number;
   } | null;
-}
 
+  deliveredAt?: {
+    seconds: number;
+    nanoseconds?: number;
+  } | null;
+
+  readAt?: {
+    seconds: number;
+    nanoseconds?: number;
+  } | null;
+}
 
 /*
 |--------------------------------------------------------------------------
 | CHAT THREAD
 |--------------------------------------------------------------------------
 */
-
 export default function ChatThread() {
 
   /*
@@ -57,8 +58,7 @@ export default function ChatThread() {
   const [, setLocation] =
     useLocation();
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | AUTHENTICATION
   |--------------------------------------------------------------------------
@@ -67,8 +67,7 @@ export default function ChatThread() {
   const { user } =
     useAuth();
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | STATE
   |--------------------------------------------------------------------------
@@ -95,8 +94,7 @@ export default function ChatThread() {
   const [sendError, setSendError] =
     useState("");
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | REFS
   |--------------------------------------------------------------------------
@@ -107,8 +105,7 @@ export default function ChatThread() {
   const inputRef =
   useRef<HTMLInputElement>(null);
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | LOAD CHAT + REAL-TIME LISTENERS
   |--------------------------------------------------------------------------
@@ -256,8 +253,6 @@ export default function ChatThread() {
           setLoading(false);
         }
       );
-
-
     /*
     |--------------------------------------------------------------------------
     | MESSAGES LISTENER
@@ -331,8 +326,6 @@ export default function ChatThread() {
           setLoading(false);
         }
       );
-
-
     /*
     |--------------------------------------------------------------------------
     | CLEANUP
@@ -351,9 +344,7 @@ export default function ChatThread() {
     user,
     chatId,
   ]);
-
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | AUTO-SCROLL
   |--------------------------------------------------------------------------
@@ -484,9 +475,7 @@ export default function ChatThread() {
     }
 
   }
-
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | GET OTHER PARTICIPANT
   |--------------------------------------------------------------------------
@@ -500,8 +489,7 @@ export default function ChatThread() {
         )
       : null;
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | OTHER USER NAME
   |--------------------------------------------------------------------------
@@ -515,8 +503,7 @@ export default function ChatThread() {
         )
       : "User";
 
-
-  /*
+ /*
   |--------------------------------------------------------------------------
   | OTHER USER PHOTO
   |--------------------------------------------------------------------------
@@ -530,8 +517,7 @@ export default function ChatThread() {
         )
       : "";
 
-
-  /*
+ /*
   |--------------------------------------------------------------------------
   | CHAT CONTEXT
   |--------------------------------------------------------------------------
@@ -585,8 +571,7 @@ export default function ChatThread() {
 
   }
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | FORMAT TIME
   |--------------------------------------------------------------------------
@@ -621,8 +606,7 @@ export default function ChatThread() {
 
   }
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | LOADING
   |--------------------------------------------------------------------------
@@ -651,8 +635,7 @@ export default function ChatThread() {
 
   }
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | FATAL ERROR
   |--------------------------------------------------------------------------
@@ -695,8 +678,7 @@ export default function ChatThread() {
 
   }
 
-
-  /*
+ /*
   |--------------------------------------------------------------------------
   | SAFETY CHECK
   |--------------------------------------------------------------------------
@@ -723,8 +705,7 @@ export default function ChatThread() {
   const chatContext =
     getChatContext();
 
-
-  /*
+/*
   |--------------------------------------------------------------------------
   | MAIN UI
   |--------------------------------------------------------------------------
@@ -732,7 +713,6 @@ export default function ChatThread() {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-
 
       {/* ================================================================
           HEADER
