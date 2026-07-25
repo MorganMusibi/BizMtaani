@@ -604,20 +604,24 @@ export async function sendChatMessage(params: {
 
   batch.set(messageRef, {
 
-    senderId,
+  senderId,
 
-    senderName:
-      senderName ||
-      "User",
+  senderName:
+    senderName ||
+    "User",
 
-    text:
-      cleanText,
+  text:
+    cleanText,
 
-    createdAt:
-      serverTimestamp(),
+  createdAt:
+    serverTimestamp(),
 
-    read: false,
-  });
+  deliveredAt:
+    null,
+
+  readAt:
+    null,
+});
 
   batch.update(chatRef, {
 
