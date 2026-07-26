@@ -23,6 +23,7 @@ interface Message {
   
   deletedFor?: string[];
   deletedForEveryone?: boolean;
+  forwarded?: boolean;
 
   replyTo?: ReplyTo | null;
 
@@ -312,7 +313,10 @@ const [selectedMessage, setSelectedMessage] =
     data.deletedFor || [],
 
   deletedForEveryone:
-    data.deletedForEveryone || false,               
+    data.deletedForEveryone || false,   
+
+    forwarded:
+    data.forwarded || false,                
 
 replyTo:
   data.replyTo || null,
