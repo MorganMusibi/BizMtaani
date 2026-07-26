@@ -1310,14 +1310,18 @@ async function handleReportMessage() {
 </button>
 
             <button
-              type="button"
-              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
-              onClick={() => {
-                setSelectedMessage(null);
-              }}
-            >
-              ➡️ Forward
-            </button>
+  type="button"
+  className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+  onClick={() => {
+    setForwardingMessage(
+      selectedMessage
+    );
+
+    setSelectedMessage(null);
+  }}
+>
+  ➡️ Forward
+</button>
 
             <button
               type="button"
@@ -1386,6 +1390,60 @@ async function handleReportMessage() {
 
         </div>
       )}
+      {forwardingMessage && (
+  <div
+    className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+    onClick={() =>
+      setForwardingMessage(null)
+    }
+  >
+
+    <div
+      className="w-full max-w-md bg-card rounded-t-2xl p-4 shadow-xl"
+      onClick={(event) =>
+        event.stopPropagation()
+      }
+    >
+
+      <div className="flex items-center justify-between mb-4">
+
+        <h3 className="font-bold text-base">
+          Forward message
+        </h3>
+
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground text-lg"
+          onClick={() =>
+            setForwardingMessage(null)
+          }
+          aria-label="Cancel forwarding"
+        >
+          ×
+        </button>
+
+      </div>
+
+      <div className="mb-4 p-3 rounded-xl bg-muted">
+
+        <p className="text-xs text-muted-foreground mb-1">
+          Message to forward
+        </p>
+
+        <p className="text-sm break-words">
+          {forwardingMessage.text}
+        </p>
+
+      </div>
+
+      <p className="text-sm text-muted-foreground text-center">
+        Select a conversation to forward this message.
+      </p>
+
+    </div>
+
+  </div>
+)}
 
 
       {/* ================================================================
