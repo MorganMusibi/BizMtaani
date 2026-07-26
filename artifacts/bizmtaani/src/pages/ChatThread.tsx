@@ -5,8 +5,8 @@ import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
-type ReplyTo, } from "@/lib/chatService";
+import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, deleteMessageForMe,
+  deleteMessageForEveryone, reportMessage, type ChatData, type ReplyTo, } from "@/lib/chatService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -741,6 +741,105 @@ function handleMessagePressEnd() {
     );
 
     longPressTimerRef.current = null;
+  }
+}
+  async function handleDeleteForMe() {
+  if (
+    !selectedMessage ||
+    !user ||
+    !chatId
+  ) {
+    return;
+  }
+
+  try {
+    await deleteMessageForMe(
+      chatId,
+      selectedMessage.id,
+      user.uid
+    );
+
+    setSelectedMessage(null);
+
+  } catch (error) {
+
+    console.error(
+      "Unable to delete message for me:",
+      error
+    );
+
+    setSendError(
+      "Unable to delete this message. Please try again."
+    );
+  }
+}
+
+
+async function handleDeleteForEveryone() {
+  if (
+    !selectedMessage ||
+    !user ||
+    !chatId
+  ) {
+    return;
+  }
+
+  try {
+    await deleteMessageForEveryone(
+      chatId,
+      selectedMessage.id,
+      user.uid
+    );
+
+    setSelectedMessage(null);
+
+  } catch (error) {
+
+    console.error(
+      "Unable to delete message for everyone:",
+      error
+    );
+
+    setSendError(
+      "Unable to delete this message for everyone."
+    );
+  }
+}
+
+
+async function handleReportMessage() {
+  if (
+    !selectedMessage ||
+    !user ||
+    !chatId
+  ) {
+    return;
+  }
+
+  try {
+    await reportMessage(
+      chatId,
+      selectedMessage.id,
+      user.uid,
+      "Reported from chat"
+    );
+
+    setSelectedMessage(null);
+
+    setSendError(
+      "Message reported successfully."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Unable to report message:",
+      error
+    );
+
+    setSendError(
+      "Unable to report this message. Please try again."
+    );
   }
 }
 
