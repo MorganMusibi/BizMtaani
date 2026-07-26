@@ -316,14 +316,30 @@ export async function startProductChat(params: {
     doc(db, "chats", chatId);
 
   const existingChat =
-    await getDoc(chatRef);
+  await getDoc(chatRef);
 
-  if (existingChat.exists()) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
+if (existingChat.exists()) {
+  await updateDoc(chatRef, {
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    productTitle,
+
+    productImage:
+      productImage || "",
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  return {
+    chatId,
+    created: false,
+  };
+}
 
   await setDoc(chatRef, {
     type: "product",
@@ -394,17 +410,32 @@ export async function startJobApplicationChat(params: {
   }
 
   const participants = sortedParticipants(applicant.uid, employer.uid);
-  const chatId = getJobChatId(jobId, applicant.uid, employer.uid);
-  const chatRef = doc(db, "chats", chatId);
+const chatId = getJobChatId(jobId, applicant.uid, employer.uid);
+const chatRef = doc(db, "chats", chatId);
 
-  const existingChat = await getDoc(chatRef);
+const existingChat = await getDoc(chatRef);
 
-  if (existingChat.exists()) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
+if (existingChat.exists()) {
+  await updateDoc(chatRef, {
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    jobTitle,
+
+    company,
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  return {
+    chatId,
+    created: false,
+  };
+}
 
   const initialMessage = `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
   const users = [applicant, employer];
