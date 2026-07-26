@@ -441,22 +441,22 @@ if (user) {
       (snapshot) => {
 
         const loadedChats =
-  snapshot.docs.map(
-    (chatDoc) => ({
-      id:
-        chatDoc.id,
-
-      ...chatDoc.data(),
-    } as ChatData & {
-      id: string;
-    })
-  );
+  snapshot.docs
+    .map(
+      (chatDoc) => ({
+        id: chatDoc.id,
+        ...chatDoc.data(),
+      } as ChatData & {
+        id: string;
+      })
+    )
+    .filter(
+      (chat) =>
+        chat.id !== chatId
+    );
 
 setForwardChats(
-  loadedChats.filter(
-    (forwardChat) =>
-      forwardChat.id !== chatId
-  )
+  loadedChats
 );
       },
       (firebaseError) => {
