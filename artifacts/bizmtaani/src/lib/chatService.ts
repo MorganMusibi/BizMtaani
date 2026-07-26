@@ -910,9 +910,13 @@ export async function markChatAsRead(
 
     }
   );
-
-  // Do not update the chat document here.
-// Message read receipts are handled below.
+batch.update(
+  messageDoc.ref,
+  {
+    readAt:
+      serverTimestamp(),
+  }
+);
 
   await batch.commit();
 }
