@@ -948,130 +948,125 @@ if (user) {
 
         ) : (
 
-          messages.map(
-  (message, index) => {
+                  messages.map(
+            (message, index) => {
 
-    const isMine =
-      message.senderId ===
-      user.uid;
+              const isMine =
+                message.senderId === user.uid;
 
-    const currentDate =
-      formatMessageDate(
-        message.createdAt
-      );
+              const currentDate =
+                formatMessageDate(
+                  message.createdAt
+                );
 
-    const previousDate =
-      index > 0
-        ? formatMessageDate(
-            messages[index - 1]
-              .createdAt
-          )
-        : null;
+              const previousDate =
+                index > 0
+                  ? formatMessageDate(
+                      messages[index - 1].createdAt
+                    )
+                  : null;
 
-    const showDateSeparator =
-      currentDate !==
-      previousDate;
+              const showDateSeparator =
+                currentDate !== previousDate;
 
-    return (
-  <div
-    key={message.id}
-  >
+              return (
+                <div
+                  key={message.id}
+                >
 
-    {showDateSeparator && (
-      <div className="flex items-center justify-center my-4">
-        <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
-          {currentDate}
-        </span>
-      </div>
-    )}
-
-    <div
-      data-testid={`message-${message.id}`}
-      className={`flex ${
-        isMine
-          ? "justify-end"
-          : "justify-start"
-      }`}
-    >
+                  {showDateSeparator && (
+                    <div className="flex items-center justify-center my-4">
+                      <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
+                        {currentDate}
+                      </span>
+                    </div>
+                  )}
 
                   <div
-                    className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
+                    data-testid={`message-${message.id}`}
+                    className={`flex ${
                       isMine
-                        ? "bg-primary text-white rounded-br-md"
-                        : "bg-card border border-border rounded-bl-md"
+                        ? "justify-end"
+                        : "justify-start"
                     }`}
                   >
 
-                    {!isMine && (
+                    <div
+                      className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
+                        isMine
+                          ? "bg-primary text-white rounded-br-md"
+                          : "bg-card border border-border rounded-bl-md"
+                      }`}
+                    >
 
-                      <p className="text-[10px] font-bold mb-1 opacity-70">
-                        {message.senderName ||
-                          getParticipantName(
-                            chat,
-                            message.senderId
-                          )}
+                      {!isMine && (
+                        <p className="text-[10px] font-bold mb-1 opacity-70">
+                          {message.senderName ||
+                            getParticipantName(
+                              chat,
+                              message.senderId
+                            )}
+                        </p>
+                      )}
+
+                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
+                        {message.text}
                       </p>
 
-                    )}
+                      <div
+                        className={`flex items-center gap-1 mt-1 ${
+                          isMine
+                            ? "justify-end"
+                            : "justify-start"
+                        }`}
+                      >
 
+                        <p
+                          className={`text-[10px] ${
+                            isMine
+                              ? "text-white/60"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {formatMessageTime(
+                            message.createdAt
+                          )}
+                        </p>
 
-                    <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                      {message.text}
-                    </p>
+                        {isMine && (
+                          <span
+                            className={`text-[11px] font-semibold ${
+                              getMessageStatus(
+                                message
+                              ).className
+                            }`}
+                            aria-label={
+                              message.readAt
+                                ? "Read"
+                                : message.deliveredAt
+                                ? "Delivered"
+                                : "Sent"
+                            }
+                          >
+                            {
+                              getMessageStatus(
+                                message
+                              ).icon
+                            }
+                          </span>
+                        )}
 
-<div
-  className={`flex items-center gap-1 mt-1 ${
-    isMine
-      ? "justify-end"
-      : "justify-start"
-  }`}
->
-  <p
-    className={`text-[10px] ${
-      isMine
-        ? "text-white/60"
-        : "text-muted-foreground"
-    }`}
-  >
-    {formatMessageTime(
-      message.createdAt
-    )}
-  </p>
+                      </div>
 
-  {isMine && (
-    <span
-      className={`text-[11px] font-semibold ${
-        getMessageStatus(
-          message
-        ).className
-      }`}
-      aria-label={
-        message.readAt
-          ? "Read"
-          : message.deliveredAt
-          ? "Delivered"
-          : "Sent"
-      }
-    >
-      {
-        getMessageStatus(
-          message
-        ).icon
-      }
-    </span>
-  )}
-</div>
+                    </div>
 
                   </div>
 
                 </div>
-
               );
 
             }
           )
-
-        )}
 
         <div
           ref={bottomRef}
