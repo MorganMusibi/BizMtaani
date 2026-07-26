@@ -702,8 +702,58 @@ export async function forwardChatMessage(params: {
     );
   }
 
-    const forwardedText =
-    originalMessage.text?.trim();
+      const originalMessageId =
+    (originalMessage as ChatMessage & {
+      messageId?: string;
+    }).messageId;
+
+  if (!originalMessageId) {
+    throw new Error(
+      "The original message could not be identified."
+    );
+  }
+
+  const originalMessageRef =
+    doc(
+      db,
+      "chats",
+      sourceChatId,
+      "messages",
+      originalMessageId
+    );
+
+  const originalMessageSnap =
+    await getDoc(
+      originalMessageRef
+    );
+
+  if (!originalMessageSnap.exists()) {
+    throw new Error(
+      "The original message no longer exists."
+    );
+  }
+
+  const verifiedOriginalMessage =
+    originalMessageSnap.data() as ChatMessage;
+
+  if (
+    verifiedOriginalMessage.senderId !== senderId
+    &&
+    !sourceChat.participants?.includes(senderId)
+  ) {
+    throw new Error(
+      "You cannot forward this message."
+    );
+  }
+
+  const forwardedText =
+    verifiedOriginalMessage.text?.trim();
+
+  if (!forwardedText) {
+    throw new Error(
+      "The message cannot be forwarded because it has no text."
+    );
+  }
 
   if (!forwardedText) {
     throw new Error(
