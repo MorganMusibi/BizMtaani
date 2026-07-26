@@ -1054,6 +1054,7 @@ if (user) {
       }
     >
       {
+      {
         getMessageStatus(
           message
         ).icon
@@ -1072,7 +1073,6 @@ if (user) {
           )
 
         )}
-
 
         <div
           ref={bottomRef}
