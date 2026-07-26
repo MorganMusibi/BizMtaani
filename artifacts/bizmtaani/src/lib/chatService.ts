@@ -627,6 +627,37 @@ export async function forwardChatMessage(params: {
     );
   }
 
+    const sourceChatRef =
+    doc(
+      db,
+      "chats",
+      sourceChatId
+    );
+
+  const sourceChatSnap =
+    await getDoc(
+      sourceChatRef
+    );
+
+  if (!sourceChatSnap.exists()) {
+    throw new Error(
+      "The source conversation no longer exists."
+    );
+  }
+
+  const sourceChat =
+    sourceChatSnap.data() as ChatData;
+
+  if (
+    !sourceChat.participants?.includes(
+      senderId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in the source conversation."
+    );
+  }
+
   const targetChatRef =
     doc(
       db,
@@ -640,10 +671,11 @@ export async function forwardChatMessage(params: {
     );
 
   if (!chatSnap.exists()) {
-        throw new Error(
-      "Source chat, target chat, and sender are required."
+    throw new Error(
+      "The selected conversation no longer exists."
     );
   }
+  
 
   const targetChat =
     chatSnap.data() as ChatData;
