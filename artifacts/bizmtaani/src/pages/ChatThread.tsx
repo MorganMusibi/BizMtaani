@@ -1306,6 +1306,11 @@ async function handleForwardMessage(
       )}
   </p>
 )}
+ {message.forwarded && !message.deletedForEveryone && (
+  <p className="text-[10px] italic opacity-60 mb-1">
+    ↪ Forwarded
+  </p>
+)}                     
 
 {message.replyTo && !message.deletedForEveryone && (
   <div className="mb-2 border-l-2 border-primary/60 bg-black/5 dark:bg-white/5 rounded-r-md px-2 py-1.5">
