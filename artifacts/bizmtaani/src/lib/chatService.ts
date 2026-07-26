@@ -48,21 +48,25 @@ export interface ChatData {
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
+export interface ReplyTo {
+  messageId: string;
+  senderId: string;
+  senderName?: string;
+  text: string;
+}
+
 export interface ChatMessage {
   senderId: string;
   senderName?: string;
   text: string;
+
+  replyTo?: ReplyTo | null;
 
   createdAt?: Timestamp | null;
 
   deliveredAt?: Timestamp | null;
 
   readAt?: Timestamp | null;
-}
-
-export interface StartChatResult {
-  chatId: string;
-  created: boolean;
 }
 
 /*
@@ -513,14 +517,16 @@ export async function sendChatMessage(params: {
   senderId: string;
   senderName: string;
   text: string;
+  replyTo?: ReplyTo | null;
 }): Promise<void> {
 
   const {
-    chatId,
-    senderId,
-    senderName,
-    text,
-  } = params;
+  chatId,
+  senderId,
+  senderName,
+  text,
+  replyTo,
+} = params;
 
   const cleanText =
     text.trim();
@@ -611,6 +617,9 @@ export async function sendChatMessage(params: {
   text:
     cleanText,
 
+  replyTo:
+    replyTo || null,
+
   createdAt:
     serverTimestamp(),
 
@@ -620,6 +629,7 @@ export async function sendChatMessage(params: {
   readAt:
     null,
 });
+
 
   batch.update(chatRef, {
 
