@@ -667,8 +667,14 @@ export async function forwardChatMessage(params: {
     );
   }
 
-  const forwardedText =
-    originalMessage.text;
+    const forwardedText =
+    originalMessage.text?.trim();
+
+  if (!forwardedText) {
+    throw new Error(
+      "The message cannot be forwarded because it has no text."
+    );
+  }
 
   const unread =
     targetChat.unreadCount || {};
@@ -704,7 +710,10 @@ export async function forwardChatMessage(params: {
       deliveredAt:
         null,
 
-      readAt:
+            readAt:
+        null,
+
+      replyTo:
         null,
 
       forwarded:
