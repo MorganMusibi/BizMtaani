@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   startJobApplicationChat,
-  ChatParticipant,
+  type ChatParticipant,
 } from "@/lib/chatService";
 import type { JobPost } from "./Jobs";
 
