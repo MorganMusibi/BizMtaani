@@ -953,6 +953,8 @@ if (user) {
 
               const isMine =
                 message.senderId === user.uid;
+              const messageStatus =
+  getMessageStatus(message);
 
               const currentDate =
                 formatMessageDate(
@@ -1035,11 +1037,9 @@ if (user) {
 
                         {isMine && (
                           <span
-                            className={`text-[11px] font-semibold ${
-                              getMessageStatus(
-                                message
-                              ).className
-                            }`}
+  className={`text-[11px] font-semibold ${
+    messageStatus.className
+  }`}
                             aria-label={
                               message.readAt
                                 ? "Read"
@@ -1049,10 +1049,8 @@ if (user) {
                             }
                           >
                             {
-                              getMessageStatus(
-                                message
-                              ).icon
-                            }
+  messageStatus.icon
+}
                           </span>
                         )}
 
