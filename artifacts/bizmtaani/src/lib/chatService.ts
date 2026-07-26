@@ -602,27 +602,26 @@ export async function sendChatMessage(params: {
 */
 
 export async function forwardChatMessage(params: {
+  sourceChatId: string;
   targetChatId: string;
   senderId: string;
   senderName: string;
   originalMessage: ChatMessage;
 }): Promise<void> {
 
-  const {
+    const {
+    sourceChatId,
     targetChatId,
     senderId,
     senderName,
     originalMessage,
   } = params;
-
-  if (
+  
+    if (
+    !sourceChatId ||
     !targetChatId ||
     !senderId
   ) {
-    throw new Error(
-      "Target chat and sender are required."
-    );
-  }
 
   const targetChatRef =
     doc(
@@ -637,8 +636,8 @@ export async function forwardChatMessage(params: {
     );
 
   if (!chatSnap.exists()) {
-    throw new Error(
-      "The selected conversation no longer exists."
+        throw new Error(
+      "Source chat, target chat, and sender are required."
     );
   }
 
