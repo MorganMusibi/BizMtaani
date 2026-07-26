@@ -1298,14 +1298,12 @@ async function handleReportMessage() {
               user.uid && (
 
               <button
-                type="button"
-                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
-                onClick={() => {
-                  setSelectedMessage(null);
-                }}
-              >
-                🗑️ Delete for me
-              </button>
+  type="button"
+  className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+  onClick={handleDeleteForMe}
+>
+  🗑️ Delete for me
+</button>
 
             )}
 
@@ -1313,14 +1311,12 @@ async function handleReportMessage() {
               user.uid && (
 
               <button
-                type="button"
-                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
-                onClick={() => {
-                  setSelectedMessage(null);
-                }}
-              >
-                🗑️ Delete for everyone
-              </button>
+  type="button"
+  className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+  onClick={handleDeleteForEveryone}
+>
+  🗑️ Delete for everyone
+</button>
 
             )}
 
@@ -1328,14 +1324,12 @@ async function handleReportMessage() {
               user.uid && (
 
               <button
-                type="button"
-                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
-                onClick={() => {
-                  setSelectedMessage(null);
-                }}
-              >
-                🚩 Report
-              </button>
+  type="button"
+  className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+  onClick={handleReportMessage}
+>
+  🚩 Report
+</button>
 
             )}
 
