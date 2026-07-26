@@ -1054,7 +1054,6 @@ if (user) {
       }
     >
       {
-      {
         getMessageStatus(
           message
         ).icon
