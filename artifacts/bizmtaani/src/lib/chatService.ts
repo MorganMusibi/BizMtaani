@@ -843,6 +843,18 @@ export async function markChatAsRead(
     }
   );
 
+    batch.update(
+    chatRef,
+    {
+      unreadCount: {
+        ...(chat.unreadCount || {}),
+        [userId]: 0,
+      },
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
+
   await batch.commit();
 }
 /*
@@ -906,14 +918,19 @@ export async function markMessagesAsDelivered(
     );
 
   const messagesQuery =
-    query(
-      messagesRef,
-      where(
-        "senderId",
-        "==",
-        otherUserId
-      )
-    );
+  query(
+    messagesRef,
+    where(
+      "senderId",
+      "==",
+      otherUserId
+    ),
+    where(
+      "readAt",
+      "==",
+      null
+    )
+  );
 
   const messagesSnap =
     await getDocs(
