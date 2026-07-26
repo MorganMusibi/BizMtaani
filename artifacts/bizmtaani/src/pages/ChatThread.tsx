@@ -1156,30 +1156,26 @@ async function handleReportMessage() {
                   >
 
                     <div
-  onTouchStart={() =>
-    handleMessagePressStart(message)
-  }
-  onTouchEnd={
-    handleMessagePressEnd
-  }
-  onTouchCancel={
-    handleMessagePressEnd
-  }
-  onMouseDown={() =>
-    handleMessagePressStart(message)
-  }
-  onMouseUp={
-    handleMessagePressEnd
-  }
-  onMouseLeave={
-    handleMessagePressEnd
-  }
+  onTouchStart={() => {
+    if (!message.deletedForEveryone) {
+      handleMessagePressStart(message);
+    }
+  }}
+  onTouchEnd={handleMessagePressEnd}
+  onTouchCancel={handleMessagePressEnd}
+  onMouseDown={() => {
+    if (!message.deletedForEveryone) {
+      handleMessagePressStart(message);
+    }
+  }}
+  onMouseUp={handleMessagePressEnd}
+  onMouseLeave={handleMessagePressEnd}
   className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
-                        isMine
-                       ? "bg-primary text-white rounded-br-md"
-                       : "bg-muted border border-border rounded-bl-md"
-                      }`}
-                    >
+    isMine
+      ? "bg-primary text-white rounded-br-md"
+      : "bg-muted border border-border rounded-bl-md"
+  }`}
+>
 
                       {!isMine && (
                         <p className="text-[10px] font-bold mb-1 opacity-70">
@@ -1191,9 +1187,18 @@ async function handleReportMessage() {
                         </p>
                       )}
 
-                      <p className="text-sm leading-relaxed break-words whitespace-pre-wrap">
-                        {message.text}
-                      </p>
+                      <p
+  className={`text-sm leading-relaxed break-words whitespace-pre-wrap ${
+    message.deletedForEveryone
+      ? "italic opacity-60"
+      : ""
+  }`}
+>
+  {message.deletedForEveryone
+    ? "🚫 This message was deleted."
+    : message.text}
+</p>
+                      {!message.deletedForEveryone && (
 
                       <div
                         className={`flex items-center gap-1 mt-1 ${
@@ -1235,6 +1240,7 @@ async function handleReportMessage() {
                         )}
 
                       </div>
+  )}
 
                     </div>
 
