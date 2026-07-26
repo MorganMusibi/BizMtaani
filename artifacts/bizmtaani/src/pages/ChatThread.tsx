@@ -93,7 +93,8 @@ export default function ChatThread() {
 
   const [sendError, setSendError] =
     useState("");
-
+const [selectedMessage, setSelectedMessage] =
+  useState<Message | null>(null);
 /*
   |--------------------------------------------------------------------------
   | REFS
@@ -104,6 +105,8 @@ export default function ChatThread() {
     useRef<HTMLDivElement>(null);
   const inputRef =
   useRef<HTMLInputElement>(null);
+  const longPressTimerRef =
+  useRef<ReturnType<typeof setTimeout> | null>(null);
 
 /*
   |--------------------------------------------------------------------------
@@ -693,6 +696,24 @@ if (user) {
     className: "text-white/60",
   };
   }
+  function handleMessagePressStart(
+  message: Message
+) {
+  longPressTimerRef.current =
+    setTimeout(() => {
+      setSelectedMessage(message);
+    }, 600);
+}
+
+function handleMessagePressEnd() {
+  if (longPressTimerRef.current) {
+    clearTimeout(
+      longPressTimerRef.current
+    );
+
+    longPressTimerRef.current = null;
+  }
+}
 
 /*
   |--------------------------------------------------------------------------
@@ -994,7 +1015,25 @@ if (user) {
                   >
 
                     <div
-                      className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
+  onTouchStart={() =>
+    handleMessagePressStart(message)
+  }
+  onTouchEnd={
+    handleMessagePressEnd
+  }
+  onTouchCancel={
+    handleMessagePressEnd
+  }
+  onMouseDown={() =>
+    handleMessagePressStart(message)
+  }
+  onMouseUp={
+    handleMessagePressEnd
+  }
+  onMouseLeave={
+    handleMessagePressEnd
+  }
+  className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
                         isMine
                        ? "bg-primary text-white rounded-br-md"
                        : "bg-muted border border-border rounded-bl-md"
