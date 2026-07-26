@@ -993,12 +993,6 @@ if (user) {
           : "justify-start"
       }`}
     >
-                  className={`flex ${
-                    isMine
-                      ? "justify-end"
-                      : "justify-start"
-                  }`}
-                >
 
                   <div
                     className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
