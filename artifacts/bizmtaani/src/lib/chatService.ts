@@ -736,13 +736,13 @@ export async function forwardChatMessage(params: {
   const verifiedOriginalMessage =
     originalMessageSnap.data() as ChatMessage;
 
-  if (
-    verifiedOriginalMessage.senderId !== senderId
-    &&
-    !sourceChat.participants?.includes(senderId)
+    if (
+    verifiedOriginalMessage.deletedFor?.includes(
+      senderId
+    )
   ) {
     throw new Error(
-      "You cannot forward this message."
+      "You cannot forward a message you deleted for yourself."
     );
   }
 
