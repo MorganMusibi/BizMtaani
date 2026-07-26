@@ -106,7 +106,7 @@ const [selectedMessage, setSelectedMessage] =
   const [forwardingMessage, setForwardingMessage] =
   useState<Message | null>(null);
   const [forwardChats, setForwardChats] =
-  useState<ChatData[]>([]);
+  useState<(ChatData & { id: string })[]>([]);
 /*
   |--------------------------------------------------------------------------
   | REFS
