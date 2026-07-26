@@ -6,7 +6,7 @@ import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, deleteMessageForMe,
-  deleteMessageForEveryone, reportMessage, type ChatData, type ReplyTo, } from "@/lib/chatService";
+deleteMessageForEveryone, reportMessage, type ChatData, type ReplyTo, } from "@/lib/chatService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -20,6 +20,9 @@ interface Message {
   senderId: string;
   senderName?: string;
   text: string;
+  
+  deletedFor?: string[];
+  deletedForEveryone?: boolean;
 
   replyTo?: ReplyTo | null;
 
@@ -301,6 +304,12 @@ const [selectedMessage, setSelectedMessage] =
   text:
   data.text || "",
 
+   deletedFor:
+    data.deletedFor || [],
+
+  deletedForEveryone:
+    data.deletedForEveryone || false,               
+
 replyTo:
   data.replyTo || null,
 
@@ -315,9 +324,13 @@ createdAt:
 };
               }
             );
-
-          setMessages(
-  loadedMessages
+ setMessages(
+  loadedMessages.filter(
+    (message) =>
+      !message.deletedFor?.includes(
+        user.uid
+      )
+  )
 );
 
 if (user) {
