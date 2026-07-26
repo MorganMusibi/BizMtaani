@@ -445,15 +445,20 @@ if (user) {
       (snapshot) => {
 
         const loadedChats =
-          snapshot.docs
-            .map(
-              (chatDoc) =>
-                chatDoc.data() as ChatData
-            );
+  snapshot.docs.map(
+    (chatDoc) => ({
+      id:
+        chatDoc.id,
 
-        setForwardChats(
-          loadedChats
-        );
+      ...chatDoc.data(),
+    } as ChatData & {
+      id: string;
+    })
+  );
+
+setForwardChats(
+  loadedChats
+);
       },
       (firebaseError) => {
 
