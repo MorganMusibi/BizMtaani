@@ -72,6 +72,7 @@ export interface ChatMessage {
 
   readAt?: Timestamp | null;
   deletedFor?: string[];
+  deletedForEveryone?: boolean;
   forwarded?: boolean;
 }
 
@@ -819,7 +820,7 @@ export async function markChatAsRead(
   const batch =
     writeBatch(db);
 
-  messagesSnap.forEach(
+    messagesSnap.forEach(
     (messageDoc) => {
 
       const message =
@@ -841,13 +842,6 @@ export async function markChatAsRead(
 
     }
   );
-batch.update(
-  messageDoc.ref,
-  {
-    readAt:
-      serverTimestamp(),
-  }
-);
 
   await batch.commit();
 }
