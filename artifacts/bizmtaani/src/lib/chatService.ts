@@ -911,18 +911,8 @@ export async function markChatAsRead(
     }
   );
 
-  batch.update(
-    chatRef,
-    {
-      unreadCount: {
-        ...(chat.unreadCount || {}),
-        [userId]: 0,
-      },
-
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
+  // Do not update the chat document here.
+// Message read receipts are handled below.
 
   await batch.commit();
 }
