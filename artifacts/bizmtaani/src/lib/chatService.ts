@@ -67,6 +67,7 @@ export interface ChatMessage {
   deliveredAt?: Timestamp | null;
 
   readAt?: Timestamp | null;
+  deletedFor?: string[];
 }
 
 /*
@@ -923,5 +924,211 @@ export function getParticipantPhoto(
   return (
     chat.participantPhotos?.[uid] ||
     ""
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE MESSAGE FOR ME
+|--------------------------------------------------------------------------
+*/
+
+export async function deleteMessageForMe(
+  chatId: string,
+  messageId: string,
+  userId: string
+): Promise<void> {
+
+  if (
+    !chatId ||
+    !messageId ||
+    !userId
+  ) {
+    throw new Error(
+      "Chat, message, and user are required."
+    );
+  }
+
+  const messageRef =
+    doc(
+      db,
+      "chats",
+      chatId,
+      "messages",
+      messageId
+    );
+
+  const messageSnap =
+    await getDoc(messageRef);
+
+  if (!messageSnap.exists()) {
+    throw new Error(
+      "This message no longer exists."
+    );
+  }
+
+  const message =
+    messageSnap.data() as ChatMessage;
+
+  const deletedFor =
+    message.deletedFor || [];
+
+  if (
+    deletedFor.includes(userId)
+  ) {
+    return;
+  }
+
+  await updateDoc(
+    messageRef,
+    {
+      deletedFor: [
+        ...deletedFor,
+        userId,
+      ],
+    }
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE MESSAGE FOR EVERYONE
+|--------------------------------------------------------------------------
+*/
+
+export async function deleteMessageForEveryone(
+  chatId: string,
+  messageId: string,
+  userId: string
+): Promise<void> {
+
+  if (
+    !chatId ||
+    !messageId ||
+    !userId
+  ) {
+    throw new Error(
+      "Chat, message, and user are required."
+    );
+  }
+
+  const messageRef =
+    doc(
+      db,
+      "chats",
+      chatId,
+      "messages",
+      messageId
+    );
+
+  const messageSnap =
+    await getDoc(messageRef);
+
+  if (!messageSnap.exists()) {
+    throw new Error(
+      "This message no longer exists."
+    );
+  }
+
+  const message =
+    messageSnap.data() as ChatMessage;
+
+  if (
+    message.senderId !== userId
+  ) {
+    throw new Error(
+      "You can only delete your own messages for everyone."
+    );
+  }
+
+  await updateDoc(
+    messageRef,
+    {
+      text:
+        "This message was deleted.",
+      
+      deletedForEveryone:
+        true,
+    }
+  );
+}
+
+/*
+|--------------------------------------------------------------------------
+| REPORT MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+export async function reportMessage(
+  chatId: string,
+  messageId: string,
+  reporterId: string,
+  reason: string
+): Promise<void> {
+
+  if (
+    !chatId ||
+    !messageId ||
+    !reporterId
+  ) {
+    throw new Error(
+      "Chat, message, and reporter are required."
+    );
+  }
+
+  const messageRef =
+    doc(
+      db,
+      "chats",
+      chatId,
+      "messages",
+      messageId
+    );
+
+  const messageSnap =
+    await getDoc(messageRef);
+
+  if (!messageSnap.exists()) {
+    throw new Error(
+      "This message no longer exists."
+    );
+  }
+
+  const message =
+    messageSnap.data() as ChatMessage;
+
+  const reportRef =
+    doc(
+      collection(
+        db,
+        "messageReports"
+      )
+    );
+
+  await setDoc(
+    reportRef,
+    {
+      chatId,
+
+      messageId,
+
+      reporterId,
+
+      reportedUserId:
+        message.senderId,
+
+      messageText:
+        message.text,
+
+      reason:
+        reason.trim() ||
+        "No reason provided",
+
+      status:
+        "pending",
+
+      createdAt:
+        serverTimestamp(),
+    }
   );
 }
