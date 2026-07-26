@@ -1498,9 +1498,101 @@ async function handleReportMessage() {
 
       </div>
 
-      <p className="text-sm text-muted-foreground text-center">
-        Select a conversation to forward this message.
-      </p>
+      <div className="mt-3 max-h-64 overflow-y-auto space-y-1">
+
+  {forwardChats.length === 0 ? (
+
+    <p className="text-sm text-muted-foreground text-center py-4">
+      No other conversations available.
+    </p>
+
+  ) : (
+
+    forwardChats
+      .map((forwardChat, index) => {
+
+        const recipientId =
+          forwardChat.participants?.find(
+            (uid) =>
+              uid !== user.uid
+          );
+
+        const recipientName =
+          recipientId
+            ? getParticipantName(
+                forwardChat,
+                recipientId
+              )
+            : "Conversation";
+
+        const recipientPhoto =
+          recipientId
+            ? getParticipantPhoto(
+                forwardChat,
+                recipientId
+              )
+            : "";
+
+        return (
+          <button
+            key={`${recipientId || "chat"}-${index}`}
+            type="button"
+            className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-muted transition-colors text-left"
+            onClick={() => {
+              console.log(
+                "Forward to:",
+                forwardChat
+              );
+            }}
+          >
+
+            {recipientPhoto ? (
+
+              <img
+                src={recipientPhoto}
+                alt={recipientName}
+                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+              />
+
+            ) : (
+
+              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <User
+                  size={18}
+                  className="text-primary"
+                />
+              </div>
+
+            )}
+
+            <div className="min-w-0 flex-1">
+
+              <p className="font-medium text-sm truncate">
+                {recipientName}
+              </p>
+
+              <p className="text-xs text-muted-foreground truncate">
+                {forwardChat.type ===
+                "product"
+                  ? forwardChat.productTitle ||
+                    "Product Chat"
+                  : forwardChat.type ===
+                    "job_application"
+                  ? forwardChat.jobTitle ||
+                    "Job Application"
+                  : "Direct Message"}
+              </p>
+
+            </div>
+
+          </button>
+        );
+
+      })
+
+  )}
+
+</div>
 
     </div>
 
