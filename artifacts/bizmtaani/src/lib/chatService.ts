@@ -447,70 +447,81 @@ export async function startJobApplicationChat(params: {
 
     jobId,
 
+export async function startJobApplicationChat(params: {
+  applicant: ChatParticipant;
+  employer: ChatParticipant;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+}): Promise<StartChatResult> {
+
+  const {
+    applicant,
+    employer,
+    jobId,
     jobTitle,
-
     company,
+  } = params;
 
-    lastMessage:
-      initialMessage,
+  validateUsers(applicant, employer);
 
-    lastMessageAt:
-      serverTimestamp(),
+  if (!jobId) {
+    throw new Error("The job could not be identified.");
+  }
 
-    lastSenderId:
-      applicant.uid,
+  const participants = sortedParticipants(applicant.uid, employer.uid);
+  const chatId = getJobChatId(jobId, applicant.uid, employer.uid);
+  const chatRef = doc(db, "chats", chatId);
 
+  const existingChat = await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  const initialMessage = `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
+  const users = [applicant, employer];
+
+  // 1. Create the chat document first
+  await setDoc(chatRef, {
+    type: "job_application",
+    participants,
+    participantNames: participantNames(users),
+    participantPhotos: participantPhotos(users),
+    jobId,
+    jobTitle,
+    company,
+    lastMessage: initialMessage,
+    lastMessageAt: serverTimestamp(),
+    lastSenderId: applicant.uid,
     unreadCount: {
       [applicant.uid]: 0,
       [employer.uid]: 1,
     },
-
-    createdAt:
-      serverTimestamp(),
-
-    updatedAt:
-      serverTimestamp(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
   });
 
-  const messageRef =
-    doc(
-      collection(
-        db,
-        "chats",
-        chatId,
-        "messages"
-      )
-    );
-
-  batch.set(messageRef, {
-
-    senderId:
-      applicant.uid,
-
-    senderName:
-      applicant.name ||
-      "Job Seeker",
-
-    text:
-      initialMessage,
-
-    createdAt:
-      serverTimestamp(),
-
-    deliveredAt:
-  null,
-
-readAt:
-  null,
+  // 2. Add the initial message separately after the chat exists
+  const messageRef = doc(collection(db, "chats", chatId, "messages"));
+  await setDoc(messageRef, {
+    senderId: applicant.uid,
+    senderName: applicant.name || "Job Seeker",
+    text: initialMessage,
+    createdAt: serverTimestamp(),
+    deliveredAt: null,
+    readAt: null,
   });
-
-  await batch.commit();
 
   return {
     chatId,
     created: true,
   };
 }
+
 
 /*
 |--------------------------------------------------------------------------
