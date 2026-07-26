@@ -102,6 +102,8 @@ const [selectedMessage, setSelectedMessage] =
   useState<Message | null>(null);
   const [replyingTo, setReplyingTo] =
   useState<Message | null>(null);
+  const [forwardingMessage, setForwardingMessage] =
+  useState<Message | null>(null);
 /*
   |--------------------------------------------------------------------------
   | REFS
