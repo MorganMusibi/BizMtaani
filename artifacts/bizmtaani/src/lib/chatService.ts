@@ -60,6 +60,8 @@ export interface ReplyTo {
 }
 
 export interface ChatMessage {
+  messageId: string;
+
   senderId: string;
   senderName?: string;
   text: string;
