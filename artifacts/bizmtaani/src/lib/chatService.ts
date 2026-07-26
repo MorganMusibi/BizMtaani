@@ -617,11 +617,15 @@ export async function forwardChatMessage(params: {
     originalMessage,
   } = params;
   
-    if (
+      if (
     !sourceChatId ||
     !targetChatId ||
     !senderId
   ) {
+    throw new Error(
+      "Source chat, target chat, and sender are required."
+    );
+  }
 
   const targetChatRef =
     doc(
