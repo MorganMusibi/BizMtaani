@@ -453,7 +453,10 @@ if (user) {
   );
 
 setForwardChats(
-  loadedChats
+  loadedChats.filter(
+    (forwardChat) =>
+      forwardChat.id !== chatId
+  )
 );
       },
       (firebaseError) => {
