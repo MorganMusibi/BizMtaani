@@ -5,7 +5,7 @@ import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, deleteMessageForMe,
+import { sendChatMessage, ForwardChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, deleteMessageForMe,
 deleteMessageForEveryone, reportMessage, type ChatData, type ReplyTo, } from "@/lib/chatService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -919,7 +919,50 @@ async function handleReportMessage() {
     );
   }
 }
+async function handleForwardMessage(
+  targetChatId: string
+) {
+  if (
+    !forwardingMessage ||
+    !user
+  ) {
+    return;
+  }
 
+  try {
+    await forwardChatMessage({
+      targetChatId,
+
+      senderId:
+        user.uid,
+
+      senderName:
+        user.displayName ||
+        user.email ||
+        "User",
+
+      originalMessage:
+        forwardingMessage,
+    });
+
+    setForwardingMessage(null);
+
+    setSendError(
+      "Message forwarded successfully."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Unable to forward message:",
+      error
+    );
+
+    setSendError(
+      "Unable to forward this message. Please try again."
+    );
+  }
+  }
 /*
   |--------------------------------------------------------------------------
   | LOADING
