@@ -1736,7 +1736,6 @@ async function handleForwardMessage(
   }
   className="flex-1 h-11 rounded-full"
   autoComplete="off"
-  autoFocus
   disabled={sending}
   maxLength={5000}
 />
