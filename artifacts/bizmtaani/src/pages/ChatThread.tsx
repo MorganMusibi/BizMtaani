@@ -949,17 +949,50 @@ if (user) {
         ) : (
 
           messages.map(
-            (message) => {
+  (message, index) => {
 
-              const isMine =
-                message.senderId ===
-                user.uid;
+    const isMine =
+      message.senderId ===
+      user.uid;
 
-              return (
+    const currentDate =
+      formatMessageDate(
+        message.createdAt
+      );
 
-                <div
-                  key={message.id}
-                  data-testid={`message-${message.id}`}
+    const previousDate =
+      index > 0
+        ? formatMessageDate(
+            messages[index - 1]
+              .createdAt
+          )
+        : null;
+
+    const showDateSeparator =
+      currentDate !==
+      previousDate;
+
+    return (
+  <div
+    key={message.id}
+  >
+
+    {showDateSeparator && (
+      <div className="flex items-center justify-center my-4">
+        <span className="px-3 py-1 rounded-full bg-muted text-muted-foreground text-[11px] font-medium">
+          {currentDate}
+        </span>
+      </div>
+    )}
+
+    <div
+      data-testid={`message-${message.id}`}
+      className={`flex ${
+        isMine
+          ? "justify-end"
+          : "justify-start"
+      }`}
+    >
                   className={`flex ${
                     isMine
                       ? "justify-end"
