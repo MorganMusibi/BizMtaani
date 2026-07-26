@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, } from "react";
-import { collection, doc, onSnapshot, orderBy, query, } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, where, } from "firebase/firestore";
 import { useLocation, useParams, Link, } from "wouter";
 import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
@@ -104,6 +104,8 @@ const [selectedMessage, setSelectedMessage] =
   useState<Message | null>(null);
   const [forwardingMessage, setForwardingMessage] =
   useState<Message | null>(null);
+  const [forwardChats, setForwardChats] =
+  useState<ChatData[]>([]);
 /*
   |--------------------------------------------------------------------------
   | REFS
@@ -413,9 +415,69 @@ if (user) {
 
   return () => clearTimeout(timer);
 }, [loading, error, chat, user]);
+  useEffect(() => {
+  if (
+    !forwardingMessage ||
+    !user
+  ) {
+    return;
+  }
 
+  const chatsQuery = query(
+    collection(
+      db,
+      "chats"
+    ),
+    where(
+      "participants",
+      "array-contains",
+      user.uid
+    ),
+    orderBy(
+      "updatedAt",
+      "desc"
+    )
+  );
 
-  /*
+  const unsubscribe =
+    onSnapshot(
+      chatsQuery,
+      (snapshot) => {
+
+        const loadedChats =
+          snapshot.docs
+            .map(
+              (chatDoc) =>
+                chatDoc.data() as ChatData
+            );
+
+        setForwardChats(
+          loadedChats
+        );
+      },
+      (firebaseError) => {
+
+        console.error(
+          "Unable to load chats for forwarding:",
+          firebaseError
+        );
+
+        setSendError(
+          "Unable to load conversations."
+        );
+      }
+    );
+
+  return () => {
+    unsubscribe();
+  };
+
+}, [
+  forwardingMessage,
+  user,
+]);
+
+ /*
   |--------------------------------------------------------------------------
   | SEND MESSAGE
   |--------------------------------------------------------------------------
