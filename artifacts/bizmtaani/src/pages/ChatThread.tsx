@@ -408,14 +408,6 @@ if (user) {
   }, [
     messages.length,
   ]);
-  useEffect(() => {
-  if (loading || error || !chat || !user) {
-    return;
-  }
-
-  const timer = setTimeout(() => {
-    inputRef.current?.focus();
-  }, 500);
 
   return () => clearTimeout(timer);
 }, [loading, error, chat, user]);
