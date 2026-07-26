@@ -938,10 +938,10 @@ export async function markMessagesAsDelivered(
       otherUserId
     ),
     where(
-      "readAt",
-      "==",
-      null
-    )
+  "deliveredAt",
+  "==",
+  null
+)
   );
 
   const messagesSnap =
