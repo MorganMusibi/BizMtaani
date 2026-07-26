@@ -996,8 +996,8 @@ if (user) {
                     <div
                       className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
                         isMine
-                          ? "bg-primary text-white rounded-br-md"
-                          : "bg-card border border-border rounded-bl-md"
+                       ? "bg-primary text-white rounded-br-md"
+                       : "bg-muted border border-border rounded-bl-md"
                       }`}
                     >
 
