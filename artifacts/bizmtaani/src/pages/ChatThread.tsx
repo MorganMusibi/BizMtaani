@@ -952,8 +952,10 @@ async function handleForwardMessage(
     user.email ||
     "User",
 
-  originalMessage:
-    forwardingMessage,
+  originalMessage: {
+  ...forwardingMessage,
+  messageId: forwardingMessage.id,
+},
 });
 
     setForwardingMessage(null);
