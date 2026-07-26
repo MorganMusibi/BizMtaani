@@ -74,7 +74,6 @@ export interface ChatMessage {
   deletedFor?: string[];
   forwarded?: boolean;
 }
-}
 
 /*
 |--------------------------------------------------------------------------
