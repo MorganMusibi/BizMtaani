@@ -6,7 +6,7 @@ import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { sendChatMessage, markChatAsRead, markMessagesAsDelivered, getOtherParticipant, getParticipantName, getParticipantPhoto, type ChatData,
-} from "@/lib/chatService";
+type ReplyTo, } from "@/lib/chatService";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -20,6 +20,8 @@ interface Message {
   senderId: string;
   senderName?: string;
   text: string;
+
+  replyTo?: ReplyTo | null;
 
   createdAt?: {
     seconds: number;
@@ -297,10 +299,13 @@ const [selectedMessage, setSelectedMessage] =
     "User",
 
   text:
-    data.text || "",
+  data.text || "",
 
-  createdAt:
-    data.createdAt || null,
+replyTo:
+  data.replyTo || null,
+
+createdAt:
+  data.createdAt || null,
 
   deliveredAt:
     data.deliveredAt || null,
@@ -450,20 +455,42 @@ if (user) {
 
       await sendChatMessage({
 
-        chatId,
+  chatId,
 
-        senderId:
-          user.uid,
+  senderId:
+    user.uid,
 
-        senderName:
-          user.displayName ||
-          user.email ||
-          "User",
+  senderName:
+    user.displayName ||
+    user.email ||
+    "User",
 
-        text:
-          messageText,
+  text:
+    messageText,
 
-      });
+  replyTo:
+    replyingTo
+      ? {
+          messageId:
+            replyingTo.id,
+
+          senderId:
+            replyingTo.senderId,
+
+          senderName:
+            replyingTo.senderName ||
+            getParticipantName(
+              chat,
+              replyingTo.senderId
+            ),
+
+          text:
+            replyingTo.text,
+        }
+      : null,
+
+});
+      setReplyingTo(null);
 
     } catch (sendError: any) {
 
