@@ -95,6 +95,8 @@ export default function ChatThread() {
     useState("");
 const [selectedMessage, setSelectedMessage] =
   useState<Message | null>(null);
+  const [replyingTo, setReplyingTo] =
+  useState<Message | null>(null);
 /*
   |--------------------------------------------------------------------------
   | REFS
@@ -1131,14 +1133,16 @@ function handleMessagePressEnd() {
           >
 
             <button
-              type="button"
-              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
-              onClick={() => {
-                setSelectedMessage(null);
-              }}
-            >
-              ↩️ Reply
-            </button>
+  type="button"
+  className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+  onClick={() => {
+    setReplyingTo(selectedMessage);
+    setSelectedMessage(null);
+    inputRef.current?.focus();
+  }}
+>
+  ↩️ Reply
+</button>
 
             <button
               type="button"
@@ -1240,6 +1244,43 @@ function handleMessagePressEnd() {
         </div>
 
       )}
+      {replyingTo && (
+  <div className="flex-shrink-0 px-4 py-2 bg-card border-t border-border">
+    <div className="flex items-center justify-between gap-3">
+
+      <div className="min-w-0 border-l-2 border-primary pl-3">
+
+        <p className="text-xs font-semibold text-primary">
+          Replying to{" "}
+          {replyingTo.senderId === user.uid
+            ? "yourself"
+            : replyingTo.senderName ||
+              getParticipantName(
+                chat,
+                replyingTo.senderId
+              )}
+        </p>
+
+        <p className="text-xs text-muted-foreground truncate">
+          {replyingTo.text}
+        </p>
+
+      </div>
+
+      <button
+        type="button"
+        className="flex-shrink-0 text-muted-foreground hover:text-foreground text-lg"
+        onClick={() =>
+          setReplyingTo(null)
+        }
+        aria-label="Cancel reply"
+      >
+        ×
+      </button>
+
+    </div>
+  </div>
+)}
 
 
       {/* ================================================================
