@@ -658,6 +658,152 @@ export async function sendChatMessage(params: {
 
   await batch.commit();
 }
+/*
+|--------------------------------------------------------------------------
+| FORWARD MESSAGE
+|--------------------------------------------------------------------------
+*/
+
+export async function forwardChatMessage(params: {
+  targetChatId: string;
+  senderId: string;
+  senderName: string;
+  originalMessage: ChatMessage;
+}): Promise<void> {
+
+  const {
+    targetChatId,
+    senderId,
+    senderName,
+    originalMessage,
+  } = params;
+
+  if (
+    !targetChatId ||
+    !senderId
+  ) {
+    throw new Error(
+      "Target chat and sender are required."
+    );
+  }
+
+  const targetChatRef =
+    doc(
+      db,
+      "chats",
+      targetChatId
+    );
+
+  const chatSnap =
+    await getDoc(
+      targetChatRef
+    );
+
+  if (!chatSnap.exists()) {
+    throw new Error(
+      "The selected conversation no longer exists."
+    );
+  }
+
+  const targetChat =
+    chatSnap.data() as ChatData;
+
+  if (
+    !targetChat.participants?.includes(
+      senderId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in this conversation."
+    );
+  }
+
+  const recipientUid =
+    targetChat.participants.find(
+      (uid) =>
+        uid !== senderId
+    );
+
+  if (!recipientUid) {
+    throw new Error(
+      "Unable to find the recipient."
+    );
+  }
+
+  const forwardedText =
+    originalMessage.text;
+
+  const unread =
+    targetChat.unreadCount || {};
+
+  const batch =
+    writeBatch(db);
+
+  const messageRef =
+    doc(
+      collection(
+        db,
+        "chats",
+        targetChatId,
+        "messages"
+      )
+    );
+
+  batch.set(
+    messageRef,
+    {
+      senderId,
+
+      senderName:
+        senderName ||
+        "User",
+
+      text:
+        forwardedText,
+
+      createdAt:
+        serverTimestamp(),
+
+      deliveredAt:
+        null,
+
+      readAt:
+        null,
+
+      forwarded:
+        true,
+    }
+  );
+
+  batch.update(
+    targetChatRef,
+    {
+      lastMessage:
+        forwardedText,
+
+      lastMessageAt:
+        serverTimestamp(),
+
+      lastSenderId:
+        senderId,
+
+      unreadCount: {
+        ...unread,
+
+        [senderId]:
+          0,
+
+        [recipientUid]:
+          (unread[recipientUid] || 0) + 1,
+      },
+
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
+
+  await batch.commit();
+}
 
 /*
 |--------------------------------------------------------------------------
