@@ -132,12 +132,17 @@ export default function JobDetail() {
     navigate(
       `/chat/${result.chatId}`
     );
-    } catch (error: any) {
-    console.error("CHAT ERROR:", error);
+      } catch (error: any) {
+    console.error(
+      "CHAT ERROR:",
+      error
+    );
 
     toast({
-      title: "Debug Error",
-      description: `Code: ${error?.code || 'none'} | Msg: ${error?.message || JSON.stringify(error)}`,
+      title: "Chat Error",
+      description:
+        error?.message ||
+        "Failed to initiate chat. Check permissions.",
       variant: "destructive",
     });
   }
