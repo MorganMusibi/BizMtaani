@@ -222,27 +222,7 @@ const [selectedMessage, setSelectedMessage] =
 
           setChat(chatData);
 
-          /*
-          |--------------------------------------------------------------------------
-          | MARK AS READ
-          |--------------------------------------------------------------------------
-          */
-
-          try {
-
-  await markChatAsRead(
-    chatId,
-    user.uid
-  );
-
-} catch (readError) {
-
-  console.error(
-    "Unable to mark chat as read:",
-    readError
-  );
-
-}
+          
 
           setLoading(false);
         },
