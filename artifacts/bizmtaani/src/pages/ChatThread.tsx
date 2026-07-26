@@ -1111,6 +1111,118 @@ function handleMessagePressEnd() {
         />
 
       </div>
+            {/* ================================================================
+          MESSAGE ACTION MENU
+      ================================================================ */}
+
+      {selectedMessage && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          onClick={() =>
+            setSelectedMessage(null)
+          }
+        >
+
+          <div
+            className="w-full max-w-md bg-card rounded-t-2xl p-2 shadow-xl"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+              onClick={() => {
+                setSelectedMessage(null);
+              }}
+            >
+              ↩️ Reply
+            </button>
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+              onClick={() => {
+                setSelectedMessage(null);
+              }}
+            >
+              ➡️ Forward
+            </button>
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+              onClick={() => {
+                navigator.clipboard.writeText(
+                  selectedMessage.text
+                );
+
+                setSelectedMessage(null);
+              }}
+            >
+              📋 Copy
+            </button>
+
+            {selectedMessage.senderId ===
+              user.uid && (
+
+              <button
+                type="button"
+                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+                onClick={() => {
+                  setSelectedMessage(null);
+                }}
+              >
+                🗑️ Delete for me
+              </button>
+
+            )}
+
+            {selectedMessage.senderId ===
+              user.uid && (
+
+              <button
+                type="button"
+                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+                onClick={() => {
+                  setSelectedMessage(null);
+                }}
+              >
+                🗑️ Delete for everyone
+              </button>
+
+            )}
+
+            {selectedMessage.senderId !==
+              user.uid && (
+
+              <button
+                type="button"
+                className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+                onClick={() => {
+                  setSelectedMessage(null);
+                }}
+              >
+                🚩 Report
+              </button>
+
+            )}
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors font-medium"
+              onClick={() =>
+                setSelectedMessage(null)
+              }
+            >
+              Cancel
+            </button>
+
+          </div>
+
+        </div>
+      )}
 
 
       {/* ================================================================
