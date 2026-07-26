@@ -1,4 +1,4 @@
-import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp, writeBatch, Timestamp,
+import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch, Timestamp,
   query,
   where,
 } from "firebase/firestore";
