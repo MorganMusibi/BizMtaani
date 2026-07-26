@@ -48,6 +48,10 @@ export interface ChatData {
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
+export interface StartChatResult {
+  chatId: string;
+  created: boolean;
+}
 export interface ReplyTo {
   messageId: string;
   senderId: string;
@@ -68,6 +72,8 @@ export interface ChatMessage {
 
   readAt?: Timestamp | null;
   deletedFor?: string[];
+  forwarded?: boolean;
+}
 }
 
 /*
