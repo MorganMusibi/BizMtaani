@@ -368,85 +368,6 @@ export async function startProductChat(params: {
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
-
-export async function startJobApplicationChat(params: {
-  applicant: ChatParticipant;
-  employer: ChatParticipant;
-  jobId: string;
-  jobTitle: string;
-  company: string;
-}): Promise<StartChatResult> {
-
-  const {
-    applicant,
-    employer,
-    jobId,
-    jobTitle,
-    company,
-  } = params;
-
-  validateUsers(
-    applicant,
-    employer
-  );
-
-  if (!jobId) {
-    throw new Error(
-      "The job could not be identified."
-    );
-  }
-
-  const participants =
-    sortedParticipants(
-      applicant.uid,
-      employer.uid
-    );
-
-  const chatId =
-    getJobChatId(
-      jobId,
-      applicant.uid,
-      employer.uid
-    );
-
-  const chatRef =
-    doc(db, "chats", chatId);
-
-  const existingChat =
-    await getDoc(chatRef);
-
-  if (existingChat.exists()) {
-    return {
-      chatId,
-      created: false,
-    };
-  }
-
-  const initialMessage =
-    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
-
-  const users = [
-    applicant,
-    employer,
-  ];
-
-  const batch =
-    writeBatch(db);
-
-  batch.set(chatRef, {
-
-    type: "job_application",
-
-    participants,
-
-    participantNames:
-      participantNames(users),
-
-    participantPhotos:
-      participantPhotos(users),
-
-    jobId,
-
 export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
@@ -521,7 +442,6 @@ export async function startJobApplicationChat(params: {
     created: true,
   };
 }
-
 
 /*
 |--------------------------------------------------------------------------
@@ -1287,4 +1207,4 @@ export async function reportMessage(
         serverTimestamp(),
     }
   );
-}
+                                      }
