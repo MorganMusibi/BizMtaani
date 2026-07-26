@@ -424,20 +424,16 @@ if (user) {
   }
 
   const chatsQuery = query(
-    collection(
-      db,
-      "chats"
-    ),
-    where(
-      "participants",
-      "array-contains",
-      user.uid
-    ),
-    orderBy(
-      "updatedAt",
-      "desc"
-    )
-  );
+  collection(
+    db,
+    "chats"
+  ),
+  where(
+    "participants",
+    "array-contains",
+    user.uid
+  )
+);
 
   const unsubscribe =
     onSnapshot(
