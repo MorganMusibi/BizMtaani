@@ -334,6 +334,15 @@ if (user) {
 
   });
 }
+          markChatAsRead(
+  chatId,
+  user.uid
+).catch((readError) => {
+  console.error(
+    "Unable to mark messages as read:",
+    readError
+  );
+});
         },
 
         (firebaseError) => {
