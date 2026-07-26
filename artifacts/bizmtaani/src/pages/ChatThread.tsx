@@ -320,20 +320,6 @@ createdAt:
       )
   )
 );
-
-if (user) {
-  markMessagesAsDelivered(
-    chatId,
-    user.uid
-  ).catch((deliveryError) => {
-
-    console.error(
-      "Unable to mark messages as delivered:",
-      deliveryError
-    );
-
-  });
-}
           markChatAsRead(
   chatId,
   user.uid
