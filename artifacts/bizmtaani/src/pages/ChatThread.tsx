@@ -939,19 +939,22 @@ async function handleForwardMessage(
 
   try {
     await forwardChatMessage({
-      targetChatId,
+  sourceChatId:
+    chatId,
 
-      senderId:
-        user.uid,
+  targetChatId,
 
-      senderName:
-        user.displayName ||
-        user.email ||
-        "User",
+  senderId:
+    user.uid,
 
-      originalMessage:
-        forwardingMessage,
-    });
+  senderName:
+    user.displayName ||
+    user.email ||
+    "User",
+
+  originalMessage:
+    forwardingMessage,
+});
 
     setForwardingMessage(null);
 
