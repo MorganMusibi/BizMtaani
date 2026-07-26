@@ -1065,8 +1065,9 @@ if (user) {
                 </div>
               );
 
-            }
+                        }
           )
+        )}
 
         <div
           ref={bottomRef}
