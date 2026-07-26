@@ -409,8 +409,6 @@ if (user) {
     messages.length,
   ]);
 
-  return () => clearTimeout(timer);
-}, [loading, error, chat, user]);
   useEffect(() => {
   if (
     !forwardingMessage ||
