@@ -1278,11 +1278,16 @@ async function handleForwardMessage(
   }}
   onMouseUp={handleMessagePressEnd}
   onMouseLeave={handleMessagePressEnd}
-  className={`max-w-[78%] px-4 py-2.5 rounded-2xl ${
-    isMine
-      ? "bg-primary text-white rounded-br-md"
-      : "bg-muted border border-border rounded-bl-md"
-  }`}
+  className={`max-w-[78%] px-4 py-2.5 rounded-2xl select-none ${
+  isMine
+    ? "bg-primary text-white rounded-br-md"
+    : "bg-muted border border-border rounded-bl-md"
+}`}
+   style={{
+  WebkitUserSelect: "none",
+  userSelect: "none",
+  WebkitTouchCallout: "none",
+}}                   
 >
 
                       {!isMine && (
