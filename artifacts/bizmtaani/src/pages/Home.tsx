@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { areaPrefix } from "@/lib/geohash";
+import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
@@ -492,20 +492,26 @@ export default function Home() {
       : query(coll, ...constraints);
   }
 
-    function areaQuery(coords: [number, number], cursor?: Cursor) {
-    const prefix = areaPrefix(coords[0], coords[1]);
-    const coll = collection(db, "products");
-    const constraints = [
+    
+function areaQueries(coords: [number, number]) {
+  const prefixes = getNearbyGeohashPrefixes(
+    coords[0],
+    coords[1],
+    5
+  );
+
+  const coll = collection(db, "products");
+
+  return prefixes.map((prefix) =>
+    query(
+      coll,
       where("geohash", ">=", prefix),
       where("geohash", "<", prefix + "\uf8ff"),
       orderBy("geohash"),
-      limit(AREA_PAGE),
-    ] as const;
-    return cursor
-      ? query(coll, constraints[0], constraints[1], constraints[2], constraints[3], startAfter(cursor), constraints[4])
-      : query(coll, ...constraints);
-  }
-
+      limit(AREA_PAGE)
+    )
+  );
+}
   useEffect(() => {
     if (!gpsReady || !userCoords) return;
 
