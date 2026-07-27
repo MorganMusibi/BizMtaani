@@ -897,26 +897,47 @@ function areaQueries(coords: [number, number]) {
       return matchCat && matchSearch && matchRadius;
     });
   }
-const wardIds = new Set(wardProducts.map((p) => p.id));
+const wardIds = new Set(
+  wardProducts.map((p) => p.id)
+);
 
 const allLoadedProducts = dedupe(
   wardProducts,
-  areaProducts.filter((p) => !wardIds.has(p.id))
+  areaProducts.filter(
+    (p) => !wardIds.has(p.id)
+  )
 );
 
 const visibleProducts = isSearchMode
   ? allLoadedProducts
   : userCoords
   ? allLoadedProducts.filter((product) =>
-      isProductVisibleToUser(product, userCoords)
+      isProductVisibleToUser(
+        product,
+        userCoords
+      )
     )
   : allLoadedProducts;
 
-const filteredProducts = applyFilters(visibleProducts);
+const filteredProducts = applyFilters(
+  visibleProducts
+);
 
 const rankedProducts = userCoords
-  ? rankProducts(filteredProducts, userCoords)
+  ? rankProducts(
+      filteredProducts,
+      userCoords
+    )
   : filteredProducts;
+
+const totalVisible =
+  rankedProducts.length;
+
+const isLoadingMore =
+  wardLoading || areaLoading;
+
+const allDone =
+  wardDone && areaDone;
 
   const totalVisible = filteredWard.length + filteredArea.length;
   const isLoadingMore = wardLoading || areaLoading;
