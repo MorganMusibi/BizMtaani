@@ -216,31 +216,48 @@ function rankProducts(
         product.lng
       );
 
+      const premium = isPremiumProduct(product);
+
+      /*
+       * Premium boost
+       *
+       * A premium advert gets a controlled ranking advantage.
+       * Distance still matters, so an extremely far-away premium
+       * advert will not automatically dominate the feed.
+       *
+       * The higher the boost, the stronger Premium is promoted.
+       */
+      const PREMIUM_BOOST = 3;
+
+      const score =
+        (premium ? PREMIUM_BOOST : 0) - distanceKm;
+
       return {
         product,
         distanceKm,
-        distanceBucket: getDistanceBucket(distanceKm),
-        premium: isPremiumProduct(product),
+        premium,
+        score,
         originalIndex: index,
       };
     })
     .sort((a, b) => {
-      // 1. Closest distance zone first
-      if (a.distanceBucket !== b.distanceBucket) {
-        return a.distanceBucket - b.distanceBucket;
+      // 1. Higher ranking score first.
+      // Premium gets boosted, while distance still matters.
+      if (a.score !== b.score) {
+        return b.score - a.score;
       }
 
-      // 2. Premium adverts get priority within the same zone
+      // 2. Premium wins exact score ties.
       if (a.premium !== b.premium) {
         return a.premium ? -1 : 1;
       }
 
-      // 3. Closest advert first within the same priority group
+      // 3. If still tied, nearest advert first.
       if (a.distanceKm !== b.distanceKm) {
         return a.distanceKm - b.distanceKm;
       }
 
-      // 4. Preserve original order as final fallback
+      // 4. Final fallback: preserve original order.
       return a.originalIndex - b.originalIndex;
     })
     .map((item) => item.product);
