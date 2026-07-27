@@ -387,6 +387,7 @@ if (existingChat.exists()) {
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
+
 export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
@@ -403,151 +404,185 @@ export async function startJobApplicationChat(params: {
     company,
   } = params;
 
-export async function startJobApplicationChat(params: {
-  applicant: ChatParticipant;
-  employer: ChatParticipant;
-  jobId: string;
-  jobTitle: string;
-  company: string;
-}): Promise<StartChatResult> {
-  const {
+  validateUsers(
     applicant,
-    employer,
-    jobId,
-    jobTitle,
-    company,
-  } = params;
-
-  validateUsers(applicant, employer);
+    employer
+  );
 
   if (!jobId) {
-    throw new Error("The job could not be identified.");
+    throw new Error(
+      "The job could not be identified."
+    );
   }
 
-  const participants = sortedParticipants(
-  applicant.uid,
-  employer.uid
-);
+  const participants =
+    sortedParticipants(
+      applicant.uid,
+      employer.uid
+    );
 
-const users = [applicant, employer];
+  const users = [
+    applicant,
+    employer,
+  ];
 
-const chatId = getJobChatId(
-  jobId,
-  applicant.uid,
-  employer.uid
-);
+  const chatId =
+    getJobChatId(
+      jobId,
+      applicant.uid,
+      employer.uid
+    );
 
-const chatRef = doc(
-  db,
-  "chats",
-  chatId
-);
+  const chatRef =
+    doc(
+      db,
+      "chats",
+      chatId
+    );
 
-const existingChat = await getDoc(chatRef);
+  const existingChat =
+    await getDoc(chatRef);
 
-if (existingChat.exists()) {
-  await updateDoc(chatRef, {
-    participantNames:
-      participantNames(users),
+  /*
+  |--------------------------------------------------------------------------
+  | EXISTING CHAT
+  |--------------------------------------------------------------------------
+  */
 
-    participantPhotos:
-      participantPhotos(users),
+  if (existingChat.exists()) {
 
-    jobTitle,
-    company,
+    await updateDoc(
+      chatRef,
+      {
+        participantNames:
+          participantNames(users),
 
-    updatedAt:
-      serverTimestamp(),
-  });
+        participantPhotos:
+          participantPhotos(users),
 
-  return {
-    chatId,
-    created: false,
-  };
-}
+        jobTitle,
 
-  // ============================================================
-  // NEW CHAT
-  // ============================================================
+        company,
+
+        updatedAt:
+          serverTimestamp(),
+      }
+    );
+
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | NEW CHAT
+  |--------------------------------------------------------------------------
+  */
 
   const initialMessage =
     `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
 
-  // 1. Create chat
-  await setDoc(chatRef, {
-    type: "job_application",
+  /*
+  |--------------------------------------------------------------------------
+  | CREATE CHAT
+  |--------------------------------------------------------------------------
+  */
 
-    participants,
+  await setDoc(
+    chatRef,
+    {
+      type:
+        "job_application",
 
-    participantNames:
-      participantNames(users),
+      participants,
 
-    participantPhotos:
-      participantPhotos(users),
+      participantNames:
+        participantNames(users),
 
-    jobId,
+      participantPhotos:
+        participantPhotos(users),
 
-    jobTitle,
+      jobId,
 
-    company,
+      jobTitle,
 
-    lastMessage:
-      initialMessage,
+      company,
 
-    lastMessageAt:
-      serverTimestamp(),
+      lastMessage:
+        initialMessage,
 
-    lastSenderId:
-      applicant.uid,
+      lastMessageAt:
+        serverTimestamp(),
 
-    unreadCount: {
-      [applicant.uid]: 0,
-      [employer.uid]: 1,
-    },
+      lastSenderId:
+        applicant.uid,
 
-    createdAt:
-      serverTimestamp(),
+      unreadCount: {
+        [applicant.uid]:
+          0,
 
-    updatedAt:
-      serverTimestamp(),
-  });
+        [employer.uid]:
+          1,
+      },
 
-  // 2. Create initial message
-  const messageRef = doc(
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    )
+      createdAt:
+        serverTimestamp(),
+
+      updatedAt:
+        serverTimestamp(),
+    }
   );
 
-  await setDoc(messageRef, {
-    senderId:
-      applicant.uid,
+  /*
+  |--------------------------------------------------------------------------
+  | CREATE INITIAL MESSAGE
+  |--------------------------------------------------------------------------
+  */
 
-    senderName:
-      applicant.name ||
-      "Job Seeker",
+  const messageRef =
+    doc(
+      collection(
+        db,
+        "chats",
+        chatId,
+        "messages"
+      )
+    );
 
-    text:
-      initialMessage,
+  await setDoc(
+    messageRef,
+    {
+      senderId:
+        applicant.uid,
 
-    createdAt:
-      serverTimestamp(),
+      senderName:
+        applicant.name ||
+        "Job Seeker",
 
-    deliveredAt:
-      null,
+      text:
+        initialMessage,
 
-    readAt:
-      null,
-  });
+      createdAt:
+        serverTimestamp(),
+
+      deliveredAt:
+        null,
+
+      readAt:
+        null,
+    }
+  );
 
   return {
     chatId,
     created: true,
   };
 }
+  
+    
+
 
 /*
 |--------------------------------------------------------------------------
