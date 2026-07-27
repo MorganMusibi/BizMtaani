@@ -415,65 +415,41 @@ export async function startJobApplicationChat(params: {
     );
   }
 
-  const participants =
-    sortedParticipants(
-      applicant.uid,
-      employer.uid
-    );
+const users = [applicant, employer];
 
-  const users = [
-    applicant,
-    employer,
-  ];
+const participants = sortedParticipants(
+  applicant.uid,
+  employer.uid
+);
 
-  const chatId =
-    getJobChatId(
-      jobId,
-      applicant.uid,
-      employer.uid
-    );
+const chatId = getJobChatId(
+  jobId,
+  applicant.uid,
+  employer.uid
+);
 
-  const chatRef =
-    doc(
-      db,
-      "chats",
-      chatId
-    );
+const chatRef = doc(
+  db,
+  "chats",
+  chatId
+);
 
-  const existingChat =
-    await getDoc(chatRef);
+const existingChat = await getDoc(chatRef);
 
-  /*
-  |--------------------------------------------------------------------------
-  | EXISTING CHAT
-  |--------------------------------------------------------------------------
-  */
+if (existingChat.exists()) {
+  await updateDoc(chatRef, {
+    participantNames: participantNames(users),
+    participantPhotos: participantPhotos(users),
+    jobTitle,
+    company,
+    updatedAt: serverTimestamp(),
+  });
 
-  if (existingChat.exists()) {
-
-    await updateDoc(
-      chatRef,
-      {
-        participantNames:
-          participantNames(users),
-
-        participantPhotos:
-          participantPhotos(users),
-
-        jobTitle,
-
-        company,
-
-        updatedAt:
-          serverTimestamp(),
-      }
-    );
-
-    return {
-      chatId,
-      created: false,
-    };
-  }
+  return {
+    chatId,
+    created: false,
+  };
+}
 
   /*
   |--------------------------------------------------------------------------
