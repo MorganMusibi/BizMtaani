@@ -158,9 +158,23 @@ function getDistanceBucket(distanceKm: number) {
   }
 
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
+  const nowSec = Date.now() / 1000;
+
   return docs
     .map((d) => ({ id: d.id, ...d.data() } as Product))
-    .filter((p) => !p.status || p.status === "active");
+    .filter((p) => {
+      // Only active products
+      if (p.status && p.status !== "active") {
+        return false;
+      }
+
+      // Do not load/use expired products
+      if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
+        return false;
+      }
+
+      return true;
+    });
 }
 
 function dedupe(existing: Product[], incoming: Product[]): Product[] {
