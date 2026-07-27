@@ -569,6 +569,11 @@ if (existingChat.exists()) {
     readAt:
       null,
   });
+console.log("AUTH UID:", auth.currentUser?.uid);
+console.log("APPLICANT UID:", applicant.uid);
+console.log("EMPLOYER UID:", employer.uid);
+console.log("CHAT ID:", chatId);
+console.log("PARTICIPANTS:", participants);
 
   // Commit both operations together.
   await batch.commit();
