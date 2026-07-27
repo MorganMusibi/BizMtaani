@@ -76,8 +76,11 @@ interface Product {
   status?: string;
   plan?: string;
 
-  isPremium?: boolean;
-  verified?: boolean;
+visibilityScope?: "local" | "county" | "all_areas";
+visibilityRadiusKm?: number;
+
+isPremium?: boolean;
+verified?: boolean;
 }
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
