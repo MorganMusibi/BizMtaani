@@ -558,13 +558,51 @@ function areaQueries(coords: [number, number]) {
       }
 
       try {
-        const snap = await getDocs(areaQuery(userCoords));
-        setAreaProducts(toProducts(snap.docs));
-        setAreaCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setAreaDone(snap.docs.length < AREA_PAGE);
-      } catch {
-        setAreaDone(true);
-      }
+  const queries = areaQueries(userCoords);
+
+  const snapshots = await Promise.all(
+    queries.map((q) => getDocs(q))
+  );
+
+  const allDocs = snapshots.flatMap(
+    (snap) => snap.docs
+  );
+
+  const products = toProducts(allDocs);
+
+  const uniqueProducts = Array.from(
+    new Map(
+      products.map((product) => [
+        product.id,
+        product,
+      ])
+    ).values()
+  );
+
+  const sortedProducts = sortNearbyProducts(
+    uniqueProducts,
+    userCoords
+  );
+
+  setAreaProducts(sortedProducts);
+
+  // Multi-cell loading is handled as one candidate batch.
+  // We will improve pagination in the next step.
+  setAreaCursor(null);
+
+  setAreaDone(
+    snapshots.every(
+      (snap) => snap.docs.length < AREA_PAGE
+    )
+  );
+} catch (error) {
+  console.error(
+    "Failed to load nearby adverts:",
+    error
+  );
+
+  setAreaDone(true);
+}
 
       setInitialLoading(false);
     };
