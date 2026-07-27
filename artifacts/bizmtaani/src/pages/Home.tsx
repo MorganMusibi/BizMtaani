@@ -930,8 +930,7 @@ const rankedProducts = userCoords
     )
   : filteredProducts;
 
-const totalVisible =
-  rankedProducts.length;
+const totalVisible = rankedProducts.length;
 
 const isLoadingMore =
   wardLoading || areaLoading;
