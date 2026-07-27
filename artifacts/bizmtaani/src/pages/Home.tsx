@@ -582,7 +582,10 @@ const [searchLoading, setSearchLoading] = useState(false);
   }
 
     
-function areaQueries(coords: [number, number]) {
+function areaQueries(
+  coords: [number, number],
+  cursors: Record<string, Cursor | null> = {}
+) {
   const prefixes = getNearbyGeohashPrefixes(
     coords[0],
     coords[1],
@@ -591,15 +594,28 @@ function areaQueries(coords: [number, number]) {
 
   const coll = collection(db, "products");
 
-  return prefixes.map((prefix) =>
-    query(
+  return prefixes.map((prefix, index) => {
+    const cursor = cursors[String(index)];
+
+    if (cursor) {
+      return query(
+        coll,
+        where("geohash", ">=", prefix),
+        where("geohash", "<", prefix + "\uf8ff"),
+        orderBy("geohash"),
+        startAfter(cursor),
+        limit(AREA_PAGE)
+      );
+    }
+
+    return query(
       coll,
       where("geohash", ">=", prefix),
       where("geohash", "<", prefix + "\uf8ff"),
       orderBy("geohash"),
       limit(AREA_PAGE)
-    )
-  );
+    );
+  });
 }
   
     useEffect(() => {
@@ -943,12 +959,43 @@ const loadMore = useCallback(async () => {
         new Map(
           newProducts.map((product) => [
             product.id,
+  // ============================================================
+  // NORMAL FEED — NEARBY AREA PAGINATION
+  // Load the next 20 adverts from nearby geohash areas.
+  // ============================================================
+  if (
+    !areaDone &&
+    !areaLoading
+  ) {
+    setAreaLoading(true);
+
+    try {
+      const queries = areaQueries(
+        userCoords,
+        areaCursors
+      );
+
+      const snapshots = await Promise.all(
+        queries.map((q) => getDocs(q))
+      );
+
+      const newProducts = snapshots.flatMap(
+        (snap) => toProducts(snap.docs)
+      );
+
+      const uniqueNewProducts = Array.from(
+        new Map(
+          newProducts.map((product) => [
+            product.id,
             product,
           ])
         ).values()
       );
 
-      const updatedCursors = {
+      const updatedCursors: Record<
+        string,
+        Cursor | null
+      > = {
         ...areaCursors,
       };
 
