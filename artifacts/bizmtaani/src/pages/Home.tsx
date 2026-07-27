@@ -865,38 +865,76 @@ function areaQueries(coords: [number, number]) {
   }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursors, userCoords, locationInfo]);
 
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMore(); },
-      { rootMargin: "400px" }
+  const el = sentinelRef.current;
+  if (!el) return;
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        loadMore();
+      }
+    },
+    {
+      rootMargin: "400px",
+    }
+  );
+
+  observer.observe(el);
+
+  return () => observer.disconnect();
+}, [loadMore]);
+
+function applyFilters(products: Product[]): Product[] {
+  const nowSec = Date.now() / 1000;
+
+  return products.filter((p) => {
+    // Hide pending-payment listings
+    if (p.status === "pending_payment") {
+      return false;
+    }
+
+    // Hide expired listings
+    if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
+      return false;
+    }
+
+    const matchCat =
+      activeKey === "All" ||
+      p.category === activeKey;
+
+    const search = searchQuery.toLowerCase();
+
+    const matchSearch =
+      !search ||
+      p.title.toLowerCase().includes(search) ||
+      p.sellerName.toLowerCase().includes(search) ||
+      (p.subcategory ?? "").toLowerCase().includes(search) ||
+      (p.ward ?? "").toLowerCase().includes(search);
+
+    // Search mode shows results across Kenya.
+    // Normal mode applies the selected radius.
+    const matchRadius =
+      isSearchMode ||
+      !userCoords ||
+      getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        p.lat,
+        p.lng
+      ) <= radiusKm;
+
+    return (
+      matchCat &&
+      matchSearch &&
+      matchRadius
     );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  });
+}
 
-  function applyFilters(products: Product[]): Product[] {
-    const nowSec = Date.now() / 1000;
-    return products.filter((p) => {
-      // Hide listings pending payment or already expired
-      if (p.status === "pending_payment") return false;
-      if (p.expiresAt && p.expiresAt.seconds < nowSec) return false;
+// ============================================================
+// MERGE WARD + NEARBY PRODUCTS
+// ============================================================
 
-      const matchCat = activeKey === "All" || p.category === activeKey;
-      const matchSearch =
-        !searchQuery ||
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.subcategory ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.ward ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-      // Radius filter — skip when in search mode (search shows all Kenya)
-      const matchRadius =
-        isSearchMode ||
-        !userCoords ||
-        getDistanceKm(userCoords[0], userCoords[1], p.lat, p.lng) <= radiusKm;
-      return matchCat && matchSearch && matchRadius;
-    });
-  }
 const wardIds = new Set(
   wardProducts.map((p) => p.id)
 );
@@ -908,33 +946,61 @@ const allLoadedProducts = dedupe(
   )
 );
 
+// ============================================================
+// APPLY VISIBILITY RULES
+// ============================================================
+
 const visibleProducts = isSearchMode
   ? allLoadedProducts
   : userCoords
   ? allLoadedProducts.filter((product) =>
-      isProductVisibleToUser(product, userCoords)
+      isProductVisibleToUser(
+        product,
+        userCoords
+      )
     )
   : allLoadedProducts;
+
+// ============================================================
+// APPLY CATEGORY, SEARCH & RADIUS FILTERS
+// ============================================================
 
 const filteredProducts = applyFilters(
   visibleProducts
 );
 
+// ============================================================
+// RANK PRODUCTS
+// ============================================================
+
 const rankedProducts = userCoords
-  ? rankProducts(filteredProducts, userCoords)
+  ? rankProducts(
+      filteredProducts,
+      userCoords
+    )
   : filteredProducts;
 
-// Keep the ward section separate from nearby adverts.
-const filteredWard = rankedProducts.filter((product) =>
-  locationInfo?.wardName
-    ? product.ward === locationInfo.wardName
-    : false
+// ============================================================
+// SPLIT WARD PRODUCTS FROM OTHER NEARBY PRODUCTS
+// ============================================================
+
+const filteredWard = rankedProducts.filter(
+  (product) =>
+    locationInfo?.wardName &&
+    product.ward === locationInfo.wardName
 );
 
-// Everything else belongs in nearby adverts.
-const filteredArea = rankedProducts.filter(
-  (product) => !filteredWard.some((wardProduct) => wardProduct.id === product.id)
+const filteredWardIds = new Set(
+  filteredWard.map((product) => product.id)
 );
+
+const filteredArea = rankedProducts.filter(
+  (product) => !filteredWardIds.has(product.id)
+);
+
+// ============================================================
+// FEED STATE
+// ============================================================
 
 const totalVisible = rankedProducts.length;
 
@@ -944,23 +1010,46 @@ const isLoadingMore =
 const allDone =
   wardDone && areaDone;
 
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setSearchQuery(searchInput.trim());
-  }
-  function clearSearch() {
-    setSearchInput(""); setSearchQuery(""); setShowSearch(false);
+// ============================================================
+// SEARCH
+// ============================================================
+
+function handleSearch(
+  e: React.FormEvent
+) {
+  e.preventDefault();
+  setSearchQuery(
+    searchInput.trim()
+  );
+}
+
+function clearSearch() {
+  setSearchInput("");
+  setSearchQuery("");
+  setShowSearch(false);
+}
+
+function bannerText() {
+  if (isSearchMode) {
+    return "Searching across Kenya";
   }
 
-  function bannerText() {
-    if (isSearchMode) return `Searching across Kenya`;
-    if (!locationInfo) return "Finding your area...";
-    const area = locationInfo.wardName;
-    if (area && gpsGranted) return `Showing adverts in ${area} area`;
-    if (area) return `Showing adverts near ${area} area (from your saved location)`;
-    return "Finding nearby adverts...";
+  if (!locationInfo) {
+    return "Finding your area...";
   }
 
+  const area = locationInfo.wardName;
+
+  if (area && gpsGranted) {
+    return `Showing adverts in ${area} area`;
+  }
+
+  if (area) {
+    return `Showing adverts near ${area} area (from your saved location)`;
+  }
+
+  return "Finding nearby adverts...";
+}
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center justify-between gap-3 z-40">
