@@ -167,6 +167,28 @@ function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
+function sortNearbyProducts(
+  products: Product[],
+  userCoords: [number, number]
+): Product[] {
+  return [...products].sort((a, b) => {
+    const distanceA = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      a.lat,
+      a.lng
+    );
+
+    const distanceB = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      b.lat,
+      b.lng
+    );
+
+    return distanceA - distanceB;
+  });
+}
 function rankProducts(
   products: Product[],
   userCoords: [number, number]
