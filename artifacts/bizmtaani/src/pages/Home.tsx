@@ -762,7 +762,7 @@ setAreaDone(false);
   }
 }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursor, userCoords, locationInfo]);
+  }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursors, userCoords, locationInfo]);
 
   useEffect(() => {
     const el = sentinelRef.current;
