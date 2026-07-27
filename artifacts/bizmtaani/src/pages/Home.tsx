@@ -445,10 +445,14 @@ export default function Home() {
   const [wardDone, setWardDone] = useState(false);
   const [wardLoading, setWardLoading] = useState(false);
 
-  const [areaProducts, setAreaProducts] = useState<Product[]>([]);
-  const [areaCursors, setAreaCursors] = useState< Record<string, Cursor | null> >({});
-  const [areaDone, setAreaDone] = useState(false);
-  const [areaLoading, setAreaLoading] = useState(false);
+const [areaProducts, setAreaProducts] = useState<Product[]>([]);
+const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
+const [areaDone, setAreaDone] = useState(false);
+const [areaLoading, setAreaLoading] = useState(false);
+
+const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
+const [searchDone, setSearchDone] = useState(false);
+const [searchLoading, setSearchLoading] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
