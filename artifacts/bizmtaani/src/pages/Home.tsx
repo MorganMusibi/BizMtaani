@@ -780,63 +780,127 @@ function areaQueries(coords: [number, number]) {
 // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [gpsReady, isSearchMode, locationInfo?.wardName]);
 
-  const loadMore = useCallback(async () => {
-    if (!userCoords) return;
+const loadMore = useCallback(async () => {
+  if (!userCoords) return;
 
-    if (!wardDone && !wardLoading && wardCursor && locationInfo?.wardName) {
-      setWardLoading(true);
-      try {
-        const snap = await getDocs(wardQuery(locationInfo.wardName, wardCursor));
-        setWardProducts((prev) => dedupe(prev, toProducts(snap.docs)));
-        setWardCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setWardDone(snap.docs.length < WARD_PAGE);
-      } finally {
-        setWardLoading(false);
-      }
-      return;
+  // ============================================================
+  // SEARCH PAGINATION
+  // Load 20 search results at a time.
+  // ============================================================
+  if (isSearchMode) {
+    if (searchDone || searchLoading) return;
+
+    setSearchLoading(true);
+
+    try {
+      const snap = await getDocs(
+        searchQueryAllProducts(searchCursor ?? undefined)
+      );
+
+      const newProducts = toProducts(snap.docs);
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(prev, newProducts);
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setSearchCursor(
+        snap.docs[snap.docs.length - 1] ?? searchCursor
+      );
+
+      setSearchDone(
+        snap.docs.length < AREA_PAGE
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load more search results:",
+        error
+      );
+    } finally {
+      setSearchLoading(false);
     }
 
-    if (
-  !areaDone &&
-  !areaLoading &&
-  userCoords
-) {
-  setAreaLoading(true);
+    return;
+  }
 
-  try {
-    const prefixes = getNearbyGeohashPrefixes(
-      userCoords[0],
-      userCoords[1],
-      5
-    );
+  // ============================================================
+  // NORMAL FEED — WARD PAGINATION FIRST
+  // Load another 20 products from the user's ward.
+  // ============================================================
+  if (
+    !wardDone &&
+    !wardLoading &&
+    wardCursor &&
+    locationInfo?.wardName
+  ) {
+    setWardLoading(true);
 
-    const queries = prefixes.map(
-      (prefix, index) => {
-        const cursor = areaCursors[index];
+    try {
+      const snap = await getDocs(
+        wardQuery(
+          locationInfo.wardName,
+          wardCursor
+        )
+      );
 
-        const coll = collection(
-          db,
-          "products"
-        );
+      const newProducts = toProducts(snap.docs);
 
-        const baseQuery = query(
-          coll,
-          where(
-            "geohash",
-            ">=",
-            prefix
-          ),
-          where(
-            "geohash",
-            "<",
-            prefix + "\uf8ff"
-          ),
-          orderBy("geohash"),
-          limit(AREA_PAGE)
-        );
+      setWardProducts((prev) =>
+        dedupe(prev, newProducts)
+      );
 
-        return cursor
-          ? query(
+      setWardCursor(
+        snap.docs[snap.docs.length - 1] ?? wardCursor
+      );
+
+      setWardDone(
+        snap.docs.length < WARD_PAGE
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load more ward adverts:",
+        error
+      );
+    } finally {
+      setWardLoading(false);
+    }
+
+    return;
+  }
+
+  // ============================================================
+  // NORMAL FEED — NEARBY AREA PAGINATION
+  // Load another 20 from each geohash prefix that still has data.
+  // ============================================================
+  if (
+    !areaDone &&
+    !areaLoading
+  ) {
+    setAreaLoading(true);
+
+    try {
+      const prefixes = getNearbyGeohashPrefixes(
+        userCoords[0],
+        userCoords[1],
+        5
+      );
+
+      const coll = collection(
+        db,
+        "products"
+      );
+
+      const queries = prefixes.map(
+        (prefix, index) => {
+          const cursor =
+            areaCursors[String(index)];
+
+          if (cursor) {
+            return query(
               coll,
               where(
                 "geohash",
@@ -851,69 +915,102 @@ function areaQueries(coords: [number, number]) {
               orderBy("geohash"),
               startAfter(cursor),
               limit(AREA_PAGE)
-            )
-          : baseQuery;
-      }
-    );
+            );
+          }
 
-    const snapshots = await Promise.all(
-      queries.map((q) => getDocs(q))
-    );
-
-    const newProducts = snapshots.flatMap(
-      (snap) => toProducts(snap.docs)
-    );
-
-    const uniqueNewProducts = Array.from(
-      new Map(
-        newProducts.map((product) => [
-          product.id,
-          product,
-        ])
-      ).values()
-    );
-
-    const updatedCursors = {
-      ...areaCursors,
-    };
-
-    snapshots.forEach(
-      (snap, index) => {
-        if (snap.docs.length > 0) {
-          updatedCursors[index] =
-            snap.docs[
-              snap.docs.length - 1
-            ];
+          return query(
+            coll,
+            where(
+              "geohash",
+              ">=",
+              prefix
+            ),
+            where(
+              "geohash",
+              "<",
+              prefix + "\uf8ff"
+            ),
+            orderBy("geohash"),
+            limit(AREA_PAGE)
+          );
         }
-      }
-    );
-
-    setAreaCursors(updatedCursors);
-
-    setAreaProducts((prev) => {
-      const merged = dedupe(
-        prev,
-        uniqueNewProducts
       );
 
-      return sortNearbyProducts(
-        merged,
-        userCoords
+      const snapshots = await Promise.all(
+        queries.map((q) => getDocs(q))
       );
-    });
 
-    setAreaDone(
-      snapshots.every(
-        (snap) =>
-          snap.docs.length < AREA_PAGE
-      )
-    );
-  } finally {
-    setAreaLoading(false);
+      const newProducts = snapshots.flatMap(
+        (snap) => toProducts(snap.docs)
+      );
+
+      const uniqueNewProducts = Array.from(
+        new Map(
+          newProducts.map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
+
+      const updatedCursors = {
+        ...areaCursors,
+      };
+
+      let allPrefixesDone = true;
+
+      snapshots.forEach(
+        (snap, index) => {
+          if (snap.docs.length > 0) {
+            updatedCursors[String(index)] =
+              snap.docs[
+                snap.docs.length - 1
+              ];
+          }
+
+          if (snap.docs.length >= AREA_PAGE) {
+            allPrefixesDone = false;
+          }
+        }
+      );
+
+      setAreaCursors(
+        updatedCursors
+      );
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(
+          prev,
+          uniqueNewProducts
+        );
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setAreaDone(
+        allPrefixesDone
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load more nearby adverts:",
+        error
+      );
+    } finally {
+      setAreaLoading(false);
+    }
   }
-}
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursors, userCoords, locationInfo]);
+}, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
+  wardLoading,
+  wardCursor,
+  locationInfo?.wardName,
+  areaDone,
+  areaLoading,
+  areaCursors,
+]);
+
 
   useEffect(() => {
   const el = sentinelRef.current;
