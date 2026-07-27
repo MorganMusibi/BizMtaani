@@ -3,8 +3,7 @@ import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, server
   where,
 } from "firebase/firestore";
 
-import { db } from "@/lib/firebase";
-
+import { db, auth } from "@/lib/firebase";
 /*
 |--------------------------------------------------------------------------
 | TYPES
@@ -409,19 +408,30 @@ if (existingChat.exists()) {
     throw new Error("The job could not be identified.");
   }
 
-  // Build participants
-  const participants = sortedParticipants(
-    applicant.uid,
-    employer.uid
-  );
+  // Make absolutely sure the applicant is the authenticated user.
+  // This must match request.auth.uid in Firestore Security Rules.
+  const currentUser = auth.currentUser;
 
-  // Build participant information
+  if (!currentUser) {
+    throw new Error("You must be signed in to apply via chat.");
+  }
+
+  if (currentUser.uid !== applicant.uid) {
+    throw new Error(
+      "The authenticated user does not match the job applicant."
+    );
+  }
+
   const users = [
     applicant,
     employer,
   ];
 
-  // Generate deterministic chat ID
+  const participants = sortedParticipants(
+    applicant.uid,
+    employer.uid
+  );
+
   const chatId = getJobChatId(
     jobId,
     applicant.uid,
@@ -434,31 +444,22 @@ if (existingChat.exists()) {
     chatId
   );
 
-  // ============================================================
-  // 1. CHECK IF CHAT ALREADY EXISTS
-  // ============================================================
-
   console.log(
-    "1. Checking existing chat:",
+    "Checking job application chat:",
     chatId
   );
 
-  const existingChat =
-    await getDoc(chatRef);
-
-  console.log(
-    "2. Existing chat result:",
-    existingChat.exists()
-  );
+  const existingChat = await getDoc(chatRef);
 
   // ============================================================
-  // 2. EXISTING CHAT
+  // EXISTING CHAT
   // ============================================================
 
   if (existingChat.exists()) {
 
     console.log(
-      "3. Updating existing chat"
+      "Job application chat already exists:",
+      chatId
     );
 
     await updateDoc(chatRef, {
@@ -476,10 +477,6 @@ if (existingChat.exists()) {
         serverTimestamp(),
     });
 
-    console.log(
-      "4. Existing chat updated successfully"
-    );
-
     return {
       chatId,
       created: false,
@@ -487,17 +484,33 @@ if (existingChat.exists()) {
   }
 
   // ============================================================
-  // 3. CREATE NEW CHAT
+  // NEW CHAT
   // ============================================================
 
   const initialMessage =
     `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
 
   console.log(
-    "5. Creating new chat"
+    "Creating new job application chat:",
+    chatId
   );
 
-  await setDoc(chatRef, {
+  // Create the message reference first.
+  const messageRef = doc(
+    collection(
+      db,
+      "chats",
+      chatId,
+      "messages"
+    )
+  );
+
+  // Use one batch so the chat and first message are created
+  // together as one atomic Firestore operation.
+  const batch = writeBatch(db);
+
+  // Create chat
+  batch.set(chatRef, {
     type: "job_application",
 
     participants,
@@ -535,24 +548,8 @@ if (existingChat.exists()) {
       serverTimestamp(),
   });
 
-  console.log(
-    "6. Chat created successfully"
-  );
-
-  // ============================================================
-  // 4. CREATE INITIAL MESSAGE
-  // ============================================================
-
-  const messageRef = doc(
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    )
-  );
-
-  await setDoc(messageRef, {
+  // Create initial message
+  batch.set(messageRef, {
     senderId:
       applicant.uid,
 
@@ -573,8 +570,12 @@ if (existingChat.exists()) {
       null,
   });
 
+  // Commit both operations together.
+  await batch.commit();
+
   console.log(
-    "7. Initial message created successfully"
+    "New job application chat and initial message created successfully:",
+    chatId
   );
 
   return {
@@ -582,7 +583,7 @@ if (existingChat.exists()) {
     created: true,
   };
 }
-
+          
 /*
 |--------------------------------------------------------------------------
 | SEND MESSAGE
