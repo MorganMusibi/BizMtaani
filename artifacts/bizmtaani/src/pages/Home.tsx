@@ -912,10 +912,7 @@ const visibleProducts = isSearchMode
   ? allLoadedProducts
   : userCoords
   ? allLoadedProducts.filter((product) =>
-      isProductVisibleToUser(
-        product,
-        userCoords
-      )
+      isProductVisibleToUser(product, userCoords)
     )
   : allLoadedProducts;
 
@@ -924,11 +921,20 @@ const filteredProducts = applyFilters(
 );
 
 const rankedProducts = userCoords
-  ? rankProducts(
-      filteredProducts,
-      userCoords
-    )
+  ? rankProducts(filteredProducts, userCoords)
   : filteredProducts;
+
+// Keep the ward section separate from nearby adverts.
+const filteredWard = rankedProducts.filter((product) =>
+  locationInfo?.wardName
+    ? product.ward === locationInfo.wardName
+    : false
+);
+
+// Everything else belongs in nearby adverts.
+const filteredArea = rankedProducts.filter(
+  (product) => !filteredWard.some((wardProduct) => wardProduct.id === product.id)
+);
 
 const totalVisible = rankedProducts.length;
 
@@ -937,10 +943,6 @@ const isLoadingMore =
 
 const allDone =
   wardDone && areaDone;
-
-  const totalVisible = filteredWard.length + filteredArea.length;
-  const isLoadingMore = wardLoading || areaLoading;
-  const allDone = wardDone && areaDone;
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
