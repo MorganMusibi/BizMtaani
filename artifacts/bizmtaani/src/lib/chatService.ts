@@ -387,8 +387,7 @@ if (existingChat.exists()) {
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
-
-export async function startJobApplicationChat(params: {
+  export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
   jobId: string;
@@ -404,151 +403,178 @@ export async function startJobApplicationChat(params: {
     company,
   } = params;
 
-  validateUsers(
-    applicant,
-    employer
-  );
+  validateUsers(applicant, employer);
 
   if (!jobId) {
-    throw new Error(
-      "The job could not be identified."
-    );
+    throw new Error("The job could not be identified.");
   }
 
-const users = [applicant, employer];
+  // Build participants
+  const participants = sortedParticipants(
+    applicant.uid,
+    employer.uid
+  );
 
-const participants = sortedParticipants(
-  applicant.uid,
-  employer.uid
-);
+  // Build participant information
+  const users = [
+    applicant,
+    employer,
+  ];
 
-const chatId = getJobChatId(
-  jobId,
-  applicant.uid,
-  employer.uid
-);
+  // Generate deterministic chat ID
+  const chatId = getJobChatId(
+    jobId,
+    applicant.uid,
+    employer.uid
+  );
 
-const chatRef = doc(
-  db,
-  "chats",
-  chatId
-);
+  const chatRef = doc(
+    db,
+    "chats",
+    chatId
+  );
 
-const existingChat = await getDoc(chatRef);
+  // ============================================================
+  // 1. CHECK IF CHAT ALREADY EXISTS
+  // ============================================================
 
-if (existingChat.exists()) {
-  await updateDoc(chatRef, {
-    participantNames: participantNames(users),
-    participantPhotos: participantPhotos(users),
-    jobTitle,
-    company,
-    updatedAt: serverTimestamp(),
-  });
+  console.log(
+    "1. Checking existing chat:",
+    chatId
+  );
 
-  return {
-    chatId,
-    created: false,
-  };
-}
+  const existingChat =
+    await getDoc(chatRef);
 
-  /*
-  |--------------------------------------------------------------------------
-  | NEW CHAT
-  |--------------------------------------------------------------------------
-  */
+  console.log(
+    "2. Existing chat result:",
+    existingChat.exists()
+  );
 
-  const initialMessage =
-    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
+  // ============================================================
+  // 2. EXISTING CHAT
+  // ============================================================
 
-  /*
-  |--------------------------------------------------------------------------
-  | CREATE CHAT
-  |--------------------------------------------------------------------------
-  */
+  if (existingChat.exists()) {
 
-  await setDoc(
-    chatRef,
-    {
-      type:
-        "job_application",
+    console.log(
+      "3. Updating existing chat"
+    );
 
-      participants,
-
+    await updateDoc(chatRef, {
       participantNames:
         participantNames(users),
 
       participantPhotos:
         participantPhotos(users),
 
-      jobId,
-
       jobTitle,
 
       company,
 
-      lastMessage:
-        initialMessage,
-
-      lastMessageAt:
-        serverTimestamp(),
-
-      lastSenderId:
-        applicant.uid,
-
-      unreadCount: {
-        [applicant.uid]:
-          0,
-
-        [employer.uid]:
-          1,
-      },
-
-      createdAt:
-        serverTimestamp(),
-
       updatedAt:
         serverTimestamp(),
-    }
-  );
+    });
 
-  /*
-  |--------------------------------------------------------------------------
-  | CREATE INITIAL MESSAGE
-  |--------------------------------------------------------------------------
-  */
-
-  const messageRef =
-    doc(
-      collection(
-        db,
-        "chats",
-        chatId,
-        "messages"
-      )
+    console.log(
+      "4. Existing chat updated successfully"
     );
 
-  await setDoc(
-    messageRef,
-    {
-      senderId:
-        applicant.uid,
+    return {
+      chatId,
+      created: false,
+    };
+  }
 
-      senderName:
-        applicant.name ||
-        "Job Seeker",
+  // ============================================================
+  // 3. CREATE NEW CHAT
+  // ============================================================
 
-      text:
-        initialMessage,
+  const initialMessage =
+    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
 
-      createdAt:
-        serverTimestamp(),
+  console.log(
+    "5. Creating new chat"
+  );
 
-      deliveredAt:
-        null,
+  await setDoc(chatRef, {
+    type: "job_application",
 
-      readAt:
-        null,
-    }
+    participants,
+
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    jobId,
+
+    jobTitle,
+
+    company,
+
+    lastMessage:
+      initialMessage,
+
+    lastMessageAt:
+      serverTimestamp(),
+
+    lastSenderId:
+      applicant.uid,
+
+    unreadCount: {
+      [applicant.uid]: 0,
+      [employer.uid]: 1,
+    },
+
+    createdAt:
+      serverTimestamp(),
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  console.log(
+    "6. Chat created successfully"
+  );
+
+  // ============================================================
+  // 4. CREATE INITIAL MESSAGE
+  // ============================================================
+
+  const messageRef = doc(
+    collection(
+      db,
+      "chats",
+      chatId,
+      "messages"
+    )
+  );
+
+  await setDoc(messageRef, {
+    senderId:
+      applicant.uid,
+
+    senderName:
+      applicant.name ||
+      "Job Seeker",
+
+    text:
+      initialMessage,
+
+    createdAt:
+      serverTimestamp(),
+
+    deliveredAt:
+      null,
+
+    readAt:
+      null,
+  });
+
+  console.log(
+    "7. Initial message created successfully"
   );
 
   return {
@@ -556,9 +582,6 @@ if (existingChat.exists()) {
     created: true,
   };
 }
-  
-    
-
 
 /*
 |--------------------------------------------------------------------------
