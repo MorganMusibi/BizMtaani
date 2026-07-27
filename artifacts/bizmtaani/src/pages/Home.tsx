@@ -415,7 +415,7 @@ export default function Home() {
   const [wardLoading, setWardLoading] = useState(false);
 
   const [areaProducts, setAreaProducts] = useState<Product[]>([]);
-  const [areaCursor, setAreaCursor] = useState<Cursor | null>(null);
+  const [areaCursors, setAreaCursors] = useState< Record<string, Cursor | null> >({});
   const [areaDone, setAreaDone] = useState(false);
   const [areaLoading, setAreaLoading] = useState(false);
 
