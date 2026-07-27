@@ -596,19 +596,7 @@ setAreaDone(false);
     )
   );
 
-  setAreaDone(
-    snapshots.every(
-      (snap) => snap.docs.length < AREA_PAGE
-    )
-  );
-} catch (error) {
-  console.error(
-    "Failed to load nearby adverts:",
-    error
-  );
-
-  setAreaDone(true);
-}
+    setAreaDone(
     snapshots.every(
       (snap) => snap.docs.length < AREA_PAGE
     )
