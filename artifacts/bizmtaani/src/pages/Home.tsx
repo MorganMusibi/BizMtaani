@@ -534,88 +534,169 @@ function areaQueries(coords: [number, number]) {
     )
   );
 }
-  useEffect(() => {
-    if (!gpsReady || !userCoords) return;
+  
+    useEffect(() => {
+  if (!gpsReady || !userCoords) return;
 
-    setInitialLoading(true);
-    setWardProducts([]); setWardCursor(null); setWardDone(false);
-    setAreaProducts([]);
-setAreaCursors({});
-setAreaDone(false);
-    const run = async () => {
-      const wardName = locationInfo?.wardName ?? "";
-      if (wardName && !isSearchMode) {
-        try {
-          const snap = await getDocs(wardQuery(wardName));
-          const docs = toProducts(snap.docs);
-          setWardProducts(docs);
-          setWardCursor(snap.docs[snap.docs.length - 1] ?? null);
-          setWardDone(snap.docs.length < WARD_PAGE);
-        } catch {
-          setWardDone(true);
-        }
-      } else {
+  setInitialLoading(true);
+
+  setWardProducts([]);
+  setWardCursor(null);
+  setWardDone(false);
+
+  setAreaProducts([]);
+  setAreaCursors({});
+  setAreaDone(false);
+
+  const run = async () => {
+
+    // ============================================================
+    // SEARCH MODE
+    // Search ALL products across Kenya.
+    //
+    // No ward restriction.
+    // No geohash restriction.
+    // No distance restriction.
+    // No radius restriction.
+    //
+    // Free and Premium products are treated equally.
+    //
+    // Expired / pending-payment / inactive products are removed
+    // later by toProducts() and applyFilters().
+    // ============================================================
+
+    if (isSearchMode) {
+      try {
+        const snap = await getDocs(
+          searchQueryAllProducts()
+        );
+
+        const products = toProducts(snap.docs);
+
+        setWardProducts([]);
+
+        setAreaProducts(products);
+
+        setWardCursor(null);
+        setAreaCursors({});
+
         setWardDone(true);
+        setAreaDone(true);
+
+      } catch (error) {
+        console.error(
+          "Failed to search all products:",
+          error
+        );
+
+        setWardProducts([]);
+        setAreaProducts([]);
+
+        setWardDone(true);
+        setAreaDone(true);
       }
 
-      try {
-  const queries = areaQueries(userCoords);
-
-  const snapshots = await Promise.all(
-    queries.map((q) => getDocs(q))
-  );
-
-  const allDocs = snapshots.flatMap(
-    (snap) => snap.docs
-  );
-
-  const products = toProducts(allDocs);
-
-  const uniqueProducts = Array.from(
-    new Map(
-      products.map((product) => [
-        product.id,
-        product,
-      ])
-    ).values()
-  );
-
-  const sortedProducts = sortNearbyProducts(
-    uniqueProducts,
-    userCoords
-  );
-
-  setAreaProducts(sortedProducts);
-
-  setAreaCursors(
-    Object.fromEntries(
-      snapshots.map((snap, index) => [
-        index,
-        snap.docs[snap.docs.length - 1] ?? null,
-      ])
-    )
-  );
-
-    setAreaDone(
-    snapshots.every(
-      (snap) => snap.docs.length < AREA_PAGE
-    )
-  );
-} catch (error) {
-  console.error(
-    "Failed to load nearby adverts:",
-    error
-  );
-
-  setAreaDone(true);
-}
-
       setInitialLoading(false);
-    };
+      return;
+    }
 
-    run();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gpsReady, isSearchMode, locationInfo?.wardName]);
+    // ============================================================
+    // NORMAL HOME FEED
+    // Keep existing ward + nearby geohash behavior.
+    // ============================================================
+
+    const wardName = locationInfo?.wardName ?? "";
+
+    if (wardName) {
+      try {
+        const snap = await getDocs(
+          wardQuery(wardName)
+        );
+
+        const docs = toProducts(snap.docs);
+
+        setWardProducts(docs);
+
+        setWardCursor(
+          snap.docs[snap.docs.length - 1] ?? null
+        );
+
+        setWardDone(
+          snap.docs.length < WARD_PAGE
+        );
+
+      } catch (error) {
+        console.error(
+          "Failed to load ward adverts:",
+          error
+        );
+
+        setWardDone(true);
+      }
+    } else {
+      setWardDone(true);
+    }
+
+    try {
+      const queries = areaQueries(userCoords);
+
+      const snapshots = await Promise.all(
+        queries.map((q) => getDocs(q))
+      );
+
+      const allDocs = snapshots.flatMap(
+        (snap) => snap.docs
+      );
+
+      const products = toProducts(allDocs);
+
+      const uniqueProducts = Array.from(
+        new Map(
+          products.map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
+
+      const sortedProducts = sortNearbyProducts(
+        uniqueProducts,
+        userCoords
+      );
+
+      setAreaProducts(sortedProducts);
+
+      setAreaCursors(
+        Object.fromEntries(
+          snapshots.map((snap, index) => [
+            index,
+            snap.docs[snap.docs.length - 1] ?? null,
+          ])
+        )
+      );
+
+      setAreaDone(
+        snapshots.every(
+          (snap) => snap.docs.length < AREA_PAGE
+        )
+      );
+
+    } catch (error) {
+      console.error(
+        "Failed to load nearby adverts:",
+        error
+      );
+
+      setAreaDone(true);
+    }
+
+    setInitialLoading(false);
+  };
+
+  run();
+
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [gpsReady, isSearchMode, locationInfo?.wardName]);
 
   const loadMore = useCallback(async () => {
     if (!userCoords) return;
