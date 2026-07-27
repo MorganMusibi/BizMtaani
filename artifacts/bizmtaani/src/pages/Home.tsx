@@ -539,8 +539,9 @@ function areaQueries(coords: [number, number]) {
 
     setInitialLoading(true);
     setWardProducts([]); setWardCursor(null); setWardDone(false);
-    setAreaProducts([]); setAreaCursor(null); setAreaDone(false);
-
+    setAreaProducts([]);
+setAreaCursors({});
+setAreaDone(false);
     const run = async () => {
       const wardName = locationInfo?.wardName ?? "";
       if (wardName && !isSearchMode) {
@@ -586,11 +587,28 @@ function areaQueries(coords: [number, number]) {
 
   setAreaProducts(sortedProducts);
 
-  // Multi-cell loading is handled as one candidate batch.
-  // We will improve pagination in the next step.
-  setAreaCursor(null);
+  setAreaCursors(
+    Object.fromEntries(
+      snapshots.map((snap, index) => [
+        index,
+        snap.docs[snap.docs.length - 1] ?? null,
+      ])
+    )
+  );
 
   setAreaDone(
+    snapshots.every(
+      (snap) => snap.docs.length < AREA_PAGE
+    )
+  );
+} catch (error) {
+  console.error(
+    "Failed to load nearby adverts:",
+    error
+  );
+
+  setAreaDone(true);
+}
     snapshots.every(
       (snap) => snap.docs.length < AREA_PAGE
     )
@@ -627,17 +645,122 @@ function areaQueries(coords: [number, number]) {
       return;
     }
 
-    if (!areaDone && !areaLoading && areaCursor) {
-      setAreaLoading(true);
-      try {
-        const snap = await getDocs(areaQuery(userCoords, areaCursor));
-        setAreaProducts((prev) => dedupe(prev, toProducts(snap.docs)));
-        setAreaCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setAreaDone(snap.docs.length < AREA_PAGE);
-      } finally {
-        setAreaLoading(false);
+    if (
+  !areaDone &&
+  !areaLoading &&
+  userCoords
+) {
+  setAreaLoading(true);
+
+  try {
+    const prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      5
+    );
+
+    const queries = prefixes.map(
+      (prefix, index) => {
+        const cursor = areaCursors[index];
+
+        const coll = collection(
+          db,
+          "products"
+        );
+
+        const baseQuery = query(
+          coll,
+          where(
+            "geohash",
+            ">=",
+            prefix
+          ),
+          where(
+            "geohash",
+            "<",
+            prefix + "\uf8ff"
+          ),
+          orderBy("geohash"),
+          limit(AREA_PAGE)
+        );
+
+        return cursor
+          ? query(
+              coll,
+              where(
+                "geohash",
+                ">=",
+                prefix
+              ),
+              where(
+                "geohash",
+                "<",
+                prefix + "\uf8ff"
+              ),
+              orderBy("geohash"),
+              startAfter(cursor),
+              limit(AREA_PAGE)
+            )
+          : baseQuery;
       }
-    }
+    );
+
+    const snapshots = await Promise.all(
+      queries.map((q) => getDocs(q))
+    );
+
+    const newProducts = snapshots.flatMap(
+      (snap) => toProducts(snap.docs)
+    );
+
+    const uniqueNewProducts = Array.from(
+      new Map(
+        newProducts.map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
+
+    const updatedCursors = {
+      ...areaCursors,
+    };
+
+    snapshots.forEach(
+      (snap, index) => {
+        if (snap.docs.length > 0) {
+          updatedCursors[index] =
+            snap.docs[
+              snap.docs.length - 1
+            ];
+        }
+      }
+    );
+
+    setAreaCursors(updatedCursors);
+
+    setAreaProducts((prev) => {
+      const merged = dedupe(
+        prev,
+        uniqueNewProducts
+      );
+
+      return sortNearbyProducts(
+        merged,
+        userCoords
+      );
+    });
+
+    setAreaDone(
+      snapshots.every(
+        (snap) =>
+          snap.docs.length < AREA_PAGE
+      )
+    );
+  } finally {
+    setAreaLoading(false);
+  }
+}
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursor, userCoords, locationInfo]);
 
