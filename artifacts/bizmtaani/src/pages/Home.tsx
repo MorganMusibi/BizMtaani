@@ -873,7 +873,9 @@ const allLoadedProducts = dedupe(
   areaProducts.filter((p) => !wardIds.has(p.id))
 );
 
-const visibleProducts = userCoords
+const visibleProducts = isSearchMode
+  ? allLoadedProducts
+  : userCoords
   ? allLoadedProducts.filter((product) =>
       isProductVisibleToUser(product, userCoords)
     )
