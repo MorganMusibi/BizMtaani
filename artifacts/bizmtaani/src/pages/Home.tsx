@@ -607,25 +607,22 @@ function areaQueries(coords: [number, number]) {
 
   setInitialLoading(true);
 
-  setWardProducts([]);
-  setWardCursor(null);
-  setWardDone(false);
+setWardProducts([]);
+setWardCursor(null);
+setWardDone(false);
 
-  setAreaProducts([]);
-  setAreaCursors({});
-  setAreaDone(false);
+setAreaProducts([]);
+setAreaCursors({});
+setAreaDone(false);
 
+setSearchCursor(null);
+setSearchDone(false);
   const run = async () => {
 
     // ============================================================
     // SEARCH MODE
     // Search ALL products across Kenya.
-    //
-    // No ward restriction.
-    // No geohash restriction.
-    // No distance restriction.
-    // No radius restriction.
-    //
+    
     // Free and Premium products are treated equally.
     //
     // Expired / pending-payment / inactive products are removed
@@ -651,20 +648,18 @@ function areaQueries(coords: [number, number]) {
       )
     );
 
-    setWardCursor(null);
+    setSearchCursor(
+  snap.docs[
+    snap.docs.length - 1
+  ] ?? null
+);
 
-    setAreaCursors({
-      search:
-        snap.docs[
-          snap.docs.length - 1
-        ] ?? null,
-    });
+setSearchDone(
+  snap.docs.length < AREA_PAGE
+);
 
-    setWardDone(true);
-
-    setAreaDone(
-      snap.docs.length < AREA_PAGE
-    );
+setWardDone(true);
+setAreaDone(true);
 
   } catch (error) {
     console.error(
