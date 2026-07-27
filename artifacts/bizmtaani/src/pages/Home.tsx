@@ -608,10 +608,24 @@ export default function Home() {
       return matchCat && matchSearch && matchRadius;
     });
   }
+const wardIds = new Set(wardProducts.map((p) => p.id));
 
-  const wardIds = new Set(wardProducts.map((p) => p.id));
-  const filteredWard = applyFilters(wardProducts);
-  const filteredArea = applyFilters(areaProducts.filter((p) => !wardIds.has(p.id)));
+const allLoadedProducts = dedupe(
+  wardProducts,
+  areaProducts.filter((p) => !wardIds.has(p.id))
+);
+
+const visibleProducts = userCoords
+  ? allLoadedProducts.filter((product) =>
+      isProductVisibleToUser(product, userCoords)
+    )
+  : allLoadedProducts;
+
+const filteredProducts = applyFilters(visibleProducts);
+
+const rankedProducts = userCoords
+  ? rankProducts(filteredProducts, userCoords)
+  : filteredProducts;
 
   const totalVisible = filteredWard.length + filteredArea.length;
   const isLoadingMore = wardLoading || areaLoading;
