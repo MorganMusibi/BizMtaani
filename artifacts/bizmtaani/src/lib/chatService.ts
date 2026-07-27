@@ -381,17 +381,12 @@ if (existingChat.exists()) {
   };
 }
 
-/*
-|--------------------------------------------------------------------------
-| START JOB APPLICATION CHAT
-|--------------------------------------------------------------------------
-*/
   /*
 |--------------------------------------------------------------------------
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
-  export async function startJobApplicationChat(params: {
+export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
   jobId: string;
@@ -458,7 +453,6 @@ if (existingChat.exists()) {
   // ============================================================
 
   if (existingChat.exists()) {
-
     console.log(
       "Job application chat already exists:",
       chatId
@@ -486,33 +480,16 @@ if (existingChat.exists()) {
   }
 
   // ============================================================
-  // NEW CHAT
+  // NEW CHAT (NO INITIAL MESSAGE PATH)
   // ============================================================
-
-  const initialMessage =
-    `Hello, I'm interested in applying for the ${jobTitle} position at ${company}. I'd like to know more about the opportunity and how I can apply.`;
 
   console.log(
     "Creating new job application chat:",
     chatId
   );
 
-  // Create the message reference first.
-  const messageRef = doc(
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    )
-  );
-
-  // Use one batch so the chat and first message are created
-  // together as one atomic Firestore operation.
-  const batch = writeBatch(db);
-
-  // Create chat
-  batch.set(chatRef, {
+  // Create just the main chat document
+  await setDoc(chatRef, {
     type: "job_application",
 
     participants,
@@ -529,18 +506,16 @@ if (existingChat.exists()) {
 
     company,
 
-    lastMessage:
-      initialMessage,
+    lastMessage: "",
 
     lastMessageAt:
       serverTimestamp(),
 
-    lastSenderId:
-      applicant.uid,
+    lastSenderId: "",
 
     unreadCount: {
       [applicant.uid]: 0,
-      [employer.uid]: 1,
+      [employer.uid]: 0,
     },
 
     createdAt:
@@ -550,33 +525,8 @@ if (existingChat.exists()) {
       serverTimestamp(),
   });
 
-  // Create initial message
-  batch.set(messageRef, {
-    senderId:
-      applicant.uid,
-
-    senderName:
-      applicant.name ||
-      "Job Seeker",
-
-    text:
-      initialMessage,
-
-    createdAt:
-      serverTimestamp(),
-
-    deliveredAt:
-      null,
-
-    readAt:
-      null,
-  });
-
-  // Commit both operations together.
-  await batch.commit();
-
   console.log(
-    "New job application chat and initial message created successfully:",
+    "New job application chat created successfully:",
     chatId
   );
 
