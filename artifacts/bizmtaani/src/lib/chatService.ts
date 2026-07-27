@@ -386,6 +386,11 @@ if (existingChat.exists()) {
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
+  /*
+|--------------------------------------------------------------------------
+| START JOB APPLICATION CHAT
+|--------------------------------------------------------------------------
+*/
   export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
@@ -394,8 +399,19 @@ if (existingChat.exists()) {
   company: string;
 }): Promise<StartChatResult> {
 
+  const currentUser = auth.currentUser;
+
+  if (!currentUser) {
+    throw new Error("You must be signed in to apply via chat.");
+  }
+
+  // Force the applicant object to always use the verified current user's UID
+  const applicant: ChatParticipant = {
+    ...params.applicant,
+    uid: currentUser.uid,
+  };
+
   const {
-    applicant,
     employer,
     jobId,
     jobTitle,
@@ -406,20 +422,6 @@ if (existingChat.exists()) {
 
   if (!jobId) {
     throw new Error("The job could not be identified.");
-  }
-
-  // Make absolutely sure the applicant is the authenticated user.
-  // This must match request.auth.uid in Firestore Security Rules.
-  const currentUser = auth.currentUser;
-
-  if (!currentUser) {
-    throw new Error("You must be signed in to apply via chat.");
-  }
-
-  if (currentUser.uid !== applicant.uid) {
-    throw new Error(
-      "The authenticated user does not match the job applicant."
-    );
   }
 
   const users = [
@@ -569,11 +571,6 @@ if (existingChat.exists()) {
     readAt:
       null,
   });
-console.log("AUTH UID:", auth.currentUser?.uid);
-console.log("APPLICANT UID:", applicant.uid);
-console.log("EMPLOYER UID:", employer.uid);
-console.log("CHAT ID:", chatId);
-console.log("PARTICIPANTS:", participants);
 
   // Commit both operations together.
   await batch.commit();
@@ -588,6 +585,7 @@ console.log("PARTICIPANTS:", participants);
     created: true,
   };
 }
+
           
 /*
 |--------------------------------------------------------------------------
