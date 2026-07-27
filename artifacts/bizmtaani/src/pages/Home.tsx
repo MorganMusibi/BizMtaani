@@ -97,6 +97,65 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
+function isPremiumProduct(product: Product) {
+  return (
+    product.plan === "premium_weekly" ||
+    product.plan === "premium_monthly" ||
+    product.isPremium === true
+  );
+}
+
+function getProductVisibilityScope(product: Product) {
+  // New adverts: use explicit visibility scope
+  if (product.visibilityScope) {
+    return product.visibilityScope;
+  }
+
+  // Backward compatibility for existing adverts
+  if (isPremiumProduct(product)) {
+    return "county";
+  }
+
+  return "local";
+}
+
+function isProductVisibleToUser(
+  product: Product,
+  userCoords: [number, number]
+) {
+  const distance = getDistanceKm(
+    userCoords[0],
+    userCoords[1],
+    product.lat,
+    product.lng
+  );
+
+  const scope = getProductVisibilityScope(product);
+
+  // Free/local adverts
+  if (scope === "local") {
+    const radius = product.visibilityRadiusKm ?? 2.5;
+    return distance <= radius;
+  }
+
+  // County and all-area adverts are currently eligible
+  // once they have been loaded by the geographic query.
+  if (scope === "county" || scope === "all_areas") {
+    return true;
+  }
+
+  return false;
+}
+
+function getDistanceBucket(distanceKm: number) {
+  if (distanceKm <= 2.5) return 1;
+  if (distanceKm <= 5) return 2;
+  if (distanceKm <= 10) return 3;
+  if (distanceKm <= 20) return 4;
+  if (distanceKm <= 50) return 5;
+
+  return 6;
+  }
 
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
   return docs
@@ -107,6 +166,48 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
 function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
+}
+function rankProducts(
+  products: Product[],
+  userCoords: [number, number]
+): Product[] {
+  return products
+    .map((product, index) => {
+      const distanceKm = getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      );
+
+      return {
+        product,
+        distanceKm,
+        distanceBucket: getDistanceBucket(distanceKm),
+        premium: isPremiumProduct(product),
+        originalIndex: index,
+      };
+    })
+    .sort((a, b) => {
+      // 1. Closest distance zone first
+      if (a.distanceBucket !== b.distanceBucket) {
+        return a.distanceBucket - b.distanceBucket;
+      }
+
+      // 2. Premium adverts get priority within the same zone
+      if (a.premium !== b.premium) {
+        return a.premium ? -1 : 1;
+      }
+
+      // 3. Closest advert first within the same priority group
+      if (a.distanceKm !== b.distanceKm) {
+        return a.distanceKm - b.distanceKm;
+      }
+
+      // 4. Preserve original order as final fallback
+      return a.originalIndex - b.originalIndex;
+    })
+    .map((item) => item.product);
 }
 
 function ProductCard({
