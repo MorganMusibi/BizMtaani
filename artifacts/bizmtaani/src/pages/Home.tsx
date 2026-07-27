@@ -533,16 +533,48 @@ export default function Home() {
     setShowAreaPicker(false);
   }
 
-  function wardQuery(wardName: string, cursor?: Cursor) {
-    const coll = collection(db, "products");
-    const constraints = [
+  function wardQuery(
+  wardName: string,
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
       where("ward", "==", wardName),
       orderBy("createdAt", "desc"),
-      limit(WARD_PAGE),
-    ] as const;
-    return cursor
-      ? query(coll, constraints[0], constraints[1], constraints[2], startAfter(cursor), constraints[3])
-      : query(coll, ...constraints);
+      startAfter(cursor),
+      limit(WARD_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    where("ward", "==", wardName),
+    orderBy("createdAt", "desc"),
+    limit(WARD_PAGE)
+  );
+}
+  function searchQueryAllProducts(
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(AREA_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
   }
 
     
@@ -597,40 +629,55 @@ function areaQueries(coords: [number, number]) {
     // ============================================================
 
     if (isSearchMode) {
-      try {
-        const snap = await getDocs(
-          searchQueryAllProducts()
-        );
+  try {
+    const snap = await getDocs(
+      searchQueryAllProducts()
+    );
 
-        const products = toProducts(snap.docs);
+    const products = toProducts(
+      snap.docs
+    );
 
-        setWardProducts([]);
+    setWardProducts([]);
 
-        setAreaProducts(products);
+    setAreaProducts(
+      sortNearbyProducts(
+        products,
+        userCoords
+      )
+    );
 
-        setWardCursor(null);
-        setAreaCursors({});
+    setWardCursor(null);
 
-        setWardDone(true);
-        setAreaDone(true);
+    setAreaCursors({
+      search:
+        snap.docs[
+          snap.docs.length - 1
+        ] ?? null,
+    });
 
-      } catch (error) {
-        console.error(
-          "Failed to search all products:",
-          error
-        );
+    setWardDone(true);
 
-        setWardProducts([]);
-        setAreaProducts([]);
+    setAreaDone(
+      snap.docs.length < AREA_PAGE
+    );
 
-        setWardDone(true);
-        setAreaDone(true);
-      }
+  } catch (error) {
+    console.error(
+      "Failed to search products:",
+      error
+    );
 
-      setInitialLoading(false);
-      return;
-    }
+    setWardProducts([]);
+    setAreaProducts([]);
 
+    setWardDone(true);
+    setAreaDone(true);
+  }
+
+  setInitialLoading(false);
+  return;
+}
     // ============================================================
     // NORMAL HOME FEED
     // Keep existing ward + nearby geohash behavior.
