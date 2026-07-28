@@ -447,6 +447,7 @@ export default function Home() {
 
 const [areaProducts, setAreaProducts] = useState<Product[]>([]);
 const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
+const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
 const [areaDone, setAreaDone] = useState(false);
 const [areaLoading, setAreaLoading] = useState(false);
 
@@ -581,42 +582,54 @@ const [searchLoading, setSearchLoading] = useState(false);
   );
   }
 
-    
-function areaQueries(
+  function areaQueries(
   coords: [number, number],
-  cursors: Record<string, Cursor | null> = {}
+  cursors: Record<string, Cursor | null> = {},
+  donePrefixes: Record<string, boolean> = {}
 ) {
   const prefixes = getNearbyGeohashPrefixes(
     coords[0],
     coords[1],
-    5
+    radiusKm
   );
 
   const coll = collection(db, "products");
 
-  return prefixes.map((prefix, index) => {
-    const cursor = cursors[String(index)];
+  return prefixes
+    .map((prefix, index) => {
+      const key = String(index);
 
-    if (cursor) {
+      // Do not query a prefix that we already know is exhausted.
+      if (donePrefixes[key]) {
+        return null;
+      }
+
+      const cursor = cursors[key];
+
+      if (cursor) {
+        return query(
+          coll,
+          where("geohash", ">=", prefix),
+          where("geohash", "<", prefix + "\uf8ff"),
+          orderBy("geohash"),
+          startAfter(cursor),
+          limit(AREA_PAGE)
+        );
+      }
+
       return query(
         coll,
         where("geohash", ">=", prefix),
         where("geohash", "<", prefix + "\uf8ff"),
         orderBy("geohash"),
-        startAfter(cursor),
         limit(AREA_PAGE)
       );
-    }
-
-    return query(
-      coll,
-      where("geohash", ">=", prefix),
-      where("geohash", "<", prefix + "\uf8ff"),
-      orderBy("geohash"),
-      limit(AREA_PAGE)
+    })
+    .filter(
+      (q): q is ReturnType<typeof query> => q !== null
     );
-  });
 }
+
   
     useEffect(() => {
   if (!gpsReady || !userCoords) return;
@@ -630,6 +643,7 @@ setWardDone(false);
 setAreaProducts([]);
 setAreaCursors({});
 setAreaDone(false);
+setAreaDonePrefixes({});      
 
 setSearchCursor(null);
 setSearchDone(false);
