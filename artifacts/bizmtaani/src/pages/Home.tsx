@@ -756,10 +756,8 @@ setAreaDone(true);
 // ============================================================
 
 try {
-  let currentCursors: Record<
-    string,
-    Cursor | null
-  > = {};
+  let currentCursors: Record<string, Cursor | null> = {};
+  let currentDonePrefixes: Record<string, boolean> = {};
 
   let collectedProducts: Product[] = [];
   let allPrefixesDone = false;
@@ -768,49 +766,61 @@ try {
     collectedProducts.length < AREA_PAGE &&
     !allPrefixesDone
   ) {
+    const prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      radiusKm
+    );
+
+    const activePrefixes = prefixes.filter(
+      (_, index) =>
+        !currentDonePrefixes[String(index)]
+    );
+
+    if (activePrefixes.length === 0) {
+      allPrefixesDone = true;
+      break;
+    }
+
     const queries = areaQueries(
       userCoords,
-      currentCursors
+      currentCursors,
+      currentDonePrefixes
     );
+
+    if (queries.length === 0) {
+      allPrefixesDone = true;
+      break;
+    }
 
     const snapshots = await Promise.all(
       queries.map((q) => getDocs(q))
     );
 
     const pageProducts = snapshots.flatMap(
-      (snap) =>
-        toProducts(snap.docs)
+      (snap) => toProducts(snap.docs)
     );
 
-    const uniquePageProducts =
-      Array.from(
-        new Map(
-          pageProducts.map(
-            (product) => [
-              product.id,
-              product,
-            ]
-          )
-        ).values()
-      );
+    const uniquePageProducts = Array.from(
+      new Map(
+        pageProducts.map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
 
-    collectedProducts =
-      Array.from(
-        new Map(
-          [
-            ...collectedProducts,
-            ...uniquePageProducts,
-          ].map(
-            (product) => [
-              product.id,
-              product,
-            ]
-          )
-        ).values()
-      );
-
-    let prefixesStillAvailable =
-      false;
+    collectedProducts = Array.from(
+      new Map(
+        [
+          ...collectedProducts,
+          ...uniquePageProducts,
+        ].map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
 
     const updatedCursors: Record<
       string,
@@ -819,45 +829,60 @@ try {
       ...currentCursors,
     };
 
-    snapshots.forEach(
-      (snap, index) => {
-        if (snap.docs.length > 0) {
-          updatedCursors[
-            String(index)
-          ] =
-            snap.docs[
-              snap.docs.length - 1
-            ];
-        }
+    const updatedDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...currentDonePrefixes,
+    };
 
-        if (
-          snap.docs.length >= AREA_PAGE
-        ) {
-          prefixesStillAvailable =
-            true;
-        }
+    let queryIndex = 0;
+
+    prefixes.forEach((_, prefixIndex) => {
+      const key = String(prefixIndex);
+
+      if (currentDonePrefixes[key]) {
+        return;
       }
+
+      const snap = snapshots[queryIndex];
+      queryIndex++;
+
+      if (!snap) {
+        updatedDonePrefixes[key] = true;
+        return;
+      }
+
+      if (snap.docs.length > 0) {
+        updatedCursors[key] =
+          snap.docs[snap.docs.length - 1];
+      }
+
+      // If fewer than AREA_PAGE documents were returned,
+      // this prefix has been completely exhausted.
+      if (snap.docs.length < AREA_PAGE) {
+        updatedDonePrefixes[key] = true;
+      }
+    });
+
+    currentCursors = updatedCursors;
+    currentDonePrefixes = updatedDonePrefixes;
+
+    allPrefixesDone = prefixes.every(
+      (_, index) =>
+        currentDonePrefixes[String(index)] === true
     );
 
-    currentCursors =
-      updatedCursors;
-
-    allPrefixesDone =
-      !prefixesStillAvailable;
-
-    if (
-      snapshots.every(
-        (snap) =>
-          snap.docs.length === 0
-      )
-    ) {
+    // Safety guard.
+    if (snapshots.every(
+      (snap) => snap.docs.length === 0
+    )) {
       allPrefixesDone = true;
     }
   }
 
-  setAreaCursors(
-    currentCursors
-  );
+  setAreaCursors(currentCursors);
+  setAreaDonePrefixes(currentDonePrefixes);
 
   setAreaProducts(
     sortNearbyProducts(
@@ -866,9 +891,7 @@ try {
     )
   );
 
-  setAreaDone(
-    allPrefixesDone
-  );
+  setAreaDone(allPrefixesDone);
 
 } catch (error) {
   console.error(
@@ -877,7 +900,7 @@ try {
   );
 
   setAreaDone(true);
-}
+      }
 
     setInitialLoading(false);
   };
@@ -999,7 +1022,6 @@ if (!wardDone && !wardLoading) {
 // Ward adverts are now exhausted.
 // Load nearby adverts in pages of approximately 20 unique items.
 // ============================================================
-
 if (!areaDone && !areaLoading) {
   setAreaLoading(true);
 
@@ -1011,6 +1033,13 @@ if (!areaDone && !areaLoading) {
       ...areaCursors,
     };
 
+    let currentDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...areaDonePrefixes,
+    };
+
     let collectedProducts: Product[] = [];
     let allPrefixesDone = false;
 
@@ -1018,49 +1047,61 @@ if (!areaDone && !areaLoading) {
       collectedProducts.length < AREA_PAGE &&
       !allPrefixesDone
     ) {
+      const prefixes = getNearbyGeohashPrefixes(
+        userCoords[0],
+        userCoords[1],
+        radiusKm
+      );
+
+      const activePrefixes = prefixes.filter(
+        (_, index) =>
+          !currentDonePrefixes[String(index)]
+      );
+
+      if (activePrefixes.length === 0) {
+        allPrefixesDone = true;
+        break;
+      }
+
       const queries = areaQueries(
         userCoords,
-        currentCursors
+        currentCursors,
+        currentDonePrefixes
       );
+
+      if (queries.length === 0) {
+        allPrefixesDone = true;
+        break;
+      }
 
       const snapshots = await Promise.all(
         queries.map((q) => getDocs(q))
       );
 
       const pageProducts = snapshots.flatMap(
-        (snap) =>
-          toProducts(snap.docs)
+        (snap) => toProducts(snap.docs)
       );
 
-      const uniquePageProducts =
-        Array.from(
-          new Map(
-            pageProducts.map(
-              (product) => [
-                product.id,
-                product,
-              ]
-            )
-          ).values()
-        );
+      const uniquePageProducts = Array.from(
+        new Map(
+          pageProducts.map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
 
-      collectedProducts =
-        Array.from(
-          new Map(
-            [
-              ...collectedProducts,
-              ...uniquePageProducts,
-            ].map(
-              (product) => [
-                product.id,
-                product,
-              ]
-            )
-          ).values()
-        );
-
-      let prefixesStillAvailable =
-        false;
+      collectedProducts = Array.from(
+        new Map(
+          [
+            ...collectedProducts,
+            ...uniquePageProducts,
+          ].map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
 
       const updatedCursors: Record<
         string,
@@ -1069,52 +1110,65 @@ if (!areaDone && !areaLoading) {
         ...currentCursors,
       };
 
-      snapshots.forEach(
-        (snap, index) => {
-          if (snap.docs.length > 0) {
-            updatedCursors[
-              String(index)
-            ] =
-              snap.docs[
-                snap.docs.length - 1
-              ];
-          }
+      const updatedDonePrefixes: Record<
+        string,
+        boolean
+      > = {
+        ...currentDonePrefixes,
+      };
 
-          if (
-            snap.docs.length >= AREA_PAGE
-          ) {
-            prefixesStillAvailable =
-              true;
-          }
+      let queryIndex = 0;
+
+      prefixes.forEach((_, prefixIndex) => {
+        const key = String(prefixIndex);
+
+        if (currentDonePrefixes[key]) {
+          return;
         }
+
+        const snap = snapshots[queryIndex];
+        queryIndex++;
+
+        if (!snap) {
+          updatedDonePrefixes[key] = true;
+          return;
+        }
+
+        if (snap.docs.length > 0) {
+          updatedCursors[key] =
+            snap.docs[snap.docs.length - 1];
+        }
+
+        // A short page means this prefix has no more
+        // documents available.
+        if (snap.docs.length < AREA_PAGE) {
+          updatedDonePrefixes[key] = true;
+        }
+      });
+
+      currentCursors = updatedCursors;
+      currentDonePrefixes = updatedDonePrefixes;
+
+      allPrefixesDone = prefixes.every(
+        (_, index) =>
+          currentDonePrefixes[String(index)] === true
       );
 
-      currentCursors =
-        updatedCursors;
-
-      allPrefixesDone =
-        !prefixesStillAvailable;
-
-      if (
-        snapshots.every(
-          (snap) =>
-            snap.docs.length === 0
-        )
-      ) {
+      if (snapshots.every(
+        (snap) => snap.docs.length === 0
+      )) {
         allPrefixesDone = true;
       }
     }
 
-    setAreaCursors(
-      currentCursors
-    );
+    setAreaCursors(currentCursors);
+    setAreaDonePrefixes(currentDonePrefixes);
 
     setAreaProducts((prev) => {
-      const merged =
-        dedupe(
-          prev,
-          collectedProducts
-        );
+      const merged = dedupe(
+        prev,
+        collectedProducts
+      );
 
       return sortNearbyProducts(
         merged,
@@ -1122,9 +1176,7 @@ if (!areaDone && !areaLoading) {
       );
     });
 
-    setAreaDone(
-      allPrefixesDone
-    );
+    setAreaDone(allPrefixesDone);
 
   } catch (error) {
     console.error(
@@ -1141,8 +1193,10 @@ if (!areaDone && !areaLoading) {
   wardCursor,
   locationInfo?.wardName,
   areaDone,
-  areaLoading,
-  areaCursors,
+areaLoading,
+areaCursors,
+areaDonePrefixes,
+radiusKm,
 ]);
 
 
