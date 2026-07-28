@@ -839,21 +839,79 @@ const loadMore = useCallback(async () => {
   }
   
 // ============================================================
-// NORMAL FEED — NEARBY AREA PAGINATION
-// Load nearby adverts in pages of 20.
+// NORMAL FEED — WARD-FIRST PAGINATION
 //
-// Each geohash prefix keeps its own Firestore cursor.
-// Results are merged and deduplicated before being added
-// to the feed.
-//
-// We continue requesting pages until we collect at least
-// AREA_PAGE new adverts, or all geohash prefixes are done.
+// 1. Load the next 20 adverts from the user's ward first.
+// 2. Only after ward adverts are exhausted, load nearby adverts.
 // ============================================================
+
+if (!wardDone && !wardLoading) {
+  const wardName = locationInfo?.wardName;
+
+  if (!wardName) {
+    setWardDone(true);
+    return;
+  }
+
+  setWardLoading(true);
+
+  try {
+    const snap = await getDocs(
+      wardQuery(
+        wardName,
+        wardCursor ?? undefined
+      )
+    );
+
+    const newWardProducts = toProducts(
+      snap.docs
+    );
+
+    setWardProducts((prev) =>
+      dedupe(
+        prev,
+        newWardProducts
+      )
+    );
+
+    setWardCursor(
+      snap.docs[
+        snap.docs.length - 1
+      ] ?? wardCursor
+    );
+
+    setWardDone(
+      snap.docs.length < WARD_PAGE
+    );
+
+  } catch (error) {
+    console.error(
+      "Failed to load more ward adverts:",
+      error
+    );
+  } finally {
+    setWardLoading(false);
+  }
+
+  return;
+}
+
+
+// ============================================================
+// NORMAL FEED — NEARBY AREA PAGINATION
+//
+// Ward adverts are now exhausted.
+// Load nearby adverts in pages of approximately 20 unique items.
+// ============================================================
+
 if (!areaDone && !areaLoading) {
   setAreaLoading(true);
 
   try {
-    let currentCursors: Record<string, Cursor | null> = {
+    let currentCursors: Record<
+      string,
+      Cursor | null
+    > = {
       ...areaCursors,
     };
 
@@ -873,32 +931,40 @@ if (!areaDone && !areaLoading) {
         queries.map((q) => getDocs(q))
       );
 
-      const pageProducts = snapshots.flatMap((snap) =>
-        toProducts(snap.docs)
+      const pageProducts = snapshots.flatMap(
+        (snap) =>
+          toProducts(snap.docs)
       );
 
-      const uniquePageProducts = Array.from(
-        new Map(
-          pageProducts.map((product) => [
-            product.id,
-            product,
-          ])
-        ).values()
-      );
+      const uniquePageProducts =
+        Array.from(
+          new Map(
+            pageProducts.map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
 
-      collectedProducts = Array.from(
-        new Map(
-          [
-            ...collectedProducts,
-            ...uniquePageProducts,
-          ].map((product) => [
-            product.id,
-            product,
-          ])
-        ).values()
-      );
+      collectedProducts =
+        Array.from(
+          new Map(
+            [
+              ...collectedProducts,
+              ...uniquePageProducts,
+            ].map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
 
-      let prefixesStillAvailable = false;
+      let prefixesStillAvailable =
+        false;
 
       const updatedCursors: Record<
         string,
@@ -907,37 +973,52 @@ if (!areaDone && !areaLoading) {
         ...currentCursors,
       };
 
-      snapshots.forEach((snap, index) => {
-        if (snap.docs.length > 0) {
-          updatedCursors[String(index)] =
-            snap.docs[snap.docs.length - 1];
+      snapshots.forEach(
+        (snap, index) => {
+          if (snap.docs.length > 0) {
+            updatedCursors[
+              String(index)
+            ] =
+              snap.docs[
+                snap.docs.length - 1
+              ];
+          }
+
+          if (
+            snap.docs.length >= AREA_PAGE
+          ) {
+            prefixesStillAvailable =
+              true;
+          }
         }
+      );
 
-        if (snap.docs.length >= AREA_PAGE) {
-          prefixesStillAvailable = true;
-        }
-      });
+      currentCursors =
+        updatedCursors;
 
-      currentCursors = updatedCursors;
+      allPrefixesDone =
+        !prefixesStillAvailable;
 
-      // If every prefix returned fewer than 20 documents,
-      // there are no more documents available in any prefix.
-      allPrefixesDone = !prefixesStillAvailable;
-
-      // Safety guard against repeatedly querying the same
-      // empty cursors.
-      if (snapshots.every((snap) => snap.docs.length === 0)) {
+      if (
+        snapshots.every(
+          (snap) =>
+            snap.docs.length === 0
+        )
+      ) {
         allPrefixesDone = true;
       }
     }
 
-    setAreaCursors(currentCursors);
+    setAreaCursors(
+      currentCursors
+    );
 
     setAreaProducts((prev) => {
-      const merged = dedupe(
-        prev,
-        collectedProducts
-      );
+      const merged =
+        dedupe(
+          prev,
+          collectedProducts
+        );
 
       return sortNearbyProducts(
         merged,
@@ -945,7 +1026,9 @@ if (!areaDone && !areaLoading) {
       );
     });
 
-    setAreaDone(allPrefixesDone);
+    setAreaDone(
+      allPrefixesDone
+    );
 
   } catch (error) {
     console.error(
