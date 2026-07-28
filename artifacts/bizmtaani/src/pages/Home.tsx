@@ -840,90 +840,123 @@ const loadMore = useCallback(async () => {
   
 // ============================================================
 // NORMAL FEED — NEARBY AREA PAGINATION
-// Load another 20 adverts from nearby geohash areas.
+// Load nearby adverts in pages of 20.
+//
+// Each geohash prefix keeps its own Firestore cursor.
+// Results are merged and deduplicated before being added
+// to the feed.
+//
+// We continue requesting pages until we collect at least
+// AREA_PAGE new adverts, or all geohash prefixes are done.
 // ============================================================
-if (
-!areaDone &&
-!areaLoading
-) {
-setAreaLoading(true);
+if (!areaDone && !areaLoading) {
+  setAreaLoading(true);
 
-try {
-  const queries = areaQueries(
-    userCoords,
-    areaCursors
-  );
+  try {
+    let currentCursors: Record<string, Cursor | null> = {
+      ...areaCursors,
+    };
 
-  const snapshots = await Promise.all(
-    queries.map((q) => getDocs(q))
-  );
+    let collectedProducts: Product[] = [];
+    let allPrefixesDone = false;
 
-  const newProducts = snapshots.flatMap(
-    (snap) => toProducts(snap.docs)
-  );
+    while (
+      collectedProducts.length < AREA_PAGE &&
+      !allPrefixesDone
+    ) {
+      const queries = areaQueries(
+        userCoords,
+        currentCursors
+      );
 
-  const uniqueNewProducts = Array.from(
-    new Map(
-      newProducts.map((product) => [
-        product.id,
-        product,
-      ])
-    ).values()
-  );
+      const snapshots = await Promise.all(
+        queries.map((q) => getDocs(q))
+      );
 
-  const updatedCursors: Record<
-    string,
-    Cursor | null
-  > = {
-    ...areaCursors,
-  };
+      const pageProducts = snapshots.flatMap((snap) =>
+        toProducts(snap.docs)
+      );
 
-  let allPrefixesDone = true;
+      const uniquePageProducts = Array.from(
+        new Map(
+          pageProducts.map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
 
-  snapshots.forEach(
-    (snap, index) => {
-      if (snap.docs.length > 0) {
-        updatedCursors[String(index)] =
-          snap.docs[
-            snap.docs.length - 1
-          ];
-      }
+      collectedProducts = Array.from(
+        new Map(
+          [
+            ...collectedProducts,
+            ...uniquePageProducts,
+          ].map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
 
-      if (snap.docs.length >= AREA_PAGE) {
-        allPrefixesDone = false;
+      let prefixesStillAvailable = false;
+
+      const updatedCursors: Record<
+        string,
+        Cursor | null
+      > = {
+        ...currentCursors,
+      };
+
+      snapshots.forEach((snap, index) => {
+        if (snap.docs.length > 0) {
+          updatedCursors[String(index)] =
+            snap.docs[snap.docs.length - 1];
+        }
+
+        if (snap.docs.length >= AREA_PAGE) {
+          prefixesStillAvailable = true;
+        }
+      });
+
+      currentCursors = updatedCursors;
+
+      // If every prefix returned fewer than 20 documents,
+      // there are no more documents available in any prefix.
+      allPrefixesDone = !prefixesStillAvailable;
+
+      // Safety guard against repeatedly querying the same
+      // empty cursors.
+      if (snapshots.every((snap) => snap.docs.length === 0)) {
+        allPrefixesDone = true;
       }
     }
-  );
 
-  setAreaCursors(
-    updatedCursors
-  );
+    setAreaCursors(currentCursors);
 
-  setAreaProducts((prev) => {
-    const merged = dedupe(
-      prev,
-      uniqueNewProducts
+    setAreaProducts((prev) => {
+      const merged = dedupe(
+        prev,
+        collectedProducts
+      );
+
+      return sortNearbyProducts(
+        merged,
+        userCoords
+      );
+    });
+
+    setAreaDone(allPrefixesDone);
+
+  } catch (error) {
+    console.error(
+      "Failed to load more nearby adverts:",
+      error
     );
-
-    return sortNearbyProducts(
-      merged,
-      userCoords
-    );
-  });
-
-  setAreaDone(
-    allPrefixesDone
-  );
-} catch (error) {
-  console.error(
-    "Failed to load more nearby adverts:",
-    error
-  );
-} finally {
-  setAreaLoading(false);
+  } finally {
+    setAreaLoading(false);
+  }
 }
 
-}
 }, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
   wardLoading,
   wardCursor,
