@@ -1,4 +1,3 @@
-
 /**
 
 Home feed — two-phase area-first advert loader.
@@ -7,10 +6,18 @@ Location fallback chain:
 
 1. Live GPS (if permitted)
 
+
+
 2. Saved home area from user's Firestore profile
+
+
 
 3. Nairobi centre (last resort)
 */
+
+
+
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
@@ -109,11 +116,13 @@ product.plan === "premium_monthly" ||
 product.isPremium === true
 );
 }
+
 function getProductVisibilityScope(product: Product) {
 // New adverts: use explicit visibility scope
 if (product.visibilityScope) {
 return product.visibilityScope;
 }
+
 // Backward compatibility for existing adverts
 if (isPremiumProduct(product)) {
 return "county";
@@ -134,11 +143,13 @@ product.lng
 );
 
 const scope = getProductVisibilityScope(product);
+
 // Free/local adverts
 if (scope === "local") {
 const radius = product.visibilityRadiusKm ?? 2.5;
 return distance <= radius;
 }
+
 // County and all-area adverts are currently eligible
 // once they have been loaded by the geographic query.
 if (scope === "county" || scope === "all_areas") {
@@ -147,6 +158,7 @@ return true;
 
 return false;
 }
+
 function getDistanceBucket(distanceKm: number) {
 if (distanceKm <= 2.5) return 1;
 if (distanceKm <= 5) return 2;
@@ -177,6 +189,7 @@ return false;
 });
 
 }
+
 function dedupe(existing: Product[], incoming: Product[]): Product[] {
 const ids = new Set(existing.map((p) => p.id));
 return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
@@ -193,7 +206,11 @@ a.lat,
 a.lng
 );
 
-const distanceB = getDistanceKm( userCoords[0], userCoords[1], b.lat, b.lng  
+const distanceB = getDistanceKm(  
+  userCoords[0],  
+  userCoords[1],  
+  b.lat,  
+  b.lng  
 );  
 
 return distanceA - distanceB;
@@ -260,6 +277,7 @@ const premium = isPremiumProduct(product);
 .map((item) => item.product);
 
 }
+
 function ProductCard({
 product, userCoords, onClick,
 }: {
@@ -270,7 +288,9 @@ onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 const distance = userCoords
 ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
 : null;
+
 const badgeColor = getCategoryBadgeColor(product.category);
+
 const isAccommodation =
 product.category === "Accommodation";
 
@@ -358,6 +378,7 @@ e.currentTarget.src = "/placeholder-image.png";
 <Package size={28} className="text-muted-foreground" />
 </div>
 )}
+
 {priceLabel && (  
       <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg z-[5]">  
         {priceLabel}  
