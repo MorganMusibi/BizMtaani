@@ -650,9 +650,10 @@ setWardCursor(null);
 setWardDone(false);
 
 setAreaProducts([]);
+setAreaBuffer([]);
 setAreaCursors({});
 setAreaDone(false);
-setAreaDonePrefixes({});      
+setAreaDonePrefixes({});    
 
 setSearchCursor(null);
 setSearchDone(false);
@@ -752,16 +753,17 @@ setAreaDone(true);
     } else {
       setWardDone(true);
     }
-
-    // ============================================================
-// INITIAL NEARBY AREA LOAD
+// ============================================================
+// INITIAL NEARBY AREA LOAD — BUFFERED
 //
-// Load approximately 20 unique nearby adverts for the first
-// nearby page.
+// Fetch a larger nearby buffer from Firestore.
+// Only 20 products are displayed at a time.
 //
-// Each geohash prefix maintains its own cursor so that the
-// next loadMore() call can continue from where this initial
-// load stopped.
+// The buffer allows pagination to happen locally first,
+// reducing repeated Firestore reads.
+//
+// Flow:
+//   Firestore -> areaBuffer -> 20 visible products
 // ============================================================
 
 try {
@@ -772,7 +774,7 @@ try {
   let allPrefixesDone = false;
 
   while (
-    collectedProducts.length < AREA_PAGE &&
+    collectedProducts.length < AREA_BUFFER_FETCH &&
     !allPrefixesDone
   ) {
     const prefixes = getNearbyGeohashPrefixes(
@@ -780,16 +782,6 @@ try {
       userCoords[1],
       radiusKm
     );
-
-    const activePrefixes = prefixes.filter(
-      (_, index) =>
-        !currentDonePrefixes[String(index)]
-    );
-
-    if (activePrefixes.length === 0) {
-      allPrefixesDone = true;
-      break;
-    }
 
     const queries = areaQueries(
       userCoords,
@@ -867,9 +859,7 @@ try {
           snap.docs[snap.docs.length - 1];
       }
 
-      // If fewer than AREA_PAGE documents were returned,
-      // this prefix has been completely exhausted.
-      if (snap.docs.length < AREA_PAGE) {
+      if (snap.docs.length < AREA_BUFFER_FETCH) {
         updatedDonePrefixes[key] = true;
       }
     });
@@ -882,25 +872,42 @@ try {
         currentDonePrefixes[String(index)] === true
     );
 
-    // Safety guard.
-    if (snapshots.every(
-      (snap) => snap.docs.length === 0
-    )) {
+    // Prevent an infinite loop when every active prefix
+    // returns an empty snapshot.
+    if (
+      snapshots.length > 0 &&
+      snapshots.every(
+        (snap) => snap.docs.length === 0
+      )
+    ) {
       allPrefixesDone = true;
     }
   }
 
+  const sortedBuffer = sortNearbyProducts(
+    collectedProducts,
+    userCoords
+  );
+
+  // First 20 products become visible.
+  // Everything else stays in the buffer.
+  setAreaProducts(
+    sortedBuffer.slice(0, AREA_PAGE)
+  );
+
+  setAreaBuffer(
+    sortedBuffer.slice(AREA_PAGE)
+  );
+
   setAreaCursors(currentCursors);
   setAreaDonePrefixes(currentDonePrefixes);
 
-  setAreaProducts(
-    sortNearbyProducts(
-      collectedProducts,
-      userCoords
-    )
+  // We are done only when Firestore has no more prefixes
+  // AND there are no buffered products waiting to be shown.
+  setAreaDone(
+    allPrefixesDone &&
+    sortedBuffer.length <= AREA_PAGE
   );
-
-  setAreaDone(allPrefixesDone);
 
 } catch (error) {
   console.error(
@@ -908,8 +915,12 @@ try {
     error
   );
 
+  setAreaProducts([]);
+  setAreaBuffer([]);
   setAreaDone(true);
-      }
+}
+
+    
 
     setInitialLoading(false);
   };
