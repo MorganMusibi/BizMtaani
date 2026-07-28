@@ -590,8 +590,7 @@ const [searchLoading, setSearchLoading] = useState(false);
     limit(AREA_PAGE)
   );
   }
-
-  function areaQueries(
+function areaQueries(
   coords: [number, number],
   cursors: Record<string, Cursor | null> = {},
   donePrefixes: Record<string, boolean> = {}
@@ -608,7 +607,7 @@ const [searchLoading, setSearchLoading] = useState(false);
     .map((prefix, index) => {
       const key = String(index);
 
-      // Do not query a prefix that we already know is exhausted.
+      // Skip geohash prefixes that are already exhausted.
       if (donePrefixes[key]) {
         return null;
       }
@@ -622,7 +621,7 @@ const [searchLoading, setSearchLoading] = useState(false);
           where("geohash", "<", prefix + "\uf8ff"),
           orderBy("geohash"),
           startAfter(cursor),
-          limit(AREA_PAGE)
+          limit(AREA_BUFFER_FETCH)
         );
       }
 
@@ -631,14 +630,13 @@ const [searchLoading, setSearchLoading] = useState(false);
         where("geohash", ">=", prefix),
         where("geohash", "<", prefix + "\uf8ff"),
         orderBy("geohash"),
-        limit(AREA_PAGE)
+        limit(AREA_BUFFER_FETCH)
       );
     })
     .filter(
       (q): q is ReturnType<typeof query> => q !== null
     );
 }
-
   
     useEffect(() => {
   if (!gpsReady || !userCoords) return;
@@ -1034,18 +1032,88 @@ if (!wardDone && !wardLoading) {
 
   return;
 }
-
-
 // ============================================================
 // NORMAL FEED — NEARBY AREA PAGINATION
 //
-// Ward adverts are now exhausted.
-// Load nearby adverts in pages of approximately 20 unique items.
+// Ward adverts are exhausted.
+//
+// BUFFER-FIRST FLOW:
+//
+// 1. If the nearby buffer already contains products,
+//    consume the next 20 locally.
+// 2. Do NOT query Firestore when the buffer has products.
+// 3. When the buffer is empty, fetch a new larger batch.
+// 4. Keep the extra products in the buffer.
+// 5. Display only 20 products at a time.
+//
+// Flow:
+//
+// Firestore
+//    ↓
+// 40+ nearby products
+//    ↓
+// areaBuffer
+//    ↓
+// 20 visible products
+//    ↓
+// consume buffer locally
+//    ↓
+// fetch again only when buffer is empty
 // ============================================================
+
 if (!areaDone && !areaLoading) {
   setAreaLoading(true);
 
   try {
+    // ==========================================================
+    // STEP 1 — CONSUME EXISTING BUFFER FIRST
+    // ==========================================================
+
+    if (areaBuffer.length > 0) {
+      const nextPage = areaBuffer.slice(
+        0,
+        AREA_PAGE
+      );
+
+      const remainingBuffer = areaBuffer.slice(
+        AREA_PAGE
+      );
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(
+          prev,
+          nextPage
+        );
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setAreaBuffer(
+        remainingBuffer
+      );
+
+      // We only mark the area as done when:
+      // - Firestore is exhausted
+      // - AND the local buffer is empty
+      if (
+        remainingBuffer.length === 0 &&
+        Object.keys(areaDonePrefixes).length > 0 &&
+        Object.values(areaDonePrefixes).every(Boolean)
+      ) {
+        setAreaDone(true);
+      }
+
+      return;
+    }
+
+    // ==========================================================
+    // STEP 2 — BUFFER IS EMPTY
+    // Fetch the next larger batch from Firestore.
+    // ==========================================================
+
     let currentCursors: Record<
       string,
       Cursor | null
@@ -1061,27 +1129,24 @@ if (!areaDone && !areaLoading) {
     };
 
     let collectedProducts: Product[] = [];
+
     let allPrefixesDone = false;
 
+    // ==========================================================
+    // Keep fetching until we have enough products to fill
+    // the buffer, or all geohash prefixes are exhausted.
+    // ==========================================================
+
     while (
-      collectedProducts.length < AREA_PAGE &&
+      collectedProducts.length < AREA_BUFFER_FETCH &&
       !allPrefixesDone
     ) {
-      const prefixes = getNearbyGeohashPrefixes(
-        userCoords[0],
-        userCoords[1],
-        radiusKm
-      );
-
-      const activePrefixes = prefixes.filter(
-        (_, index) =>
-          !currentDonePrefixes[String(index)]
-      );
-
-      if (activePrefixes.length === 0) {
-        allPrefixesDone = true;
-        break;
-      }
+      const prefixes =
+        getNearbyGeohashPrefixes(
+          userCoords[0],
+          userCoords[1],
+          radiusKm
+        );
 
       const queries = areaQueries(
         userCoords,
@@ -1094,34 +1159,57 @@ if (!areaDone && !areaLoading) {
         break;
       }
 
-      const snapshots = await Promise.all(
-        queries.map((q) => getDocs(q))
-      );
+      const snapshots =
+        await Promise.all(
+          queries.map((q) =>
+            getDocs(q)
+          )
+        );
 
-      const pageProducts = snapshots.flatMap(
-        (snap) => toProducts(snap.docs)
-      );
+      // ========================================================
+      // Convert Firestore documents into valid products.
+      // ========================================================
 
-      const uniquePageProducts = Array.from(
-        new Map(
-          pageProducts.map((product) => [
-            product.id,
-            product,
-          ])
-        ).values()
-      );
+      const pageProducts =
+        snapshots.flatMap(
+          (snap) =>
+            toProducts(
+              snap.docs
+            )
+        );
 
-      collectedProducts = Array.from(
-        new Map(
-          [
-            ...collectedProducts,
-            ...uniquePageProducts,
-          ].map((product) => [
-            product.id,
-            product,
-          ])
-        ).values()
-      );
+      // Remove duplicate products caused by overlapping
+      // geohash prefixes.
+      const uniquePageProducts =
+        Array.from(
+          new Map(
+            pageProducts.map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
+
+      collectedProducts =
+        Array.from(
+          new Map(
+            [
+              ...collectedProducts,
+              ...uniquePageProducts,
+            ].map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
+
+      // ========================================================
+      // Update cursors and exhausted-prefix state.
+      // ========================================================
 
       const updatedCursors: Record<
         string,
@@ -1139,64 +1227,161 @@ if (!areaDone && !areaLoading) {
 
       let queryIndex = 0;
 
-      prefixes.forEach((_, prefixIndex) => {
-        const key = String(prefixIndex);
+      prefixes.forEach(
+        (_, prefixIndex) => {
+          const key =
+            String(prefixIndex);
 
-        if (currentDonePrefixes[key]) {
-          return;
+          // This prefix was already exhausted.
+          if (
+            currentDonePrefixes[key]
+          ) {
+            return;
+          }
+
+          const snap =
+            snapshots[queryIndex];
+
+          queryIndex++;
+
+          if (!snap) {
+            updatedDonePrefixes[
+              key
+            ] = true;
+
+            return;
+          }
+
+          // Save the last document as the cursor
+          // for the next Firestore request.
+          if (
+            snap.docs.length > 0
+          ) {
+            updatedCursors[
+              key
+            ] =
+              snap.docs[
+                snap.docs.length - 1
+              ];
+          }
+
+          // Because each request now fetches AREA_BUFFER_FETCH
+          // documents, a shorter result means this prefix
+          // has been completely exhausted.
+          if (
+            snap.docs.length <
+            AREA_BUFFER_FETCH
+          ) {
+            updatedDonePrefixes[
+              key
+            ] = true;
+          }
         }
-
-        const snap = snapshots[queryIndex];
-        queryIndex++;
-
-        if (!snap) {
-          updatedDonePrefixes[key] = true;
-          return;
-        }
-
-        if (snap.docs.length > 0) {
-          updatedCursors[key] =
-            snap.docs[snap.docs.length - 1];
-        }
-
-        // A short page means this prefix has no more
-        // documents available.
-        if (snap.docs.length < AREA_PAGE) {
-          updatedDonePrefixes[key] = true;
-        }
-      });
-
-      currentCursors = updatedCursors;
-      currentDonePrefixes = updatedDonePrefixes;
-
-      allPrefixesDone = prefixes.every(
-        (_, index) =>
-          currentDonePrefixes[String(index)] === true
       );
 
-      if (snapshots.every(
-        (snap) => snap.docs.length === 0
-      )) {
+      currentCursors =
+        updatedCursors;
+
+      currentDonePrefixes =
+        updatedDonePrefixes;
+
+      // ========================================================
+      // Check whether every nearby geohash prefix is exhausted.
+      // ========================================================
+
+      allPrefixesDone =
+        prefixes.every(
+          (_, index) =>
+            currentDonePrefixes[
+              String(index)
+            ] === true
+        );
+
+      // Safety check:
+      // If every query returned zero documents,
+      // stop immediately to avoid an infinite loop.
+      if (
+        snapshots.length > 0 &&
+        snapshots.every(
+          (snap) =>
+            snap.docs.length === 0
+        )
+      ) {
         allPrefixesDone = true;
       }
     }
 
-    setAreaCursors(currentCursors);
-    setAreaDonePrefixes(currentDonePrefixes);
+    // ==========================================================
+    // Sort the newly fetched products by distance.
+    // ==========================================================
 
-    setAreaProducts((prev) => {
-      const merged = dedupe(
-        prev,
-        collectedProducts
-      );
-
-      return sortNearbyProducts(
-        merged,
+    const sortedProducts =
+      sortNearbyProducts(
+        collectedProducts,
         userCoords
       );
-    });
 
-    setAreaDone(allPrefixesDone);
+    // ==========================================================
+    // Display the first 20.
+    // Keep everything else in the local buffer.
+    // ==========================================================
+
+    const nextPage =
+      sortedProducts.slice(
+        0,
+        AREA_PAGE
+      );
+
+    const remainingBuffer =
+      sortedProducts.slice(
+        AREA_PAGE
+      );
+
+    setAreaProducts(
+      (prev) => {
+        const merged =
+          dedupe(
+            prev,
+            nextPage
+          );
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      }
+    );
+
+    setAreaBuffer(
+      remainingBuffer
+    );
+
+    // ==========================================================
+    // Save Firestore pagination state.
+    // ==========================================================
+
+    setAreaCursors(
+      currentCursors
+    );
+
+    setAreaDonePrefixes(
+      currentDonePrefixes
+    );
+
+    // ==========================================================
+    // The nearby feed is completely finished only when:
+    //
+    // 1. Every geohash prefix is exhausted
+    // 2. The local buffer is empty
+    //
+    // If there are still products in the buffer,
+    // we must allow the next loadMore() call to consume them.
+    // ==========================================================
+
+    setAreaDone(
+      allPrefixesDone &&
+      remainingBuffer.length === 0
+    );
 
   } catch (error) {
     console.error(
