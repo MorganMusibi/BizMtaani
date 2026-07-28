@@ -959,91 +959,92 @@ const loadMore = useCallback(async () => {
         new Map(
           newProducts.map((product) => [
             product.id,
-  // ============================================================
-  // NORMAL FEED — NEARBY AREA PAGINATION
-  // Load the next 20 adverts from nearby geohash areas.
-  // ============================================================
-  if (
-    !areaDone &&
-    !areaLoading
-  ) {
-    setAreaLoading(true);
+// ============================================================
+// NORMAL FEED — NEARBY AREA PAGINATION
+// Load another 20 adverts from nearby geohash areas.
+// ============================================================
+if (
+!areaDone &&
+!areaLoading
+) {
+setAreaLoading(true);
 
-    try {
-      const queries = areaQueries(
-        userCoords,
-        areaCursors
-      );
+try {
+  const queries = areaQueries(
+    userCoords,
+    areaCursors
+  );
 
-      const snapshots = await Promise.all(
-        queries.map((q) => getDocs(q))
-      );
+  const snapshots = await Promise.all(
+    queries.map((q) => getDocs(q))
+  );
 
-      const newProducts = snapshots.flatMap(
-        (snap) => toProducts(snap.docs)
-      );
+  const newProducts = snapshots.flatMap(
+    (snap) => toProducts(snap.docs)
+  );
 
-      const uniqueNewProducts = Array.from(
-        new Map(
-          newProducts.map((product) => [
-            product.id,
-            product,
-          ])
-        ).values()
-      );
+  const uniqueNewProducts = Array.from(
+    new Map(
+      newProducts.map((product) => [
+        product.id,
+        product,
+      ])
+    ).values()
+  );
 
-      const updatedCursors: Record<
-        string,
-        Cursor | null
-      > = {
-        ...areaCursors,
-      };
+  const updatedCursors: Record<
+    string,
+    Cursor | null
+  > = {
+    ...areaCursors,
+  };
 
-      let allPrefixesDone = true;
+  let allPrefixesDone = true;
 
-      snapshots.forEach(
-        (snap, index) => {
-          if (snap.docs.length > 0) {
-            updatedCursors[String(index)] =
-              snap.docs[
-                snap.docs.length - 1
-              ];
-          }
+  snapshots.forEach(
+    (snap, index) => {
+      if (snap.docs.length > 0) {
+        updatedCursors[String(index)] =
+          snap.docs[
+            snap.docs.length - 1
+          ];
+      }
 
-          if (snap.docs.length >= AREA_PAGE) {
-            allPrefixesDone = false;
-          }
-        }
-      );
-
-      setAreaCursors(
-        updatedCursors
-      );
-
-      setAreaProducts((prev) => {
-        const merged = dedupe(
-          prev,
-          uniqueNewProducts
-        );
-
-        return sortNearbyProducts(
-          merged,
-          userCoords
-        );
-      });
-
-      setAreaDone(
-        allPrefixesDone
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load more nearby adverts:",
-        error
-      );
-    } finally {
-      setAreaLoading(false);
+      if (snap.docs.length >= AREA_PAGE) {
+        allPrefixesDone = false;
+      }
     }
-  }
+  );
+
+  setAreaCursors(
+    updatedCursors
+  );
+
+  setAreaProducts((prev) => {
+    const merged = dedupe(
+      prev,
+      uniqueNewProducts
+    );
+
+    return sortNearbyProducts(
+      merged,
+      userCoords
+    );
+  });
+
+  setAreaDone(
+    allPrefixesDone
+  );
+} catch (error) {
+  console.error(
+    "Failed to load more nearby adverts:",
+    error
+  );
+} finally {
+  setAreaLoading(false);
+}
+
+}
 }, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
   wardLoading,
   wardCursor,
