@@ -730,58 +730,140 @@ setAreaDone(true);
       setWardDone(true);
     }
 
-    try {
-      const queries = areaQueries(userCoords);
+    // ============================================================
+// INITIAL NEARBY AREA LOAD
+//
+// Load approximately 20 unique nearby adverts for the first
+// nearby page.
+//
+// Each geohash prefix maintains its own cursor so that the
+// next loadMore() call can continue from where this initial
+// load stopped.
+// ============================================================
 
-      const snapshots = await Promise.all(
-        queries.map((q) => getDocs(q))
-      );
+try {
+  let currentCursors: Record<
+    string,
+    Cursor | null
+  > = {};
 
-      const allDocs = snapshots.flatMap(
-        (snap) => snap.docs
-      );
+  let collectedProducts: Product[] = [];
+  let allPrefixesDone = false;
 
-      const products = toProducts(allDocs);
+  while (
+    collectedProducts.length < AREA_PAGE &&
+    !allPrefixesDone
+  ) {
+    const queries = areaQueries(
+      userCoords,
+      currentCursors
+    );
 
-      const uniqueProducts = Array.from(
+    const snapshots = await Promise.all(
+      queries.map((q) => getDocs(q))
+    );
+
+    const pageProducts = snapshots.flatMap(
+      (snap) =>
+        toProducts(snap.docs)
+    );
+
+    const uniquePageProducts =
+      Array.from(
         new Map(
-          products.map((product) => [
-            product.id,
-            product,
-          ])
+          pageProducts.map(
+            (product) => [
+              product.id,
+              product,
+            ]
+          )
         ).values()
       );
 
-      const sortedProducts = sortNearbyProducts(
-        uniqueProducts,
-        userCoords
+    collectedProducts =
+      Array.from(
+        new Map(
+          [
+            ...collectedProducts,
+            ...uniquePageProducts,
+          ].map(
+            (product) => [
+              product.id,
+              product,
+            ]
+          )
+        ).values()
       );
 
-      setAreaProducts(sortedProducts);
+    let prefixesStillAvailable =
+      false;
 
-      setAreaCursors(
-        Object.fromEntries(
-          snapshots.map((snap, index) => [
-            index,
-            snap.docs[snap.docs.length - 1] ?? null,
-          ])
-        )
-      );
+    const updatedCursors: Record<
+      string,
+      Cursor | null
+    > = {
+      ...currentCursors,
+    };
 
-      setAreaDone(
-        snapshots.every(
-          (snap) => snap.docs.length < AREA_PAGE
-        )
-      );
+    snapshots.forEach(
+      (snap, index) => {
+        if (snap.docs.length > 0) {
+          updatedCursors[
+            String(index)
+          ] =
+            snap.docs[
+              snap.docs.length - 1
+            ];
+        }
 
-    } catch (error) {
-      console.error(
-        "Failed to load nearby adverts:",
-        error
-      );
+        if (
+          snap.docs.length >= AREA_PAGE
+        ) {
+          prefixesStillAvailable =
+            true;
+        }
+      }
+    );
 
-      setAreaDone(true);
+    currentCursors =
+      updatedCursors;
+
+    allPrefixesDone =
+      !prefixesStillAvailable;
+
+    if (
+      snapshots.every(
+        (snap) =>
+          snap.docs.length === 0
+      )
+    ) {
+      allPrefixesDone = true;
     }
+  }
+
+  setAreaCursors(
+    currentCursors
+  );
+
+  setAreaProducts(
+    sortNearbyProducts(
+      collectedProducts,
+      userCoords
+    )
+  );
+
+  setAreaDone(
+    allPrefixesDone
+  );
+
+} catch (error) {
+  console.error(
+    "Failed to load nearby adverts:",
+    error
+  );
+
+  setAreaDone(true);
+}
 
     setInitialLoading(false);
   };
