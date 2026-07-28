@@ -839,51 +839,6 @@ const loadMore = useCallback(async () => {
   }
 
   // ============================================================
-  // NORMAL FEED — WARD PAGINATION FIRST
-  // Load another 20 products from the user's ward.
-  // ============================================================
-  if (
-    !wardDone &&
-    !wardLoading &&
-    wardCursor &&
-    locationInfo?.wardName
-  ) {
-    setWardLoading(true);
-
-    try {
-      const snap = await getDocs(
-        wardQuery(
-          locationInfo.wardName,
-          wardCursor
-        )
-      );
-
-      const newProducts = toProducts(snap.docs);
-
-      setWardProducts((prev) =>
-        dedupe(prev, newProducts)
-      );
-
-      setWardCursor(
-        snap.docs[snap.docs.length - 1] ?? wardCursor
-      );
-
-      setWardDone(
-        snap.docs.length < WARD_PAGE
-      );
-    } catch (error) {
-      console.error(
-        "Failed to load more ward adverts:",
-        error
-      );
-    } finally {
-      setWardLoading(false);
-    }
-
-    return;
-  }
-
-  // ============================================================
   // NORMAL FEED — NEARBY AREA PAGINATION
   // Load another 20 from each geohash prefix that still has data.
   // ============================================================
