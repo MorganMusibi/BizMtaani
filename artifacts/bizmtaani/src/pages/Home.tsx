@@ -14,7 +14,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { areaPrefix } from "@/lib/geohash";
+import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
@@ -34,32 +34,54 @@ const FILTER_CHIPS = [
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
 
+interface ProductImage {
+  url: string;
+  public_id?: string;
+}
+
 interface Product {
   id: string;
   title: string;
   price: number;
   rentPerMonth?: number;
+
   category: string;
   subcategory?: string;
-  imageUrl: string;
-  imageUrls?: string[];
+
+  // Supports both old and new image formats
+  imageUrl?: string;
+  imageUrls?: (string | ProductImage)[];
+
   lat: number;
   lng: number;
+
   ward?: string;
+
+  // Supports both old and new pricing fields
   priceType?: "fixed" | "negotiable";
+  priceDisplay?: "fixed" | "negotiable";
+
   pricingBasis?: string;
+
   sellerId: string;
   sellerName: string;
   sellerType?: "business" | "individual";
+
   phone?: string;
   geohash?: string;
+
   createdAt?: { seconds: number } | null;
   expiresAt?: { seconds: number } | null;
+
   status?: string;
   plan?: string;
-  verified?: boolean;
-}
 
+visibilityScope?: "local" | "county" | "all_areas";
+visibilityRadiusKm?: number;
+
+isPremium?: boolean;
+verified?: boolean;
+}
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
 function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
@@ -75,49 +97,240 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
+function isPremiumProduct(product: Product) {
+  return (
+    product.plan === "premium_weekly" ||
+    product.plan === "premium_monthly" ||
+    product.isPremium === true
+  );
+}
+
+function getProductVisibilityScope(product: Product) {
+  // New adverts: use explicit visibility scope
+  if (product.visibilityScope) {
+    return product.visibilityScope;
+  }
+
+  // Backward compatibility for existing adverts
+  if (isPremiumProduct(product)) {
+    return "county";
+  }
+
+  return "local";
+}
+
+function isProductVisibleToUser(
+  product: Product,
+  userCoords: [number, number]
+) {
+  const distance = getDistanceKm(
+    userCoords[0],
+    userCoords[1],
+    product.lat,
+    product.lng
+  );
+
+  const scope = getProductVisibilityScope(product);
+
+  // Free/local adverts
+  if (scope === "local") {
+    const radius = product.visibilityRadiusKm ?? 2.5;
+    return distance <= radius;
+  }
+
+  // County and all-area adverts are currently eligible
+  // once they have been loaded by the geographic query.
+  if (scope === "county" || scope === "all_areas") {
+    return true;
+  }
+
+  return false;
+}
+
+function getDistanceBucket(distanceKm: number) {
+  if (distanceKm <= 2.5) return 1;
+  if (distanceKm <= 5) return 2;
+  if (distanceKm <= 10) return 3;
+  if (distanceKm <= 20) return 4;
+  if (distanceKm <= 50) return 5;
+
+  return 6;
+  }
 
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
+  const nowSec = Date.now() / 1000;
+
   return docs
     .map((d) => ({ id: d.id, ...d.data() } as Product))
-    .filter((p) => !p.status || p.status === "active");
+    .filter((p) => {
+      // Only active products
+      if (p.status && p.status !== "active") {
+        return false;
+      }
+
+      // Do not load/use expired products
+      if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
+        return false;
+      }
+
+      return true;
+    });
 }
 
 function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
+function sortNearbyProducts(
+  products: Product[],
+  userCoords: [number, number]
+): Product[] {
+  return [...products].sort((a, b) => {
+    const distanceA = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      a.lat,
+      a.lng
+    );
+
+    const distanceB = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      b.lat,
+      b.lng
+    );
+
+    return distanceA - distanceB;
+  });
+}
+function rankProducts(
+  products: Product[],
+  userCoords: [number, number]
+): Product[] {
+  return products
+    .map((product, index) => {
+      const distanceKm = getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      );
+
+      const premium = isPremiumProduct(product);
+
+      /*
+       * Premium boost
+       *
+       * A premium advert gets a controlled ranking advantage.
+       * Distance still matters, so an extremely far-away premium
+       * advert will not automatically dominate the feed.
+       *
+       * The higher the boost, the stronger Premium is promoted.
+       */
+      const PREMIUM_BOOST = 3;
+
+      const score =
+        (premium ? PREMIUM_BOOST : 0) - distanceKm;
+
+      return {
+        product,
+        distanceKm,
+        premium,
+        score,
+        originalIndex: index,
+      };
+    })
+    .sort((a, b) => {
+      // 1. Higher ranking score first.
+      // Premium gets boosted, while distance still matters.
+      if (a.score !== b.score) {
+        return b.score - a.score;
+      }
+
+      // 2. Premium wins exact score ties.
+      if (a.premium !== b.premium) {
+        return a.premium ? -1 : 1;
+      }
+
+      // 3. If still tied, nearest advert first.
+      if (a.distanceKm !== b.distanceKm) {
+        return a.distanceKm - b.distanceKm;
+      }
+
+      // 4. Final fallback: preserve original order.
+      return a.originalIndex - b.originalIndex;
+    })
+    .map((item) => item.product);
+}
 
 function ProductCard({
   product, userCoords, onClick,
 }: {
-  product: Product; userCoords: [number, number] | null; onClick: () => void;
+  product: Product; 
+  userCoords: [number, number] | null; 
+  onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const distance = userCoords
-    ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
-    : null;
+  ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
+  : null;
 
-  const badgeColor = getCategoryBadgeColor(product.category);
-  const isAccommodation = product.category === "Accommodation";
-  const isEatery =
-    product.subcategory === "Hotels / Eateries" ||
-    product.subcategory === "Restaurants & Cooked Food";
-  const displayImage = product.imageUrls?.[0] ?? product.imageUrl ?? "";
+const badgeColor = getCategoryBadgeColor(product.category);
 
-  const negotiable = product.priceType === "negotiable";
-  const basisLabel: Record<string, string> = {
-    per_km: "/km", per_hour: "/hr", per_day: "/day",
-    per_trip: "/trip", per_session: "/session",
-  };
-  const basisSuffix = product.pricingBasis ? (basisLabel[product.pricingBasis] ?? "") : "";
-  const priceLabel = isAccommodation
-    ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
-    : isEatery
-    ? null
-    : product.pricingBasis === "quote_only"
-    ? "Quote only"
-    : product.price > 0
-    ? `KES ${product.price.toLocaleString()}${basisSuffix}${negotiable ? " · Neg." : ""}`
-    : negotiable ? "Negotiable" : null;
+const isAccommodation =
+  product.category === "Accommodation";
+
+const isEatery =
+  product.subcategory === "Hotels / Eateries" ||
+  product.subcategory === "Restaurants & Cooked Food";
+
+// Support BOTH old string arrays and new object arrays
+const firstImage = product.imageUrls?.[0];
+
+const displayImage =
+  typeof firstImage === "string"
+    ? firstImage
+    : firstImage?.url || product.imageUrl || "";
+
+const negotiable =
+  (product.priceDisplay ?? product.priceType) === "negotiable";
+
+const basisLabel: Record<string, string> = {
+  per_km: "/km",
+  per_hour: "/hr",
+  per_day: "/day",
+  per_trip: "/trip",
+  per_session: "/session",
+};
+
+const serviceCategories = [
+  "Services",
+  "Transport",
+  "Delivery",
+  "Cleaning",
+  "Repairs",
+];
+
+const showPricingBasis =
+  serviceCategories.includes(product.category);
+
+const basisSuffix =
+  showPricingBasis && product.pricingBasis
+    ? basisLabel[product.pricingBasis] ?? ""
+    : "";
+
+const priceLabel = isAccommodation
+  ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
+  : isEatery
+  ? null
+  : product.pricingBasis === "quote_only"
+  ? "Quote only"
+  : product.price > 0
+  ? `KES ${product.price.toLocaleString()}${basisSuffix}${
+      negotiable ? " · Neg." : ""
+    }`
+  : negotiable
+  ? "Negotiable"
+  : null;
 
   return (
     <div
@@ -126,35 +339,57 @@ function ProductCard({
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
     >
       <div className="relative">
+        {/* --- PREMIUM BADGE --- */}
+        {product.plan?.startsWith("premium") && (
+          <div className="absolute top-2 left-2 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
+            PREMIUM
+          </div>
+        )}
+
         {displayImage ? (
           <img
-            src={displayImage} alt={product.title} loading="lazy"
-            className="w-full aspect-square object-cover"
-          />
+  src={displayImage}
+  alt={product.title}
+  loading="lazy"
+  className="w-full aspect-square object-cover"
+  onError={(e) => {
+  console.error("Image failed:", displayImage);
+
+  e.currentTarget.onerror = null;
+  e.currentTarget.src = "/placeholder-image.png";
+}}
+/>
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
             <Package size={28} className="text-muted-foreground" />
           </div>
         )}
+        
         {priceLabel && (
-          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg">
+          <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg z-[5]">
             {priceLabel}
           </div>
         )}
-        <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+        
+        <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor} z-[5]`}>
           {product.subcategory ?? product.category}
         </div>
-        {(product.verified || product.plan === "basic" || product.plan === "premium") && (
-          <div className="absolute top-2 left-2 flex items-center gap-0.5 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full">
+        
+        {/* Verified Badge - Positioned to avoid overlapping Premium badge */}
+        {(product.verified || product.plan?.startsWith("premium")) && (
+          <div className="absolute top-2 left-14 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
             <Check size={8} />
             <span>Verified</span>
           </div>
         )}
-        {isAccommodation && (product.imageUrls?.length ?? 0) > 1 && (
-          <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium">
-            +{(product.imageUrls?.length ?? 1) - 1} photos
-          </div>
-        )}
+        
+        {isAccommodation &&
+  Array.isArray(product.imageUrls) &&
+  product.imageUrls.length > 1 && (
+    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
+      +{product.imageUrls.length - 1} photos
+    </div>
+)}
       </div>
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
@@ -210,10 +445,24 @@ export default function Home() {
   const [wardDone, setWardDone] = useState(false);
   const [wardLoading, setWardLoading] = useState(false);
 
-  const [areaProducts, setAreaProducts] = useState<Product[]>([]);
-  const [areaCursor, setAreaCursor] = useState<Cursor | null>(null);
-  const [areaDone, setAreaDone] = useState(false);
-  const [areaLoading, setAreaLoading] = useState(false);
+const [areaProducts, setAreaProducts] = useState<Product[]>([]);
+
+// Products fetched from Firestore but not yet displayed.
+// These act as the nearby pagination buffer.
+const [areaBuffer, setAreaBuffer] = useState<Product[]>([]);
+
+const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
+const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
+const [areaDone, setAreaDone] = useState(false);
+const [areaLoading, setAreaLoading] = useState(false);
+
+// Number of products to fetch from each active geohash prefix.
+// This is intentionally larger than the visible page size.
+const AREA_BUFFER_FETCH = 40;
+
+const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
+const [searchDone, setSearchDone] = useState(false);
+const [searchLoading, setSearchLoading] = useState(false);
 
   const [initialLoading, setInitialLoading] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -298,160 +547,854 @@ export default function Home() {
     setShowAreaPicker(false);
   }
 
-  function wardQuery(wardName: string, cursor?: Cursor) {
-    const coll = collection(db, "products");
-    const constraints = [
+  function wardQuery(
+  wardName: string,
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
       where("ward", "==", wardName),
       orderBy("createdAt", "desc"),
-      limit(WARD_PAGE),
-    ] as const;
-    return cursor
-      ? query(coll, constraints[0], constraints[1], startAfter(cursor), constraints[2])
-      : query(coll, ...constraints);
+      startAfter(cursor),
+      limit(WARD_PAGE)
+    );
   }
 
-  function areaQuery(coords: [number, number], cursor?: Cursor) {
-    const prefix = areaPrefix(coords[0], coords[1]);
-    const coll = collection(db, "products");
-    const constraints = [
-      where("geohash", ">=", prefix),
-      where("geohash", "<", prefix + "\uf8ff"),
-      orderBy("geohash"),
-      limit(AREA_PAGE),
-    ] as const;
-    return cursor
-      ? query(coll, constraints[0], constraints[1], constraints[2], startAfter(cursor), constraints[3])
-      : query(coll, ...constraints);
+  return query(
+    coll,
+    where("ward", "==", wardName),
+    orderBy("createdAt", "desc"),
+    limit(WARD_PAGE)
+  );
+}
+  function searchQueryAllProducts(
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(AREA_PAGE)
+    );
   }
 
-  useEffect(() => {
-    if (!gpsReady || !userCoords) return;
+  return query(
+    coll,
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
+  }
 
-    setInitialLoading(true);
-    setWardProducts([]); setWardCursor(null); setWardDone(false);
-    setAreaProducts([]); setAreaCursor(null); setAreaDone(false);
+  function areaQueries(
+  coords: [number, number],
+  cursors: Record<string, Cursor | null> = {},
+  donePrefixes: Record<string, boolean> = {}
+) {
+  const prefixes = getNearbyGeohashPrefixes(
+    coords[0],
+    coords[1],
+    radiusKm
+  );
 
-    const run = async () => {
-      const wardName = locationInfo?.wardName ?? "";
-      if (wardName && !isSearchMode) {
-        try {
-          const snap = await getDocs(wardQuery(wardName));
-          const docs = toProducts(snap.docs);
-          setWardProducts(docs);
-          setWardCursor(snap.docs[snap.docs.length - 1] ?? null);
-          setWardDone(snap.docs.length < WARD_PAGE);
-        } catch {
-          setWardDone(true);
-        }
-      } else {
+  const coll = collection(db, "products");
+
+  return prefixes
+    .map((prefix, index) => {
+      const key = String(index);
+
+      // Do not query a prefix that we already know is exhausted.
+      if (donePrefixes[key]) {
+        return null;
+      }
+
+      const cursor = cursors[key];
+
+      if (cursor) {
+        return query(
+          coll,
+          where("geohash", ">=", prefix),
+          where("geohash", "<", prefix + "\uf8ff"),
+          orderBy("geohash"),
+          startAfter(cursor),
+          limit(AREA_PAGE)
+        );
+      }
+
+      return query(
+        coll,
+        where("geohash", ">=", prefix),
+        where("geohash", "<", prefix + "\uf8ff"),
+        orderBy("geohash"),
+        limit(AREA_PAGE)
+      );
+    })
+    .filter(
+      (q): q is ReturnType<typeof query> => q !== null
+    );
+}
+
+  
+    useEffect(() => {
+  if (!gpsReady || !userCoords) return;
+
+  setInitialLoading(true);
+
+setWardProducts([]);
+setWardCursor(null);
+setWardDone(false);
+
+setAreaProducts([]);
+setAreaCursors({});
+setAreaDone(false);
+setAreaDonePrefixes({});      
+
+setSearchCursor(null);
+setSearchDone(false);
+  const run = async () => {
+
+    // ============================================================
+    // SEARCH MODE
+    // Search ALL products across Kenya.
+    
+    // Free and Premium products are treated equally.
+    //
+    // Expired / pending-payment / inactive products are removed
+    // later by toProducts() and applyFilters().
+    // ============================================================
+
+    if (isSearchMode) {
+  try {
+    const snap = await getDocs(
+      searchQueryAllProducts()
+    );
+
+    const products = toProducts(
+      snap.docs
+    );
+
+    setWardProducts([]);
+
+    setAreaProducts(
+      sortNearbyProducts(
+        products,
+        userCoords
+      )
+    );
+
+    setSearchCursor(
+  snap.docs[
+    snap.docs.length - 1
+  ] ?? null
+);
+
+setSearchDone(
+  snap.docs.length < AREA_PAGE
+);
+
+setWardDone(true);
+setAreaDone(true);
+
+  } catch (error) {
+    console.error(
+      "Failed to search products:",
+      error
+    );
+
+    setWardProducts([]);
+    setAreaProducts([]);
+
+    setWardDone(true);
+    setAreaDone(true);
+  }
+
+  setInitialLoading(false);
+  return;
+}
+    // ============================================================
+    // NORMAL HOME FEED
+    // Keep existing ward + nearby geohash behavior.
+    // ============================================================
+
+    const wardName = locationInfo?.wardName ?? "";
+
+    if (wardName) {
+      try {
+        const snap = await getDocs(
+          wardQuery(wardName)
+        );
+
+        const docs = toProducts(snap.docs);
+
+        setWardProducts(docs);
+
+        setWardCursor(
+          snap.docs[snap.docs.length - 1] ?? null
+        );
+
+        setWardDone(
+          snap.docs.length < WARD_PAGE
+        );
+
+      } catch (error) {
+        console.error(
+          "Failed to load ward adverts:",
+          error
+        );
+
         setWardDone(true);
       }
+    } else {
+      setWardDone(true);
+    }
 
-      try {
-        const snap = await getDocs(areaQuery(userCoords));
-        setAreaProducts(toProducts(snap.docs));
-        setAreaCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setAreaDone(snap.docs.length < AREA_PAGE);
-      } catch {
-        setAreaDone(true);
-      }
+    // ============================================================
+// INITIAL NEARBY AREA LOAD
+//
+// Load approximately 20 unique nearby adverts for the first
+// nearby page.
+//
+// Each geohash prefix maintains its own cursor so that the
+// next loadMore() call can continue from where this initial
+// load stopped.
+// ============================================================
 
-      setInitialLoading(false);
+try {
+  let currentCursors: Record<string, Cursor | null> = {};
+  let currentDonePrefixes: Record<string, boolean> = {};
+
+  let collectedProducts: Product[] = [];
+  let allPrefixesDone = false;
+
+  while (
+    collectedProducts.length < AREA_PAGE &&
+    !allPrefixesDone
+  ) {
+    const prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      radiusKm
+    );
+
+    const activePrefixes = prefixes.filter(
+      (_, index) =>
+        !currentDonePrefixes[String(index)]
+    );
+
+    if (activePrefixes.length === 0) {
+      allPrefixesDone = true;
+      break;
+    }
+
+    const queries = areaQueries(
+      userCoords,
+      currentCursors,
+      currentDonePrefixes
+    );
+
+    if (queries.length === 0) {
+      allPrefixesDone = true;
+      break;
+    }
+
+    const snapshots = await Promise.all(
+      queries.map((q) => getDocs(q))
+    );
+
+    const pageProducts = snapshots.flatMap(
+      (snap) => toProducts(snap.docs)
+    );
+
+    const uniquePageProducts = Array.from(
+      new Map(
+        pageProducts.map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
+
+    collectedProducts = Array.from(
+      new Map(
+        [
+          ...collectedProducts,
+          ...uniquePageProducts,
+        ].map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
+
+    const updatedCursors: Record<
+      string,
+      Cursor | null
+    > = {
+      ...currentCursors,
     };
 
-    run();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gpsReady, isSearchMode, locationInfo?.wardName]);
+    const updatedDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...currentDonePrefixes,
+    };
 
-  const loadMore = useCallback(async () => {
-    if (!userCoords) return;
+    let queryIndex = 0;
 
-    if (!wardDone && !wardLoading && wardCursor && locationInfo?.wardName) {
-      setWardLoading(true);
-      try {
-        const snap = await getDocs(wardQuery(locationInfo.wardName, wardCursor));
-        setWardProducts((prev) => dedupe(prev, toProducts(snap.docs)));
-        setWardCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setWardDone(snap.docs.length < WARD_PAGE);
-      } finally {
-        setWardLoading(false);
+    prefixes.forEach((_, prefixIndex) => {
+      const key = String(prefixIndex);
+
+      if (currentDonePrefixes[key]) {
+        return;
       }
-      return;
+
+      const snap = snapshots[queryIndex];
+      queryIndex++;
+
+      if (!snap) {
+        updatedDonePrefixes[key] = true;
+        return;
+      }
+
+      if (snap.docs.length > 0) {
+        updatedCursors[key] =
+          snap.docs[snap.docs.length - 1];
+      }
+
+      // If fewer than AREA_PAGE documents were returned,
+      // this prefix has been completely exhausted.
+      if (snap.docs.length < AREA_PAGE) {
+        updatedDonePrefixes[key] = true;
+      }
+    });
+
+    currentCursors = updatedCursors;
+    currentDonePrefixes = updatedDonePrefixes;
+
+    allPrefixesDone = prefixes.every(
+      (_, index) =>
+        currentDonePrefixes[String(index)] === true
+    );
+
+    // Safety guard.
+    if (snapshots.every(
+      (snap) => snap.docs.length === 0
+    )) {
+      allPrefixesDone = true;
+    }
+  }
+
+  setAreaCursors(currentCursors);
+  setAreaDonePrefixes(currentDonePrefixes);
+
+  setAreaProducts(
+    sortNearbyProducts(
+      collectedProducts,
+      userCoords
+    )
+  );
+
+  setAreaDone(allPrefixesDone);
+
+} catch (error) {
+  console.error(
+    "Failed to load nearby adverts:",
+    error
+  );
+
+  setAreaDone(true);
+      }
+
+    setInitialLoading(false);
+  };
+
+  run();
+
+// eslint-disable-next-line react-hooks/exhaustive-deps
+}, [gpsReady, isSearchMode, locationInfo?.wardName]);
+
+const loadMore = useCallback(async () => {
+  if (!userCoords) return;
+
+  // ============================================================
+  // SEARCH PAGINATION
+  // Load 20 search results at a time.
+  // ============================================================
+  if (isSearchMode) {
+    if (searchDone || searchLoading) return;
+
+    setSearchLoading(true);
+
+    try {
+      const snap = await getDocs(
+        searchQueryAllProducts(searchCursor ?? undefined)
+      );
+
+      const newProducts = toProducts(snap.docs);
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(prev, newProducts);
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setSearchCursor(
+        snap.docs[snap.docs.length - 1] ?? searchCursor
+      );
+
+      setSearchDone(
+        snap.docs.length < AREA_PAGE
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load more search results:",
+        error
+      );
+    } finally {
+      setSearchLoading(false);
     }
 
-    if (!areaDone && !areaLoading && areaCursor) {
-      setAreaLoading(true);
-      try {
-        const snap = await getDocs(areaQuery(userCoords, areaCursor));
-        setAreaProducts((prev) => dedupe(prev, toProducts(snap.docs)));
-        setAreaCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setAreaDone(snap.docs.length < AREA_PAGE);
-      } finally {
-        setAreaLoading(false);
+    return;
+  }
+  
+// ============================================================
+// NORMAL FEED — WARD-FIRST PAGINATION
+//
+// 1. Load the next 20 adverts from the user's ward first.
+// 2. Only after ward adverts are exhausted, load nearby adverts.
+// ============================================================
+
+if (!wardDone && !wardLoading) {
+  const wardName = locationInfo?.wardName;
+
+  if (!wardName) {
+    setWardDone(true);
+    return;
+  }
+
+  setWardLoading(true);
+
+  try {
+    const snap = await getDocs(
+      wardQuery(
+        wardName,
+        wardCursor ?? undefined
+      )
+    );
+
+    const newWardProducts = toProducts(
+      snap.docs
+    );
+
+    setWardProducts((prev) =>
+      dedupe(
+        prev,
+        newWardProducts
+      )
+    );
+
+    setWardCursor(
+      snap.docs[
+        snap.docs.length - 1
+      ] ?? wardCursor
+    );
+
+    setWardDone(
+      snap.docs.length < WARD_PAGE
+    );
+
+  } catch (error) {
+    console.error(
+      "Failed to load more ward adverts:",
+      error
+    );
+  } finally {
+    setWardLoading(false);
+  }
+
+  return;
+}
+
+
+// ============================================================
+// NORMAL FEED — NEARBY AREA PAGINATION
+//
+// Ward adverts are now exhausted.
+// Load nearby adverts in pages of approximately 20 unique items.
+// ============================================================
+if (!areaDone && !areaLoading) {
+  setAreaLoading(true);
+
+  try {
+    let currentCursors: Record<
+      string,
+      Cursor | null
+    > = {
+      ...areaCursors,
+    };
+
+    let currentDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...areaDonePrefixes,
+    };
+
+    let collectedProducts: Product[] = [];
+    let allPrefixesDone = false;
+
+    while (
+      collectedProducts.length < AREA_PAGE &&
+      !allPrefixesDone
+    ) {
+      const prefixes = getNearbyGeohashPrefixes(
+        userCoords[0],
+        userCoords[1],
+        radiusKm
+      );
+
+      const activePrefixes = prefixes.filter(
+        (_, index) =>
+          !currentDonePrefixes[String(index)]
+      );
+
+      if (activePrefixes.length === 0) {
+        allPrefixesDone = true;
+        break;
+      }
+
+      const queries = areaQueries(
+        userCoords,
+        currentCursors,
+        currentDonePrefixes
+      );
+
+      if (queries.length === 0) {
+        allPrefixesDone = true;
+        break;
+      }
+
+      const snapshots = await Promise.all(
+        queries.map((q) => getDocs(q))
+      );
+
+      const pageProducts = snapshots.flatMap(
+        (snap) => toProducts(snap.docs)
+      );
+
+      const uniquePageProducts = Array.from(
+        new Map(
+          pageProducts.map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
+
+      collectedProducts = Array.from(
+        new Map(
+          [
+            ...collectedProducts,
+            ...uniquePageProducts,
+          ].map((product) => [
+            product.id,
+            product,
+          ])
+        ).values()
+      );
+
+      const updatedCursors: Record<
+        string,
+        Cursor | null
+      > = {
+        ...currentCursors,
+      };
+
+      const updatedDonePrefixes: Record<
+        string,
+        boolean
+      > = {
+        ...currentDonePrefixes,
+      };
+
+      let queryIndex = 0;
+
+      prefixes.forEach((_, prefixIndex) => {
+        const key = String(prefixIndex);
+
+        if (currentDonePrefixes[key]) {
+          return;
+        }
+
+        const snap = snapshots[queryIndex];
+        queryIndex++;
+
+        if (!snap) {
+          updatedDonePrefixes[key] = true;
+          return;
+        }
+
+        if (snap.docs.length > 0) {
+          updatedCursors[key] =
+            snap.docs[snap.docs.length - 1];
+        }
+
+        // A short page means this prefix has no more
+        // documents available.
+        if (snap.docs.length < AREA_PAGE) {
+          updatedDonePrefixes[key] = true;
+        }
+      });
+
+      currentCursors = updatedCursors;
+      currentDonePrefixes = updatedDonePrefixes;
+
+      allPrefixesDone = prefixes.every(
+        (_, index) =>
+          currentDonePrefixes[String(index)] === true
+      );
+
+      if (snapshots.every(
+        (snap) => snap.docs.length === 0
+      )) {
+        allPrefixesDone = true;
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wardDone, wardLoading, wardCursor, areaDone, areaLoading, areaCursor, userCoords, locationInfo]);
+
+    setAreaCursors(currentCursors);
+    setAreaDonePrefixes(currentDonePrefixes);
+
+    setAreaProducts((prev) => {
+      const merged = dedupe(
+        prev,
+        collectedProducts
+      );
+
+      return sortNearbyProducts(
+        merged,
+        userCoords
+      );
+    });
+
+    setAreaDone(allPrefixesDone);
+
+  } catch (error) {
+    console.error(
+      "Failed to load more nearby adverts:",
+      error
+    );
+  } finally {
+    setAreaLoading(false);
+  }
+}
+
+}, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
+  wardLoading,
+  wardCursor,
+  locationInfo?.wardName,
+  areaDone,
+areaLoading,
+areaCursors,
+areaDonePrefixes,
+radiusKm,
+]);
+
 
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) loadMore(); },
-      { rootMargin: "400px" }
+  const el = sentinelRef.current;
+  if (!el) return;
+
+  const observer = new IntersectionObserver(
+    ([entry]) => {
+      if (entry.isIntersecting) {
+        loadMore();
+      }
+    },
+    {
+      rootMargin: "400px",
+    }
+  );
+
+  observer.observe(el);
+
+  return () => observer.disconnect();
+}, [loadMore]);
+
+function applyFilters(products: Product[]): Product[] {
+  const nowSec = Date.now() / 1000;
+
+  return products.filter((p) => {
+    // Hide pending-payment listings
+    if (p.status === "pending_payment") {
+      return false;
+    }
+
+    // Hide expired listings
+    if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
+      return false;
+    }
+
+    const matchCat =
+      activeKey === "All" ||
+      p.category === activeKey;
+
+    const search = searchQuery.toLowerCase();
+
+    const matchSearch =
+      !search ||
+      p.title.toLowerCase().includes(search) ||
+      p.sellerName.toLowerCase().includes(search) ||
+      (p.subcategory ?? "").toLowerCase().includes(search) ||
+      (p.ward ?? "").toLowerCase().includes(search);
+
+    // Search mode shows results across Kenya.
+    // Normal mode applies the selected radius.
+    const matchRadius =
+      isSearchMode ||
+      !userCoords ||
+      getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        p.lat,
+        p.lng
+      ) <= radiusKm;
+
+    return (
+      matchCat &&
+      matchSearch &&
+      matchRadius
     );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  });
+}
 
-  function applyFilters(products: Product[]): Product[] {
-    const nowSec = Date.now() / 1000;
-    return products.filter((p) => {
-      // Hide listings pending payment or already expired
-      if (p.status === "pending_payment") return false;
-      if (p.expiresAt && p.expiresAt.seconds < nowSec) return false;
+// ============================================================
+// MERGE WARD + NEARBY PRODUCTS
+// ============================================================
 
-      const matchCat = activeKey === "All" || p.category === activeKey;
-      const matchSearch =
-        !searchQuery ||
-        p.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        p.sellerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.subcategory ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (p.ward ?? "").toLowerCase().includes(searchQuery.toLowerCase());
-      // Radius filter — skip when in search mode (search shows all Kenya)
-      const matchRadius =
-        isSearchMode ||
-        !userCoords ||
-        getDistanceKm(userCoords[0], userCoords[1], p.lat, p.lng) <= radiusKm;
-      return matchCat && matchSearch && matchRadius;
-    });
+const wardIds = new Set(
+  wardProducts.map((p) => p.id)
+);
+
+const allLoadedProducts = dedupe(
+  wardProducts,
+  areaProducts.filter(
+    (p) => !wardIds.has(p.id)
+  )
+);
+
+// ============================================================
+// APPLY VISIBILITY RULES
+// ============================================================
+
+const visibleProducts = isSearchMode
+  ? allLoadedProducts
+  : userCoords
+  ? allLoadedProducts.filter((product) =>
+      isProductVisibleToUser(
+        product,
+        userCoords
+      )
+    )
+  : allLoadedProducts;
+
+// ============================================================
+// APPLY CATEGORY, SEARCH & RADIUS FILTERS
+// ============================================================
+
+const filteredProducts = applyFilters(
+  visibleProducts
+);
+
+// ============================================================
+// RANK PRODUCTS
+// ============================================================
+
+const rankedProducts = userCoords
+  ? rankProducts(
+      filteredProducts,
+      userCoords
+    )
+  : filteredProducts;
+
+// ============================================================
+// SPLIT WARD PRODUCTS FROM OTHER NEARBY PRODUCTS
+// ============================================================
+
+const filteredWard = rankedProducts.filter(
+  (product) =>
+    locationInfo?.wardName &&
+    product.ward === locationInfo.wardName
+);
+
+const filteredWardIds = new Set(
+  filteredWard.map((product) => product.id)
+);
+
+const filteredArea = rankedProducts.filter(
+  (product) => !filteredWardIds.has(product.id)
+);
+
+// ============================================================
+// FEED STATE
+// ============================================================
+
+const totalVisible = rankedProducts.length;
+
+const isLoadingMore =
+  wardLoading || areaLoading;
+
+const allDone =
+  wardDone && areaDone;
+
+// ============================================================
+// SEARCH
+// ============================================================
+
+function handleSearch(
+  e: React.FormEvent
+) {
+  e.preventDefault();
+  setSearchQuery(
+    searchInput.trim()
+  );
+}
+
+function clearSearch() {
+  setSearchInput("");
+  setSearchQuery("");
+  setShowSearch(false);
+}
+
+function bannerText() {
+  if (isSearchMode) {
+    return "Searching across Kenya";
   }
 
-  const wardIds = new Set(wardProducts.map((p) => p.id));
-  const filteredWard = applyFilters(wardProducts);
-  const filteredArea = applyFilters(areaProducts.filter((p) => !wardIds.has(p.id)));
-
-  const totalVisible = filteredWard.length + filteredArea.length;
-  const isLoadingMore = wardLoading || areaLoading;
-  const allDone = wardDone && areaDone;
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setSearchQuery(searchInput.trim());
-  }
-  function clearSearch() {
-    setSearchInput(""); setSearchQuery(""); setShowSearch(false);
+  if (!locationInfo) {
+    return "Finding your area...";
   }
 
-  function bannerText() {
-    if (isSearchMode) return `Searching across Kenya`;
-    if (!locationInfo) return "Finding your area...";
-    const area = locationInfo.wardName;
-    if (area && gpsGranted) return `Showing adverts in ${area} area`;
-    if (area) return `Showing adverts near ${area} area (from your saved location)`;
-    return "Finding nearby adverts...";
+  const area = locationInfo.wardName;
+
+  if (area && gpsGranted) {
+    return `Showing adverts in ${area} area`;
   }
 
+  if (area) {
+    return `Showing adverts near ${area} area (from your saved location)`;
+  }
+
+  return "Finding nearby adverts...";
+}
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center justify-between gap-3 z-40">
@@ -655,12 +1598,16 @@ export default function Home() {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   {filteredWard.map((p) => (
-                    <ProductCard
-                      key={p.id} product={p}
-                      userCoords={userCoords}
-                      onClick={() => setLocation(`/product/${p.id}`)}
-                    />
-                  ))}
+  <ProductCard
+    key={p.id} 
+    product={p}
+    userCoords={userCoords}
+    onClick={(e) => {
+      e.stopPropagation(); // This prevents the click from reaching the FAB
+      setLocation(`/product/${p.id}`);
+    }}
+  />
+                ))}
                 </div>
               </>
             )}
@@ -676,12 +1623,16 @@ export default function Home() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {filteredArea.map((p) => (
-                    <ProductCard
-                      key={p.id} product={p}
-                      userCoords={userCoords}
-                      onClick={() => setLocation(`/product/${p.id}`)}
-                    />
-                  ))}
+  <ProductCard
+    key={p.id} 
+    product={p}
+    userCoords={userCoords}
+    onClick={(e) => {
+      e.stopPropagation(); // This prevents the click from reaching the FAB
+      setLocation(`/product/${p.id}`);
+    }}
+  />
+))}
                 </div>
               </>
             )}
@@ -703,17 +1654,17 @@ export default function Home() {
         )}
       </div>
 
-      {user && (
-        <div className="fixed bottom-20 right-4 z-40">
-          <button
-            data-testid="fab-advertise"
-            onClick={() => setLocation("/post")}
-            className="flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
-          >
-            <Plus size={18} />Advertise
-          </button>
-        </div>
-      )}
+{user && (
+  <div className="fixed bottom-20 right-4 z-40 pointer-events-none"> {/* Added pointer-events-none */}
+    <button
+      data-testid="fab-advertise"
+      onClick={() => setLocation("/post")}
+      className="pointer-events-auto flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
+    >
+      <Plus size={18} />Advertise
+    </button>
+  </div>
+)}
 
       {!user && gpsReady && (
         <div className="flex-shrink-0 bg-card border-t border-border px-4 py-3 flex items-center gap-3 z-40">
