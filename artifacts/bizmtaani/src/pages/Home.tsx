@@ -837,8 +837,6 @@ const loadMore = useCallback(async () => {
 
     return;
   }
-
-  ("geohash"),
   
 // ============================================================
 // NORMAL FEED — NEARBY AREA PAGINATION
