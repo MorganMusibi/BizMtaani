@@ -838,82 +838,8 @@ const loadMore = useCallback(async () => {
     return;
   }
 
-  // ============================================================
-  // NORMAL FEED — NEARBY AREA PAGINATION
-  // Load another 20 from each geohash prefix that still has data.
-  // ============================================================
-  if (
-    !areaDone &&
-    !areaLoading
-  ) {
-    setAreaLoading(true);
-
-    try {
-      const prefixes = getNearbyGeohashPrefixes(
-        userCoords[0],
-        userCoords[1],
-        5
-      );
-
-      const coll = collection(
-        db,
-        "products"
-      );
-
-      const queries = prefixes.map(
-        (prefix, index) => {
-          const cursor =
-            areaCursors[String(index)];
-
-          if (cursor) {
-            return query(
-              coll,
-              where(
-                "geohash",
-                ">=",
-                prefix
-              ),
-              where(
-                "geohash",
-                "<",
-                prefix + "\uf8ff"
-              ),
-              orderBy("geohash"),
-              startAfter(cursor),
-              limit(AREA_PAGE)
-            );
-          }
-
-          return query(
-            coll,
-            where(
-              "geohash",
-              ">=",
-              prefix
-            ),
-            where(
-              "geohash",
-              "<",
-              prefix + "\uf8ff"
-            ),
-            orderBy("geohash"),
-            limit(AREA_PAGE)
-          );
-        }
-      );
-
-      const snapshots = await Promise.all(
-        queries.map((q) => getDocs(q))
-      );
-
-      const newProducts = snapshots.flatMap(
-        (snap) => toProducts(snap.docs)
-      );
-
-      const uniqueNewProducts = Array.from(
-        new Map(
-          newProducts.map((product) => [
-            product.id,
+  ("geohash"),
+  
 // ============================================================
 // NORMAL FEED — NEARBY AREA PAGINATION
 // Load another 20 adverts from nearby geohash areas.
