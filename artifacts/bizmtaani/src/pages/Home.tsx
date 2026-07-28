@@ -446,10 +446,19 @@ export default function Home() {
   const [wardLoading, setWardLoading] = useState(false);
 
 const [areaProducts, setAreaProducts] = useState<Product[]>([]);
+
+// Products fetched from Firestore but not yet displayed.
+// These act as the nearby pagination buffer.
+const [areaBuffer, setAreaBuffer] = useState<Product[]>([]);
+
 const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
 const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
 const [areaDone, setAreaDone] = useState(false);
 const [areaLoading, setAreaLoading] = useState(false);
+
+// Number of products to fetch from each active geohash prefix.
+// This is intentionally larger than the visible page size.
+const AREA_BUFFER_FETCH = 40;
 
 const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
