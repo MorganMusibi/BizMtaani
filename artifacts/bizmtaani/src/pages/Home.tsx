@@ -5,7 +5,7 @@
  *   2. Saved home area from user's Firestore profile
  *   3. Nairobi centre (last resort)
  */
-
+import { useHomeFeeds } from "@/hooks/useHomeFeeds";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
@@ -216,6 +216,8 @@ export default function Home() {
   const isSearchMode = searchQuery.length > 0;
   const [initialLoading, setInitialLoading] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const { wardProducts, areaProducts, wardLoading, areaLoading, wardDone, areaDone, loadMore, } = useHomeFeeds({
+  gpsReady, userCoords, isSearchMode, locationInfo, radiusKm, });
 
   useEffect(() => {
   const el = sentinelRef.current;
