@@ -8,11 +8,6 @@
 import { useHomeFeeds } from "@/hooks/useHomeFeeds";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
-import {
-  collection, query, orderBy, where, limit, startAfter,
-  getDocs, QueryDocumentSnapshot, DocumentData,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
