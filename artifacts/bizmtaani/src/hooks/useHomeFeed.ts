@@ -636,3 +636,481 @@ try {
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [gpsReady, isSearchMode, locationInfo?.wardName]);
 }
+
+const loadMore = useCallback(async () => {
+  if (!userCoords) return;
+
+  // ============================================================
+  // SEARCH PAGINATION
+  // Load 20 search results at a time.
+  // ============================================================
+  if (isSearchMode) {
+    if (searchDone || searchLoading) return;
+
+    setSearchLoading(true);
+
+    try {
+      const snap = await getDocs(
+        searchQueryAllProducts(searchCursor ?? undefined)
+      );
+
+      const newProducts = toProducts(snap.docs);
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(prev, newProducts);
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setSearchCursor(
+        snap.docs[snap.docs.length - 1] ?? searchCursor
+      );
+
+      setSearchDone(
+        snap.docs.length < AREA_PAGE
+      );
+    } catch (error) {
+      console.error(
+        "Failed to load more search results:",
+        error
+      );
+    } finally {
+      setSearchLoading(false);
+    }
+
+    return;
+  }
+  
+// ============================================================
+// NORMAL FEED — WARD-FIRST PAGINATION
+//
+// 1. Load the next 20 adverts from the user's ward first.
+// 2. Only after ward adverts are exhausted, load nearby adverts.
+// ============================================================
+
+if (!wardDone && !wardLoading) {
+  const wardName = locationInfo?.wardName;
+
+  if (!wardName) {
+    setWardDone(true);
+    return;
+  }
+
+  setWardLoading(true);
+
+  try {
+    const snap = await getDocs(
+      wardQuery(
+        wardName,
+        wardCursor ?? undefined
+      )
+    );
+
+    const newWardProducts = toProducts(
+      snap.docs
+    );
+
+    setWardProducts((prev) =>
+      dedupe(
+        prev,
+        newWardProducts
+      )
+    );
+
+    setWardCursor(
+      snap.docs[
+        snap.docs.length - 1
+      ] ?? wardCursor
+    );
+
+    setWardDone(
+      snap.docs.length < WARD_PAGE
+    );
+
+  } catch (error) {
+    console.error(
+      "Failed to load more ward adverts:",
+      error
+    );
+  } finally {
+    setWardLoading(false);
+  }
+
+  return;
+}
+// ============================================================
+// NORMAL FEED — NEARBY AREA PAGINATION
+//
+// Ward adverts are exhausted.
+//
+// BUFFER-FIRST FLOW:
+//
+// 1. If the nearby buffer already contains products,
+//    consume the next 20 locally.
+// 2. Do NOT query Firestore when the buffer has products.
+// 3. When the buffer is empty, fetch a new larger batch.
+// 4. Keep the extra products in the buffer.
+// 5. Display only 20 products at a time.
+//
+// Flow:
+//
+// Firestore
+//    ↓
+// 40+ nearby products
+//    ↓
+// areaBuffer
+//    ↓
+// 20 visible products
+//    ↓
+// consume buffer locally
+//    ↓
+// fetch again only when buffer is empty
+// ============================================================
+
+if (!areaDone && !areaLoading) {
+  setAreaLoading(true);
+
+  try {
+    // ==========================================================
+    // STEP 1 — CONSUME EXISTING BUFFER FIRST
+    // ==========================================================
+
+    if (areaBuffer.length > 0) {
+      const nextPage = areaBuffer.slice(
+        0,
+        AREA_PAGE
+      );
+
+      const remainingBuffer = areaBuffer.slice(
+        AREA_PAGE
+      );
+
+      setAreaProducts((prev) => {
+        const merged = dedupe(
+          prev,
+          nextPage
+        );
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      });
+
+      setAreaBuffer(
+        remainingBuffer
+      );
+
+      // We only mark the area as done when:
+      // - Firestore is exhausted
+      // - AND the local buffer is empty
+      if (
+        remainingBuffer.length === 0 &&
+        Object.keys(areaDonePrefixes).length > 0 &&
+        Object.values(areaDonePrefixes).every(Boolean)
+      ) {
+        setAreaDone(true);
+      }
+
+      return;
+    }
+
+    // ==========================================================
+    // STEP 2 — BUFFER IS EMPTY
+    // Fetch the next larger batch from Firestore.
+    // ==========================================================
+
+    let currentCursors: Record<
+      string,
+      Cursor | null
+    > = {
+      ...areaCursors,
+    };
+
+    let currentDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...areaDonePrefixes,
+    };
+
+    let collectedProducts: Product[] = [];
+
+    let allPrefixesDone = false;
+
+    // ==========================================================
+    // Keep fetching until we have enough products to fill
+    // the buffer, or all geohash prefixes are exhausted.
+    // ==========================================================
+
+    while (
+      collectedProducts.length < AREA_BUFFER_FETCH &&
+      !allPrefixesDone
+    ) {
+      const prefixes =
+        getNearbyGeohashPrefixes(
+          userCoords[0],
+          userCoords[1],
+          radiusKm
+        );
+
+      const queries =
+  areaQueries(
+    userCoords,
+    radiusKm,
+    currentCursors,
+    currentDonePrefixes
+  );
+
+      if (queries.length === 0) {
+        allPrefixesDone = true;
+        break;
+      }
+
+      const snapshots =
+        await Promise.all(
+          queries.map((q) =>
+            getDocs(q)
+          )
+        );
+
+      // ========================================================
+      // Convert Firestore documents into valid products.
+      // ========================================================
+
+      const pageProducts =
+        snapshots.flatMap(
+          (snap) =>
+            toProducts(
+              snap.docs
+            )
+        );
+
+      // Remove duplicate products caused by overlapping
+      // geohash prefixes.
+      const uniquePageProducts =
+        Array.from(
+          new Map(
+            pageProducts.map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
+
+      collectedProducts =
+        Array.from(
+          new Map(
+            [
+              ...collectedProducts,
+              ...uniquePageProducts,
+            ].map(
+              (product) => [
+                product.id,
+                product,
+              ]
+            )
+          ).values()
+        );
+
+      // ========================================================
+      // Update cursors and exhausted-prefix state.
+      // ========================================================
+
+      const updatedCursors: Record<
+        string,
+        Cursor | null
+      > = {
+        ...currentCursors,
+      };
+
+      const updatedDonePrefixes: Record<
+        string,
+        boolean
+      > = {
+        ...currentDonePrefixes,
+      };
+
+      let queryIndex = 0;
+
+      prefixes.forEach(
+        (_, prefixIndex) => {
+          const key =
+            String(prefixIndex);
+
+          // This prefix was already exhausted.
+          if (
+            currentDonePrefixes[key]
+          ) {
+            return;
+          }
+
+          const snap =
+            snapshots[queryIndex];
+
+          queryIndex++;
+
+          if (!snap) {
+            updatedDonePrefixes[
+              key
+            ] = true;
+
+            return;
+          }
+
+          // Save the last document as the cursor
+          // for the next Firestore request.
+          if (
+            snap.docs.length > 0
+          ) {
+            updatedCursors[
+              key
+            ] =
+              snap.docs[
+                snap.docs.length - 1
+              ];
+          }
+
+          // Because each request now fetches AREA_BUFFER_FETCH
+          // documents, a shorter result means this prefix
+          // has been completely exhausted.
+          if (
+            snap.docs.length <
+            AREA_BUFFER_FETCH
+          ) {
+            updatedDonePrefixes[
+              key
+            ] = true;
+          }
+        }
+      );
+
+      currentCursors =
+        updatedCursors;
+
+      currentDonePrefixes =
+        updatedDonePrefixes;
+
+      // ========================================================
+      // Check whether every nearby geohash prefix is exhausted.
+      // ========================================================
+
+      allPrefixesDone =
+        prefixes.every(
+          (_, index) =>
+            currentDonePrefixes[
+              String(index)
+            ] === true
+        );
+
+      // Safety check:
+      // If every query returned zero documents,
+      // stop immediately to avoid an infinite loop.
+      if (
+        snapshots.length > 0 &&
+        snapshots.every(
+          (snap) =>
+            snap.docs.length === 0
+        )
+      ) {
+        allPrefixesDone = true;
+      }
+    }
+
+    // ==========================================================
+    // Sort the newly fetched products by distance.
+    // ==========================================================
+
+    const sortedProducts =
+      sortNearbyProducts(
+        collectedProducts,
+        userCoords
+      );
+
+    // ==========================================================
+    // Display the first 20.
+    // Keep everything else in the local buffer.
+    // ==========================================================
+
+    const nextPage =
+      sortedProducts.slice(
+        0,
+        AREA_PAGE
+      );
+
+    const remainingBuffer =
+      sortedProducts.slice(
+        AREA_PAGE
+      );
+
+    setAreaProducts(
+      (prev) => {
+        const merged =
+          dedupe(
+            prev,
+            nextPage
+          );
+
+        return sortNearbyProducts(
+          merged,
+          userCoords
+        );
+      }
+    );
+
+    setAreaBuffer(
+      remainingBuffer
+    );
+
+    // ==========================================================
+    // Save Firestore pagination state.
+    // ==========================================================
+
+    setAreaCursors(
+      currentCursors
+    );
+
+    setAreaDonePrefixes(
+      currentDonePrefixes
+    );
+
+    // ==========================================================
+    // The nearby feed is completely finished only when:
+    //
+    // 1. Every geohash prefix is exhausted
+    // 2. The local buffer is empty
+    //
+    // If there are still products in the buffer,
+    // we must allow the next loadMore() call to consume them.
+    // ==========================================================
+
+    setAreaDone(
+      allPrefixesDone &&
+      remainingBuffer.length === 0
+    );
+
+  } catch (error) {
+    console.error(
+      "Failed to load more nearby adverts:",
+      error
+    );
+  } finally {
+    setAreaLoading(false);
+  }
+}
+
+}, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
+  wardLoading,
+  wardCursor,
+  locationInfo?.wardName,
+  areaDone,
+areaLoading,
+areaCursors,
+areaDonePrefixes,
+radiusKm,
+]);
