@@ -283,14 +283,14 @@ function applyFilters(products: Product[]): Product[] {
     // Search mode shows results across Kenya.
     // Normal mode applies the selected radius.
     const matchRadius =
-      isSearchMode ||
-      !userCoords ||
-      getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        p.lat,
-        p.lng
-      ) <= radiusKm;
+  isSearchMode ||
+  !userCoords ||
+  getDistanceKm(
+    userCoords[0],
+    userCoords[1],
+    p.lat,
+    p.lng
+  ) <= radiusKm;
 
     return (
       matchCat &&
@@ -376,8 +376,9 @@ const totalVisible = rankedProducts.length;
 const isLoadingMore =
   wardLoading || areaLoading;
 
-const allDone =
-  wardDone && areaDone;
+const allDone = isSearchMode
+  ? areaDone
+  : wardDone && areaDone;
 
 // ============================================================
 // SEARCH
@@ -527,9 +528,10 @@ function bannerText() {
                   min={0}
                   max={RADIUS_STEPS.length - 1}
                   step={1}
-                  value={RADIUS_STEPS.indexOf(radiusKm) === -1
-                    ? RADIUS_STEPS.findIndex((s) => s >= radiusKm)
-                    : RADIUS_STEPS.indexOf(radiusKm)}
+                  value={Math.max(
+  0,
+  RADIUS_STEPS.indexOf(radiusKm)
+)}
                   onChange={(e) => setRadiusKm(RADIUS_STEPS[Number(e.target.value)])}
                   className="w-full h-2 rounded-full appearance-none cursor-pointer
                     bg-muted [&::-webkit-slider-thumb]:appearance-none
