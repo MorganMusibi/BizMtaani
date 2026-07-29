@@ -269,10 +269,10 @@ function areaQueries(
   cursors: Record<string, Cursor | null> = {},
   donePrefixes: Record<string, boolean> = {}
 ) {
-  const prefixes = getNearbyGeohashPrefixes(
-    coords[0],
-    coords[1],
-    radiusKm
+  const prefixes =
+  getNearbyGeohashPrefixes(
+    userCoords[0],
+    userCoords[1]
   );
 
   const coll = collection(db, "products");
@@ -485,11 +485,11 @@ try {
     collectedProducts.length < AREA_BUFFER_FETCH &&
     !allPrefixesDone
   ) {
-    const prefixes = getNearbyGeohashPrefixes(
-      userCoords[0],
-      userCoords[1],
-      radiusKm
-    );
+    const prefixes =
+  getNearbyGeohashPrefixes(
+    userCoords[0],
+    userCoords[1]
+  );
 
   const queries = areaQueries(
   userCoords,
