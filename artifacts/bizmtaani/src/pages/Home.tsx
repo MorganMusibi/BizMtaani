@@ -215,10 +215,23 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
-  const [initialLoading, setInitialLoading] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const { wardProducts, areaProducts, wardLoading, areaLoading, wardDone, areaDone, loadMore, } = useHomeFeeds({
-  gpsReady, userCoords, isSearchMode, locationInfo, radiusKm, });
+  const {
+  wardProducts,
+  areaProducts,
+  wardLoading,
+  areaLoading,
+  wardDone,
+  areaDone,
+  initialLoading,
+  loadMore,
+} = useHomeFeeds({
+  gpsReady,
+  userCoords,
+  isSearchMode,
+  locationInfo,
+  radiusKm,
+});
 
   useEffect(() => {
   const el = sentinelRef.current;
