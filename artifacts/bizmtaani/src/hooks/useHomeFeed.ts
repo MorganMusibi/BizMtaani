@@ -102,7 +102,7 @@ export function isProductVisibleToUser(
   if (scope === "local") {
     const radius = product.visibilityRadiusKm ?? 2.5;
     return distance <= radius;
-
+  }
   // County and all-area adverts (Weekly/Monthly premiums) are visible in all wards
   if (scope === "county" || scope === "all_areas") {
     return true;
