@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -7,6 +7,8 @@ interface ProductImage {
   url: string;
   public_id?: string;
 }
+const WARD_PAGE = 20;
+const AREA_PAGE = 20;
 const AREA_BUFFER_FETCH = 40;
 
 export interface Product {
@@ -632,10 +634,9 @@ try {
     setInitialLoading(false);
   };
 
-  run();
+    run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [gpsReady, isSearchMode, locationInfo?.wardName]);
-}
+}, [gpsReady, isSearchMode, locationInfo?.wardName, userCoords, radiusKm]);
 
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
@@ -1123,3 +1124,4 @@ return {
   areaDone,
   loadMore,
 };
+}
