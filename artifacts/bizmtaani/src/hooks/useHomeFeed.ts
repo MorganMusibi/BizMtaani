@@ -1,22 +1,13 @@
 import { useState } from "react";
-import {
-  collection,
-  query,
-  orderBy,
-  where,
-  limit,
-  startAfter,
-  getDocs,
-  QueryDocumentSnapshot,
-  DocumentData,
+import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
-
 import { db } from "@/lib/firebase";
 import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 interface ProductImage {
   url: string;
   public_id?: string;
 }
+const AREA_BUFFER_FETCH = 40;
 
 interface Product {
   id: string;
@@ -98,14 +89,10 @@ function isProductVisibleToUser(
   product: Product,
   userCoords: [number, number]
 ) {
-  const distance = getDistanceKm(
-    userCoords[0],
-    userCoords[1],
-    product.lat,
+  const distance = getDistanceKm( userCoords[0], userCoords[1], product.lat,
     product.lng
   );
-
-  const scope = getProductVisibilityScope(product);
+ const scope = getProductVisibilityScope(product);
 
   // Free/local adverts
   if (scope === "local") {
@@ -207,13 +194,7 @@ function rankProducts(
       const score =
         (premium ? PREMIUM_BOOST : 0) - distanceKm;
 
-      return {
-        product,
-        distanceKm,
-        premium,
-        score,
-        originalIndex: index,
-      };
+      return { product, distanceKm, premium, score, originalIndex: index, };
     })
     .sort((a, b) => {
       // 1. Higher ranking score first.
@@ -328,7 +309,21 @@ function areaQueries(
     );
 }
 
-export function useHomeFeeds() {
+export function useHomeFeeds({
+  gpsReady,
+  userCoords,
+  isSearchMode,
+  locationInfo,
+  radiusKm,
+}: {
+  gpsReady: boolean;
+  userCoords: [number, number] | null;
+  isSearchMode: boolean;
+  locationInfo: {
+    wardName?: string;
+  } | null;
+  radiusKm: number;
+}) {
 
 const [wardProducts, setWardProducts] = useState<Product[]>([]);
   const [wardCursor, setWardCursor] = useState<Cursor | null>(null);
@@ -345,11 +340,6 @@ const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({}
 const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
 const [areaDone, setAreaDone] = useState(false);
 const [areaLoading, setAreaLoading] = useState(false);
-
-// Number of products to fetch from each active geohash prefix.
-// This is intentionally larger than the visible page size.
-const AREA_BUFFER_FETCH = 40;
-
 const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
