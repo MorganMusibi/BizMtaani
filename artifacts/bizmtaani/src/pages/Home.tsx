@@ -252,6 +252,21 @@ export default function Home() {
 
   return () => observer.disconnect();
 }, [loadMore]);
+  
+ const handleAreaSelect = useCallback((choice: ResolvedLocation) => {
+setLocationInfo(choice);
+
+if (choice.lat != null && choice.lng != null) {
+setUserCoords([choice.lat, choice.lng]);
+}
+
+setShowAreaPicker(false);
+
+localStorage.setItem(
+AREA_PICKER_STORAGE_KEY,
+JSON.stringify(choice)
+);
+}, []);
 
 function applyFilters(products: Product[]): Product[] {
   const nowSec = Date.now() / 1000;
