@@ -9,7 +9,7 @@ interface ProductImage {
 }
 const AREA_BUFFER_FETCH = 40;
 
-interface Product {
+export interface Product {
   id: string;
   title: string;
   price: number;
@@ -54,7 +54,7 @@ verified?: boolean;
 }
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
-function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+ export function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -85,7 +85,7 @@ function getProductVisibilityScope(product: Product) {
   return "local";
 }
 
-function isProductVisibleToUser(
+export function isProductVisibleToUser(
   product: Product,
   userCoords: [number, number]
 ) {
@@ -139,7 +139,7 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
     });
 }
 
-function dedupe(existing: Product[], incoming: Product[]): Product[] {
+export function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
@@ -165,7 +165,7 @@ function sortNearbyProducts(
     return distanceA - distanceB;
   });
 }
-function rankProducts(
+export function rankProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
