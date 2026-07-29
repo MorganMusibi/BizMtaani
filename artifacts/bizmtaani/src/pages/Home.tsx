@@ -5,7 +5,14 @@
  *   2. Saved home area from user's Firestore profile
  *   3. Nairobi centre (last resort)
  */
-import { useHomeFeeds } from "@/hooks/useHomeFeeds";
+import {
+  useHomeFeeds,
+  type Product,
+  getDistanceKm,
+  dedupe,
+  isProductVisibleToUser,
+  rankProducts,
+} from "@/hooks/useHomeFeeds";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
