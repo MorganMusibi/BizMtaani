@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -263,6 +263,7 @@ function wardQuery(
   }
 function areaQueries(
   coords: [number, number],
+  radiusKm: number,
   cursors: Record<string, Cursor | null> = {},
   donePrefixes: Record<string, boolean> = {}
 ) {
@@ -343,5 +344,5 @@ const [areaLoading, setAreaLoading] = useState(false);
 const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
-
+const [initialLoading, setInitialLoading] = useState(true);
 }
