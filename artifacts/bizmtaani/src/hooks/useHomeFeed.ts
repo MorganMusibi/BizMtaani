@@ -98,11 +98,10 @@ export function isProductVisibleToUser(
   const distance = getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng);
   const scope = getProductVisibilityScope(product);
 
-    // Free/local adverts
+    // Free/local adverts (Free weekly visible to a radius of 2.5 km)
   if (scope === "local") {
-    const radius = product.visibilityRadiusKm ?? 5;
+    const radius = product.visibilityRadiusKm ?? 2.5;
     return distance <= radius;
-  }
 
   // County and all-area adverts (Weekly/Monthly premiums) are visible in all wards
   if (scope === "county" || scope === "all_areas") {
