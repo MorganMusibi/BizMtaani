@@ -1114,3 +1114,12 @@ areaCursors,
 areaDonePrefixes,
 radiusKm,
 ]);
+return {
+  wardProducts,
+  areaProducts,
+  wardLoading,
+  areaLoading,
+  wardDone,
+  areaDone,
+  loadMore,
+};
