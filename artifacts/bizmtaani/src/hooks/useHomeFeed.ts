@@ -11,6 +11,12 @@ const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const AREA_BUFFER_FETCH = 40;
 
+// Internal geographic loading radius.
+// This is NOT selected by the user.
+// The feed uses this to discover nearby candidates,
+// which are then filtered by each advert's visibility rules.
+const HOME_FEED_RADIUS_KM = 50;
+
 export interface Product {
   id: string;
   title: string;
@@ -270,10 +276,10 @@ function areaQueries(
   donePrefixes: Record<string, boolean> = {}
 ) {
   const prefixes = getNearbyGeohashPrefixes(
-  userCoords[0],
-  userCoords[1],
-  radiusKm
-);
+    coords[0],
+    coords[1],
+    radiusKm
+  );
   const coll = collection(db, "products");
 
   return prefixes
