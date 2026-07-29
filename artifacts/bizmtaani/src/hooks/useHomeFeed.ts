@@ -346,3 +346,293 @@ const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
 const [initialLoading, setInitialLoading] = useState(true);
 }
+
+useEffect(() => {
+  if (!gpsReady || !userCoords) return;
+
+  setInitialLoading(true);
+
+setWardProducts([]);
+setWardCursor(null);
+setWardDone(false);
+
+setAreaProducts([]);
+setAreaBuffer([]);
+setAreaCursors({});
+setAreaDone(false);
+setAreaDonePrefixes({});    
+
+setSearchCursor(null);
+setSearchDone(false);
+  const run = async () => {
+
+    // ============================================================
+    // SEARCH MODE
+    // Search ALL products across Kenya.
+    
+    // Free and Premium products are treated equally.
+    //
+    // Expired / pending-payment / inactive products are removed
+    // later by toProducts() and applyFilters().
+    // ============================================================
+
+    if (isSearchMode) {
+  try {
+    const snap = await getDocs(
+      searchQueryAllProducts()
+    );
+
+    const products = toProducts(
+      snap.docs
+    );
+
+    setWardProducts([]);
+
+    setAreaProducts(
+      sortNearbyProducts(
+        products,
+        userCoords
+      )
+    );
+
+    setSearchCursor(
+  snap.docs[
+    snap.docs.length - 1
+  ] ?? null
+);
+
+setSearchDone(
+  snap.docs.length < AREA_PAGE
+);
+
+setWardDone(true);
+setAreaDone(true);
+
+  } catch (error) {
+    console.error(
+      "Failed to search products:",
+      error
+    );
+
+    setWardProducts([]);
+    setAreaProducts([]);
+
+    setWardDone(true);
+    setAreaDone(true);
+  }
+
+  setInitialLoading(false);
+  return;
+}
+    // ============================================================
+    // NORMAL HOME FEED
+    // Keep existing ward + nearby geohash behavior.
+    // ============================================================
+
+    const wardName = locationInfo?.wardName ?? "";
+
+    if (wardName) {
+      try {
+        const snap = await getDocs(
+          wardQuery(wardName)
+        );
+
+        const docs = toProducts(snap.docs);
+
+        setWardProducts(docs);
+
+        setWardCursor(
+          snap.docs[snap.docs.length - 1] ?? null
+        );
+
+        setWardDone(
+          snap.docs.length < WARD_PAGE
+        );
+
+      } catch (error) {
+        console.error(
+          "Failed to load ward adverts:",
+          error
+        );
+
+        setWardDone(true);
+      }
+    } else {
+      setWardDone(true);
+    }
+// ============================================================
+// INITIAL NEARBY AREA LOAD — BUFFERED
+//
+// Fetch a larger nearby buffer from Firestore.
+// Only 20 products are displayed at a time.
+//
+// The buffer allows pagination to happen locally first,
+// reducing repeated Firestore reads.
+//
+// Flow:
+//   Firestore -> areaBuffer -> 20 visible products
+// ============================================================
+
+try {
+  let currentCursors: Record<string, Cursor | null> = {};
+  let currentDonePrefixes: Record<string, boolean> = {};
+
+  let collectedProducts: Product[] = [];
+  let allPrefixesDone = false;
+
+  while (
+    collectedProducts.length < AREA_BUFFER_FETCH &&
+    !allPrefixesDone
+  ) {
+    const prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      radiusKm
+    );
+
+  const queries = areaQueries(
+  userCoords,
+  radiusKm,
+  currentCursors,
+  currentDonePrefixes
+);
+
+    if (queries.length === 0) {
+      allPrefixesDone = true;
+      break;
+    }
+
+    const snapshots = await Promise.all(
+      queries.map((q) => getDocs(q))
+    );
+
+    const pageProducts = snapshots.flatMap(
+      (snap) => toProducts(snap.docs)
+    );
+
+    const uniquePageProducts = Array.from(
+      new Map(
+        pageProducts.map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
+
+    collectedProducts = Array.from(
+      new Map(
+        [
+          ...collectedProducts,
+          ...uniquePageProducts,
+        ].map((product) => [
+          product.id,
+          product,
+        ])
+      ).values()
+    );
+
+    const updatedCursors: Record<
+      string,
+      Cursor | null
+    > = {
+      ...currentCursors,
+    };
+
+    const updatedDonePrefixes: Record<
+      string,
+      boolean
+    > = {
+      ...currentDonePrefixes,
+    };
+
+    let queryIndex = 0;
+
+    prefixes.forEach((_, prefixIndex) => {
+      const key = String(prefixIndex);
+
+      if (currentDonePrefixes[key]) {
+        return;
+      }
+
+      const snap = snapshots[queryIndex];
+      queryIndex++;
+
+      if (!snap) {
+        updatedDonePrefixes[key] = true;
+        return;
+      }
+
+      if (snap.docs.length > 0) {
+        updatedCursors[key] =
+          snap.docs[snap.docs.length - 1];
+      }
+
+      if (snap.docs.length < AREA_BUFFER_FETCH) {
+        updatedDonePrefixes[key] = true;
+      }
+    });
+
+    currentCursors = updatedCursors;
+    currentDonePrefixes = updatedDonePrefixes;
+
+    allPrefixesDone = prefixes.every(
+      (_, index) =>
+        currentDonePrefixes[String(index)] === true
+    );
+
+    // Prevent an infinite loop when every active prefix
+    // returns an empty snapshot.
+    if (
+      snapshots.length > 0 &&
+      snapshots.every(
+        (snap) => snap.docs.length === 0
+      )
+    ) {
+      allPrefixesDone = true;
+    }
+  }
+
+  const sortedBuffer = sortNearbyProducts(
+    collectedProducts,
+    userCoords
+  );
+
+  // First 20 products become visible.
+  // Everything else stays in the buffer.
+  setAreaProducts(
+    sortedBuffer.slice(0, AREA_PAGE)
+  );
+
+  setAreaBuffer(
+    sortedBuffer.slice(AREA_PAGE)
+  );
+
+  setAreaCursors(currentCursors);
+  setAreaDonePrefixes(currentDonePrefixes);
+
+  // We are done only when Firestore has no more prefixes
+  // AND there are no buffered products waiting to be shown.
+  setAreaDone(
+    allPrefixesDone &&
+    sortedBuffer.length <= AREA_PAGE
+  );
+
+} catch (error) {
+  console.error(
+    "Failed to load nearby adverts:",
+    error
+  );
+
+  setAreaProducts([]);
+  setAreaBuffer([]);
+  setAreaDone(true);
+}
+
+    
+
+    setInitialLoading(false);
+  };
+
+  run();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [gpsReady, isSearchMode, locationInfo?.wardName]);
