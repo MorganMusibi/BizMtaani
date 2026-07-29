@@ -214,31 +214,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
-
-  const [wardProducts, setWardProducts] = useState<Product[]>([]);
-  const [wardCursor, setWardCursor] = useState<Cursor | null>(null);
-  const [wardDone, setWardDone] = useState(false);
-  const [wardLoading, setWardLoading] = useState(false);
-
-const [areaProducts, setAreaProducts] = useState<Product[]>([]);
-
-// Products fetched from Firestore but not yet displayed.
-// These act as the nearby pagination buffer.
-const [areaBuffer, setAreaBuffer] = useState<Product[]>([]);
-
-const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
-const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
-const [areaDone, setAreaDone] = useState(false);
-const [areaLoading, setAreaLoading] = useState(false);
-
-// Number of products to fetch from each active geohash prefix.
-// This is intentionally larger than the visible page size.
-const AREA_BUFFER_FETCH = 40;
-
-const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
-const [searchDone, setSearchDone] = useState(false);
-const [searchLoading, setSearchLoading] = useState(false);
-
   const [initialLoading, setInitialLoading] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
