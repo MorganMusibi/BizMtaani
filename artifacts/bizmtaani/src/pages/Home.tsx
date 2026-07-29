@@ -440,11 +440,12 @@ try {
       radiusKm
     );
 
-    const queries = areaQueries(
-      userCoords,
-      currentCursors,
-      currentDonePrefixes
-    );
+  const queries = areaQueries(
+  userCoords,
+  radiusKm,
+  currentCursors,
+  currentDonePrefixes
+);
 
     if (queries.length === 0) {
       allPrefixesDone = true;
