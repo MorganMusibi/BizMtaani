@@ -236,3 +236,93 @@ function rankProducts(
     })
     .map((item) => item.product);
   }
+function wardQuery(
+  wardName: string,
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      where("ward", "==", wardName),
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(WARD_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    where("ward", "==", wardName),
+    orderBy("createdAt", "desc"),
+    limit(WARD_PAGE)
+  );
+}
+  function searchQueryAllProducts(
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(AREA_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
+  }
+function areaQueries(
+  coords: [number, number],
+  cursors: Record<string, Cursor | null> = {},
+  donePrefixes: Record<string, boolean> = {}
+) {
+  const prefixes = getNearbyGeohashPrefixes(
+    coords[0],
+    coords[1],
+    radiusKm
+  );
+
+  const coll = collection(db, "products");
+
+  return prefixes
+    .map((prefix, index) => {
+      const key = String(index);
+
+      // Skip geohash prefixes that are already exhausted.
+      if (donePrefixes[key]) {
+        return null;
+      }
+
+      const cursor = cursors[key];
+
+      if (cursor) {
+        return query(
+          coll,
+          where("geohash", ">=", prefix),
+          where("geohash", "<", prefix + "\uf8ff"),
+          orderBy("geohash"),
+          startAfter(cursor),
+          limit(AREA_BUFFER_FETCH)
+        );
+      }
+
+      return query(
+        coll,
+        where("geohash", ">=", prefix),
+        where("geohash", "<", prefix + "\uf8ff"),
+        orderBy("geohash"),
+        limit(AREA_BUFFER_FETCH)
+      );
+    })
+    .filter(
+      (q): q is ReturnType<typeof query> => q !== null
+    );
+}
