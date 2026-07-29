@@ -12,7 +12,7 @@ import {
   dedupe,
   isProductVisibleToUser,
   rankProducts,
-} from "@/hooks/useHomeFeeds";
+} from "@/hooks/useHomeFeed";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
