@@ -1180,15 +1180,6 @@ async function handleForwardMessage(
         </div>
       )}
 
-
-    {/* Product Name & Context */}
-    <div className="flex-1 min-w-0">
-      <p className="text-xs text-muted-foreground font-medium">Regarding Product</p>
-      <h4 className="font-bold text-sm truncate">{chatData.productTitle}</h4>
-    </div>
-  </div>
-)}
-
       {/* ================================================================
           MESSAGES
       ================================================================ */}
