@@ -14,7 +14,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
