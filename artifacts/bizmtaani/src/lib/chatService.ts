@@ -4,6 +4,7 @@ import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, server
 } from "firebase/firestore";
 
 import { db, auth } from "@/lib/firebase";
+
 /*
 |--------------------------------------------------------------------------
 | TYPES
@@ -47,10 +48,12 @@ export interface ChatData {
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
+
 export interface StartChatResult {
   chatId: string;
   created: boolean;
 }
+
 export interface ReplyTo {
   messageId: string;
   senderId: string;
@@ -160,9 +163,168 @@ export function getUnifiedChatId(
 
 /*
 |--------------------------------------------------------------------------
+| START DIRECT CHAT
+|--------------------------------------------------------------------------
+*/
+
+export async function startDirectChat(
+  currentUser: ChatParticipant,
+  otherUser: ChatParticipant
+): Promise<StartChatResult> {
+
+  validateUsers(
+    currentUser,
+    otherUser
+  );
+
+  const users = [
+    currentUser,
+    otherUser,
+  ];
+
+  const participants =
+    sortedParticipants(
+      currentUser.uid,
+      otherUser.uid
+    );
+
+  const chatId =
+    getUnifiedChatId(
+      currentUser.uid,
+      otherUser.uid
+    );
+
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  await setDoc(chatRef, {
+    type: "direct",
+    participants,
+    participantNames: participantNames(users),
+    participantPhotos: participantPhotos(users),
+    lastMessage: "",
+    lastMessageAt: serverTimestamp(),
+    lastSenderId: "",
+    unreadCount: unreadCounts(users),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    chatId,
+    created: true,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
+| START PRODUCT CHAT
+|--------------------------------------------------------------------------
+*/
+
+export async function startProductChat(params: {
+  currentUser: ChatParticipant;
+  seller: ChatParticipant;
+  productId: string;
+  productTitle: string;
+  productImage?: string;
+}): Promise<StartChatResult> {
+
+  const {
+    currentUser,
+    seller,
+    productId,
+    productTitle,
+    productImage,
+  } = params;
+
+  validateUsers(
+    currentUser,
+    seller
+  );
+
+  if (!productId) {
+    throw new Error(
+      "The product could not be identified."
+    );
+  }
+
+  const users = [
+    currentUser,
+    seller,
+  ];
+
+  const participants =
+    sortedParticipants(
+      currentUser.uid,
+      seller.uid
+    );
+
+  const chatId =
+    getUnifiedChatId(
+      currentUser.uid,
+      seller.uid
+    );
+
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const existingChat =
+    await getDoc(chatRef);
+
+  if (existingChat.exists()) {
+    await updateDoc(chatRef, {
+      participantNames: participantNames(users),
+      participantPhotos: participantPhotos(users),
+      productTitle,
+      productImage: productImage || "",
+      updatedAt: serverTimestamp(),
+    });
+
+    return {
+      chatId,
+      created: false,
+    };
+  }
+
+  await setDoc(chatRef, {
+    type: "product",
+    participants,
+    participantNames: participantNames(users),
+    participantPhotos: participantPhotos(users),
+    productId,
+    productTitle,
+    productImage: productImage || "",
+    lastMessage: "",
+    lastMessageAt: serverTimestamp(),
+    lastSenderId: "",
+    unreadCount: unreadCounts(users),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return {
+    chatId,
+    created: true,
+  };
+}
+
+/*
+|--------------------------------------------------------------------------
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
 */
+
 export async function startJobApplicationChat(params: {
   applicant: ChatParticipant;
   employer: ChatParticipant;
@@ -282,7 +444,6 @@ export async function startJobApplicationChat(params: {
   };
 }
 
-          
 /*
 |--------------------------------------------------------------------------
 | SEND MESSAGE
@@ -298,12 +459,12 @@ export async function sendChatMessage(params: {
 }): Promise<void> {
 
   const {
-  chatId,
-  senderId,
-  senderName,
-  text,
-  replyTo,
-} = params;
+    chatId,
+    senderId,
+    senderName,
+    text,
+    replyTo,
+  } = params;
 
   const cleanText =
     text.trim();
@@ -384,32 +545,29 @@ export async function sendChatMessage(params: {
     );
 
   batch.set(messageRef, {
+    senderId,
 
-  senderId,
+    senderName:
+      senderName ||
+      "User",
 
-  senderName:
-    senderName ||
-    "User",
+    text:
+      cleanText,
 
-  text:
-    cleanText,
+    replyTo:
+      replyTo || null,
 
-  replyTo:
-    replyTo || null,
+    createdAt:
+      serverTimestamp(),
 
-  createdAt:
-    serverTimestamp(),
+    deliveredAt:
+      null,
 
-  deliveredAt:
-    null,
-
-  readAt:
-    null,
-});
-
+    readAt:
+      null,
+  });
 
   batch.update(chatRef, {
-
     lastMessage:
       cleanText,
 
@@ -434,6 +592,7 @@ export async function sendChatMessage(params: {
 
   await batch.commit();
 }
+
 /*
 |--------------------------------------------------------------------------
 | FORWARD MESSAGE
@@ -448,15 +607,15 @@ export async function forwardChatMessage(params: {
   originalMessage: ChatMessage;
 }): Promise<void> {
 
-    const {
+  const {
     sourceChatId,
     targetChatId,
     senderId,
     senderName,
     originalMessage,
   } = params;
-  
-      if (
+
+  if (
     !sourceChatId ||
     !targetChatId ||
     !senderId
@@ -466,7 +625,7 @@ export async function forwardChatMessage(params: {
     );
   }
 
-    const sourceChatRef =
+  const sourceChatRef =
     doc(
       db,
       "chats",
@@ -514,7 +673,6 @@ export async function forwardChatMessage(params: {
       "The selected conversation no longer exists."
     );
   }
-  
 
   const targetChat =
     chatSnap.data() as ChatData;
@@ -541,7 +699,7 @@ export async function forwardChatMessage(params: {
     );
   }
 
-      const originalMessageId =
+  const originalMessageId =
     (originalMessage as ChatMessage & {
       messageId?: string;
     }).messageId;
@@ -575,7 +733,7 @@ export async function forwardChatMessage(params: {
   const verifiedOriginalMessage =
     originalMessageSnap.data() as ChatMessage;
 
-    if (
+  if (
     verifiedOriginalMessage.deletedFor?.includes(
       senderId
     )
@@ -628,7 +786,7 @@ export async function forwardChatMessage(params: {
       deliveredAt:
         null,
 
-            readAt:
+      readAt:
         null,
 
       replyTo:
@@ -747,16 +905,14 @@ export async function markChatAsRead(
   const batch =
     writeBatch(db);
 
-    messagesSnap.forEach(
+  messagesSnap.forEach(
     (messageDoc) => {
-
       const message =
         messageDoc.data();
 
       if (
         !message.readAt
       ) {
-
         batch.update(
           messageDoc.ref,
           {
@@ -764,13 +920,11 @@ export async function markChatAsRead(
               serverTimestamp(),
           }
         );
-
       }
-
     }
   );
 
-    batch.update(
+  batch.update(
     chatRef,
     {
       unreadCount: {
@@ -784,6 +938,7 @@ export async function markChatAsRead(
 
   await batch.commit();
 }
+
 /*
 |--------------------------------------------------------------------------
 | MARK MESSAGES AS DELIVERED
@@ -845,19 +1000,19 @@ export async function markMessagesAsDelivered(
     );
 
   const messagesQuery =
-  query(
-    messagesRef,
-    where(
-      "senderId",
-      "==",
-      otherUserId
-    ),
-    where(
-  "deliveredAt",
-  "==",
-  null
-)
-  );
+    query(
+      messagesRef,
+      where(
+        "senderId",
+        "==",
+        otherUserId
+      ),
+      where(
+        "deliveredAt",
+        "==",
+        null
+      )
+    );
 
   const messagesSnap =
     await getDocs(
@@ -872,14 +1027,12 @@ export async function markMessagesAsDelivered(
 
   messagesSnap.forEach(
     (messageDoc) => {
-
       const message =
         messageDoc.data();
 
       if (
         !message.deliveredAt
       ) {
-
         batch.update(
           messageDoc.ref,
           {
@@ -891,7 +1044,6 @@ export async function markMessagesAsDelivered(
         hasUpdates =
           true;
       }
-
     }
   );
 
@@ -1145,4 +1297,4 @@ export async function reportMessage(
         serverTimestamp(),
     }
   );
-                                      }
+}
