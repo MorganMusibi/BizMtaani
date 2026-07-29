@@ -144,42 +144,99 @@ function validateUsers(
 
 /*
 |--------------------------------------------------------------------------
-| CHAT IDS
+| CHAT ID
 |--------------------------------------------------------------------------
 */
 
-export function getDirectChatId(
+export function getUnifiedChatId(
   uidA: string,
   uidB: string
 ): string {
   const [a, b] =
     sortedParticipants(uidA, uidB);
 
-  return `direct_${a}_${b}`;
+  return `${a}_${b}`;
 }
 
-export function getProductChatId(
-  productId: string,
-  uidA: string,
-  uidB: string
-): string {
-  const [a, b] =
-    sortedParticipants(uidA, uidB);
+|--------------------------------------------------------------------------
 
-  return `product_${productId}_${a}_${b}`;
-}
 
-export function getJobChatId(
-  jobId: string,
-  uidA: string,
-  uidB: string
-): string {
-  const [a, b] =
-    sortedParticipants(uidA, uidB);
+  /*
+|--------------------------------------------------------------------------
+| START JOB APPLICATION CHAT
+|--------------------------------------------------------------------------
+*/
+export async function startJobApplicationChat(params: {
+  applicant: ChatParticipant;
+  employer: ChatParticipant;
+  jobId: string;
+  jobTitle: string;
+  company: string;
+}): Promise<StartChatResult> {
 
-  return `job_${jobId}_${a}_${b}`;
-}
+  const currentUser = auth.currentUser;
 
+  if (!currentUser) {
+    throw new Error("You must be signed in to apply via chat.");
+  }
+
+  // Force the applicant object to always use the verified current user's UID
+  const applicant: ChatParticipant = {
+    ...params.applicant,
+    uid: currentUser.uid,
+  };
+
+  const {
+    employer,
+    jobId,
+    jobTitle,
+    company,
+  } = params;
+
+  validateUsers(applicant, employer);
+
+  if (!jobId) {
+    throw new Error("The job could not be identified.");
+  }
+
+  const users = [
+    applicant,
+    employer,
+  ];
+
+  const participants = sortedParticipants(
+    applicant.uid,
+    employer.uid
+  );
+
+  const chatId = getJobChatId(
+    jobId,
+    applicant.uid,
+    employer.uid
+  );
+
+  const chatRef = doc(
+    db,
+    "chats",
+    chatId
+  );
+
+  console.log(
+    "Checking job application chat:",
+    chatId
+  );
+
+  const existingChat = await getDoc(chatRef);
+
+  // ============================================================
+  // EXISTING CHAT
+  // ============================================================
+
+  if (existingChat.exists()) {
+    console.log(
+      "Job application chat already exists:",
+      chatId
+    );
 /*
 |--------------------------------------------------------------------------
 | START DIRECT CHAT
@@ -208,7 +265,7 @@ export async function startDirectChat(
     );
 
   const chatId =
-    getDirectChatId(
+    getUnifiedChatId(
       currentUser.uid,
       otherUser.uid
     );
@@ -305,8 +362,7 @@ export async function startProductChat(params: {
     );
 
   const chatId =
-    getProductChatId(
-      productId,
+    getUnifiedChatId(
       currentUser.uid,
       seller.uid
     );
@@ -315,30 +371,30 @@ export async function startProductChat(params: {
     doc(db, "chats", chatId);
 
   const existingChat =
-  await getDoc(chatRef);
+    await getDoc(chatRef);
 
-if (existingChat.exists()) {
-  await updateDoc(chatRef, {
-    participantNames:
-      participantNames(users),
+  if (existingChat.exists()) {
+    await updateDoc(chatRef, {
+      participantNames:
+        participantNames(users),
 
-    participantPhotos:
-      participantPhotos(users),
+      participantPhotos:
+        participantPhotos(users),
 
-    productTitle,
+      productTitle,
 
-    productImage:
-      productImage || "",
+      productImage:
+        productImage || "",
 
-    updatedAt:
-      serverTimestamp(),
-  });
+      updatedAt:
+        serverTimestamp(),
+    });
 
-  return {
-    chatId,
-    created: false,
-  };
-}
+    return {
+      chatId,
+      created: false,
+    };
+  }
 
   await setDoc(chatRef, {
     type: "product",
@@ -381,7 +437,7 @@ if (existingChat.exists()) {
   };
 }
 
-  /*
+/*
 |--------------------------------------------------------------------------
 | START JOB APPLICATION CHAT
 |--------------------------------------------------------------------------
@@ -400,7 +456,6 @@ export async function startJobApplicationChat(params: {
     throw new Error("You must be signed in to apply via chat.");
   }
 
-  // Force the applicant object to always use the verified current user's UID
   const applicant: ChatParticipant = {
     ...params.applicant,
     uid: currentUser.uid,
@@ -429,8 +484,7 @@ export async function startJobApplicationChat(params: {
     employer.uid
   );
 
-  const chatId = getJobChatId(
-    jobId,
+  const chatId = getUnifiedChatId(
     applicant.uid,
     employer.uid
   );
@@ -441,23 +495,9 @@ export async function startJobApplicationChat(params: {
     chatId
   );
 
-  console.log(
-    "Checking job application chat:",
-    chatId
-  );
-
   const existingChat = await getDoc(chatRef);
 
-  // ============================================================
-  // EXISTING CHAT
-  // ============================================================
-
   if (existingChat.exists()) {
-    console.log(
-      "Job application chat already exists:",
-      chatId
-    );
-
     await updateDoc(chatRef, {
       participantNames:
         participantNames(users),
@@ -478,6 +518,49 @@ export async function startJobApplicationChat(params: {
       created: false,
     };
   }
+
+  await setDoc(chatRef, {
+    type: "job_application",
+
+    participants,
+
+    participantNames:
+      participantNames(users),
+
+    participantPhotos:
+      participantPhotos(users),
+
+    jobId,
+
+    jobTitle,
+
+    company,
+
+    lastMessage: "",
+
+    lastMessageAt:
+      serverTimestamp(),
+
+    lastSenderId: "",
+
+    unreadCount: {
+      [applicant.uid]: 0,
+      [employer.uid]: 0,
+    },
+
+    createdAt:
+      serverTimestamp(),
+
+    updatedAt:
+      serverTimestamp(),
+  });
+
+  return {
+    chatId,
+    created: true,
+  };
+}
+
 
   // ============================================================
   // NEW CHAT (NO INITIAL MESSAGE PATH)
