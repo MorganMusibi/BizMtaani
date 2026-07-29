@@ -230,7 +230,7 @@ export default function Home() {
   userCoords,
   isSearchMode,
   locationInfo,
-  radiusKm,
+  radiusKm: 50,
 });
 
   useEffect(() => {
@@ -295,18 +295,10 @@ function applyFilters(products: Product[]): Product[] {
       (p.subcategory ?? "").toLowerCase().includes(search) ||
       (p.ward ?? "").toLowerCase().includes(search);
 
-    // Search mode shows results across Kenya.
-    // Normal mode applies the selected radius.
-    const matchRadius =
-  isSearchMode ||
-  !userCoords ||
-  getDistanceKm(
-    userCoords[0],
-    userCoords[1],
-    p.lat,
-    p.lng
-  ) <= radiusKm;
-
+    
+// Geographic visibility is controlled by the advert's plan
+// and visibility rules, not by a user-selected radius.
+const matchRadius = true;
     return (
       matchCat &&
       matchSearch &&
