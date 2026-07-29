@@ -27,8 +27,8 @@ const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const NAIROBI: [number, number] = [-1.286389, 36.817223];
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
-const DEFAULT_RADIUS_KM = 5;
-const RADIUS_STEPS = [1, 2, 3, 5, 7, 10]; // discrete steps for the slider
+const DEFAULT_RADIUS_KM = 2.5;
+const RADIUS_STEPS = [1, 2.5, 5, 7, 10]; // discrete steps for the slider
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -203,9 +203,10 @@ export default function Home() {
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
 
   // Border-area picker state
-  const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
+    const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
+
 
   const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
   const [showRadiusSlider, setShowRadiusSlider] = useState(false);
@@ -295,10 +296,12 @@ function applyFilters(products: Product[]): Product[] {
       (p.subcategory ?? "").toLowerCase().includes(search) ||
       (p.ward ?? "").toLowerCase().includes(search);
 
-    
-// Geographic visibility is controlled by the advert's plan
-// and visibility rules, not by a user-selected radius.
-const matchRadius = true;
+    // Free weekly ads respect the user's slider/radius filter (default 5km),
+    // while Premium county/all-area ads bypass the user slider and show everywhere.
+    const isPremium = p.plan?.startsWith("premium") || p.isPremium;
+    const distance = userCoords ? getDistanceKm(userCoords[0], userCoords[1], p.lat, p.lng) : 0;
+    const matchRadius = isPremium || distance <= radiusKm;
+
     return (
       matchCat &&
       matchSearch &&
