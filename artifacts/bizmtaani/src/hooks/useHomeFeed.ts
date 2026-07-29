@@ -3,9 +3,7 @@ import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNearbyGeohashPrefixes } from "@/lib/geohash";
-interface ProductImage {
-  url: string;
-  public_id?: string;
+interface ProductImage { url: string; public_id?: string;
 }
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
