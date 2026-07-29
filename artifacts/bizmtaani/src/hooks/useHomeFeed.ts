@@ -1,3 +1,17 @@
+import {
+  collection,
+  query,
+  orderBy,
+  where,
+  limit,
+  startAfter,
+  getDocs,
+  QueryDocumentSnapshot,
+  DocumentData,
+} from "firebase/firestore";
+
+import { db } from "@/lib/firebase";
+import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 interface ProductImage {
   url: string;
   public_id?: string;
