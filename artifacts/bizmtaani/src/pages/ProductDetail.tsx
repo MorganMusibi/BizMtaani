@@ -680,37 +680,35 @@ const handleReply = () => {
       </Button>
     </div>
   ) : (
-    <div className="grid grid-cols-3 gap-3">
-      {product.phone && (
-        <a
-          href={`tel:${product.phone}`}
-          className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg"
-        >
-          <Phone size={17} /> Call
-        </a>
-      )}
+    <div className="flex gap-3">
+  {product.phone && (
+    <a
+      href={`tel:${product.phone}`}
+      className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg"
+    >
+      <Phone size={17} /> Call
+    </a>
+  )}
 
-      <Button
-        data-testid="button-chat-seller"
-        className={`h-12 font-bold gap-2 shadow-xl ${
-          product.phone ? "flex-1" : "w-full"
-        }`}
-        onClick={handleChat}
-        disabled={chatLoading}
-      >
-        {chatLoading ? (
-          <Loader2 size={18} className="animate-spin" />
-        ) : (
-          <MessageCircle size={18} />
-        )}
+  <Button
+    data-testid="button-chat-seller"
+    className={`h-12 font-bold gap-2 shadow-xl flex-1`}
+    onClick={handleChat}
+    disabled={chatLoading}
+  >
+    {chatLoading ? (
+      <Loader2 size={18} className="animate-spin" />
+    ) : (
+      <MessageCircle size={18} />
+    )}
+    {isAccommodation
+      ? "Message Landlord"
+      : isEatery
+      ? "Contact Restaurant"
+      : "Chat with Seller"}
+  </Button>
+</div>
 
-        {isAccommodation
-          ? "Message Landlord"
-          : isEatery
-          ? "Contact Restaurant"
-          : "Chat with Seller"}
-      </Button>
-    </div>
   )}
 </div>
 
