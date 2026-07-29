@@ -278,8 +278,8 @@ function areaQueries(
   const coll = collection(db, "products");
 
   return prefixes
-    .map((prefix, index) => {
-      const key = String(index);
+  .map((prefix) => {
+    const key = prefix;
 
       // Skip geohash prefixes that are already exhausted.
       if (donePrefixes[key]) {
@@ -548,15 +548,15 @@ try {
 
     let queryIndex = 0;
 
-    prefixes.forEach((_, prefixIndex) => {
-      const key = String(prefixIndex);
+prefixes.forEach((prefix) => {
+  const key = prefix;
 
-      if (currentDonePrefixes[key]) {
-        return;
-      }
+  if (currentDonePrefixes[key]) {
+    return;
+  }
 
-      const snap = snapshots[queryIndex];
-      queryIndex++;
+  const snap = snapshots[queryIndex];
+  queryIndex++;
 
       if (!snap) {
         updatedDonePrefixes[key] = true;
@@ -577,9 +577,9 @@ try {
     currentDonePrefixes = updatedDonePrefixes;
 
     allPrefixesDone = prefixes.every(
-      (_, index) =>
-        currentDonePrefixes[String(index)] === true
-    );
+  (prefix) =>
+    currentDonePrefixes[prefix] === true
+);
 
     // Prevent an infinite loop when every active prefix
     // returns an empty snapshot.
@@ -593,10 +593,21 @@ try {
     }
   }
 
-  const sortedBuffer = sortNearbyProducts(
-    collectedProducts,
-    userCoords
+  const radiusFilteredProducts =
+  collectedProducts.filter(
+    (product) =>
+      getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      ) <= radiusKm
   );
+
+const sortedBuffer = sortNearbyProducts(
+  radiusFilteredProducts,
+  userCoords
+);
 
   // First 20 products become visible.
   // Everything else stays in the buffer.
@@ -939,22 +950,22 @@ if (!areaDone && !areaLoading) {
 
       let queryIndex = 0;
 
-      prefixes.forEach(
-        (_, prefixIndex) => {
-          const key =
-            String(prefixIndex);
+prefixes.forEach(
+  (prefix) => {
+    const key = prefix;
 
-          // This prefix was already exhausted.
-          if (
-            currentDonePrefixes[key]
-          ) {
-            return;
-          }
+    // This prefix was already exhausted.
+    if (
+      currentDonePrefixes[key]
+    ) {
+      return;
+    }
 
-          const snap =
-            snapshots[queryIndex];
+    const snap =
+      snapshots[queryIndex];
 
-          queryIndex++;
+    queryIndex++;
+
 
           if (!snap) {
             updatedDonePrefixes[
@@ -1001,14 +1012,13 @@ if (!areaDone && !areaLoading) {
       // Check whether every nearby geohash prefix is exhausted.
       // ========================================================
 
-      allPrefixesDone =
-        prefixes.every(
-          (_, index) =>
-            currentDonePrefixes[
-              String(index)
-            ] === true
-        );
-
+allPrefixesDone =
+  prefixes.every(
+    (prefix) =>
+      currentDonePrefixes[
+        prefix
+      ] === true
+  );
       // Safety check:
       // If every query returned zero documents,
       // stop immediately to avoid an infinite loop.
@@ -1026,12 +1036,22 @@ if (!areaDone && !areaLoading) {
     // ==========================================================
     // Sort the newly fetched products by distance.
     // ==========================================================
+const radiusFilteredProducts =
+  collectedProducts.filter(
+    (product) =>
+      getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      ) <= radiusKm
+  );
 
-    const sortedProducts =
-      sortNearbyProducts(
-        collectedProducts,
-        userCoords
-      );
+const sortedProducts =
+  sortNearbyProducts(
+    radiusFilteredProducts,
+    userCoords
+  );
 
     // ==========================================================
     // Display the first 20.
@@ -1122,6 +1142,7 @@ return {
   areaLoading,
   wardDone,
   areaDone,
+  initialLoading,
   loadMore,
 };
 }
