@@ -259,21 +259,28 @@ export async function startProductChat(params: {
     );
   }
 
+  // FORCE FIX: Ensure the seller's photo URL is their actual profile photo,
+  // and completely block the product image from accidentally overriding it.
+  const cleanSeller: ChatParticipant = {
+    ...seller,
+    photoURL: seller.photoURL && seller.photoURL !== productImage ? seller.photoURL : "",
+  };
+
   const users = [
     currentUser,
-    seller,
+    cleanSeller,
   ];
 
   const participants =
     sortedParticipants(
       currentUser.uid,
-      seller.uid
+      cleanSeller.uid
     );
 
   const chatId =
     getUnifiedChatId(
       currentUser.uid,
-      seller.uid
+      cleanSeller.uid
     );
 
   const chatRef =
