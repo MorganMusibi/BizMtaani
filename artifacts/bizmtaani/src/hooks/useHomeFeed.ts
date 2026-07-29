@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -7,11 +7,9 @@ interface ProductImage {
   url: string;
   public_id?: string;
 }
-const WARD_PAGE = 20;
-const AREA_PAGE = 20;
 const AREA_BUFFER_FETCH = 40;
 
-export interface Product {
+interface Product {
   id: string;
   title: string;
   price: number;
@@ -56,7 +54,7 @@ verified?: boolean;
 }
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
- export function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
+function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -87,7 +85,7 @@ function getProductVisibilityScope(product: Product) {
   return "local";
 }
 
-export function isProductVisibleToUser(
+function isProductVisibleToUser(
   product: Product,
   userCoords: [number, number]
 ) {
@@ -141,7 +139,7 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
     });
 }
 
-export function dedupe(existing: Product[], incoming: Product[]): Product[] {
+function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
@@ -167,7 +165,7 @@ function sortNearbyProducts(
     return distanceA - distanceB;
   });
 }
-export function rankProducts(
+function rankProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
@@ -634,9 +632,10 @@ try {
     setInitialLoading(false);
   };
 
-    run();
+  run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [gpsReady, isSearchMode, locationInfo?.wardName, userCoords, radiusKm]);
+}, [gpsReady, isSearchMode, locationInfo?.wardName]);
+}
 
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
@@ -1124,4 +1123,3 @@ return {
   areaDone,
   loadMore,
 };
-}
