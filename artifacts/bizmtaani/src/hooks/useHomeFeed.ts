@@ -345,7 +345,6 @@ const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
 const [initialLoading, setInitialLoading] = useState(true);
-}
 
 useEffect(() => {
   if (!gpsReady || !userCoords) return;
@@ -636,3 +635,4 @@ try {
   run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [gpsReady, isSearchMode, locationInfo?.wardName]);
+}
