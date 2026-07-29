@@ -1155,21 +1155,31 @@ async function handleForwardMessage(
         </div>
 
       </header>
-    {chatData?.type === "product" && chatData?.productTitle && (
-  <div className="flex items-center gap-3 p-3 bg-muted/60 border-b border-border">
-    {/* Display thumbnail if available */}
-    {chatData.productImage ? (
-      <img
-        src={chatData.productImage}
-        alt={chatData.productTitle}
-        className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-      />
-    ) : (
-      /* Fallback container if image is missing */
-      <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 font-bold text-primary">
-        {chatData.productTitle.charAt(0).toUpperCase()}
-      </div>
-    )}
+          {/* ================================================================
+          PRODUCT BANNER (Displays thumbnail & title for products)
+      ================================================================ */}
+
+      {chat?.type === "product" && chat?.productTitle && (
+        <div className="flex items-center gap-3 p-3 bg-muted/60 border-b border-border flex-shrink-0">
+          {chat.productImage ? (
+            <img
+              src={chat.productImage}
+              alt={chat.productTitle}
+              className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 font-bold text-primary">
+              {chat.productTitle.charAt(0).toUpperCase()}
+            </div>
+          )}
+
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground font-medium">Regarding Product</p>
+            <h4 className="font-bold text-sm truncate">{chat.productTitle}</h4>
+          </div>
+        </div>
+      )}
+
 
     {/* Product Name & Context */}
     <div className="flex-1 min-w-0">
