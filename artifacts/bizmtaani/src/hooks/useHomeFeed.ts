@@ -598,7 +598,7 @@ prefixes.forEach((prefix) => {
         userCoords[1],
         product.lat,
         product.lng
-      ) <= radiusKm
+      ) <= HOME_FEED_RADIUS_KM
   );
 
 const sortedBuffer = sortNearbyProducts(
@@ -644,7 +644,7 @@ const sortedBuffer = sortNearbyProducts(
 
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [gpsReady, isSearchMode, locationInfo?.wardName, userCoords, radiusKm]);
+}, [gpsReady, isSearchMode, locationInfo?.wardName, userCoords]);
 
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
@@ -1040,7 +1040,7 @@ const radiusFilteredProducts =
         userCoords[1],
         product.lat,
         product.lng
-      ) <= radiusKm
+      ) <= HOME_FEED_RADIUS_KM
   );
 
 const sortedProducts =
@@ -1121,15 +1121,20 @@ const sortedProducts =
   }
 }
 
-}, [ isSearchMode, userCoords, searchDone, searchLoading, searchCursor, wardDone,
+}, [
+  isSearchMode,
+  userCoords,
+  searchDone,
+  searchLoading,
+  searchCursor,
+  wardDone,
   wardLoading,
   wardCursor,
   locationInfo?.wardName,
   areaDone,
-areaLoading,
-areaCursors,
-areaDonePrefixes,
-radiusKm,
+  areaLoading,
+  areaCursors,
+  areaDonePrefixes,
 ]);
 return {
   wardProducts,
