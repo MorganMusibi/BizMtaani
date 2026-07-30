@@ -276,47 +276,6 @@ function areaQueries(
     coords[1],
     radiusKm
   );
-
-  const coll = collection(db, "products");
-
-  return prefixes
-    .map((prefix) => {
-      // Skip prefixes that have already been exhausted.
-      if (donePrefixes[prefix]) {
-        return null;
-      }
-
-      const cursor = cursors[prefix];
-
-      if (cursor) {
-        return query(
-          coll,
-          where("geohash", ">=", prefix),
-          where("geohash", "<", prefix + "\uf8ff"),
-          orderBy("geohash"),
-          startAfter(cursor),
-          limit(AREA_BUFFER_FETCH)
-        );
-      }
-
-      return query(
-        coll,
-        where("geohash", ">=", prefix),
-        where("geohash", "<", prefix + "\uf8ff"),
-        orderBy("geohash"),
-        limit(AREA_BUFFER_FETCH)
-      );
-    })
-    .filter(
-      (q): q is ReturnType<typeof query> =>
-        q !== null
-    );
-}
-  const prefixes = getNearbyGeohashPrefixes(
-    coords[0],
-    coords[1],
-    radiusKm
-  );
   const coll = collection(db, "products");
 
   return prefixes
