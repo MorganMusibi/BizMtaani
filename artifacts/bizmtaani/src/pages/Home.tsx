@@ -208,6 +208,229 @@ const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
 const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
 const [showAreaPicker, setShowAreaPicker] = useState(false);
 const hasPromptedArea = useRef(false);
+// ============================================================
+// LOCATION INITIALIZATION
+// Priority:
+// 1. Live GPS
+// 2. Saved homeLocation from user profile
+// 3. Previously selected area
+// 4. Ask user to select an area
+//
+// IMPORTANT:
+// There is NO Nairobi fallback.
+// ============================================================
+
+useEffect(() => {
+  let cancelled = false;
+
+  const useLocation = (location: ResolvedLocation) => {
+    if (cancelled) return;
+
+    setLocationInfo(location);
+
+    if (
+      location.lat != null &&
+      location.lng != null
+    ) {
+      setUserCoords([
+        location.lat,
+        location.lng,
+      ]);
+    }
+
+    setGpsReady(true);
+  };
+
+  const useSavedProfileLocation = () => {
+    const saved = userProfile?.homeLocation;
+
+    if (
+      saved &&
+      typeof saved.lat === "number" &&
+      typeof saved.lng === "number"
+    ) {
+      const savedLocation: ResolvedLocation = {
+        lat: saved.lat,
+        lng: saved.lng,
+        wardName: saved.areaName,
+        constituency: saved.constituency,
+        county: saved.county,
+      };
+
+      useLocation(savedLocation);
+      return true;
+    }
+
+    return false;
+  };
+
+  const usePreviouslySelectedArea = () => {
+    try {
+      const stored =
+        localStorage.getItem(
+          AREA_PICKER_STORAGE_KEY
+        );
+
+      if (!stored) {
+        return false;
+      }
+
+      const parsed =
+        JSON.parse(stored) as ResolvedLocation;
+
+      if (
+        typeof parsed.lat !== "number" ||
+        typeof parsed.lng !== "number"
+      ) {
+        return false;
+      }
+
+      useLocation(parsed);
+      return true;
+    } catch (error) {
+      console.error(
+        "Failed to load saved area:",
+        error
+      );
+
+      return false;
+    }
+  };
+
+  const requestGps = () => {
+    if (
+      !navigator.geolocation
+    ) {
+      // GPS is unavailable.
+      // Try saved profile location.
+      if (
+        useSavedProfileLocation()
+      ) {
+        return;
+      }
+
+      // Try previously selected area.
+      if (
+        usePreviouslySelectedArea()
+      ) {
+        return;
+      }
+
+      // No location available.
+      // The user must choose one.
+      setGpsReady(true);
+
+      if (!hasPromptedArea.current) {
+        hasPromptedArea.current = true;
+        setShowAreaPicker(true);
+      }
+
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        if (cancelled) return;
+
+        const lat =
+          position.coords.latitude;
+
+        const lng =
+          position.coords.longitude;
+
+        setUserCoords([lat, lng]);
+        setGpsGranted(true);
+        setGpsReady(true);
+
+        try {
+          const resolved =
+            await getWardInfo(lat, lng);
+
+          if (cancelled) return;
+
+          if (resolved) {
+            setLocationInfo(resolved);
+
+            // Get nearby/border-area choices
+            // only when GPS successfully resolves.
+            try {
+              const choices =
+                await getAreaChoices(
+                  lat,
+                  lng
+                );
+
+              if (!cancelled) {
+                setAreaChoices(
+                  choices ?? []
+                );
+              }
+            } catch (error) {
+              console.error(
+                "Failed to load nearby area choices:",
+                error
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Failed to resolve GPS location:",
+            error
+          );
+
+          // GPS coordinates still exist,
+          // so continue using them.
+        }
+      },
+      () => {
+        // GPS denied or unavailable.
+        setGpsGranted(false);
+
+        // First try saved profile location.
+        if (
+          useSavedProfileLocation()
+        ) {
+          return;
+        }
+
+        // Then try previously selected area.
+        if (
+          usePreviouslySelectedArea()
+        ) {
+          return;
+        }
+
+        // No location available.
+        // Do NOT use Nairobi.
+        setGpsReady(true);
+
+        if (!hasPromptedArea.current) {
+          hasPromptedArea.current = true;
+          setShowAreaPicker(true);
+        }
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000,
+      }
+    );
+  };
+
+  // Wait until the profile has finished loading
+  // before deciding whether to use its location.
+  if (user && !userProfile) {
+    return;
+  }
+requestGps();
+
+  return () => {
+    cancelled = true;
+  };
+}, [
+  user,
+  userProfile,
+]);
 
 const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
 const [showRadiusSlider, setShowRadiusSlider] = useState(false);
@@ -255,21 +478,33 @@ const [showRadiusSlider, setShowRadiusSlider] = useState(false);
   return () => observer.disconnect();
 }, [loadMore]);
   
- const handleAreaSelect = useCallback((choice: ResolvedLocation) => {
-setLocationInfo(choice);
+ const handleAreaSelect = useCallback(
+  (choice: ResolvedLocation) => {
+    setLocationInfo(choice);
 
-if (choice.lat != null && choice.lng != null) {
-setUserCoords([choice.lat, choice.lng]);
-}
+    if (
+      choice.lat != null &&
+      choice.lng != null
+    ) {
+      setUserCoords([
+        choice.lat,
+        choice.lng,
+      ]);
+    }
 
-setShowAreaPicker(false);
+    // The user now has a valid location,
+    // so the feed can start loading.
+    setGpsReady(true);
 
-localStorage.setItem(
-AREA_PICKER_STORAGE_KEY,
-JSON.stringify(choice)
+    setShowAreaPicker(false);
+
+    localStorage.setItem(
+      AREA_PICKER_STORAGE_KEY,
+      JSON.stringify(choice)
+    );
+  },
+  []
 );
-}, []);
-
 function applyFilters(products: Product[]): Product[] {
   const nowSec = Date.now() / 1000;
 
