@@ -433,7 +433,17 @@ setAreaDone(true);
           wardQuery(wardName)
         );
 
-        const docs = toProducts(snap.docs);
+        const docs = filterVisibleProducts(
+  toProducts(snap.docs),
+  userCoords
+);
+
+setWardProducts(
+  sortNearbyProducts(
+    docs,
+    userCoords
+  )
+);
 
         setWardProducts(docs);
 
@@ -502,8 +512,12 @@ try {
     );
 
     const pageProducts = snapshots.flatMap(
-      (snap) => toProducts(snap.docs)
-    );
+  (snap) =>
+    filterVisibleProducts(
+      toProducts(snap.docs),
+      userCoords
+    )
+);
 
     const uniquePageProducts = Array.from(
       new Map(
@@ -588,14 +602,17 @@ prefixes.forEach((prefix) => {
   }
 
   const radiusFilteredProducts =
-  collectedProducts.filter(
-    (product) =>
-      getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        product.lat,
-        product.lng
-      ) <= HOME_FEED_RADIUS_KM
+  filterVisibleProducts(
+    collectedProducts.filter(
+      (product) =>
+        getDistanceKm(
+          userCoords[0],
+          userCoords[1],
+          product.lat,
+          product.lng
+        ) <= HOME_FEED_RADIUS_KM
+    ),
+    userCoords
   );
 
 const sortedBuffer = sortNearbyProducts(
@@ -887,12 +904,13 @@ if (!areaDone && !areaLoading) {
       // ========================================================
 
       const pageProducts =
-        snapshots.flatMap(
-          (snap) =>
-            toProducts(
-              snap.docs
-            )
-        );
+  snapshots.flatMap(
+    (snap) =>
+      filterVisibleProducts(
+        toProducts(snap.docs),
+        userCoords
+      )
+  );
 
       // Remove duplicate products caused by overlapping
       // geohash prefixes.
@@ -1030,14 +1048,17 @@ allPrefixesDone =
     // Sort the newly fetched products by distance.
     // ==========================================================
 const radiusFilteredProducts =
-  collectedProducts.filter(
-    (product) =>
-      getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        product.lat,
-        product.lng
-      ) <= HOME_FEED_RADIUS_KM
+  filterVisibleProducts(
+    collectedProducts.filter(
+      (product) =>
+        getDistanceKm(
+          userCoords[0],
+          userCoords[1],
+          product.lat,
+          product.lng
+        ) <= HOME_FEED_RADIUS_KM
+    ),
+    userCoords
   );
 
 const sortedProducts =
