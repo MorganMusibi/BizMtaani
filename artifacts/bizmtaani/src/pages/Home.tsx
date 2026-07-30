@@ -1,10 +1,14 @@
 /**
- * Home feed — two-phase area-first advert loader.
- * Location fallback chain:
- *   1. Live GPS (if permitted)
- *   2. Saved home area from user's Firestore profile
- *   3. Nairobi centre (last resort)
- */
+
+* Home feed — two-phase area-first advert loader.
+* 
+* Location priority:
+* 1. Live GPS (if permitted)
+* 2. Saved home area from the user's Firestore profile
+* 3. If neither exists, wait for the user to provide/select an area.
+* 
+* No artificial Nairobi fallback is used.
+  */
 import {
   useHomeFeeds,
   type Product,
@@ -25,7 +29,6 @@ import { BottomNav } from "@/components/BottomNav";
 
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
-const NAIROBI: [number, number] = [-1.286389, 36.817223];
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 const DEFAULT_RADIUS_KM = 2.5;
 const RADIUS_STEPS = [1, 2.5, 5, 7, 10]; // discrete steps for the slider
