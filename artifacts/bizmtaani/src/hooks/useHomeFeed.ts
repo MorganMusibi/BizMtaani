@@ -445,8 +445,6 @@ setWardProducts(
   )
 );
 
-        setWardProducts(docs);
-
         setWardCursor(
           snap.docs[snap.docs.length - 1] ?? null
         );
@@ -490,10 +488,10 @@ try {
     collectedProducts.length < AREA_BUFFER_FETCH &&
     !allPrefixesDone
   ) {
-    const prefixes = getNearbyGeohashPrefixes(
+  const prefixes = getNearbyGeohashPrefixes(
   userCoords[0],
   userCoords[1],
-  radiusKm
+  HOME_FEED_RADIUS_KM
 );
   const queries = areaQueries(
   userCoords,
@@ -732,9 +730,10 @@ if (!wardDone && !wardLoading) {
       )
     );
 
-    const newWardProducts = toProducts(
-      snap.docs
-    );
+    const newWardProducts = filterVisibleProducts(
+  toProducts(snap.docs),
+  userCoords
+);
 
     setWardProducts((prev) =>
       dedupe(
