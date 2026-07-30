@@ -8,12 +8,23 @@ interface ProductImage { url: string; public_id?: string;
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const AREA_BUFFER_FETCH = 40;
+// Internal geographic discovery stages.
+//
+// These are NOT user-selected visibility distances.
+// They control how the feed progressively discovers
+// nearby candidate adverts.
+//
+// Advert visibility is still controlled separately by
+// isProductVisibleToUser().
+const HOME_FEED_RADIUS_STEPS = [
+  2.5,
+  5,
+  10,
+  20,
+  50,
+];
 
-// Internal geographic loading radius.
-// This is NOT selected by the user.
-// The feed uses this to discover nearby candidates,
-// which are then filtered by each advert's visibility rules.
-const HOME_FEED_RADIUS_KM = 50;
+const HOME_FEED_MAX_RADIUS_KM = 50;
 
 export interface Product {
   id: string;
@@ -265,6 +276,47 @@ function areaQueries(
     coords[1],
     radiusKm
   );
+
+  const coll = collection(db, "products");
+
+  return prefixes
+    .map((prefix) => {
+      // Skip prefixes that have already been exhausted.
+      if (donePrefixes[prefix]) {
+        return null;
+      }
+
+      const cursor = cursors[prefix];
+
+      if (cursor) {
+        return query(
+          coll,
+          where("geohash", ">=", prefix),
+          where("geohash", "<", prefix + "\uf8ff"),
+          orderBy("geohash"),
+          startAfter(cursor),
+          limit(AREA_BUFFER_FETCH)
+        );
+      }
+
+      return query(
+        coll,
+        where("geohash", ">=", prefix),
+        where("geohash", "<", prefix + "\uf8ff"),
+        orderBy("geohash"),
+        limit(AREA_BUFFER_FETCH)
+      );
+    })
+    .filter(
+      (q): q is ReturnType<typeof query> =>
+        q !== null
+    );
+}
+  const prefixes = getNearbyGeohashPrefixes(
+    coords[0],
+    coords[1],
+    radiusKm
+  );
   const coll = collection(db, "products");
 
   return prefixes
@@ -322,6 +374,17 @@ const [wardProducts, setWardProducts] = useState<Product[]>([]);
   const [wardLoading, setWardLoading] = useState(false);
 
 const [areaProducts, setAreaProducts] = useState<Product[]>([]);
+  // Current geographic discovery stage.
+//
+// 0 = 2.5 km
+// 1 = 5 km
+// 2 = 10 km
+// 3 = 20 km
+// 4 = 50 km
+//
+// This controls candidate discovery only.
+// It does NOT change advert visibility permissions.
+const [areaRadiusStage, setAreaRadiusStage] = useState(0);
 
 // Products fetched from Firestore but not yet displayed.
 // These act as the nearby pagination buffer.
@@ -339,7 +402,7 @@ const [initialLoading, setInitialLoading] = useState(true);
 useEffect(() => {
   if (!gpsReady || !userCoords) return;
 
-  setInitialLoading(true);
+setInitialLoading(true);
 
 setWardProducts([]);
 setWardCursor(null);
@@ -349,7 +412,8 @@ setAreaProducts([]);
 setAreaBuffer([]);
 setAreaCursors({});
 setAreaDone(false);
-setAreaDonePrefixes({});    
+setAreaDonePrefixes({});   
+setAreaRadiusStage(0);
 
 setSearchCursor(null);
 setSearchDone(false);
@@ -486,9 +550,12 @@ try {
   userCoords[1],
   HOME_FEED_RADIUS_KM
 );
-  const queries = areaQueries(
+  const currentRadius =
+  HOME_FEED_RADIUS_STEPS[0];
+
+const queries = areaQueries(
   userCoords,
-  HOME_FEED_RADIUS_KM,
+  currentRadius,
   currentCursors,
   currentDonePrefixes
 );
@@ -865,12 +932,6 @@ if (!areaDone && !areaLoading) {
       collectedProducts.length < AREA_BUFFER_FETCH &&
       !allPrefixesDone
     ) {
-      const prefixes =
-        getNearbyGeohashPrefixes(
-  userCoords[0],
-  userCoords[1],
-  HOME_FEED_RADIUS_KM
-);
 
       const queries = areaQueries(
   userCoords,
