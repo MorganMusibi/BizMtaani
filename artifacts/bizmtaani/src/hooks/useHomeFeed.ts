@@ -111,17 +111,6 @@ export function isProductVisibleToUser(
   return false;
 }
 
-
-function getDistanceBucket(distanceKm: number) {
-  if (distanceKm <= 2.5) return 1;
-  if (distanceKm <= 5) return 2;
-  if (distanceKm <= 10) return 3;
-  if (distanceKm <= 20) return 4;
-  if (distanceKm <= 50) return 5;
-
-  return 6;
-  }
-
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
   const nowSec = Date.now() / 1000;
 
@@ -140,6 +129,14 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
 
       return true;
     });
+}
+function filterVisibleProducts(
+  products: Product[],
+  userCoords: [number, number]
+): Product[] {
+  return products.filter((product) =>
+    isProductVisibleToUser(product, userCoords)
+  );
 }
 
 export function dedupe(existing: Product[], incoming: Product[]): Product[] {
