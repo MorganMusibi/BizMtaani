@@ -567,43 +567,114 @@ const visibleProducts = isSearchMode
       )
     )
   : allLoadedProducts;
-
 // ============================================================
-// APPLY CATEGORY, SEARCH & RADIUS FILTERS
+// APPLY CATEGORY & SEARCH FILTERS
 // ============================================================
 
-const filteredProducts = applyFilters(
+const categoryAndSearchFiltered = applyFilters(
   visibleProducts
 );
 
 // ============================================================
-// RANK PRODUCTS
+// APPLY USER DISPLAY RADIUS
+//
+// IMPORTANT:
+// This is ONLY a display preference.
+//
+// It does NOT change an advert's visibility rules.
+//
+// Free adverts are still restricted by
+// isProductVisibleToUser().
+// Premium adverts can still be visible beyond
+// the free advert radius.
+//
+// The slider simply controls how far the user
+// wants to browse from their current location.
 // ============================================================
 
-const rankedProducts = userCoords
+const filteredProducts = isSearchMode
+  ? categoryAndSearchFiltered
+  : userCoords
+  ? categoryAndSearchFiltered.filter((product) => {
+      const distance = getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      );
+
+      return distance <= radiusKm;
+    })
+  : categoryAndSearchFiltered;
+
+// ============================================================
+// RANK PRODUCTS — WARD FIRST, THEN NEARBY
+// ============================================================
+
+// ------------------------------------------------------------
+// 1. Separate the loaded products into:
+//    - Products belonging to the user's current ward
+//    - Products from other nearby areas
+//
+// IMPORTANT:
+// Geographic phase has priority over Premium ranking.
+// Premium adverts cannot jump from the nearby section
+// into the ward section.
+// ------------------------------------------------------------
+
+const wardProductsFiltered = filteredProducts.filter(
+  (product) =>
+    Boolean(locationInfo?.wardName) &&
+    product.ward === locationInfo?.wardName
+);
+
+const wardProductIds = new Set(
+  wardProductsFiltered.map((product) => product.id)
+);
+
+const areaProductsFiltered = filteredProducts.filter(
+  (product) => !wardProductIds.has(product.id)
+);
+
+// ------------------------------------------------------------
+// 2. Rank ONLY within the ward section.
+//
+// This means Premium can receive ranking preference
+// against other adverts in the same geographic phase,
+// but cannot override the ward-first structure.
+// ------------------------------------------------------------
+
+const filteredWard = userCoords
   ? rankProducts(
-      filteredProducts,
+      wardProductsFiltered,
       userCoords
     )
-  : filteredProducts;
+  : wardProductsFiltered;
 
-// ============================================================
-// SPLIT WARD PRODUCTS FROM OTHER NEARBY PRODUCTS
-// ============================================================
+// ------------------------------------------------------------
+// 3. Rank ONLY within the nearby section.
+//
+// Nearby adverts are ranked independently from ward adverts.
+// ------------------------------------------------------------
 
-const filteredWard = rankedProducts.filter(
-  (product) =>
-    locationInfo?.wardName &&
-    product.ward === locationInfo.wardName
-);
+const filteredArea = userCoords
+  ? rankProducts(
+      areaProductsFiltered,
+      userCoords
+    )
+  : areaProductsFiltered;
 
-const filteredWardIds = new Set(
-  filteredWard.map((product) => product.id)
-);
+// ------------------------------------------------------------
+// 4. Combine only for total count.
+//
+// The UI still renders filteredWard first and filteredArea
+// second, so the geographic order is preserved.
+// ------------------------------------------------------------
 
-const filteredArea = rankedProducts.filter(
-  (product) => !filteredWardIds.has(product.id)
-);
+const rankedProducts = [
+  ...filteredWard,
+  ...filteredArea,
+];
 
 // ============================================================
 // FEED STATE
