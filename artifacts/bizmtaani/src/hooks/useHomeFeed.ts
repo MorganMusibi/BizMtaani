@@ -169,55 +169,48 @@ export function rankProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
-  return products
-    .map((product, index) => {
-      const distanceKm = getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        product.lat,
-        product.lng
-      );
+  return [...products].sort((a, b) => {
+    const distanceA = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      a.lat,
+      a.lng
+    );
 
-      const premium = isPremiumProduct(product);
+    const distanceB = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      b.lat,
+      b.lng
+    );
 
-      /*
-       * Premium boost
-       *
-       * A premium advert gets a controlled ranking advantage.
-       * Distance still matters, so an extremely far-away premium
-       * advert will not automatically dominate the feed.
-       *
-       * The higher the boost, the stronger Premium is promoted.
-       */
-      const PREMIUM_BOOST = 3;
+    const premiumA = isPremiumProduct(a);
+    const premiumB = isPremiumProduct(b);
 
-      const score =
-        (premium ? PREMIUM_BOOST : 0) - distanceKm;
+    /*
+     * Geographic distance is the primary ranking factor.
+     *
+     * Premium status is only used as a tie-breaker.
+     *
+     * This prevents a distant Premium advert from jumping
+     * ahead of a much closer advert.
+     */
+    if (distanceA !== distanceB) {
+      return distanceA - distanceB;
+    }
 
-      return { product, distanceKm, premium, score, originalIndex: index, };
-    })
-    .sort((a, b) => {
-      // 1. Higher ranking score first.
-      // Premium gets boosted, while distance still matters.
-      if (a.score !== b.score) {
-        return b.score - a.score;
-      }
+    // Premium wins when adverts are approximately tied in distance.
+    if (premiumA !== premiumB) {
+      return premiumA ? -1 : 1;
+    }
 
-      // 2. Premium wins exact score ties.
-      if (a.premium !== b.premium) {
-        return a.premium ? -1 : 1;
-      }
+    // Newer adverts first when distance and plan are tied.
+    const createdA = a.createdAt?.seconds ?? 0;
+    const createdB = b.createdAt?.seconds ?? 0;
 
-      // 3. If still tied, nearest advert first.
-      if (a.distanceKm !== b.distanceKm) {
-        return a.distanceKm - b.distanceKm;
-      }
-
-      // 4. Final fallback: preserve original order.
-      return a.originalIndex - b.originalIndex;
-    })
-    .map((item) => item.product);
-  }
+    return createdB - createdA;
+  });
+}
 function wardQuery(
   wardName: string,
   cursor?: Cursor
