@@ -490,7 +490,7 @@ try {
 );
   const queries = areaQueries(
   userCoords,
-  radiusKm,
+  HOME_FEED_RADIUS_KM,
   currentCursors,
   currentDonePrefixes
 );
@@ -861,18 +861,17 @@ if (!areaDone && !areaLoading) {
     ) {
       const prefixes =
         getNearbyGeohashPrefixes(
-          userCoords[0],
-          userCoords[1],
-          radiusKm
-        );
+  userCoords[0],
+  userCoords[1],
+  HOME_FEED_RADIUS_KM
+);
 
-      const queries =
-  areaQueries(
-    userCoords,
-    radiusKm,
-    currentCursors,
-    currentDonePrefixes
-  );
+      const queries = areaQueries(
+  userCoords,
+  HOME_FEED_RADIUS_KM,
+  currentCursors,
+  currentDonePrefixes
+);
 
       if (queries.length === 0) {
         allPrefixesDone = true;
