@@ -455,7 +455,6 @@ const [showRadiusSlider, setShowRadiusSlider] = useState(false);
   userCoords,
   isSearchMode,
   locationInfo,
-  radiusKm: 50,
 });
 
   useEffect(() => {
