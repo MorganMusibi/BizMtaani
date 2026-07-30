@@ -531,17 +531,10 @@ function applyFilters(products: Product[]): Product[] {
       (p.subcategory ?? "").toLowerCase().includes(search) ||
       (p.ward ?? "").toLowerCase().includes(search);
 
-    // Free weekly ads respect the user's slider/radius filter (default 5km),
-    // while Premium county/all-area ads bypass the user slider and show everywhere.
-    const isPremium = p.plan?.startsWith("premium") || p.isPremium;
-    const distance = userCoords ? getDistanceKm(userCoords[0], userCoords[1], p.lat, p.lng) : 0;
-    const matchRadius = isPremium || distance <= radiusKm;
-
     return (
-      matchCat &&
-      matchSearch &&
-      matchRadius
-    );
+  matchCat &&
+  matchSearch
+);
   });
 }
 
