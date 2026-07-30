@@ -197,22 +197,20 @@ const priceLabel = isAccommodation
 }
 
 export default function Home() {
-  const [, setLocation] = useLocation();
-  const { user, userProfile } = useAuth();
+const [, setLocation] = useLocation();
+const { user, userProfile } = useAuth();
+const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
+const [gpsGranted, setGpsGranted] = useState(false);
+const [gpsReady, setGpsReady] = useState(false);
+const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
 
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [gpsGranted, setGpsGranted] = useState(false);
-  const [gpsReady, setGpsReady] = useState(false);
-  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
+// Area picker state
+const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
+const [showAreaPicker, setShowAreaPicker] = useState(false);
+const hasPromptedArea = useRef(false);
 
-  // Border-area picker state
-    const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
-  const [showAreaPicker, setShowAreaPicker] = useState(false);
-  const hasPromptedArea = useRef(false);
-
-
-  const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
-  const [showRadiusSlider, setShowRadiusSlider] = useState(false);
+const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
+const [showRadiusSlider, setShowRadiusSlider] = useState(false);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
