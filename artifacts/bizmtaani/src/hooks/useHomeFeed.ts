@@ -317,7 +317,6 @@ export function useHomeFeeds({
   userCoords,
   isSearchMode,
   locationInfo,
-  radiusKm,
 }: {
   gpsReady: boolean;
   userCoords: [number, number] | null;
@@ -325,7 +324,6 @@ export function useHomeFeeds({
   locationInfo: {
     wardName?: string;
   } | null;
-  radiusKm: number;
 }) {
 
 const [wardProducts, setWardProducts] = useState<Product[]>([]);
