@@ -569,19 +569,18 @@ const queries = areaQueries(
       boolean
     > = {
       ...currentDonePrefixes,
-    };
-
+    }
     let queryIndex = 0;
 
-prefixes.forEach((prefix) => {
-  const key = prefix;
+    prefixes.forEach((prefix) => {
+      const key = prefix;
 
-  if (currentDonePrefixes[key]) {
-    return;
-  }
+      if (currentDonePrefixes[key]) {
+        return;
+      }
 
-  const snap = snapshots[queryIndex];
-  queryIndex++;
+      const snap = snapshots[queryIndex];
+      queryIndex++;
 
       if (!snap) {
         updatedDonePrefixes[key] = true;
@@ -589,8 +588,7 @@ prefixes.forEach((prefix) => {
       }
 
       if (snap.docs.length > 0) {
-        updatedCursors[key] =
-          snap.docs[snap.docs.length - 1];
+        updatedCursors[key] = snap.docs[snap.docs.length - 1];
       }
 
       if (snap.docs.length < AREA_BUFFER_FETCH) {
@@ -602,9 +600,9 @@ prefixes.forEach((prefix) => {
     currentDonePrefixes = updatedDonePrefixes;
 
     allPrefixesDone = prefixes.every(
-  (prefix) =>
-    currentDonePrefixes[prefix] === true
-);
+      (prefix) => currentDonePrefixes[prefix] === true
+    );
+
 
     // Prevent an infinite loop when every active prefix
     // returns an empty snapshot.
