@@ -1,14 +1,13 @@
 /**
-
-* Home feed — two-phase area-first advert loader.
-* 
-* Location priority:
-* 1. Live GPS (if permitted)
-* 2. Saved home area from the user's Firestore profile
-* 3. If neither exists, wait for the user to provide/select an area.
-* 
-* No artificial Nairobi fallback is used.
-  */
+ * Home feed — two-phase area-first advert loader.
+ * 
+ * Location priority:
+ * 1. Live GPS (if permitted)
+ * 2. Saved home area from the user's Firestore profile
+ * 3. If neither exists, wait for the user to provide/select an area.
+ * 
+ * No artificial Nairobi fallback is used.
+ */
 import {
   useHomeFeeds,
   type Product,
@@ -46,66 +45,65 @@ function ProductCard({
   onClick: (e: React.MouseEvent | React.TouchEvent) => void;
 }) {
   const distance = userCoords
-  ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
-  : null;
+    ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
+    : null;
 
-const badgeColor = getCategoryBadgeColor(product.category);
+  const badgeColor = getCategoryBadgeColor(product.category);
 
-const isAccommodation =
-  product.category === "Accommodation";
+  const isAccommodation =
+    product.category === "Accommodation";
 
-const isEatery =
-  product.subcategory === "Hotels / Eateries" ||
-  product.subcategory === "Restaurants & Cooked Food";
+  const isEatery =
+    product.subcategory === "Hotels / Eateries" ||
+    product.subcategory === "Restaurants & Cooked Food";
 
-// Support BOTH old string arrays and new object arrays
-const firstImage = product.imageUrls?.[0];
+  const firstImage = product.imageUrls?.[0];
 
-const displayImage =
-  typeof firstImage === "string"
-    ? firstImage
-    : firstImage?.url || product.imageUrl || "";
+  const displayImage =
+    typeof firstImage === "string"
+      ? firstImage
+      : firstImage?.url || product.imageUrl || "";
 
-const negotiable =
-  (product.priceDisplay ?? product.priceType) === "negotiable";
+  const negotiable =
+    (product.priceDisplay ?? product.priceType) === "negotiable";
 
-const basisLabel: Record<string, string> = {
-  per_km: "/km",
-  per_hour: "/hr",
-  per_day: "/day",
-  per_trip: "/trip",
-  per_session: "/session",
-};
+  const basisLabel: Record<string, string> = {
+    per_km: "/km",
+    per_hour: "/hr",
+    per_day: "/day",
+    per_trip: "/trip",
+    per_session: "/session",
+  };
 
-const serviceCategories = [
-  "Services",
-  "Transport",
-  "Delivery",
-  "Cleaning",
-  "Repairs",
-];
+  const serviceCategories = [
+    "Services",
+    "Transport",
+    "Delivery",
+    "Cleaning",
+    "Repairs",
+  ];
 
-const showPricingBasis =
-  serviceCategories.includes(product.category);
+  const showPricingBasis =
+    serviceCategories.includes(product.category);
 
-const basisSuffix =
-  showPricingBasis && product.pricingBasis
-    ? basisLabel[product.pricingBasis] ?? ""
-    : "";
+  const basisSuffix =
+    showPricingBasis && product.pricingBasis
+      ? basisLabel[product.pricingBasis] ?? ""
+      : "";
 
-const priceLabel = isAccommodation
-  ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
-  : isEatery
-  ? null
-  : product.pricingBasis === "quote_only"
-  ? "Quote only"
-  : product.price > 0
-  ? `KES ${product.price.toLocaleString()}${basisSuffix}${
-      negotiable ? " · Neg." : ""
-    }`
-  : negotiable
-  ? "Negotiable"
-  : null;
+  const priceLabel = isAccommodation
+    ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}/mo`
+    : isEatery
+    ? null
+    : product.pricingBasis === "quote_only"
+    ? "Quote only"
+    : product.price > 0
+    ? `KES ${product.price.toLocaleString()}${basisSuffix}${
+        negotiable ? " · Neg." : ""
+      }`
+    : negotiable
+    ? "Negotiable"
+    : null;
 
   return (
     <div
@@ -114,7 +112,6 @@ const priceLabel = isAccommodation
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
     >
       <div className="relative">
-        {/* --- PREMIUM BADGE --- */}
         {product.plan?.startsWith("premium") && (
           <div className="absolute top-2 left-2 bg-[#00A651] text-white text-[9px] font-black px-1.5 py-0.5 rounded-full shadow-sm z-10">
             PREMIUM
@@ -123,17 +120,16 @@ const priceLabel = isAccommodation
 
         {displayImage ? (
           <img
-  src={displayImage}
-  alt={product.title}
-  loading="lazy"
-  className="w-full aspect-square object-cover"
-  onError={(e) => {
-  console.error("Image failed:", displayImage);
-
-  e.currentTarget.onerror = null;
-  e.currentTarget.src = "/placeholder-image.png";
-}}
-/>
+            src={displayImage}
+            alt={product.title}
+            loading="lazy"
+            className="w-full aspect-square object-cover"
+            onError={(e) => {
+              console.error("Image failed:", displayImage);
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/placeholder-image.png";
+            }}
+          />
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
             <Package size={28} className="text-muted-foreground" />
@@ -150,7 +146,6 @@ const priceLabel = isAccommodation
           {product.subcategory ?? product.category}
         </div>
         
-        {/* Verified Badge - Positioned to avoid overlapping Premium badge */}
         {(product.verified || product.plan?.startsWith("premium")) && (
           <div className="absolute top-2 left-14 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
             <Check size={8} />
@@ -159,12 +154,12 @@ const priceLabel = isAccommodation
         )}
         
         {isAccommodation &&
-  Array.isArray(product.imageUrls) &&
-  product.imageUrls.length > 1 && (
-    <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
-      +{product.imageUrls.length - 1} photos
-    </div>
-)}
+          Array.isArray(product.imageUrls) &&
+          product.imageUrls.length > 1 && (
+            <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
+              +{product.imageUrls.length - 1} photos
+            </div>
+        )}
       </div>
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
@@ -193,235 +188,119 @@ const priceLabel = isAccommodation
 }
 
 export default function Home() {
-const [, setLocation] = useLocation();
-const { user, userProfile } = useAuth();
-const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-const [gpsGranted, setGpsGranted] = useState(false);
-const [gpsReady, setGpsReady] = useState(false);
-const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
+  const [, setLocation] = useLocation();
+  const { user, userProfile } = useAuth();
+  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
+  const [gpsGranted, setGpsGranted] = useState(false);
+  const [gpsReady, setGpsReady] = useState(false);
+  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
 
-// Area picker state
-const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
-const [showAreaPicker, setShowAreaPicker] = useState(false);
-const hasPromptedArea = useRef(false);
-// ============================================================
-// LOCATION INITIALIZATION
-// Priority:
-// 1. Live GPS
-// 2. Saved homeLocation from user profile
-// 3. Previously selected area
-// 4. Ask user to select an area
-useEffect(() => {
-  let cancelled = false;
+  const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const hasPromptedArea = useRef(false);
 
-  const applyResolvedLocation = (location: ResolvedLocation) => {
-    if (cancelled) return;
+  useEffect(() => {
+    let cancelled = false;
 
-    setLocationInfo(location);
-
-    if (
-      location.lat != null &&
-      location.lng != null
-    ) {
-      setUserCoords([
-        location.lat,
-        location.lng,
-      ]);
-    }
-
-    setGpsReady(true);
-  };
-
-  const useSavedProfileLocation = () => {
-    const saved = userProfile?.homeLocation;
-
-    if (
-      saved &&
-      typeof saved.lat === "number" &&
-      typeof saved.lng === "number"
-    ) {
-      const savedLocation: ResolvedLocation = {
-        lat: saved.lat,
-        lng: saved.lng,
-        wardName: saved.areaName,
-        constituency: saved.constituency,
-        county: saved.county,
-      };
-
-      applyResolvedLocation(savedLocation);
-      return true;
-    }
-
-    return false;
-  };
-
-  const usePreviouslySelectedArea = () => {
-    try {
-      const stored =
-        localStorage.getItem(
-          AREA_PICKER_STORAGE_KEY
-        );
-
-      if (!stored) {
-        return false;
+    const applyResolvedLocation = (location: ResolvedLocation) => {
+      if (cancelled) return;
+      setLocationInfo(location);
+      if (location.lat != null && location.lng != null) {
+        setUserCoords([location.lat, location.lng]);
       }
-
-      const parsed =
-        JSON.parse(stored) as ResolvedLocation;
-
-      if (
-        typeof parsed.lat !== "number" ||
-        typeof parsed.lng !== "number"
-      ) {
-        return false;
-      }
-
-      applyResolvedLocation(parsed);
-      return true;
-    } catch (error) {
-      console.error(
-        "Failed to load saved area:",
-        error
-      );
-
-      return false;
-    }
-  };
-
-  const requestGps = () => {
-    if (
-      !navigator.geolocation
-    ) {
-      // GPS is unavailable.
-      // Try saved profile location.
-      if (
-        useSavedProfileLocation()
-      ) {
-        return;
-      }
-
-      // Try previously selected area.
-      if (
-        usePreviouslySelectedArea()
-      ) {
-        return;
-      }
-
-      // No location available.
-      // The user must choose one.
       setGpsReady(true);
+    };
 
-      if (!hasPromptedArea.current) {
-        hasPromptedArea.current = true;
-        setShowAreaPicker(true);
+    const useSavedProfileLocation = () => {
+      const saved = userProfile?.homeLocation;
+      if (saved && typeof saved.lat === "number" && typeof saved.lng === "number") {
+        const savedLocation: ResolvedLocation = {
+          lat: saved.lat,
+          lng: saved.lng,
+          wardName: saved.areaName,
+          constituency: saved.constituency,
+          county: saved.county,
+        };
+        applyResolvedLocation(savedLocation);
+        return true;
       }
+      return false;
+    };
 
-      return;
-    }
+    const usePreviouslySelectedArea = () => {
+      try {
+        const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
+        if (!stored) return false;
+        const parsed = JSON.parse(stored) as ResolvedLocation;
+        if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") return false;
+        applyResolvedLocation(parsed);
+        return true;
+      } catch (error) {
+        console.error("Failed to load saved area:", error);
+        return false;
+      }
+    };
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        if (cancelled) return;
-
-        const lat =
-          position.coords.latitude;
-
-        const lng =
-          position.coords.longitude;
-
-        setUserCoords([lat, lng]);
-        setGpsGranted(true);
+    const requestGps = () => {
+      if (!navigator.geolocation) {
+        if (useSavedProfileLocation()) return;
+        if (usePreviouslySelectedArea()) return;
         setGpsReady(true);
-
-        try {
-          const resolved =
-            await getWardInfo(lat, lng);
-
-          if (cancelled) return;
-
-          if (resolved) {
-            setLocationInfo(resolved);
-
-            // Get nearby/border-area choices
-            // only when GPS successfully resolves.
-            try {
-              const choices =
-                await getAreaChoices(
-                  lat,
-                  lng
-                );
-
-              if (!cancelled) {
-                setAreaChoices(
-                  choices ?? []
-                );
-              }
-            } catch (error) {
-              console.error(
-                "Failed to load nearby area choices:",
-                error
-              );
-            }
-          }
-        } catch (error) {
-          console.error(
-            "Failed to resolve GPS location:",
-            error
-          );
-
-          // GPS coordinates still exist,
-          // so continue using them.
-        }
-      },
-      () => {
-        // GPS denied or unavailable.
-        setGpsGranted(false);
-
-        // First try saved profile location.
-        if (
-          useSavedProfileLocation()
-        ) {
-          return;
-        }
-
-        // Then try previously selected area.
-        if (
-          usePreviouslySelectedArea()
-        ) {
-          return;
-        }
-
-        // No location available.
-        // Do NOT use Nairobi.
-        setGpsReady(true);
-
         if (!hasPromptedArea.current) {
           hasPromptedArea.current = true;
           setShowAreaPicker(true);
         }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 300000,
+        return;
       }
-    );
-  };
 
-  // Wait until the profile has finished loading
-  // before deciding whether to use its location.
-  if (user && !userProfile) {
-    return;
-  }
-requestGps();
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (cancelled) return;
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setUserCoords([lat, lng]);
+          setGpsGranted(true);
+          setGpsReady(true);
 
-  return () => {
-    cancelled = true;
-  };
-}, [
-  user,
-  userProfile,
-]);
+          try {
+            const resolved = await getWardInfo(lat, lng);
+            if (cancelled) return;
+            if (resolved) {
+              setLocationInfo(resolved);
+              try {
+                const choices = await getAreaChoices(lat, lng);
+                if (!cancelled) {
+                  setAreaChoices(choices ?? []);
+                }
+              } catch (error) {
+                console.error("Failed to load nearby area choices:", error);
+              }
+            }
+          } catch (error) {
+            console.error("Failed to resolve GPS location:", error);
+          }
+        },
+        () => {
+          setGpsGranted(false);
+          if (useSavedProfileLocation()) return;
+          if (usePreviouslySelectedArea()) return;
+          setGpsReady(true);
+          if (!hasPromptedArea.current) {
+            hasPromptedArea.current = true;
+            setShowAreaPicker(true);
+          }
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+      );
+    };
+
+    if (user && !userProfile) return;
+    requestGps();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, userProfile]);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -429,267 +308,122 @@ requestGps();
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
   const sentinelRef = useRef<HTMLDivElement>(null);
+
   const {
-  wardProducts,
-  areaProducts,
-  wardLoading,
-  areaLoading,
-  wardDone,
-  areaDone,
-  initialLoading,
-  loadMore,
-} = useHomeFeeds({
-  gpsReady,
-  userCoords,
-  isSearchMode,
-  locationInfo,
-});
+    wardProducts,
+    areaProducts,
+    wardLoading,
+    areaLoading,
+    wardDone,
+    areaDone,
+    initialLoading,
+    loadMore,
+  } = useHomeFeeds({
+    gpsReady,
+    userCoords,
+    isSearchMode,
+    locationInfo,
+  });
 
   useEffect(() => {
-  const el = sentinelRef.current;
-  if (!el) return;
+    const el = sentinelRef.current;
+    if (!el) return;
 
-  const observer = new IntersectionObserver(
-    ([entry]) => {
-      if (entry.isIntersecting) {
-        loadMore();
-      }
-    },
-    {
-      rootMargin: "400px",
-    }
-  );
-
-  observer.observe(el);
-
-  return () => observer.disconnect();
-}, [loadMore]);
-  
- const handleAreaSelect = useCallback(
-  (choice: ResolvedLocation) => {
-    setLocationInfo(choice);
-
-    if (
-      choice.lat != null &&
-      choice.lng != null
-    ) {
-      setUserCoords([
-        choice.lat,
-        choice.lng,
-      ]);
-    }
-
-    // The user now has a valid location,
-    // so the feed can start loading.
-    setGpsReady(true);
-
-    setShowAreaPicker(false);
-
-    localStorage.setItem(
-      AREA_PICKER_STORAGE_KEY,
-      JSON.stringify(choice)
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: "400px" }
     );
-  },
-  []
-);
-function applyFilters(products: Product[]): Product[] {
-  const nowSec = Date.now() / 1000;
 
-  return products.filter((p) => {
-    // Hide pending-payment listings
-    if (p.status === "pending_payment") {
-      return false;
-    }
-
-    // Hide expired listings
-    if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
-      return false;
-    }
-
-    const matchCat =
-      activeKey === "All" ||
-      p.category === activeKey;
-
-    const search = searchQuery.toLowerCase();
-
-    const matchSearch =
-      !search ||
-      p.title.toLowerCase().includes(search) ||
-      p.sellerName.toLowerCase().includes(search) ||
-      (p.subcategory ?? "").toLowerCase().includes(search) ||
-      (p.ward ?? "").toLowerCase().includes(search);
-
-    return (
-  matchCat &&
-  matchSearch
-);
-  });
-}
-
-// ============================================================
-// MERGE WARD + NEARBY PRODUCTS
-// ============================================================
-
-const wardIds = new Set(
-  wardProducts.map((p) => p.id)
-);
-
-const allLoadedProducts = dedupe(
-  wardProducts,
-  areaProducts.filter(
-    (p) => !wardIds.has(p.id)
-  )
-);
-
-// ============================================================
-// APPLY VISIBILITY RULES
-// ============================================================
-
-const visibleProducts = isSearchMode
-  ? allLoadedProducts
-  : userCoords
-  ? allLoadedProducts.filter((product) =>
-      isProductVisibleToUser(
-        product,
-        userCoords
-      )
-    )
-  : allLoadedProducts;
-// ============================================================
-// APPLY CATEGORY & SEARCH FILTERS
-// ============================================================
-
-const categoryAndSearchFiltered = applyFilters(
-  visibleProducts
-);
-
-// ============================================================
-// APPLY USER DISPLAY RADIUS
-//
-const filteredProducts = categoryAndSearchFiltered;
-
-// ============================================================
-// RANK PRODUCTS — WARD FIRST, THEN NEARBY
-// ============================================================
-
-// ------------------------------------------------------------
-// 1. Separate the loaded products into:
-//    - Products belonging to the user's current ward
-//    - Products from other nearby areas
-//
-// IMPORTANT:
-// Geographic phase has priority over Premium ranking.
-// Premium adverts cannot jump from the nearby section
-// into the ward section.
-// ------------------------------------------------------------
-
-const wardProductsFiltered = filteredProducts.filter(
-  (product) =>
-    Boolean(locationInfo?.wardName) &&
-    product.ward === locationInfo?.wardName
-);
-
-const wardProductIds = new Set(
-  wardProductsFiltered.map((product) => product.id)
-);
-
-const areaProductsFiltered = filteredProducts.filter(
-  (product) => !wardProductIds.has(product.id)
-);
-
-// ------------------------------------------------------------
-// 2. Rank ONLY within the ward section.
-//
-// This means Premium can receive ranking preference
-// against other adverts in the same geographic phase,
-// but cannot override the ward-first structure.
-// ------------------------------------------------------------
-
-const filteredWard = userCoords
-  ? rankProducts(
-      wardProductsFiltered,
-      userCoords
-    )
-  : wardProductsFiltered;
-
-// ------------------------------------------------------------
-// 3. Rank ONLY within the nearby section.
-//
-// Nearby adverts are ranked independently from ward adverts.
-// ------------------------------------------------------------
-
-const filteredArea = userCoords
-  ? rankProducts(
-      areaProductsFiltered,
-      userCoords
-    )
-  : areaProductsFiltered;
-
-// ------------------------------------------------------------
-// 4. Combine only for total count.
-//
-// The UI still renders filteredWard first and filteredArea
-// second, so the geographic order is preserved.
-// ------------------------------------------------------------
-
-const rankedProducts = [
-  ...filteredWard,
-  ...filteredArea,
-];
-
-// ============================================================
-// FEED STATE
-// ============================================================
-
-const totalVisible = rankedProducts.length;
-
-const isLoadingMore =
-  wardLoading || areaLoading;
-
-const allDone = isSearchMode
-  ? areaDone
-  : wardDone && areaDone;
-
-// ============================================================
-// SEARCH
-// ============================================================
-
-function handleSearch(
-  e: React.FormEvent
-) {
-  e.preventDefault();
-  setSearchQuery(
-    searchInput.trim()
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
+  
+  const handleAreaSelect = useCallback(
+    (choice: ResolvedLocation) => {
+      setLocationInfo(choice);
+      if (choice.lat != null && choice.lng != null) {
+        setUserCoords([choice.lat, choice.lng]);
+      }
+      setGpsReady(true);
+      setShowAreaPicker(false);
+      localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
+    },
+    []
   );
-}
 
-function clearSearch() {
-  setSearchInput("");
-  setSearchQuery("");
-  setShowSearch(false);
-}
+  function applyFilters(products: Product[]): Product[] {
+    const nowSec = Date.now() / 1000;
+    return products.filter((p) => {
+      if (p.status === "pending_payment") return false;
+      if (p.expiresAt && p.expiresAt.seconds <= nowSec) return false;
 
-function bannerText() {
-  if (isSearchMode) {
-    return "Searching across Kenya";
+      const matchCat = activeKey === "All" || p.category === activeKey;
+      const search = searchQuery.toLowerCase();
+      const matchSearch =
+        !search ||
+        p.title.toLowerCase().includes(search) ||
+        p.sellerName.toLowerCase().includes(search) ||
+        (p.subcategory ?? "").toLowerCase().includes(search) ||
+        (p.ward ?? "").toLowerCase().includes(search);
+
+      return matchCat && matchSearch;
+    });
   }
 
-  if (!locationInfo) {
-    return "Finding your area...";
+  const wardIds = new Set(wardProducts.map((p) => p.id));
+  const allLoadedProducts = dedupe(
+    wardProducts,
+    areaProducts.filter((p) => !wardIds.has(p.id))
+  );
+
+  const filteredProducts = applyFilters(allLoadedProducts);
+
+  const wardProductsFiltered = filteredProducts.filter(
+    (product) => Boolean(locationInfo?.wardName) && product.ward === locationInfo?.wardName
+  );
+
+  const wardProductIds = new Set(wardProductsFiltered.map((product) => product.id));
+  const areaProductsFiltered = filteredProducts.filter(
+    (product) => !wardProductIds.has(product.id)
+  );
+
+  const filteredWard = userCoords
+    ? rankProducts(wardProductsFiltered, userCoords)
+    : wardProductsFiltered;
+
+  const filteredArea = userCoords
+    ? rankProducts(areaProductsFiltered, userCoords)
+    : areaProductsFiltered;
+
+  const rankedProducts = [...filteredWard, ...filteredArea];
+  const totalVisible = rankedProducts.length;
+  const isLoadingMore = wardLoading || areaLoading;
+  const allDone = isSearchMode ? areaDone : wardDone && areaDone;
+
+  function handleSearch(e: React.FormEvent) {
+    e.preventDefault();
+    setSearchQuery(searchInput.trim());
   }
 
-  const area = locationInfo.wardName;
-
-  if (area && gpsGranted) {
-    return `Showing adverts in ${area} area`;
+  function clearSearch() {
+    setSearchInput("");
+    setSearchQuery("");
+    setShowSearch(false);
   }
 
-  if (area) {
-    return `Showing adverts near ${area} area (from your saved location)`;
+  function bannerText() {
+    if (isSearchMode) return "Searching across Kenya";
+    if (!locationInfo) return "Finding your area...";
+    const area = locationInfo.wardName;
+    if (area && gpsGranted) return `Showing adverts in ${area} area`;
+    if (area) return `Showing adverts near ${area} area (from your saved location)`;
+    return "Finding nearby adverts...";
   }
 
-  return "Finding nearby adverts...";
-}
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center justify-between gap-3 z-40">
@@ -769,6 +503,7 @@ function bannerText() {
             </button>
           ))}
         </div>
+      </div>
 
       <div className="flex-1 overflow-y-auto">
         {gpsReady && (
@@ -826,16 +561,16 @@ function bannerText() {
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   {filteredWard.map((p) => (
-  <ProductCard
-    key={p.id} 
-    product={p}
-    userCoords={userCoords}
-    onClick={(e) => {
-      e.stopPropagation(); // This prevents the click from reaching the FAB
-      setLocation(`/product/${p.id}`);
-    }}
-  />
-                ))}
+                    <ProductCard
+                      key={p.id} 
+                      product={p}
+                      userCoords={userCoords}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/product/${p.id}`);
+                      }}
+                    />
+                  ))}
                 </div>
               </>
             )}
@@ -851,16 +586,16 @@ function bannerText() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   {filteredArea.map((p) => (
-  <ProductCard
-    key={p.id} 
-    product={p}
-    userCoords={userCoords}
-    onClick={(e) => {
-      e.stopPropagation(); // This prevents the click from reaching the FAB
-      setLocation(`/product/${p.id}`);
-    }}
-  />
-))}
+                    <ProductCard
+                      key={p.id} 
+                      product={p}
+                      userCoords={userCoords}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/product/${p.id}`);
+                      }}
+                    />
+                  ))}
                 </div>
               </>
             )}
@@ -882,17 +617,17 @@ function bannerText() {
         )}
       </div>
 
-{user && (
-  <div className="fixed bottom-20 right-4 z-40 pointer-events-none"> {/* Added pointer-events-none */}
-    <button
-      data-testid="fab-advertise"
-      onClick={() => setLocation("/post")}
-      className="pointer-events-auto flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
-    >
-      <Plus size={18} />Advertise
-    </button>
-  </div>
-)}
+      {user && (
+        <div className="fixed bottom-20 right-4 z-40 pointer-events-none">
+          <button
+            data-testid="fab-advertise"
+            onClick={() => setLocation("/post")}
+            className="pointer-events-auto flex items-center gap-2 bg-primary text-white font-black text-sm px-5 h-12 rounded-full shadow-xl active:scale-95 transition-transform"
+          >
+            <Plus size={18} />Advertise
+          </button>
+        </div>
+      )}
 
       {!user && gpsReady && (
         <div className="flex-shrink-0 bg-card border-t border-border px-4 py-3 flex items-center gap-3 z-40">
@@ -911,7 +646,6 @@ function bannerText() {
         </div>
       )}
 
-      {/* Border area picker */}
       {showAreaPicker && (
         <AreaPickerSheet
           choices={areaChoices}
