@@ -500,6 +500,8 @@ try {
   let collectedProducts: Product[] = [];
   let allPrefixesDone = false;
 
+    const currentRadius = HOME_FEED_RADIUS_STEPS[0];
+
   while (
     collectedProducts.length < AREA_BUFFER_FETCH &&
     !allPrefixesDone
@@ -507,10 +509,8 @@ try {
   const prefixes = getNearbyGeohashPrefixes(
   userCoords[0],
   userCoords[1],
-  HOME_FEED_RADIUS_KM
+  currentRadius
 );
-  const currentRadius =
-  HOME_FEED_RADIUS_STEPS[0];
 
 const queries = areaQueries(
   userCoords,
