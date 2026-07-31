@@ -362,8 +362,10 @@ const subcategories =
 
   // Only require a price when using Fixed or Negotiable pricing
   const requiresPrice =
-    priceDisplay === "fixed" ||
-    priceDisplay === "negotiable";
+  !isJobSeeking &&
+  !isAccommodation &&
+  !isEatery &&
+  (priceDisplay === "fixed" || priceDisplay === "negotiable");
 
   if (
     requiresPrice &&
