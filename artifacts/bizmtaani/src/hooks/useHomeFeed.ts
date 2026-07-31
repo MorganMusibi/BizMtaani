@@ -106,20 +106,91 @@ export function isProductVisibleToUser(
   product: Product,
   userCoords: [number, number]
 ) {
-  const distance = getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng);
+  const distance = getDistanceKm(
+    userCoords[0],
+    userCoords[1],
+    product.lat,
+    product.lng
+  );
+
   const scope = getProductVisibilityScope(product);
 
-    // Free/local adverts (Free weekly visible to a radius of 2.5 km)
+  // ============================================================
+  // FREE / LOCAL ADVERTS
+  //
+  // Free adverts are only visible within their local radius.
+  // Default maximum visibility = 2.5 km.
+  //
+  // Therefore:
+  // Stage 1: visible
+  // Stage 2+: not visible
+  // ============================================================
+
   if (scope === "local") {
     const radius = product.visibilityRadiusKm ?? 2.5;
+
     return distance <= radius;
   }
-  // County and all-area adverts (Weekly/Monthly premiums) are visible in all wards
-  if (scope === "county" || scope === "all_areas") {
+
+  // ============================================================
+  // PREMIUM / WIDER VISIBILITY ADVERTS
+  //
+  // Premium adverts are eligible for progressive geographic
+  // discovery.
+  //
+  // The actual geographic stage is handled by the feed loader.
+  // Here we only confirm that the advert has wider visibility.
+  // ============================================================
+
+  if (
+    scope === "county" ||
+    scope === "all_areas"
+  ) {
     return true;
   }
 
   return false;
+}
+function isProductEligibleForFeedStage(
+  product: Product,
+  distanceKm: number,
+  stageIndex: number
+) {
+  const isPremium = isPremiumProduct(product);
+
+  // ============================================================
+  // STAGE 1 — 0–2.5 KM
+  //
+  // Free + Premium adverts are allowed.
+  // ============================================================
+
+  if (stageIndex === 0) {
+    return distanceKm <= 2.5;
+  }
+
+  // ============================================================
+  // STAGES 2–5
+  //
+  // Only Premium adverts are allowed beyond 2.5 km.
+  //
+  // Free adverts are NEVER allowed beyond 2.5 km.
+  // ============================================================
+
+  if (!isPremium) {
+    return false;
+  }
+
+  const previousRadius =
+    HOME_FEED_RADIUS_STEPS[stageIndex - 1] ?? 0;
+
+  const currentRadius =
+    HOME_FEED_RADIUS_STEPS[stageIndex] ??
+    HOME_FEED_MAX_RADIUS_KM;
+
+  return (
+    distanceKm > previousRadius &&
+    distanceKm <= currentRadius
+  );
 }
 
 function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
@@ -173,9 +244,27 @@ function sortNearbyProducts(
       b.lng
     );
 
-    return distanceA - distanceB;
+    // Distance remains the primary ordering factor.
+    if (distanceA !== distanceB) {
+      return distanceA - distanceB;
+    }
+
+    // Premium wins only when distance is effectively tied.
+    const premiumA = isPremiumProduct(a);
+    const premiumB = isPremiumProduct(b);
+
+    if (premiumA !== premiumB) {
+      return premiumA ? -1 : 1;
+    }
+
+    // Newer adverts first when distance and premium status tie.
+    const createdA = a.createdAt?.seconds ?? 0;
+    const createdB = b.createdAt?.seconds ?? 0;
+
+    return createdB - createdA;
   });
 }
+
 export function rankProducts(
   products: Product[],
   userCoords: [number, number]
@@ -195,27 +284,35 @@ export function rankProducts(
       b.lng
     );
 
-    const premiumA = isPremiumProduct(a);
-    const premiumB = isPremiumProduct(b);
+    // ============================================================
+    // PRIMARY FACTOR — DISTANCE
+    //
+    // The home feed always prefers adverts that are physically
+    // closer to the user.
+    // ============================================================
 
-    /*
-     * Geographic distance is the primary ranking factor.
-     *
-     * Premium status is only used as a tie-breaker.
-     *
-     * This prevents a distant Premium advert from jumping
-     * ahead of a much closer advert.
-     */
     if (distanceA !== distanceB) {
       return distanceA - distanceB;
     }
 
-    // Premium wins when adverts are approximately tied in distance.
+    // ============================================================
+    // SECONDARY FACTOR — PREMIUM
+    //
+    // Premium gets a boost when adverts are at approximately
+    // the same distance.
+    // ============================================================
+
+    const premiumA = isPremiumProduct(a);
+    const premiumB = isPremiumProduct(b);
+
     if (premiumA !== premiumB) {
       return premiumA ? -1 : 1;
     }
 
-    // Newer adverts first when distance and plan are tied.
+    // ============================================================
+    // TERTIARY FACTOR — NEWER ADVERTS
+    // ============================================================
+
     const createdA = a.createdAt?.seconds ?? 0;
     const createdB = b.createdAt?.seconds ?? 0;
 
@@ -529,11 +626,30 @@ const queries = areaQueries(
     );
 
     const pageProducts = snapshots.flatMap(
-  (snap) =>
-    filterVisibleProducts(
-      toProducts(snap.docs),
-      userCoords
-    )
+  (snap) => {
+    const products = toProducts(snap.docs);
+
+    return products.filter((product) => {
+      const distance = getDistanceKm(
+        userCoords[0],
+        userCoords[1],
+        product.lat,
+        product.lng
+      );
+
+      return (
+        isProductVisibleToUser(
+          product,
+          userCoords
+        ) &&
+        isProductEligibleForFeedStage(
+          product,
+          distance,
+          0
+        )
+      );
+    });
+  }
 );
 
     const uniquePageProducts = Array.from(
@@ -617,18 +733,26 @@ const queries = areaQueries(
   }
 
   const radiusFilteredProducts =
-  filterVisibleProducts(
-    collectedProducts.filter(
-      (product) =>
-        getDistanceKm(
-  userCoords[0],
-  userCoords[1],
-  product.lat,
-  product.lng
-) <= currentRadius
-    ),
-    userCoords
-  );
+  collectedProducts.filter((product) => {
+    const distance = getDistanceKm(
+      userCoords[0],
+      userCoords[1],
+      product.lat,
+      product.lng
+    );
+
+    return (
+      isProductVisibleToUser(
+        product,
+        userCoords
+      ) &&
+      isProductEligibleForFeedStage(
+        product,
+        distance,
+        0
+      )
+    );
+  });
 
 const sortedBuffer = sortNearbyProducts(
   radiusFilteredProducts,
@@ -909,13 +1033,36 @@ if (!areaDone && !areaLoading) {
       // ========================================================
 
       const pageProducts =
-        snapshots.flatMap(
-          (snap) =>
-            filterVisibleProducts(
-              toProducts(snap.docs),
+  snapshots.flatMap(
+    (snap) => {
+      const products =
+        toProducts(snap.docs);
+
+      return products.filter(
+        (product) => {
+          const distance =
+            getDistanceKm(
+              userCoords[0],
+              userCoords[1],
+              product.lat,
+              product.lng
+            );
+
+          return (
+            isProductVisibleToUser(
+              product,
               userCoords
+            ) &&
+            isProductEligibleForFeedStage(
+              product,
+              distance,
+              areaRadiusStage
             )
-        );
+          );
+        }
+      );
+    }
+  );
 
       // ========================================================
       // Remove duplicates caused by overlapping geohashes.
@@ -1044,18 +1191,29 @@ if (!areaDone && !areaLoading) {
     // ==========================================================
 
     const radiusFilteredProducts =
-      filterVisibleProducts(
-        collectedProducts.filter(
-          (product) =>
-            getDistanceKm(
-              userCoords[0],
-              userCoords[1],
-              product.lat,
-              product.lng
-            ) <= currentRadius
-        ),
-        userCoords
+  collectedProducts.filter(
+    (product) => {
+      const distance =
+        getDistanceKm(
+          userCoords[0],
+          userCoords[1],
+          product.lat,
+          product.lng
+        );
+
+      return (
+        isProductVisibleToUser(
+          product,
+          userCoords
+        ) &&
+        isProductEligibleForFeedStage(
+          product,
+          distance,
+          areaRadiusStage
+        )
       );
+    }
+  );
 
     const sortedProducts =
       sortNearbyProducts(
@@ -1168,6 +1326,8 @@ if (!areaDone && !areaLoading) {
   locationInfo?.wardName,
   areaDone,
   areaLoading,
+  areaBuffer,
+  areaRadiusStage,
   areaCursors,
   areaDonePrefixes,
 ]);
