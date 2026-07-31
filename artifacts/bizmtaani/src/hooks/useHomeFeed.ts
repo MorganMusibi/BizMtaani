@@ -623,11 +623,11 @@ prefixes.forEach((prefix) => {
     collectedProducts.filter(
       (product) =>
         getDistanceKm(
-          userCoords[0],
-          userCoords[1],
-          product.lat,
-          product.lng
-        ) <= HOME_FEED_RADIUS_KM
+  userCoords[0],
+  userCoords[1],
+  product.lat,
+  product.lng
+) <= currentRadius
     ),
     userCoords
   );
@@ -892,12 +892,16 @@ if (!areaDone && !areaLoading) {
       !allPrefixesDone
     ) {
 
-      const queries = areaQueries(
-  userCoords,
-  HOME_FEED_RADIUS_KM,
-  currentCursors,
-  currentDonePrefixes
-);
+  const currentRadius =
+  HOME_FEED_RADIUS_STEPS[areaRadiusStage];
+
+const queries =
+  areaQueries(
+    userCoords,
+    currentRadius,
+    currentCursors,
+    currentDonePrefixes
+  );
 
       if (queries.length === 0) {
         allPrefixesDone = true;
