@@ -184,9 +184,8 @@ const isEatery =
 
 const isTransport =
   selectedSubcategory === "Delivery & Transport";
-
-const isJobSeeking
-  selectedSubcategory === " job seeking & CVs";
+const isJobSeeking =
+  selectedSubcategory === "Job Seeking & CVs";
 
 const isProfessionalService =
   selectedSubcategory === "Professional Services";
