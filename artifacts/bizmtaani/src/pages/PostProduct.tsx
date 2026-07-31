@@ -208,7 +208,7 @@ const subcategories =
   function getPriceOptions() {
   // People seeking work are not selling a product,
   // so they should not be asked to enter a price.
-  if (isSeekingWork) {
+  if (isJobSeeking) {
     return [];
   }
 
