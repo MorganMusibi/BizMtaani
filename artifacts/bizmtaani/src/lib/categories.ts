@@ -116,7 +116,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Home Services",
       "Personal Services",
       "Professional Services",
-      "Job Seeking & CVs,
+      "Job Seeking & CVs",
       "Business & Digital Services",
       "Delivery & Transport",
       "Other Services",
