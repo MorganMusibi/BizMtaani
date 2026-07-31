@@ -388,8 +388,8 @@ export default function Home() {
   : filteredProducts;
 
 const totalVisible = rankedProducts.length;
-  const isLoadingMore = wardLoading || areaLoading;
-  const allDone = isSearchMode ? areaDone : wardDone && areaDone;
+  const isLoadingMore = areaLoading;
+  const allDone = areaDone;
 
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
