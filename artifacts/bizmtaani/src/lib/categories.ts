@@ -251,7 +251,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Vehicle Services",
     ],
   },
-];
+
 // ============================================================
 // OTHER & MISCELLANEOUS
 // ============================================================
@@ -269,6 +269,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     "Other",
   ],
 },
+  ];
 
 export type CategoryKey = (typeof CATEGORY_DEFS)[number]["key"];
 
