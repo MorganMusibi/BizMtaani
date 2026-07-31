@@ -172,17 +172,53 @@ useEffect(() => {
   };
 }, [imagePreviews]);
 
-  const catDef = selectedCategory ? CATEGORY_DEFS.find((c) => c.key === selectedCategory) : null;
-  const isAccommodation = selectedCategory === "Accommodation";
-  const isEatery =
-    selectedSubcategory === "Hotels / Eateries" ||
-    selectedSubcategory === "Restaurants & Cooked Food";
-  const isTransport = selectedSubcategory === "Delivery & Transport";
-  const subcategories = catDef?.subcategories ?? [];
+  const catDef = selectedCategory
+  ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
+  : null;
+
+const isAccommodation = selectedCategory === "Accommodation";
+
+const isEatery =
+  selectedSubcategory === "Hotels / Eateries" ||
+  selectedSubcategory === "Restaurants & Cooked Food";
+
+const isTransport =
+  selectedSubcategory === "Delivery & Transport";
+
+const isJobSeeking
+  selectedSubcategory === " job seeking & CVs";
+
+const isProfessionalService =
+  selectedSubcategory === "Professional Services";
+
+const isVehicle =
+  selectedCategory === "Vehicles";
+
+const isBabiesAndKids =
+  selectedCategory === "Babies & Kids";
+
+const isAnimalsAndPets =
+  selectedCategory === "Animals & Pets";
+
+const isOtherCategory =
+  selectedCategory === "Other & Miscellaneous";
+
+const subcategories =
+  catDef?.subcategories ?? [];
   
   function getPriceOptions() {
-  if (isAccommodation) return [];
+  // People seeking work are not selling a product,
+  // so they should not be asked to enter a price.
+  if (isSeekingWork) {
+    return [];
+  }
 
+  // Accommodation uses monthly rent instead of normal pricing.
+  if (isAccommodation) {
+    return [];
+  }
+
+  // Delivery & Transport supports service-based pricing.
   if (isTransport) {
     return [
       { value: "fixed", label: "Fixed Price" },
@@ -191,6 +227,8 @@ useEffect(() => {
     ];
   }
 
+  // All Services, including Professional Services,
+  // should support contact or quote-based pricing.
   if (selectedCategory === "Services") {
     return [
       { value: "contact", label: "Contact for Price" },
@@ -198,11 +236,12 @@ useEffect(() => {
     ];
   }
 
+  // Normal products and other categories.
   return [
     { value: "fixed", label: "Fixed Price" },
     { value: "negotiable", label: "Negotiable" },
   ];
-  }
+}
 
   function handleImageFiles(files: FileList | null) {
   if (!files) return;
