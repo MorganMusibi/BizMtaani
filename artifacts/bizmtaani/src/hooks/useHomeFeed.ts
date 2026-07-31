@@ -782,33 +782,24 @@ if (!wardDone && !wardLoading) {
 
   return;
 }
-// ============================================================
-// NORMAL FEED — NEARBY AREA PAGINATION
+     // ============================================================
+// NORMAL FEED — PROGRESSIVE NEARBY AREA PAGINATION
 //
-// Ward adverts are exhausted.
+// Geographic expansion:
 //
-// BUFFER-FIRST FLOW:
+//   Stage 0 → 2.5 km
+//   Stage 1 → 5 km
+//   Stage 2 → 10 km
+//   Stage 3 → 20 km
+//   Stage 4 → 50 km
 //
-// 1. If the nearby buffer already contains products,
-//    consume the next 20 locally.
-// 2. Do NOT query Firestore when the buffer has products.
-// 3. When the buffer is empty, fetch a new larger batch.
-// 4. Keep the extra products in the buffer.
-// 5. Display only 20 products at a time.
+// The feed always tries the closest geographic stage first.
+// When that stage is exhausted, it expands outward.
 //
-// Flow:
-//
-// Firestore
-//    ↓
-// 40+ nearby products
-//    ↓
-// areaBuffer
-//    ↓
-// 20 visible products
-//    ↓
-// consume buffer locally
-//    ↓
-// fetch again only when buffer is empty
+// IMPORTANT:
+// This does NOT change advert visibility rules.
+// isProductVisibleToUser() still decides whether an advert
+// is actually visible to the user.
 // ============================================================
 
 if (!areaDone && !areaLoading) {
@@ -817,6 +808,9 @@ if (!areaDone && !areaLoading) {
   try {
     // ==========================================================
     // STEP 1 — CONSUME EXISTING BUFFER FIRST
+    //
+    // Never query Firestore if we already have products
+    // waiting in the local buffer.
     // ==========================================================
 
     if (areaBuffer.length > 0) {
@@ -845,24 +839,18 @@ if (!areaDone && !areaLoading) {
         remainingBuffer
       );
 
-      // We only mark the area as done when:
-      // - Firestore is exhausted
-      // - AND the local buffer is empty
-      if (
-        remainingBuffer.length === 0 &&
-        Object.keys(areaDonePrefixes).length > 0 &&
-        Object.values(areaDonePrefixes).every(Boolean)
-      ) {
-        setAreaDone(true);
-      }
-
       return;
     }
 
     // ==========================================================
-    // STEP 2 — BUFFER IS EMPTY
-    // Fetch the next larger batch from Firestore.
+    // STEP 2 — GET CURRENT GEOGRAPHIC STAGE
     // ==========================================================
+
+    const currentRadius =
+      HOME_FEED_RADIUS_STEPS[
+        areaRadiusStage
+      ] ??
+      HOME_FEED_MAX_RADIUS_KM;
 
     let currentCursors: Record<
       string,
@@ -883,25 +871,28 @@ if (!areaDone && !areaLoading) {
     let allPrefixesDone = false;
 
     // ==========================================================
-    // Keep fetching until we have enough products to fill
-    // the buffer, or all geohash prefixes are exhausted.
+    // STEP 3 — FETCH ENOUGH PRODUCTS FOR THE BUFFER
     // ==========================================================
 
     while (
-      collectedProducts.length < AREA_BUFFER_FETCH &&
+      collectedProducts.length <
+        AREA_BUFFER_FETCH &&
       !allPrefixesDone
     ) {
+      const prefixes =
+        getNearbyGeohashPrefixes(
+          userCoords[0],
+          userCoords[1],
+          currentRadius
+        );
 
-  const currentRadius =
-  HOME_FEED_RADIUS_STEPS[areaRadiusStage];
-
-const queries =
-  areaQueries(
-    userCoords,
-    currentRadius,
-    currentCursors,
-    currentDonePrefixes
-  );
+      const queries =
+        areaQueries(
+          userCoords,
+          currentRadius,
+          currentCursors,
+          currentDonePrefixes
+        );
 
       if (queries.length === 0) {
         allPrefixesDone = true;
@@ -916,20 +907,22 @@ const queries =
         );
 
       // ========================================================
-      // Convert Firestore documents into valid products.
+      // Convert Firestore documents into products.
       // ========================================================
 
       const pageProducts =
-  snapshots.flatMap(
-    (snap) =>
-      filterVisibleProducts(
-        toProducts(snap.docs),
-        userCoords
-      )
-  );
+        snapshots.flatMap(
+          (snap) =>
+            filterVisibleProducts(
+              toProducts(snap.docs),
+              userCoords
+            )
+        );
 
-      // Remove duplicate products caused by overlapping
-      // geohash prefixes.
+      // ========================================================
+      // Remove duplicates caused by overlapping geohashes.
+      // ========================================================
+
       const uniquePageProducts =
         Array.from(
           new Map(
@@ -958,7 +951,7 @@ const queries =
         );
 
       // ========================================================
-      // Update cursors and exhausted-prefix state.
+      // Update cursors and exhausted prefix state.
       // ========================================================
 
       const updatedCursors: Record<
@@ -977,22 +970,20 @@ const queries =
 
       let queryIndex = 0;
 
-prefixes.forEach(
-  (prefix) => {
-    const key = prefix;
+      prefixes.forEach(
+        (prefix) => {
+          const key = prefix;
 
-    // This prefix was already exhausted.
-    if (
-      currentDonePrefixes[key]
-    ) {
-      return;
-    }
+          if (
+            currentDonePrefixes[key]
+          ) {
+            return;
+          }
 
-    const snap =
-      snapshots[queryIndex];
+          const snap =
+            snapshots[queryIndex];
 
-    queryIndex++;
-
+          queryIndex++;
 
           if (!snap) {
             updatedDonePrefixes[
@@ -1002,8 +993,6 @@ prefixes.forEach(
             return;
           }
 
-          // Save the last document as the cursor
-          // for the next Firestore request.
           if (
             snap.docs.length > 0
           ) {
@@ -1015,9 +1004,6 @@ prefixes.forEach(
               ];
           }
 
-          // Because each request now fetches AREA_BUFFER_FETCH
-          // documents, a shorter result means this prefix
-          // has been completely exhausted.
           if (
             snap.docs.length <
             AREA_BUFFER_FETCH
@@ -1035,20 +1021,15 @@ prefixes.forEach(
       currentDonePrefixes =
         updatedDonePrefixes;
 
-      // ========================================================
-      // Check whether every nearby geohash prefix is exhausted.
-      // ========================================================
+      allPrefixesDone =
+        prefixes.every(
+          (prefix) =>
+            currentDonePrefixes[
+              prefix
+            ] === true
+        );
 
-allPrefixesDone =
-  prefixes.every(
-    (prefix) =>
-      currentDonePrefixes[
-        prefix
-      ] === true
-  );
-      // Safety check:
-      // If every query returned zero documents,
-      // stop immediately to avoid an infinite loop.
+      // Safety protection against endless loops.
       if (
         snapshots.length > 0 &&
         snapshots.every(
@@ -1061,31 +1042,31 @@ allPrefixesDone =
     }
 
     // ==========================================================
-    // Sort the newly fetched products by distance.
+    // STEP 4 — FILTER TO CURRENT GEOGRAPHIC STAGE
     // ==========================================================
-const radiusFilteredProducts =
-  filterVisibleProducts(
-    collectedProducts.filter(
-      (product) =>
-        getDistanceKm(
-          userCoords[0],
-          userCoords[1],
-          product.lat,
-          product.lng
-        ) <= HOME_FEED_RADIUS_KM
-    ),
-    userCoords
-  );
 
-const sortedProducts =
-  sortNearbyProducts(
-    radiusFilteredProducts,
-    userCoords
-  );
+    const radiusFilteredProducts =
+      filterVisibleProducts(
+        collectedProducts.filter(
+          (product) =>
+            getDistanceKm(
+              userCoords[0],
+              userCoords[1],
+              product.lat,
+              product.lng
+            ) <= currentRadius
+        ),
+        userCoords
+      );
+
+    const sortedProducts =
+      sortNearbyProducts(
+        radiusFilteredProducts,
+        userCoords
+      );
 
     // ==========================================================
-    // Display the first 20.
-    // Keep everything else in the local buffer.
+    // STEP 5 — SHOW 20 AND BUFFER THE REST
     // ==========================================================
 
     const nextPage =
@@ -1118,10 +1099,6 @@ const sortedProducts =
       remainingBuffer
     );
 
-    // ==========================================================
-    // Save Firestore pagination state.
-    // ==========================================================
-
     setAreaCursors(
       currentCursors
     );
@@ -1131,19 +1108,45 @@ const sortedProducts =
     );
 
     // ==========================================================
-    // The nearby feed is completely finished only when:
+    // STEP 6 — PROGRESSIVE RADIUS EXPANSION
     //
-    // 1. Every geohash prefix is exhausted
-    // 2. The local buffer is empty
-    //
-    // If there are still products in the buffer,
-    // we must allow the next loadMore() call to consume them.
+    // If the current radius is exhausted, move outward.
     // ==========================================================
 
-    setAreaDone(
+    if (
       allPrefixesDone &&
       remainingBuffer.length === 0
-    );
+    ) {
+      const nextStage =
+        areaRadiusStage + 1;
+
+      if (
+        nextStage <
+        HOME_FEED_RADIUS_STEPS.length
+      ) {
+        // Expand to the next radius.
+        //
+        // IMPORTANT:
+        // Reset geohash cursors because the larger radius
+        // introduces new geohash prefixes that have never
+        // been queried before.
+
+        setAreaRadiusStage(
+          nextStage
+        );
+
+        setAreaCursors({});
+
+        setAreaDonePrefixes({});
+
+        setAreaDone(false);
+      } else {
+        // All geographic stages have been exhausted.
+        setAreaDone(true);
+      }
+    } else {
+      setAreaDone(false);
+    }
 
   } catch (error) {
     console.error(
@@ -1153,7 +1156,7 @@ const sortedProducts =
   } finally {
     setAreaLoading(false);
   }
-}
+}    
 
 }, [
   isSearchMode,
