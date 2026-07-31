@@ -846,64 +846,6 @@ const loadMore = useCallback(async () => {
     return;
   }
   
-// ============================================================
-// NORMAL FEED — WARD-FIRST PAGINATION
-//
-// 1. Load the next 20 adverts from the user's ward first.
-// 2. Only after ward adverts are exhausted, load nearby adverts.
-// ============================================================
-
-if (!wardDone && !wardLoading) {
-  const wardName = locationInfo?.wardName;
-
-  if (!wardName) {
-    setWardDone(true);
-    return;
-  }
-
-  setWardLoading(true);
-
-  try {
-    const snap = await getDocs(
-      wardQuery(
-        wardName,
-        wardCursor ?? undefined
-      )
-    );
-
-    const newWardProducts = filterVisibleProducts(
-  toProducts(snap.docs),
-  userCoords
-);
-
-    setWardProducts((prev) =>
-      dedupe(
-        prev,
-        newWardProducts
-      )
-    );
-
-    setWardCursor(
-      snap.docs[
-        snap.docs.length - 1
-      ] ?? wardCursor
-    );
-
-    setWardDone(
-      snap.docs.length < WARD_PAGE
-    );
-
-  } catch (error) {
-    console.error(
-      "Failed to load more ward adverts:",
-      error
-    );
-  } finally {
-    setWardLoading(false);
-  }
-
-  return;
-}
      // ============================================================
 // NORMAL FEED — PROGRESSIVE NEARBY AREA PAGINATION
 //
@@ -1320,10 +1262,6 @@ if (!areaDone && !areaLoading) {
   searchDone,
   searchLoading,
   searchCursor,
-  wardDone,
-  wardLoading,
-  wardCursor,
-  locationInfo?.wardName,
   areaDone,
   areaLoading,
   areaBuffer,
