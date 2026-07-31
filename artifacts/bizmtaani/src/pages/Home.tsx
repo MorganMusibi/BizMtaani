@@ -35,6 +35,21 @@ const FILTER_CHIPS = [
 function fmtDist(km: number) {
   return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
 }
+function getThumbnailUrl(url: string): string {
+  if (!url) return "";
+
+  // Cloudinary images:
+  // Optimize format, quality, width, and crop for feed cards.
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace(
+      "/upload/",
+      "/upload/f_auto,q_auto,w_500,c_fill/"
+    );
+  }
+
+  // Non-Cloudinary images are returned unchanged.
+  return url;
+}
 
 function ProductCard({
   product, userCoords, onClick,
@@ -119,16 +134,17 @@ function ProductCard({
 
         {displayImage ? (
           <img
-            src={displayImage}
-            alt={product.title}
-            loading="lazy"
-            className="w-full aspect-square object-cover"
-            onError={(e) => {
-              console.error("Image failed:", displayImage);
-              e.currentTarget.onerror = null;
-              e.currentTarget.src = "/placeholder-image.png";
-            }}
-          />
+  src={getThumbnailUrl(displayImage)}
+  alt={product.title}
+  loading="lazy"
+  decoding="async"
+  className="w-full aspect-square object-cover"
+  onError={(e) => {
+    console.error("Image failed:", displayImage);
+    e.currentTarget.onerror = null;
+    e.currentTarget.src = "/placeholder-image.png";
+  }}
+/>
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
             <Package size={28} className="text-muted-foreground" />
