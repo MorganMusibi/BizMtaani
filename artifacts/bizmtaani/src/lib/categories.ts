@@ -7,10 +7,10 @@ import {
   ShoppingBag,
   RefreshCcw,
   Clapperboard,
-  BriefcaseBusiness,
   Baby,
   PawPrint,
   Car,
+  MoreHorizontal,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -252,6 +252,23 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     ],
   },
 ];
+// ============================================================
+// OTHER & MISCELLANEOUS
+// ============================================================
+{
+  key: "Other & Miscellaneous",
+  displayShort: "Other",
+  icon: MoreHorizontal,
+  color: "text-gray-600 bg-gray-50 border-gray-300",
+  badgeColor: "bg-gray-100 text-gray-700",
+  tagline: "Other products, services, items and things not listed",
+  subcategories: [
+    "Other Products",
+    "Other Services",
+    "Other Items",
+    "Other",
+  ],
+},
 
 export type CategoryKey = (typeof CATEGORY_DEFS)[number]["key"];
 
