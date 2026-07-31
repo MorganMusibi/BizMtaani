@@ -89,16 +89,9 @@ function ProductCard({
     per_session: "/session",
   };
 
-  const serviceCategories = [
-    "Services",
-    "Transport",
-    "Delivery",
-    "Cleaning",
-    "Repairs",
-  ];
-
   const showPricingBasis =
-    serviceCategories.includes(product.category);
+  product.category === "Services" ||
+  product.category === "Vehicles";
 
   const basisSuffix =
     showPricingBasis && product.pricingBasis
