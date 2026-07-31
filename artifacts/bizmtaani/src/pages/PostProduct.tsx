@@ -79,6 +79,27 @@ export default function PostProduct() {
   | "contact"
   | "quote"
   | "free";
+  // Job seeker details
+const [jobTitle, setJobTitle] = useState("");
+const [jobType, setJobType] = useState("");
+const [experienceLevel, setExperienceLevel] = useState("");
+const [skills, setSkills] = useState("");
+const [education, setEducation] = useState("");
+const [cvUrl, setCvUrl] = useState("");
+
+// Vehicle details
+const [vehicleMake, setVehicleMake] = useState("");
+const [vehicleModel, setVehicleModel] = useState("");
+const [vehicleYear, setVehicleYear] = useState("");
+const [vehicleCondition, setVehicleCondition] = useState("");
+const [vehicleMileage, setVehicleMileage] = useState("");
+const [vehicleTransmission, setVehicleTransmission] = useState("");
+const [vehicleFuelType, setVehicleFuelType] = useState("");
+const [vehicleBodyType, setVehicleBodyType] = useState("");
+
+// Professional service details
+const [serviceType, setServiceType] = useState("");
+const [serviceArea, setServiceArea] = useState("");
 
 const [priceDisplay, setPriceDisplay] =
   useState<PriceDisplay>("fixed");
@@ -201,6 +222,11 @@ const isAnimalsAndPets =
 
 const isOtherCategory =
   selectedCategory === "Other & Miscellaneous";
+
+ const isNormalAdvertCategory =
+  isBabiesAndKids ||
+  isAnimalsAndPets ||
+  isOtherCategory; 
 
 const subcategories =
   catDef?.subcategories ?? [];
@@ -343,6 +369,84 @@ const subcategories =
       return true;
     }
     if (step === 2) {
+
+  // Job seeker validation
+  if (isJobSeeking) {
+    if (!jobTitle.trim()) {
+      toast({
+        title: "Enter the job title",
+        description: "Tell employers what position you are looking for.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  // Vehicle validation
+  if (isVehicle) {
+    if (!title.trim()) {
+      toast({
+        title: "Enter an advert title",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!vehicleMake.trim() || !vehicleModel.trim()) {
+      toast({
+        title: "Enter vehicle details",
+        description: "Make and model are required.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!price || parseFloat(price) <= 0) {
+      toast({
+        title: "Enter a valid vehicle price",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  // Professional service validation
+  if (isProfessionalService) {
+    if (!title.trim()) {
+      toast({
+        title: "Enter a service title",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (!servicePricingType) {
+      toast({
+        title: "Choose a pricing method",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (
+      servicePricingType !== "quote_only" &&
+      (!price || parseFloat(price) <= 0)
+    ) {
+      toast({
+        title: "Enter a valid service price",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    return true;
+  }
+
+  // Normal advert validation
   if (!title.trim()) {
     toast({
       title: "Enter a title",
@@ -360,22 +464,20 @@ const subcategories =
     return false;
   }
 
-  // Only require a price when using Fixed or Negotiable pricing
   const requiresPrice =
-  !isJobSeeking &&
-  !isAccommodation &&
-  !isEatery &&
-  (priceDisplay === "fixed" || priceDisplay === "negotiable");
+    !isAccommodation &&
+    !isEatery &&
+    (priceDisplay === "fixed" ||
+      priceDisplay === "negotiable");
 
   if (
     requiresPrice &&
-    !isAccommodation &&
-    !isEatery &&
     (!price || parseFloat(price) <= 0)
   ) {
     toast({
       title: "Enter a valid price",
-      description: "Or choose 'Contact for Price' or 'Request Quote'.",
+      description:
+        "Or choose 'Contact for Price' or 'Request Quote'.",
       variant: "destructive",
     });
     return false;
@@ -486,6 +588,38 @@ async function handleInitiate(
 
     plan,
     phone: cleanedPhone,
+    // Category-specific details
+jobDetails: isJobSeeking
+  ? {
+      jobTitle: jobTitle.trim(),
+      skills: jobSkills.trim(),
+      experience: jobExperience.trim(),
+      education: jobEducation.trim(),
+      employmentType: jobEmploymentType,
+      availability: jobAvailability.trim(),
+    }
+  : null,
+
+vehicleDetails: isVehicle
+  ? {
+      make: vehicleMake.trim(),
+      model: vehicleModel.trim(),
+      year: vehicleYear ? parseInt(vehicleYear) : null,
+      condition: vehicleCondition,
+      transmission: vehicleTransmission,
+      fuelType: vehicleFuelType,
+      mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+      registration: vehicleRegistration.trim(),
+    }
+  : null,
+
+serviceDetails: isProfessionalService
+  ? {
+      serviceType: serviceType.trim(),
+      serviceArea: serviceArea.trim(),
+      pricingType: servicePricingType,
+    }
+  : null,
   };
 
   // 3. Ask backend to create the advert
@@ -591,7 +725,39 @@ async function handleInitiate(
       hotelMenu: isEatery ? hotelMenu : null,
       plan: "free",
 
-      phone: cleanedPhone,
+phone: cleanedPhone,
+
+jobDetails: isJobSeeking
+  ? {
+      jobTitle: jobTitle.trim(),
+      skills: jobSkills.trim(),
+      experience: jobExperience.trim(),
+      education: jobEducation.trim(),
+      employmentType: jobEmploymentType,
+      availability: jobAvailability.trim(),
+    }
+  : null,
+
+vehicleDetails: isVehicle
+  ? {
+      make: vehicleMake.trim(),
+      model: vehicleModel.trim(),
+      year: vehicleYear ? parseInt(vehicleYear) : null,
+      condition: vehicleCondition,
+      transmission: vehicleTransmission,
+      fuelType: vehicleFuelType,
+      mileage: vehicleMileage ? parseInt(vehicleMileage) : null,
+      registration: vehicleRegistration.trim(),
+    }
+  : null,
+
+serviceDetails: isProfessionalService
+  ? {
+      serviceType: serviceType.trim(),
+      serviceArea: serviceArea.trim(),
+      pricingType: servicePricingType,
+    }
+  : null,
     };
 
     // Publish advert through Cloud Function
@@ -786,161 +952,723 @@ const data = result.data as PublishAdvertResponse;
           </>
         )}
 
-        {/* ========== STEP 2: Details ========== */}
-        {step === 2 && (
-          <>
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold">Title *</label>
-              <Input
-                placeholder={
-                  isAccommodation ? "e.g. 1 bedroom bedsitter in Kariobangi"
-                  : isEatery ? "e.g. Mama Njeri Restaurant"
-                  : isTransport ? "e.g. Toyota Probox taxi — Eastleigh"
-                  : "e.g. iPhone 13 Pro 256GB"
-                }
-                value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} className="h-12 text-base"
-              />
-            </div>
+    {/* ========== STEP 2: Details ========== */}
+{step === 2 && (
+  <>
+    {/* =========================================================
+        JOB SEEKER / CV FORM
+        ========================================================= */}
+    {isJobSeeking ? (
+      <div className="space-y-5">
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold">Description</label>
-              <Textarea
-                placeholder="Describe your product or service in detail..."
-                value={description} onChange={(e) => setDescription(e.target.value)}
-                className="min-h-[100px] text-sm" maxLength={1000}
-              />
-              <p className="text-xs text-right text-muted-foreground">{description.length}/1000</p>
-            </div>
+        <div>
+          <h2 className="font-black text-lg">Job Seeker Profile</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tell employers about the work you are looking for and your skills.
+          </p>
+        </div>
 
-            {isAccommodation ? (
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold">Monthly Rent (KES) *</label>
-                <Input type="number" inputMode="numeric" placeholder="e.g. 7500"
-                  value={rentPerMonth} onChange={(e) => setRentPerMonth(e.target.value)} className="h-12 text-base" />
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Job Title / Position *</label>
+          <Input
+            placeholder="e.g. ICT Support Technician"
+            value={jobTitle}
+            onChange={(e) => setJobTitle(e.target.value)}
+            maxLength={80}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Professional Summary</label>
+          <Textarea
+            placeholder="Briefly describe yourself, your experience and the type of work you are looking for..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            className="min-h-[120px] text-sm"
+          />
+          <p className="text-xs text-right text-muted-foreground">
+            {description.length}/1000
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Skills</label>
+          <Textarea
+            placeholder="e.g. Computer networking, IT support, Microsoft Office, customer service..."
+            value={jobSkills}
+            onChange={(e) => setJobSkills(e.target.value)}
+            maxLength={500}
+            className="min-h-[90px] text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Work Experience</label>
+          <Textarea
+            placeholder="e.g. 2 years experience in ICT support..."
+            value={jobExperience}
+            onChange={(e) => setJobExperience(e.target.value)}
+            maxLength={500}
+            className="min-h-[90px] text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Education / Qualifications</label>
+          <Textarea
+            placeholder="e.g. Diploma in IT, Bachelor's Degree in Information Technology..."
+            value={jobEducation}
+            onChange={(e) => setJobEducation(e.target.value)}
+            maxLength={500}
+            className="min-h-[80px] text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Employment Type</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              "Full-time",
+              "Part-time",
+              "Contract",
+              "Temporary",
+              "Internship",
+              "Freelance",
+            ].map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => setJobEmploymentType(type)}
+                className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  jobEmploymentType === type
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Availability</label>
+          <Input
+            placeholder="e.g. Available immediately"
+            value={jobAvailability}
+            onChange={(e) => setJobAvailability(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+      </div>
+
+    ) : isVehicle ? (
+
+      /* =========================================================
+         VEHICLE FORM
+         ========================================================= */
+      <div className="space-y-5">
+
+        <div>
+          <h2 className="font-black text-lg">Vehicle Details</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Provide important details about the vehicle you are selling.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Advert Title *</label>
+          <Input
+            placeholder="e.g. Toyota Probox 2018 in good condition"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Make *</label>
+            <Input
+              placeholder="e.g. Toyota"
+              value={vehicleMake}
+              onChange={(e) => setVehicleMake(e.target.value)}
+              className="h-12"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Model *</label>
+            <Input
+              placeholder="e.g. Probox"
+              value={vehicleModel}
+              onChange={(e) => setVehicleModel(e.target.value)}
+              className="h-12"
+            />
+          </div>
+
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Year</label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder="e.g. 2018"
+              value={vehicleYear}
+              onChange={(e) => setVehicleYear(e.target.value)}
+              className="h-12"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Mileage (KM)</label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder="e.g. 85000"
+              value={vehicleMileage}
+              onChange={(e) => setVehicleMileage(e.target.value)}
+              className="h-12"
+            />
+          </div>
+
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Condition</label>
+          <div className="grid grid-cols-2 gap-2">
+            {["New", "Used", "Foreign Used", "Locally Used"].map((condition) => (
+              <button
+                key={condition}
+                type="button"
+                onClick={() => setVehicleCondition(condition)}
+                className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  vehicleCondition === condition
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {condition}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Transmission</label>
+            <select
+              value={vehicleTransmission}
+              onChange={(e) => setVehicleTransmission(e.target.value)}
+              className="w-full h-12 rounded-xl border-2 border-border bg-background px-3 text-sm"
+            >
+              <option value="">Select</option>
+              <option value="Automatic">Automatic</option>
+              <option value="Manual">Manual</option>
+            </select>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Fuel Type</label>
+            <select
+              value={vehicleFuelType}
+              onChange={(e) => setVehicleFuelType(e.target.value)}
+              className="w-full h-12 rounded-xl border-2 border-border bg-background px-3 text-sm"
+            >
+              <option value="">Select</option>
+              <option value="Petrol">Petrol</option>
+              <option value="Diesel">Diesel</option>
+              <option value="Hybrid">Hybrid</option>
+              <option value="Electric">Electric</option>
+            </select>
+          </div>
+
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Description</label>
+          <Textarea
+            placeholder="Describe the vehicle, condition, features and any other important information..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            className="min-h-[120px] text-sm"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-sm font-bold">Price (KES) *</label>
+
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 850000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-12 text-base"
+          />
+
+          <div className="flex gap-2">
+            {[
+              { value: "fixed", label: "Fixed Price" },
+              { value: "negotiable", label: "Negotiable" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+      </div>
+
+    ) : isProfessionalService ? (
+
+      /* =========================================================
+         PROFESSIONAL SERVICES FORM
+         ========================================================= */
+      <div className="space-y-5">
+
+        <div>
+          <h2 className="font-black text-lg">Professional Service Details</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tell customers what professional service you offer and how you charge.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Service Title *</label>
+          <Input
+            placeholder="e.g. Professional Graphic Design Services"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Service Description</label>
+          <Textarea
+            placeholder="Describe your professional service, experience and what customers can expect..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            className="min-h-[120px] text-sm"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Service Type</label>
+          <Input
+            placeholder="e.g. Accounting, Legal, IT Support, Graphic Design"
+            value={serviceType}
+            onChange={(e) => setServiceType(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Service Area</label>
+          <Input
+            placeholder="e.g. Nairobi, Kasarani, Remote / Online"
+            value={serviceArea}
+            onChange={(e) => setServiceArea(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Pricing Method *</label>
+
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { value: "fixed", label: "Fixed Price" },
+              { value: "per_hour", label: "Per Hour" },
+              { value: "per_day", label: "Per Day" },
+              { value: "per_session", label: "Per Session" },
+              { value: "per_project", label: "Per Project" },
+              { value: "quote_only", label: "Request Quote" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setServicePricingType(option.value)}
+                className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  servicePricingType === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {servicePricingType !== "quote_only" && (
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Price (KES) *</label>
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder="e.g. 5000"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+        )}
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+      </div>
+
+    ) : (
+
+      /* =========================================================
+         NORMAL ADVERT FORM
+         Includes:
+         - Babies & Kids
+         - Animals & Pets
+         - Other & Miscellaneous
+         - All other existing categories
+         ========================================================= */
+      <div className="space-y-5">
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Title *</label>
+          <Input
+            placeholder={
+              isAccommodation
+                ? "e.g. 1 bedroom bedsitter in Kariobangi"
+                : isEatery
+                ? "e.g. Mama Njeri Restaurant"
+                : isTransport
+                ? "e.g. Toyota Probox taxi — Eastleigh"
+                : "e.g. iPhone 13 Pro 256GB"
+            }
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Description</label>
+          <Textarea
+            placeholder="Describe your product or service in detail..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="min-h-[100px] text-sm"
+            maxLength={1000}
+          />
+          <p className="text-xs text-right text-muted-foreground">
+            {description.length}/1000
+          </p>
+        </div>
+
+        {isAccommodation ? (
+          <div className="space-y-1.5">
+
+            <label className="text-sm font-bold">
+              Monthly Rent (KES) *
+            </label>
+
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder="e.g. 7500"
+              value={rentPerMonth}
+              onChange={(e) => setRentPerMonth(e.target.value)}
+              className="h-12 text-base"
+            />
+
             <div className="flex gap-2">
-  {getPriceOptions().map((option) => (
-    <button
-      key={option.value}
-      onClick={() => setPriceDisplay(option.value as PriceDisplay)}
-      className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-        priceDisplay === option.value
-          ? "border-primary bg-primary/5 text-primary"
-          : "border-border text-muted-foreground"
-      }`}
-    >
-      {option.label}
-    </button>
-  ))}
-</div>
-              </div>
-            ) : isTransport ? (
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-bold">Pricing Basis</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PRICING_BASIS_OPTIONS.map(({ value, label }) => (
-                      <button key={value} onClick={() => setPricingBasis(value)}
-                        className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
-                          pricingBasis === value ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"
-                        }`}>{label}</button>
-                    ))}
-                  </div>
-                </div>
-                {pricingBasis !== "quote_only" && (
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-bold">Price (KES)</label>
-                    <Input type="number" inputMode="numeric"
-                      placeholder={pricingBasis === "per_km" ? "e.g. 50 per km" : "e.g. 2000"}
-                      value={price} onChange={(e) => setPrice(e.target.value)} className="h-12 text-base" />
-                  </div>
-                )}
-              </div>
-            ) : !isEatery ? (
-              <div className="space-y-3">
-                {(priceDisplay === "fixed" ||
-  priceDisplay === "negotiable") && (
-  <div className="space-y-1.5">
-    <label className="text-sm font-bold">
-      Price (KES)
-    </label>
+              {getPriceOptions().map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    setPriceDisplay(option.value as PriceDisplay)
+                  }
+                  className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    priceDisplay === option.value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
 
-    <Input
-      type="number"
-      inputMode="numeric"
-      placeholder="e.g. 1500"
-      value={price}
-      onChange={(e) => setPrice(e.target.value)}
-      className="h-12 text-base"
-    />
-  </div>
-)}
-                <div className="flex gap-2">
-                  {getPriceOptions().map((option) => (
-  <button
-    key={option.value}
-    onClick={() => setPriceDisplay(option.value as PriceDisplay)}
-    className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-      priceDisplay === option.value
-        ? "border-primary bg-primary/5 text-primary"
-        : "border-border text-muted-foreground"
-    }`}
-  >
-    {option.label}
-  </button>
-))}
-                    
-                </div>
-              </div>
-            ) : null}
+          </div>
 
-            {isEatery && (
-              <div className="space-y-4">
-                <p className="font-black text-base">Hotel / Restaurant Menu</p>
-                {MEAL_PERIODS.map(({ key, label }) => (
-                  <div key={key} className="rounded-2xl border border-border overflow-hidden">
-                    <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
-                      <span className="font-bold text-sm text-rose-700 dark:text-rose-400">{label}</span>
-                    </div>
-                    {hotelMenu[key].length > 0 && (
-                      <div className="divide-y divide-border">
-                        {hotelMenu[key].map((item, i) => (
-                          <div key={i} className="flex items-center px-4 py-2.5 gap-2">
-                            <span className="flex-1 text-sm font-medium">{item.name}</span>
-                            <span className="text-sm font-bold text-primary">KES {item.price}</span>
-                            <button onClick={() => removeMenuItem(key, i)} className="ml-2 text-muted-foreground hover:text-destructive">
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="flex gap-2 p-3">
-                      <Input placeholder="Dish name" value={newItems[key].name}
-                        onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], name: e.target.value } }))}
-                        className="flex-1 h-9 text-sm"
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
-                      <Input type="number" inputMode="numeric" placeholder="KES" value={newItems[key].price}
-                        onChange={(e) => setNewItems((prev) => ({ ...prev, [key]: { ...prev[key], price: e.target.value } }))}
-                        className="w-24 h-9 text-sm"
-                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addMenuItem(key); } }} />
-                      <button onClick={() => addMenuItem(key)}
-                        className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0">
-                        <Plus size={16} />
-                      </button>
-                    </div>
-                  </div>
+        ) : isTransport ? (
+
+          <div className="space-y-3">
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">
+                Pricing Basis
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                {PRICING_BASIS_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setPricingBasis(value)}
+                    className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
+                      pricingBasis === value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
+              </div>
+            </div>
+
+            {pricingBasis !== "quote_only" && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">
+                  Price (KES)
+                </label>
+
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={
+                    pricingBasis === "per_km"
+                      ? "e.g. 50 per km"
+                      : "e.g. 2000"
+                  }
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-12 text-base"
+                />
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold">Contact Phone (WhatsApp)</label>
-              <Input type="tel" placeholder="e.g. 0712345678"
-                value={phone} onChange={(e) => setPhone(e.target.value)} className="h-12 text-base" />
+          </div>
+
+        ) : !isEatery ? (
+
+          <div className="space-y-3">
+
+            {(priceDisplay === "fixed" ||
+              priceDisplay === "negotiable") && (
+              <div className="space-y-1.5">
+
+                <label className="text-sm font-bold">
+                  Price (KES)
+                </label>
+
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="e.g. 1500"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-12 text-base"
+                />
+
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              {getPriceOptions().map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    setPriceDisplay(option.value as PriceDisplay)
+                  }
+                  className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    priceDisplay === option.value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-          </>
+
+          </div>
+
+        ) : null}
+
+        {isEatery && (
+          <div className="space-y-4">
+
+            <p className="font-black text-base">
+              Hotel / Restaurant Menu
+            </p>
+
+            {MEAL_PERIODS.map(({ key, label }) => (
+              <div
+                key={key}
+                className="rounded-2xl border border-border overflow-hidden"
+              >
+
+                <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
+                  <span className="font-bold text-sm text-rose-700 dark:text-rose-400">
+                    {label}
+                  </span>
+                </div>
+
+                {hotelMenu[key].length > 0 && (
+                  <div className="divide-y divide-border">
+                    {hotelMenu[key].map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center px-4 py-2.5 gap-2"
+                      >
+                        <span className="flex-1 text-sm font-medium">
+                          {item.name}
+                        </span>
+
+                        <span className="text-sm font-bold text-primary">
+                          KES {item.price}
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            removeMenuItem(key, i)
+                          }
+                          className="ml-2 text-muted-foreground hover:text-destructive"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 p-3">
+
+                  <Input
+                    placeholder="Dish name"
+                    value={newItems[key].name}
+                    onChange={(e) =>
+                      setNewItems((prev) => ({
+                        ...prev,
+                        [key]: {
+                          ...prev[key],
+                          name: e.target.value,
+                        },
+                      }))
+                    }
+                    className="flex-1 h-9 text-sm"
+                  />
+
+                  <Input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="KES"
+                    value={newItems[key].price}
+                    onChange={(e) =>
+                      setNewItems((prev) => ({
+                        ...prev,
+                        [key]: {
+                          ...prev[key],
+                          price: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-24 h-9 text-sm"
+                  />
+
+                  <button
+                    onClick={() => addMenuItem(key)}
+                    className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <Plus size={16} />
+                  </button>
+
+                </div>
+
+              </div>
+            ))}
+
+          </div>
         )}
 
+        <div className="space-y-1.5">
+
+          <label className="text-sm font-bold">
+            Contact Phone (WhatsApp)
+          </label>
+
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base"
+          />
+
+        </div>
+
+      </div>
+    )}
+  </>
+)}
+        
         {/* ========== STEP 3: Photos & Location ========== */}
         {step === 3 && (
           <>
