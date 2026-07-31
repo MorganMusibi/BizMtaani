@@ -81,11 +81,11 @@ export default function PostProduct() {
   | "free";
   // Job seeker details
 const [jobTitle, setJobTitle] = useState("");
-const [jobType, setJobType] = useState("");
-const [experienceLevel, setExperienceLevel] = useState("");
-const [skills, setSkills] = useState("");
-const [education, setEducation] = useState("");
-const [cvUrl, setCvUrl] = useState("");
+const [jobSkills, setJobSkills] = useState("");
+const [jobExperience, setJobExperience] = useState("");
+const [jobEducation, setJobEducation] = useState("");
+const [jobEmploymentType, setJobEmploymentType] = useState("");
+const [jobAvailability, setJobAvailability] = useState("");
 
 // Vehicle details
 const [vehicleMake, setVehicleMake] = useState("");
@@ -96,11 +96,11 @@ const [vehicleMileage, setVehicleMileage] = useState("");
 const [vehicleTransmission, setVehicleTransmission] = useState("");
 const [vehicleFuelType, setVehicleFuelType] = useState("");
 const [vehicleBodyType, setVehicleBodyType] = useState("");
-
+const [vehicleRegistration, setVehicleRegistration] = useState("");
 // Professional service details
 const [serviceType, setServiceType] = useState("");
 const [serviceArea, setServiceArea] = useState("");
-
+const [servicePricingType, setServicePricingType] = useState("");
 const [priceDisplay, setPriceDisplay] =
   useState<PriceDisplay>("fixed");
   const [pricingBasis, setPricingBasis] = useState("per_trip");
@@ -542,10 +542,12 @@ async function handleInitiate(
     description: description.trim(),
 
     price: isAccommodation
-      ? parseFloat(rentPerMonth) || 0
-      : pricingBasis === "quote_only"
-        ? 0
-        : parseFloat(price) || 0,
+  ? parseFloat(rentPerMonth) || 0
+  : isProfessionalService && servicePricingType === "quote_only"
+    ? 0
+    : isTransport && pricingBasis === "quote_only"
+      ? 0
+      : parseFloat(price) || 0,
 
     category: selectedCategory,
 
@@ -690,10 +692,12 @@ serviceDetails: isProfessionalService
       title: title.trim(),
       description: description.trim(),
       price: isAccommodation
-        ? parseFloat(rentPerMonth) || 0
-        : pricingBasis === "quote_only"
-          ? 0
-          : parseFloat(price) || 0,
+  ? parseFloat(rentPerMonth) || 0
+  : isProfessionalService && servicePricingType === "quote_only"
+    ? 0
+    : isTransport && pricingBasis === "quote_only"
+      ? 0
+      : parseFloat(price) || 0,
 
       category: selectedCategory,
       subcategory:
