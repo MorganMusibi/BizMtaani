@@ -7,6 +7,10 @@ import {
   ShoppingBag,
   RefreshCcw,
   Clapperboard,
+  BriefcaseBusiness,
+  Baby,
+  PawPrint,
+  Car,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -21,6 +25,9 @@ export interface CategoryDef {
 }
 
 export const CATEGORY_DEFS: CategoryDef[] = [
+  // ============================================================
+  // FOOD & GROCERIES
+  // ============================================================
   {
     key: "Food & Groceries",
     displayShort: "Food",
@@ -36,6 +43,10 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Hotels / Eateries",
     ],
   },
+
+  // ============================================================
+  // HOUSING
+  // ============================================================
   {
     key: "Accommodation",
     displayShort: "Housing",
@@ -51,6 +62,10 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Lodges / Guest Houses",
     ],
   },
+
+  // ============================================================
+  // FASHION
+  // ============================================================
   {
     key: "Fashion & Clothing",
     displayShort: "Fashion",
@@ -66,6 +81,10 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Jewelry",
     ],
   },
+
+  // ============================================================
+  // ELECTRONICS & TECH
+  // ============================================================
   {
     key: "Electronics & Tech",
     displayShort: "Electronics",
@@ -82,21 +101,31 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Cyber / Printing Services",
     ],
   },
+
+  // ============================================================
+  // SERVICES
+  // ============================================================
   {
     key: "Services",
     displayShort: "Services",
     icon: Wrench,
     color: "text-teal-600 bg-teal-50 border-teal-300",
     badgeColor: "bg-teal-100 text-teal-700",
-    tagline: "Home, personal, business & other services",
+    tagline: "Home, personal, professional, Seeking Work, business & other services",
     subcategories: [
       "Home Services",
       "Personal Services",
+      "Professional Services",
+      "Seeking Work & CVs",
       "Business & Digital Services",
       "Delivery & Transport",
       "Other Services",
     ],
   },
+
+  // ============================================================
+  // GENERAL PRODUCTS
+  // ============================================================
   {
     key: "General Products",
     displayShort: "Products",
@@ -112,21 +141,28 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Miscellaneous Products",
     ],
   },
+
+  // ============================================================
+  // SECOND-HAND
+  // ============================================================
   {
     key: "Second-Hand / Used Items",
     displayShort: "2nd Hand",
     icon: RefreshCcw,
     color: "text-yellow-600 bg-yellow-50 border-yellow-300",
     badgeColor: "bg-yellow-100 text-yellow-700",
-    tagline: "Used phones, furniture, mtumba, vehicles",
+    tagline: "Used phones, furniture, mtumba, and other pre-owned items",
     subcategories: [
       "Used Phones & Electronics",
       "Used Furniture & Household",
       "Mtumba / Used Clothing",
-      "Vehicles & Motorbikes",
       "Other Used Items",
     ],
   },
+
+  // ============================================================
+  // EVENTS & ENTERTAINMENT
+  // ============================================================
   {
     key: "Entertainment & Events",
     displayShort: "Events",
@@ -142,6 +178,79 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Venues & Event Spaces",
     ],
   },
+
+  // ============================================================
+  // BABIES & KIDS
+  // ============================================================
+  {
+    key: "Babies & Kids",
+    displayShort: "Babies & Kids",
+    icon: Baby,
+    color: "text-cyan-600 bg-cyan-50 border-cyan-300",
+    badgeColor: "bg-cyan-100 text-cyan-700",
+    tagline: "Baby products, kids' items, childcare and children's activities",
+    subcategories: [
+      "Baby Products",
+      "Kids' Clothes",
+      "Kids' Shoes",
+      "Toys & Games",
+      "Baby Furniture",
+      "Strollers & Car Seats",
+      "Diapers & Baby Care",
+      "School Uniforms",
+      "Kids' Books & Learning",
+      "Daycare & Childcare",
+      "Babysitters & Nannies",
+      "Kids' Activities",
+      "Kids' Birthday Parties",
+    ],
+  },
+
+  // ============================================================
+  // ANIMALS & PETS
+  // ============================================================
+  {
+    key: "Animals & Pets",
+    displayShort: "Animals & Pets",
+    icon: PawPrint,
+    color: "text-lime-600 bg-lime-50 border-lime-300",
+    badgeColor: "bg-lime-100 text-lime-700",
+    tagline: "Pets, livestock, poultry, animal products and services",
+    subcategories: [
+      "Dogs & Cats",
+      "Birds",
+      "Other Pets",
+      "Pet Products",
+      "Pet Services",
+      "Livestock",
+      "Poultry",
+      "Animal Feeds",
+    ],
+  },
+
+  // ============================================================
+  // VEHICLES
+  // ============================================================
+  {
+    key: "Vehicles",
+    displayShort: "Vehicles",
+    icon: Car,
+    color: "text-slate-600 bg-slate-50 border-slate-300",
+    badgeColor: "bg-slate-100 text-slate-700",
+    tagline: "Cars, motorcycles, tuk-tuks, spare parts and vehicle services",
+    subcategories: [
+      "Cars",
+      "Motorcycles",
+      "Tuk-tuks",
+      "Bicycles",
+      "Trucks & Lorries",
+      "Vans",
+      "Vehicle Spare Parts",
+      "Vehicle Accessories",
+      "Car Hire",
+      "Vehicle Services",
+    ],
+  },
 ];
 
 export type CategoryKey = (typeof CATEGORY_DEFS)[number]["key"];
@@ -152,4 +261,4 @@ export function getCategoryDef(key: string): CategoryDef | undefined {
 
 export function getCategoryBadgeColor(key: string): string {
   return getCategoryDef(key)?.badgeColor ?? "bg-gray-100 text-gray-600";
-}
+    }
