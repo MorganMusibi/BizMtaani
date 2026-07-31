@@ -13,7 +13,6 @@ import {
   type Product,
   getDistanceKm,
   dedupe,
-  isProductVisibleToUser,
   rankProducts,
 } from "@/hooks/useHomeFeed";
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -381,26 +380,14 @@ export default function Home() {
   );
 
   const filteredProducts = applyFilters(allLoadedProducts);
+  const rankedProducts = userCoords
+  ? rankProducts(
+      filteredProducts,
+      userCoords
+    )
+  : filteredProducts;
 
-  const wardProductsFiltered = filteredProducts.filter(
-    (product) => Boolean(locationInfo?.wardName) && product.ward === locationInfo?.wardName
-  );
-
-  const wardProductIds = new Set(wardProductsFiltered.map((product) => product.id));
-  const areaProductsFiltered = filteredProducts.filter(
-    (product) => !wardProductIds.has(product.id)
-  );
-
-  const filteredWard = userCoords
-    ? rankProducts(wardProductsFiltered, userCoords)
-    : wardProductsFiltered;
-
-  const filteredArea = userCoords
-    ? rankProducts(areaProductsFiltered, userCoords)
-    : areaProductsFiltered;
-
-  const rankedProducts = [...filteredWard, ...filteredArea];
-  const totalVisible = rankedProducts.length;
+const totalVisible = rankedProducts.length;
   const isLoadingMore = wardLoading || areaLoading;
   const allDone = isSearchMode ? areaDone : wardDone && areaDone;
 
@@ -549,56 +536,34 @@ export default function Home() {
           </div>
         ) : (
           <div className="px-3 pt-3 pb-24">
-            {filteredWard.length > 0 && (
-              <>
-                {locationInfo?.wardName && !isSearchMode && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <MapPin size={13} className="text-primary flex-shrink-0" />
-                    <p className="text-xs font-bold text-primary uppercase tracking-wide">
-                      In {locationInfo.wardName} area
-                    </p>
-                  </div>
-                )}
-                <div className="grid grid-cols-2 gap-3">
-                  {filteredWard.map((p) => (
-                    <ProductCard
-                      key={p.id} 
-                      product={p}
-                      userCoords={userCoords}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/product/${p.id}`);
-                      }}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+            {rankedProducts.length > 0 && (
+  <>
+    {!isSearchMode && (
+      <div className="flex items-center gap-3 mb-3">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap px-1">
+          Nearby adverts
+        </span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+    )}
 
-            {filteredArea.length > 0 && (
-              <>
-                <div className={`flex items-center gap-3 ${filteredWard.length > 0 ? "mt-6 mb-3" : "mb-3"}`}>
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap px-1">
-                    {filteredWard.length > 0 ? "Other nearby adverts" : "Nearby adverts"}
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {filteredArea.map((p) => (
-                    <ProductCard
-                      key={p.id} 
-                      product={p}
-                      userCoords={userCoords}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setLocation(`/product/${p.id}`);
-                      }}
-                    />
-                  ))}
-                </div>
-              </>
-            )}
+    <div className="grid grid-cols-2 gap-3">
+      {rankedProducts.map((p) => (
+        <ProductCard
+          key={p.id}
+          product={p}
+          userCoords={userCoords}
+          onClick={(e) => {
+            e.stopPropagation();
+            setLocation(`/product/${p.id}`);
+          }}
+        />
+      ))}
+    </div>
+  </>
+)}
+            
 
             <div ref={sentinelRef} className="h-1" />
 
