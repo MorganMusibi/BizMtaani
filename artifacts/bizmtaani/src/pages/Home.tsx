@@ -27,11 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
-const WARD_PAGE = 20;
-const AREA_PAGE = 20;
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
-const DEFAULT_RADIUS_KM = 2.5;
-const RADIUS_STEPS = [1, 2.5, 5, 7, 10]; // discrete steps for the slider
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -215,15 +211,10 @@ const hasPromptedArea = useRef(false);
 // 2. Saved homeLocation from user profile
 // 3. Previously selected area
 // 4. Ask user to select an area
-//
-// IMPORTANT:
-// There is NO Nairobi fallback.
-// ============================================================
-
 useEffect(() => {
   let cancelled = false;
 
-  const useLocation = (location: ResolvedLocation) => {
+  const applyResolvedLocation = (location: ResolvedLocation) => {
     if (cancelled) return;
 
     setLocationInfo(location);
@@ -257,7 +248,7 @@ useEffect(() => {
         county: saved.county,
       };
 
-      useLocation(savedLocation);
+      applyResolvedLocation(savedLocation);
       return true;
     }
 
@@ -285,7 +276,7 @@ useEffect(() => {
         return false;
       }
 
-      useLocation(parsed);
+      applyResolvedLocation(parsed);
       return true;
     } catch (error) {
       console.error(
@@ -431,9 +422,6 @@ requestGps();
   user,
   userProfile,
 ]);
-
-const [radiusKm, setRadiusKm] = useState(DEFAULT_RADIUS_KM);
-const [showRadiusSlider, setShowRadiusSlider] = useState(false);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -781,74 +769,6 @@ function bannerText() {
             </button>
           ))}
         </div>
-
-        {/* Near me radius row */}
-        {!isSearchMode && (
-          <div className="px-4 pb-2.5">
-            <button
-              onClick={() => setShowRadiusSlider((s) => !s)}
-              className="flex items-center gap-2 group"
-            >
-              <MapPin size={12} className="text-primary flex-shrink-0" />
-              <span className="text-xs font-semibold text-primary">
-                Within {radiusKm} km
-              </span>
-              <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">
-                {showRadiusSlider ? "▲" : "▼"}
-              </span>
-            </button>
-
-            {showRadiusSlider && (
-              <div className="mt-3 pb-1">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-muted-foreground">1 km</span>
-                  <span className="text-xs font-black text-primary">{radiusKm} km from you</span>
-                  <span className="text-[10px] text-muted-foreground">10 km</span>
-                </div>
-                <input
-                  type="range"
-                  min={0}
-                  max={RADIUS_STEPS.length - 1}
-                  step={1}
-                  value={Math.max(
-  0,
-  RADIUS_STEPS.indexOf(radiusKm)
-)}
-                  onChange={(e) => setRadiusKm(RADIUS_STEPS[Number(e.target.value)])}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer
-                    bg-muted [&::-webkit-slider-thumb]:appearance-none
-                    [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5
-                    [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary
-                    [&::-webkit-slider-thumb]:shadow-md [&::-webkit-slider-thumb]:cursor-pointer
-                    [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5
-                    [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary
-                    [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-pointer"
-                  style={{
-                    background: `linear-gradient(to right, hsl(var(--primary)) 0%, hsl(var(--primary)) ${
-                      (RADIUS_STEPS.indexOf(radiusKm) / (RADIUS_STEPS.length - 1)) * 100
-                    }%, hsl(var(--muted)) ${
-                      (RADIUS_STEPS.indexOf(radiusKm) / (RADIUS_STEPS.length - 1)) * 100
-                    }%, hsl(var(--muted)) 100%)`,
-                  }}
-                />
-                <div className="flex justify-between mt-1.5">
-                  {RADIUS_STEPS.map((s) => (
-                    <span
-                      key={s}
-                      onClick={() => setRadiusKm(s)}
-                      className={`text-[9px] font-semibold cursor-pointer transition-colors ${
-                        s === radiusKm ? "text-primary" : "text-muted-foreground"
-                      }`}
-                    >
-                      {s}km
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
 
       <div className="flex-1 overflow-y-auto">
         {gpsReady && (
