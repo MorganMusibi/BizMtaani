@@ -578,34 +578,7 @@ const categoryAndSearchFiltered = applyFilters(
 // ============================================================
 // APPLY USER DISPLAY RADIUS
 //
-// IMPORTANT:
-// This is ONLY a display preference.
-//
-// It does NOT change an advert's visibility rules.
-//
-// Free adverts are still restricted by
-// isProductVisibleToUser().
-// Premium adverts can still be visible beyond
-// the free advert radius.
-//
-// The slider simply controls how far the user
-// wants to browse from their current location.
-// ============================================================
-
-const filteredProducts = isSearchMode
-  ? categoryAndSearchFiltered
-  : userCoords
-  ? categoryAndSearchFiltered.filter((product) => {
-      const distance = getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        product.lat,
-        product.lng
-      );
-
-      return distance <= radiusKm;
-    })
-  : categoryAndSearchFiltered;
+const filteredProducts = categoryAndSearchFiltered;
 
 // ============================================================
 // RANK PRODUCTS — WARD FIRST, THEN NEARBY
