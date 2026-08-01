@@ -1933,50 +1933,78 @@ const data = result.data as PublishAdvertResponse;
           </div>
         )}
         </div>
-
-
       {/* Bottom action */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border px-4 py-3"
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 0.75rem)" }}>
         {step < 5 ? (
-          <Button className="w-full h-12 font-black text-base rounded-2xl shadow-lg" onClick={goNext}>
-            Next
-          </Button>
-        ) : hasActivePremium ? (
-          <Button
-  className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
-  onClick={handlePublishPremiumSubscriber}
-  disabled={publishingFree}
->
-  {publishingFree ? (
-    <Loader2 size={18} className="animate-spin" />
-  ) : (
-    "Publish Advert"
-  )}
-</Button>
-        ) : plan === "free" ? (
-  <Button
-    className="w-full h-12 font-black text-base rounded-2xl shadow-lg"
-    onClick={handlePublishFree}
-    disabled={publishingFree}
-  >
-    {publishingFree ? (
-      <Loader2 size={18} className="animate-spin" />
-    ) : (
-      "Publish Free"
-    )}
-  </Button>
-) : (
-  <Button
-    className="w-full h-12 font-black text-base rounded-2xl shadow-lg gap-2"
-    style={{ backgroundColor: "#00A651" }}
-    onClick={() => setShowPaymentModal(true)}
-  >
-    <Smartphone size={18} />
-    Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
-  </Button>
-)}
+          <div className="flex gap-3">
+            {step > 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-1/3 h-12 font-black text-base rounded-2xl border-2"
+                onClick={() => setStep((prev) => (prev - 1) as Step)}
+              >
+                Back
+              </Button>
+            )}
+            <Button 
+              className={`h-12 font-black text-base rounded-2xl shadow-lg ${step > 1 ? "flex-1" : "w-full"}`} 
+              onClick={goNext}
+            >
+              Next
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-1/3 h-12 font-black text-base rounded-2xl border-2"
+              onClick={() => setStep((prev) => (prev - 1) as Step)}
+              disabled={publishingFree}
+            >
+              Back
+            </Button>
+
+            {hasActivePremium ? (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+                onClick={handlePublishPremiumSubscriber}
+                disabled={publishingFree}
+              >
+                {publishingFree ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  "Publish Advert"
+                )}
+              </Button>
+            ) : plan === "free" ? (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg"
+                onClick={handlePublishFree}
+                disabled={publishingFree}
+              >
+                {publishingFree ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  "Publish Free"
+                )}
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+                style={{ backgroundColor: "#00A651" }}
+                onClick={() => setShowPaymentModal(true)}
+              >
+                <Smartphone size={18} />
+                Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
+              </Button>
+            )}
+          </div>
+        )}
       </div>
+
 
       {/* Image source picker sheet */}
       {showImageMenu && (
