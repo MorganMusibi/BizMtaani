@@ -737,66 +737,152 @@ setRelatedProducts(relatedItems);
     {isSeller ? "View My Shop" : "View Shop"}
   </Button>
 </Card>
-        {relatedProducts.length > 0 && (
-  <Card className="p-5">
-    <h2 className="text-lg font-bold mb-4">
-  More {product.subcategory ?? product.category} nearby
-</h2>
+         {relatedProducts.length > 0 && (
+  <section className="space-y-4">
+    {/* Related Products Heading */}
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-xl font-black">
+          {product.subcategory
+            ? `More ${product.subcategory}`
+            : `More ${product.category}`}
+        </h2>
 
+        <p className="text-sm text-muted-foreground mt-1">
+          Similar adverts you may be interested in
+        </p>
+      </div>
+    </div>
+
+    {/* Related Products Grid */}
     <div className="grid grid-cols-2 gap-3">
       {relatedProducts.map((item) => {
         const itemImages = Array.isArray(item.imageUrls)
-          ? item.imageUrls.map((img: any) =>
-              typeof img === "string" ? img : img.url
-            )
+          ? item.imageUrls
+              .map((img: any) =>
+                typeof img === "string"
+                  ? img
+                  : img?.url
+              )
+              .filter(Boolean)
           : item.imageUrl
           ? [item.imageUrl]
           : [];
 
+        const itemDistance =
+          userCoords &&
+          item.lat &&
+          item.lng
+            ? getDistanceKm(
+                userCoords.lat,
+                userCoords.lng,
+                item.lat,
+                item.lng
+              )
+            : null;
+
+        const itemIsAccommodation =
+          item.category === "Accommodation";
+
+        let itemPriceLabel = "";
+
+        if (itemIsAccommodation) {
+          itemPriceLabel = `KES ${(
+            item.rentPerMonth ??
+            item.price
+          ).toLocaleString()} / month`;
+        } else if (
+          item.priceDisplay === "contact"
+        ) {
+          itemPriceLabel = "Contact for Price";
+        } else if (
+          item.priceDisplay === "quote"
+        ) {
+          itemPriceLabel = "Request Quote";
+        } else if (
+          item.priceDisplay === "free"
+        ) {
+          itemPriceLabel = "Free";
+        } else {
+          itemPriceLabel = `KES ${item.price.toLocaleString()}`;
+        }
+
         return (
-          <div
+          <button
             key={item.id}
-            onClick={() => setLocation(`/product/${item.id}`)}
-            className="cursor-pointer rounded-xl border border-border overflow-hidden bg-card hover:shadow-md transition"
+            type="button"
+            onClick={() =>
+              setLocation(
+                `/product/${item.id}`
+              )
+            }
+            className="text-left rounded-2xl border border-border overflow-hidden bg-card hover:shadow-md active:scale-[0.98] transition-all"
           >
-            <div className="aspect-square bg-muted">
+            {/* Product Image */}
+            <div className="relative aspect-square bg-muted">
               {itemImages.length > 0 ? (
                 <img
                   src={itemImages[0]}
                   alt={item.title}
+                  loading="lazy"
                   className="w-full h-full object-cover"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
-                  <Store className="text-muted-foreground" size={32} />
+                  <Store
+                    className="text-muted-foreground"
+                    size={32}
+                  />
+                </div>
+              )}
+
+              {/* Multiple Images Indicator */}
+              {itemImages.length > 1 && (
+                <div className="absolute bottom-2 right-2 rounded-full bg-black/60 backdrop-blur-sm px-2 py-1 text-[10px] font-semibold text-white">
+                  {itemImages.length} photos
                 </div>
               )}
             </div>
 
+            {/* Product Information */}
             <div className="p-3">
-              <h3 className="font-semibold text-sm line-clamp-1">
+              <h3 className="font-bold text-sm line-clamp-2 min-h-[40px]">
                 {item.title}
               </h3>
 
-              <p className="text-primary font-bold mt-1">
-                {item.priceDisplay === "contact"
-                  ? "Contact for Price"
-                  : item.priceDisplay === "quote"
-                  ? "Request Quote"
-                  : item.priceDisplay === "free"
-                  ? "Free"
-                  : `KES ${item.price.toLocaleString()}`}
+              <p className="text-primary font-black mt-2 text-sm">
+                {itemPriceLabel}
               </p>
 
-              <p className="text-xs text-muted-foreground mt-1">
-                {item.ward}
-              </p>
+              {/* Location */}
+              {item.ward && (
+                <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                  <MapPin size={12} />
+
+                  <span className="truncate">
+                    {item.ward}
+                  </span>
+                </div>
+              )}
+
+              {/* Distance */}
+              {itemDistance !== null && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {itemDistance < 1
+                    ? `${(
+                        itemDistance * 1000
+                      ).toFixed(0)}m away`
+                    : `${itemDistance.toFixed(
+                        1
+                      )} km away`}
+                </p>
+              )}
             </div>
-          </div>
+          </button>
         );
       })}
     </div>
-  </Card>
+  </section>
 )}
         {/* --- OPTIONS MODAL START --- */}
         {showOptions && (
