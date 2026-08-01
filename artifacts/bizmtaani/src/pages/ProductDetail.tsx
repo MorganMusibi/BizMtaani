@@ -539,9 +539,9 @@ useEffect(() => {
   // but keeping it cleanly triggered prevents infinite fetch loops)
 }, [userCoords]);
   
-  const images = product 
+    const images = product 
     ? (Array.isArray(product.imageUrls) 
-        ? product.imageUrls.map((img: any) => (typeof img === 'string' ? img : img.url)) 
+        ? product.imageUrls.map((img: string | { url: string; public_id?: string }) => (typeof img === 'string' ? img : img.url)) 
         : product.imageUrl ? [product.imageUrl] : [])
     : [];
 
@@ -700,12 +700,15 @@ useEffect(() => {
 
     <div
   onTouchStart={handlePressStart}
-  onTouchEnd={handlePressEnd}
+  onTouchMove={handlePressCancel}
+  onTouchEnd={handlePressCancel}
   onMouseDown={handlePressStart}
-  onMouseUp={handlePressEnd}
+  onMouseUp={handlePressCancel}
+  onMouseLeave={handlePressCancel}
 >
   <ImageGallery images={images} />
-      </div>
+</div>
+
       <div className="px-4 pt-4 pb-4 space-y-6">
     
   
