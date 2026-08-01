@@ -688,8 +688,8 @@ useEffect(() => {
     : isEatery ? "Restaurant owner"
     : "Seller";
 
-  return (
-  <div className="min-h-screen bg-background pb-36">
+    return (
+  <div className="min-h-screen bg-background pb-36 select-none">
     <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
       <button
         data-testid="button-back"
