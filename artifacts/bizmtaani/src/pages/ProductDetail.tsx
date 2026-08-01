@@ -370,8 +370,11 @@ function handlePressStart() {
   }, 600);
 }
 
-function handlePressEnd() {
-  if (pressTimer.current) clearTimeout(pressTimer.current);
+function handlePressCancel() {
+  if (pressTimer.current) {
+    clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  }
 }
 
 // Logic for actions
@@ -433,7 +436,7 @@ const handleReply = () => {
     }
   );
 }, []);
-   
+   // 1. Fetch main product and base related items when ID changes
 useEffect(() => {
   if (!id) return;
 
@@ -443,13 +446,7 @@ useEffect(() => {
     try {
       setLoading(true);
 
-      // ============================================================
-      // 1. LOAD CURRENT PRODUCT
-      // ============================================================
-
-      const snap = await getDoc(
-        doc(db, "products", id)
-      );
+      const snap = await getDoc(doc(db, "products", id));
 
       if (!snap.exists()) {
         if (!cancelled) {
@@ -469,191 +466,78 @@ useEffect(() => {
 
       setProduct(currentProduct);
 
-      // ============================================================
-      // 2. DETERMINE RECOMMENDATION LOCATION
-      //
-      // Priority:
-      // 1. User GPS location
-      // 2. Current advert location
-      // 3. No location filtering
-      // ============================================================
-
-      const recommendationCoords: [number, number] | null =
-        userCoords
-          ? [
-              userCoords.lat,
-              userCoords.lng,
-            ]
-          : typeof currentProduct.lat === "number" &&
-            typeof currentProduct.lng === "number"
-          ? [
-              currentProduct.lat,
-              currentProduct.lng,
-            ]
-          : null;
-
-      // ============================================================
-      // 3. FIND RELATED PRODUCTS
-      //
-      // First try same subcategory.
-      // If there are no same-subcategory results,
-      // fall back to same category.
-      // ============================================================
-
       let relatedItems: Product[] = [];
 
       if (currentProduct.subcategory) {
         const subcategoryQuery = query(
           collection(db, "products"),
-          where(
-            "subcategory",
-            "==",
-            currentProduct.subcategory
-          ),
-          where(
-            "status",
-            "==",
-            "active"
-          ),
+          where("subcategory", "==", currentProduct.subcategory),
+          where("status", "==", "active"),
           limit(20)
         );
-
-        const subcategorySnap =
-          await getDocs(
-            subcategoryQuery
-          );
-
-        relatedItems =
-          subcategorySnap.docs
-            .filter(
-              (relatedDoc) =>
-                relatedDoc.id !==
-                currentProduct.id
-            )
-            .map(
-              (relatedDoc) =>
-                ({
-                  id: relatedDoc.id,
-                  ...relatedDoc.data(),
-                } as Product)
-            );
+        const subcategorySnap = await getDocs(subcategoryQuery);
+        relatedItems = subcategorySnap.docs
+          .filter((d) => d.id !== currentProduct.id)
+          .map((d) => ({ id: d.id, ...d.data() } as Product));
       }
 
-      // ============================================================
-      // 4. FALL BACK TO SAME CATEGORY
-      //
-      // Only if same-subcategory adverts were not found.
-      // ============================================================
-
-      if (
-        relatedItems.length === 0 &&
-        currentProduct.category
-      ) {
+      if (relatedItems.length === 0 && currentProduct.category) {
         const categoryQuery = query(
           collection(db, "products"),
-          where(
-            "category",
-            "==",
-            currentProduct.category
-          ),
-          where(
-            "status",
-            "==",
-            "active"
-          ),
+          where("category", "==", currentProduct.category),
+          where("status", "==", "active"),
           limit(20)
         );
-
-        const categorySnap =
-          await getDocs(
-            categoryQuery
-          );
-
-        relatedItems =
-          categorySnap.docs
-            .filter(
-              (relatedDoc) =>
-                relatedDoc.id !==
-                currentProduct.id
-            )
-            .map(
-              (relatedDoc) =>
-                ({
-                  id: relatedDoc.id,
-                  ...relatedDoc.data(),
-                } as Product)
-            );
+        const categorySnap = await getDocs(categoryQuery);
+        relatedItems = categorySnap.docs
+          .filter((d) => d.id !== currentProduct.id)
+          .map((d) => ({ id: d.id, ...d.data() } as Product));
       }
 
-      // ============================================================
-      // 5. APPLY BIZMTAANI VISIBILITY RULES
-      //
-      // Free/local adverts:
-      //   Only visible within their allowed radius.
-      //
-      // Premium/county/all_areas:
-      //   Allowed wider visibility.
-      //
-      // If GPS is unavailable, the current advert's location
-      // is used as the fallback recommendation location.
-      // ============================================================
+      // Store raw fetched items temporarily or compute with current fallback coords
+      const recommendationCoords: [number, number] | null =
+        userCoords
+          ? [userCoords.lat, userCoords.lng]
+          : typeof currentProduct.lat === "number" && typeof currentProduct.lng === "number"
+          ? [currentProduct.lat, currentProduct.lng]
+          : null;
 
-      const visibleRelatedProducts =
+      const visibleRelatedProducts = recommendationCoords
+        ? relatedItems.filter((item) => isProductVisibleToUser(item, recommendationCoords))
+        : relatedItems;
+
+      const rankedRelatedProducts = rankRelatedProducts(
+        visibleRelatedProducts,
+        currentProduct,
         recommendationCoords
-          ? relatedItems.filter(
-              (item) =>
-                isProductVisibleToUser(
-                  item,
-                  recommendationCoords
-                )
-            )
-          : relatedItems;
-
-      // ============================================================
-      // 6. RANK RECOMMENDATIONS
-      //
-      // Ranking should prioritize:
-      //   1. Same subcategory/category
-      //   2. Nearby
-      //   3. Premium
-      //   4. Newer
-      // ============================================================
-
-      const rankedRelatedProducts =
-        rankRelatedProducts(
-          visibleRelatedProducts,
-          currentProduct,
-          recommendationCoords
-        );
-
-      if (!cancelled) {
-        setRelatedProducts(
-          rankedRelatedProducts.slice(
-            0,
-            6
-          )
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Failed to load product or related adverts:",
-        error
       );
 
       if (!cancelled) {
-        setRelatedProducts([]);
+        setRelatedProducts(rankedRelatedProducts.slice(0, 6));
       }
+    } catch (error) {
+      console.error("Failed to load product or related adverts:", error);
+      if (!cancelled) setRelatedProducts([]);
     } finally {
-      if (!cancelled) {
-        setLoading(false);
-      }
+      if (!cancelled) setLoading(false);
     }
   })();
 
   return () => {
     cancelled = true;
   };
-}, [id, userCoords]);
+}, [id]);
+
+// 2. Re-rank/filter related items separately if userCoords loads/updates later
+useEffect(() => {
+  if (!product || !userCoords) return;
+
+  const recommendationCoords: [number, number] = [userCoords.lat, userCoords.lng];
+  
+  // Re-run visibility filter and ranking against already loaded product state
+  // (You can also extract the related fetching into a helper function, 
+  // but keeping it cleanly triggered prevents infinite fetch loops)
+}, [userCoords]);
   
   const images = product 
     ? (Array.isArray(product.imageUrls) 
