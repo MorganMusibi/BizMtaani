@@ -15,6 +15,7 @@ import {
   startProductChat,
   ChatParticipant,
 } from "@/lib/chatService";
+import { isProductVisibleToUser, } from "@/hooks/useHomeFeed";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -48,6 +49,19 @@ interface Product {
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
   createdAt: { seconds: number } | null;
+
+  // Advert visibility fields
+  visibilityScope?: "local" | "county" | "all_areas";
+  visibilityRadiusKm?: number;
+
+  // Premium / subscription fields
+  plan?: string;
+  isPremium?: boolean;
+  verified?: boolean;
+
+  // Advert status
+  status?: string;
+  expiresAt?: { seconds: number } | null;
 }
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
@@ -411,236 +425,228 @@ const handleReply = () => {
       }
     : null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-
-  useEffect(() => {
+   
+useEffect(() => {
   if (!id) return;
 
+  let cancelled = false;
+
   (async () => {
-  const snap = await getDoc(doc(db, "products", id));
+    try {
+      setLoading(true);
 
-  if (!snap.exists()) {
-    setLoading(false);
-    return;
-  }
+      // ============================================================
+      // 1. LOAD CURRENT PRODUCT
+      // ============================================================
 
-  const currentProduct = {
-    id: snap.id,
-    ...snap.data(),
-  } as Product;
+      const snap = await getDoc(
+        doc(db, "products", id)
+      );
 
-  setProduct(currentProduct);
-
-// ============================================================
-// RELATED PRODUCTS
-//
-// Recommendation strategy:
-//
-// 1. Same subcategory candidates first.
-// 2. Same category candidates as fallback.
-// 3. Remove current product.
-// 4. Remove expired/inactive adverts.
-// 5. Deduplicate.
-// 6. Rank by:
-//      - Same subcategory
-//      - Distance
-//      - Premium
-//      - Newest
-// 7. Display top 6.
-// ============================================================
-
-const RELATED_LIMIT = 6;
-const RELATED_CANDIDATE_LIMIT = 30;
-
-let relatedItems: Product[] = [];
-
-// Current time for expiry filtering.
-const nowSec = Date.now() / 1000;
-
-// ------------------------------------------------------------
-// STEP 1 — SAME SUBCATEGORY CANDIDATES
-// ------------------------------------------------------------
-
-if (currentProduct.subcategory) {
-  const subcategoryQuery = query(
-    collection(db, "products"),
-    where(
-      "subcategory",
-      "==",
-      currentProduct.subcategory
-    ),
-    where(
-      "status",
-      "==",
-      "active"
-    ),
-    limit(
-      RELATED_CANDIDATE_LIMIT
-    )
-  );
-
-  const subcategorySnap =
-    await getDocs(
-      subcategoryQuery
-    );
-
-  relatedItems =
-    subcategorySnap.docs
-      .filter(
-        (doc) =>
-          doc.id !==
-          currentProduct.id
-      )
-      .map(
-        (doc) =>
-          ({
-            id: doc.id,
-            ...doc.data(),
-          } as Product)
-      )
-      .filter((item) => {
-        // Remove expired adverts.
-        if (
-          item.expiresAt &&
-          item.expiresAt.seconds <=
-            nowSec
-        ) {
-          return false;
+      if (!snap.exists()) {
+        if (!cancelled) {
+          setProduct(null);
+          setRelatedProducts([]);
+          setLoading(false);
         }
+        return;
+      }
 
-        return (
-          !item.status ||
-          item.status === "active"
+      const currentProduct = {
+        id: snap.id,
+        ...snap.data(),
+      } as Product;
+
+      if (cancelled) return;
+
+      setProduct(currentProduct);
+
+      // ============================================================
+      // 2. DETERMINE RECOMMENDATION LOCATION
+      //
+      // Priority:
+      // 1. User GPS location
+      // 2. Current advert location
+      // 3. No location filtering
+      // ============================================================
+
+      const recommendationCoords: [number, number] | null =
+        userCoords
+          ? [
+              userCoords.lat,
+              userCoords.lng,
+            ]
+          : typeof currentProduct.lat === "number" &&
+            typeof currentProduct.lng === "number"
+          ? [
+              currentProduct.lat,
+              currentProduct.lng,
+            ]
+          : null;
+
+      // ============================================================
+      // 3. FIND RELATED PRODUCTS
+      //
+      // First try same subcategory.
+      // If there are no same-subcategory results,
+      // fall back to same category.
+      // ============================================================
+
+      let relatedItems: Product[] = [];
+
+      if (currentProduct.subcategory) {
+        const subcategoryQuery = query(
+          collection(db, "products"),
+          where(
+            "subcategory",
+            "==",
+            currentProduct.subcategory
+          ),
+          where(
+            "status",
+            "==",
+            "active"
+          ),
+          limit(20)
         );
-      });
-}
 
-// ------------------------------------------------------------
-// STEP 2 — CATEGORY FALLBACK
-//
-// Fetch category candidates when the subcategory pool
-// does not provide enough recommendations.
-// ------------------------------------------------------------
+        const subcategorySnap =
+          await getDocs(
+            subcategoryQuery
+          );
 
-if (
-  relatedItems.length <
-  RELATED_LIMIT
-) {
-  const categoryQuery = query(
-    collection(db, "products"),
-    where(
-      "category",
-      "==",
-      currentProduct.category
-    ),
-    where(
-      "status",
-      "==",
-      "active"
-    ),
-    limit(
-      RELATED_CANDIDATE_LIMIT
-    )
-  );
+        relatedItems =
+          subcategorySnap.docs
+            .filter(
+              (relatedDoc) =>
+                relatedDoc.id !==
+                currentProduct.id
+            )
+            .map(
+              (relatedDoc) =>
+                ({
+                  id: relatedDoc.id,
+                  ...relatedDoc.data(),
+                } as Product)
+            );
+      }
 
-  const categorySnap =
-    await getDocs(
-      categoryQuery
-    );
+      // ============================================================
+      // 4. FALL BACK TO SAME CATEGORY
+      //
+      // Only if same-subcategory adverts were not found.
+      // ============================================================
 
-  const existingIds =
-    new Set([
-      currentProduct.id,
-      ...relatedItems.map(
-        (item) => item.id
-      ),
-    ]);
+      if (
+        relatedItems.length === 0 &&
+        currentProduct.category
+      ) {
+        const categoryQuery = query(
+          collection(db, "products"),
+          where(
+            "category",
+            "==",
+            currentProduct.category
+          ),
+          where(
+            "status",
+            "==",
+            "active"
+          ),
+          limit(20)
+        );
 
-  const categoryFallback =
-    categorySnap.docs
-      .filter(
-        (doc) =>
-          !existingIds.has(
-            doc.id
+        const categorySnap =
+          await getDocs(
+            categoryQuery
+          );
+
+        relatedItems =
+          categorySnap.docs
+            .filter(
+              (relatedDoc) =>
+                relatedDoc.id !==
+                currentProduct.id
+            )
+            .map(
+              (relatedDoc) =>
+                ({
+                  id: relatedDoc.id,
+                  ...relatedDoc.data(),
+                } as Product)
+            );
+      }
+
+      // ============================================================
+      // 5. APPLY BIZMTAANI VISIBILITY RULES
+      //
+      // Free/local adverts:
+      //   Only visible within their allowed radius.
+      //
+      // Premium/county/all_areas:
+      //   Allowed wider visibility.
+      //
+      // If GPS is unavailable, the current advert's location
+      // is used as the fallback recommendation location.
+      // ============================================================
+
+      const visibleRelatedProducts =
+        recommendationCoords
+          ? relatedItems.filter(
+              (item) =>
+                isProductVisibleToUser(
+                  item,
+                  recommendationCoords
+                )
+            )
+          : relatedItems;
+
+      // ============================================================
+      // 6. RANK RECOMMENDATIONS
+      //
+      // Ranking should prioritize:
+      //   1. Same subcategory/category
+      //   2. Nearby
+      //   3. Premium
+      //   4. Newer
+      // ============================================================
+
+      const rankedRelatedProducts =
+        rankRelatedProducts(
+          visibleRelatedProducts,
+          currentProduct,
+          recommendationCoords
+        );
+
+      if (!cancelled) {
+        setRelatedProducts(
+          rankedRelatedProducts.slice(
+            0,
+            6
           )
-      )
-      .map(
-        (doc) =>
-          ({
-            id: doc.id,
-            ...doc.data(),
-          } as Product)
-      )
-      .filter((item) => {
-        // Remove expired adverts.
-        if (
-          item.expiresAt &&
-          item.expiresAt.seconds <=
-            nowSec
-        ) {
-          return false;
-        }
-
-        return (
-          !item.status ||
-          item.status === "active"
         );
-      });
+      }
+    } catch (error) {
+      console.error(
+        "Failed to load product or related adverts:",
+        error
+      );
 
-  relatedItems = [
-    ...relatedItems,
-    ...categoryFallback,
-  ];
-}
-
-// ------------------------------------------------------------
-// STEP 3 — RANK ALL CANDIDATES
-// ------------------------------------------------------------
-
-const rankedRelatedProducts =
-  rankRelatedProducts(
-    relatedItems,
-    currentProduct,
-    userCoords ??
-      (typeof currentProduct.lat === "number" &&
-      typeof currentProduct.lng === "number"
-        ? {
-            lat: currentProduct.lat,
-            lng: currentProduct.lng,
-          }
-        : null)
-  );
-
-// ------------------------------------------------------------
-// STEP 4 — TAKE ONLY THE BEST 6
-// ------------------------------------------------------------
-
-setRelatedProducts(
-  rankedRelatedProducts.slice(
-    0,
-    RELATED_LIMIT
-  )
-);
-
-  setLoading(false);
-})();
-
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      setUserCoords({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-      });
-    },
-    () => {},
-    {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0,
+      if (!cancelled) {
+        setRelatedProducts([]);
+      }
+    } finally {
+      if (!cancelled) {
+        setLoading(false);
+      }
     }
-  );
-}, [id]);
+  })();
 
-  // MOVE IMAGES CALCULATION UP HERE
+  return () => {
+    cancelled = true;
+  };
+}, [id, userCoords]);
+  
   const images = product 
     ? (Array.isArray(product.imageUrls) 
         ? product.imageUrls.map((img: any) => (typeof img === 'string' ? img : img.url)) 
