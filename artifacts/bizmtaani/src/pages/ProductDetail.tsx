@@ -27,6 +27,13 @@ interface Product {
   rentPerMonth?: number;
   category: string;
   subcategory?: string;
+  plan?: string;
+  isPremium?: boolean;
+  verified?: boolean;
+  visibilityScope?: "local" | "county" | "all_areas";
+  visibilityRadiusKm?: number;
+  expiresAt?: { seconds: number } | null;
+  status?: string;
   imageUrl: string;
   imageUrls?: (string | { url: string; public_id?: string })[];
   lat: number;
@@ -56,7 +63,104 @@ function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const a = Math.sin(dLat / 2) ** 2 + Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
+function isPremiumProduct(product: Product) {
+  return (
+    product.plan === "premium_weekly" ||
+    product.plan === "premium_monthly" ||
+    product.isPremium === true
+  );
+}
+function rankRelatedProducts(
+  products: Product[],
+  currentProduct: Product,
+  userCoords: { lat: number; lng: number } | null
+): Product[] {
+  return [...products].sort((a, b) => {
+    // ============================================================
+    // PRIMARY FACTOR — SUBCATEGORY RELEVANCE
+    //
+    // Products in the exact same subcategory come first.
+    // ============================================================
 
+    const aSameSubcategory =
+      Boolean(
+        currentProduct.subcategory &&
+        a.subcategory ===
+          currentProduct.subcategory
+      );
+
+    const bSameSubcategory =
+      Boolean(
+        currentProduct.subcategory &&
+        b.subcategory ===
+          currentProduct.subcategory
+      );
+
+    if (
+      aSameSubcategory !==
+      bSameSubcategory
+    ) {
+      return aSameSubcategory ? -1 : 1;
+    }
+
+    // ============================================================
+    // SECONDARY FACTOR — DISTANCE
+    //
+    // Nearby adverts come before distant adverts.
+    // ============================================================
+
+    if (userCoords) {
+      const distanceA = getDistanceKm(
+        userCoords.lat,
+        userCoords.lng,
+        a.lat,
+        a.lng
+      );
+
+      const distanceB = getDistanceKm(
+        userCoords.lat,
+        userCoords.lng,
+        b.lat,
+        b.lng
+      );
+
+      if (distanceA !== distanceB) {
+        return distanceA - distanceB;
+      }
+    }
+
+    // ============================================================
+    // TERTIARY FACTOR — PREMIUM
+    //
+    // Premium adverts win when relevance and distance
+    // are otherwise comparable.
+    // ============================================================
+
+    const premiumA =
+      isPremiumProduct(a);
+
+    const premiumB =
+      isPremiumProduct(b);
+
+    if (
+      premiumA !== premiumB
+    ) {
+      return premiumA ? -1 : 1;
+    }
+
+    // ============================================================
+    // FINAL FACTOR — NEWEST
+    // ============================================================
+
+    const createdA =
+      a.createdAt?.seconds ?? 0;
+
+    const createdB =
+      b.createdAt?.seconds ?? 0;
+
+    return createdB - createdA;
+  });
+}
 function timeAgo(createdAt: { seconds: number } | null) {
   if (!createdAt) return "";
 
@@ -325,62 +429,161 @@ const handleReply = () => {
 // 4. Avoid duplicate products.
 // ============================================================
 
+// ============================================================
+// RELATED PRODUCTS
+//
+// Recommendation strategy:
+//
+// 1. Same subcategory candidates first.
+// 2. Same category candidates as fallback.
+// 3. Remove current product.
+// 4. Remove expired/inactive adverts.
+// 5. Deduplicate.
+// 6. Rank by:
+//      - Same subcategory
+//      - Distance
+//      - Premium
+//      - Newest
+// 7. Display top 6.
+// ============================================================
+
 const RELATED_LIMIT = 6;
+const RELATED_CANDIDATE_LIMIT = 30;
 
 let relatedItems: Product[] = [];
 
+// Current time for expiry filtering.
+const nowSec = Date.now() / 1000;
+
 // ------------------------------------------------------------
-// STEP 1: SAME SUBCATEGORY
+// STEP 1 — SAME SUBCATEGORY CANDIDATES
 // ------------------------------------------------------------
 
 if (currentProduct.subcategory) {
   const subcategoryQuery = query(
     collection(db, "products"),
-    where("subcategory", "==", currentProduct.subcategory),
-    where("status", "==", "active"),
-    limit(RELATED_LIMIT + 1)
+    where(
+      "subcategory",
+      "==",
+      currentProduct.subcategory
+    ),
+    where(
+      "status",
+      "==",
+      "active"
+    ),
+    limit(
+      RELATED_CANDIDATE_LIMIT
+    )
   );
 
-  const subcategorySnap = await getDocs(subcategoryQuery);
+  const subcategorySnap =
+    await getDocs(
+      subcategoryQuery
+    );
 
-  relatedItems = subcategorySnap.docs
-    .filter((doc) => doc.id !== currentProduct.id)
-    .map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Product))
-    .slice(0, RELATED_LIMIT);
+  relatedItems =
+    subcategorySnap.docs
+      .filter(
+        (doc) =>
+          doc.id !==
+          currentProduct.id
+      )
+      .map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Product)
+      )
+      .filter((item) => {
+        // Remove expired adverts.
+        if (
+          item.expiresAt &&
+          item.expiresAt.seconds <=
+            nowSec
+        ) {
+          return false;
+        }
+
+        return (
+          !item.status ||
+          item.status === "active"
+        );
+      });
 }
 
 // ------------------------------------------------------------
-// STEP 2: SAME CATEGORY FALLBACK
+// STEP 2 — CATEGORY FALLBACK
+//
+// Fetch category candidates when the subcategory pool
+// does not provide enough recommendations.
 // ------------------------------------------------------------
 
-if (relatedItems.length < RELATED_LIMIT) {
-  const remainingSlots =
-    RELATED_LIMIT - relatedItems.length;
-
+if (
+  relatedItems.length <
+  RELATED_LIMIT
+) {
   const categoryQuery = query(
     collection(db, "products"),
-    where("category", "==", currentProduct.category),
-    where("status", "==", "active"),
-    limit(RELATED_LIMIT + 5)
+    where(
+      "category",
+      "==",
+      currentProduct.category
+    ),
+    where(
+      "status",
+      "==",
+      "active"
+    ),
+    limit(
+      RELATED_CANDIDATE_LIMIT
+    )
   );
 
-  const categorySnap = await getDocs(categoryQuery);
+  const categorySnap =
+    await getDocs(
+      categoryQuery
+    );
 
-  const existingIds = new Set([
-    currentProduct.id,
-    ...relatedItems.map((item) => item.id),
-  ]);
+  const existingIds =
+    new Set([
+      currentProduct.id,
+      ...relatedItems.map(
+        (item) => item.id
+      ),
+    ]);
 
-  const categoryFallback = categorySnap.docs
-    .filter((doc) => !existingIds.has(doc.id))
-    .map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    } as Product))
-    .slice(0, remainingSlots);
+  const categoryFallback =
+    categorySnap.docs
+      .filter(
+        (doc) =>
+          !existingIds.has(
+            doc.id
+          )
+      )
+      .map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          } as Product)
+      )
+      .filter((item) => {
+        // Remove expired adverts.
+        if (
+          item.expiresAt &&
+          item.expiresAt.seconds <=
+            nowSec
+        ) {
+          return false;
+        }
+
+        return (
+          !item.status ||
+          item.status === "active"
+        );
+      });
 
   relatedItems = [
     ...relatedItems,
@@ -388,7 +591,27 @@ if (relatedItems.length < RELATED_LIMIT) {
   ];
 }
 
-setRelatedProducts(relatedItems);
+// ------------------------------------------------------------
+// STEP 3 — RANK ALL CANDIDATES
+// ------------------------------------------------------------
+
+const rankedRelatedProducts =
+  rankRelatedProducts(
+    relatedItems,
+    currentProduct,
+    userCoords
+  );
+
+// ------------------------------------------------------------
+// STEP 4 — TAKE ONLY THE BEST 6
+// ------------------------------------------------------------
+
+setRelatedProducts(
+  rankedRelatedProducts.slice(
+    0,
+    RELATED_LIMIT
+  )
+);
 
   setLoading(false);
 })();
