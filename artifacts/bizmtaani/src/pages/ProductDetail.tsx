@@ -402,6 +402,14 @@ const handleReply = () => {
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const recommendationCoords = userCoords ?? (product &&
+  typeof product.lat === "number" &&
+  typeof product.lng === "number"
+    ? {
+        lat: product.lat,
+        lng: product.lng,
+      }
+    : null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
 
   useEffect(() => {
@@ -421,13 +429,6 @@ const handleReply = () => {
   } as Product;
 
   setProduct(currentProduct);
-// ============================================================
-// RELATED PRODUCTS
-// 1. Get products from the same subcategory first.
-// 2. If fewer than 6, fill remaining slots from same category.
-// 3. Exclude the current product.
-// 4. Avoid duplicate products.
-// ============================================================
 
 // ============================================================
 // RELATED PRODUCTS
@@ -599,7 +600,14 @@ const rankedRelatedProducts =
   rankRelatedProducts(
     relatedItems,
     currentProduct,
-    userCoords
+    userCoords ??
+      (typeof currentProduct.lat === "number" &&
+      typeof currentProduct.lng === "number"
+        ? {
+            lat: currentProduct.lat,
+            lng: currentProduct.lng,
+          }
+        : null)
   );
 
 // ------------------------------------------------------------
