@@ -974,11 +974,15 @@ setRelatedProducts(
     <div className="flex items-center justify-between">
       <div>
         <h2 className="text-xl font-black">
-          {product.subcategory
-            ? `More ${product.subcategory}`
-            : `More ${product.category}`}
-        </h2>
-
+  {product.subcategory
+    ? `More ${product.subcategory}`
+    : `More ${product.category}`}
+  {userCoords
+    ? " Near You"
+    : product.lat && product.lng
+    ? " Near This Location"
+    : ""}
+</h2>
         <p className="text-sm text-muted-foreground mt-1">
           Similar adverts you may be interested in
         </p>
@@ -1000,17 +1004,27 @@ setRelatedProducts(
           ? [item.imageUrl]
           : [];
 
-        const itemDistance =
-          userCoords &&
-          item.lat &&
-          item.lng
-            ? getDistanceKm(
-                userCoords.lat,
-                userCoords.lng,
-                item.lat,
-                item.lng
-              )
-            : null;
+const recommendationLocation =
+  userCoords ??
+  (product.lat &&
+  product.lng
+    ? {
+        lat: product.lat,
+        lng: product.lng,
+      }
+    : null);
+
+const itemDistance =
+  recommendationLocation &&
+  typeof item.lat === "number" &&
+  typeof item.lng === "number"
+    ? getDistanceKm(
+        recommendationLocation.lat,
+        recommendationLocation.lng,
+        item.lat,
+        item.lng
+      )
+    : null;
 
         const itemIsAccommodation =
           item.category === "Accommodation";
@@ -1098,16 +1112,18 @@ setRelatedProducts(
 
               {/* Distance */}
               {itemDistance !== null && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  {itemDistance < 1
-                    ? `${(
-                        itemDistance * 1000
-                      ).toFixed(0)}m away`
-                    : `${itemDistance.toFixed(
-                        1
-                      )} km away`}
-                </p>
-              )}
+  <p className="text-xs text-muted-foreground mt-1">
+    <MapPin className="inline w-3 h-3 mr-1" />
+
+    {itemDistance < 1
+      ? `${(
+          itemDistance * 1000
+        ).toFixed(0)}m away`
+      : `${itemDistance.toFixed(
+          1
+        )} km away`}
+  </p>
+)}
             </div>
           </button>
         );
