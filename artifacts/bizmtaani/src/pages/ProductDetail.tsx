@@ -760,38 +760,37 @@ useEffect(() => {
   </div>
 
 </div>
-
-<Card className="mt-5 p-5">
+<Card className="mt-5 p-4">
 
   {isAccommodation ? (
-    <h2 className="text-3xl font-bold text-orange-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
     </h2>
 
   ) : product.priceDisplay === "contact" ? (
-    <h2 className="text-3xl font-bold text-orange-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       Contact for Price
     </h2>
 
   ) : product.priceDisplay === "quote" ? (
-    <h2 className="text-3xl font-bold text-orange-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       Request Quote
     </h2>
 
   ) : product.priceDisplay === "free" ? (
-    <h2 className="text-3xl font-bold text-green-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-green-600 select-none">
       Free
     </h2>
 
   ) : (
-    <h2 className="text-3xl font-bold text-orange-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       KES {product.price.toLocaleString()}
     </h2>
   )}
 
   {product.priceDisplay === "negotiable" && (
-    <div className="mt-3">
-      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-700">
+    <div className="mt-2 select-none">
+      <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-700">
         Negotiable
       </span>
     </div>
