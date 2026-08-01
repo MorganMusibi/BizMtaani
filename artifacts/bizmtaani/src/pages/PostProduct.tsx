@@ -368,7 +368,7 @@ const subcategories =
       }
       return true;
     }
-    if (step === 2) {
+        if (step === 2) {
 
   // Job seeker validation
   if (isJobSeeking) {
@@ -381,8 +381,13 @@ const subcategories =
       return false;
     }
 
+    if (!title.trim()) {
+      setTitle(jobTitle.trim());
+    }
+
     return true;
   }
+
 
   // Vehicle validation
   if (isVehicle) {
@@ -977,7 +982,10 @@ const data = result.data as PublishAdvertResponse;
           <Input
             placeholder="e.g. ICT Support Technician"
             value={jobTitle}
-            onChange={(e) => setJobTitle(e.target.value)}
+            onChange={(e) => {
+              setJobTitle(e.target.value);
+              setTitle(e.target.value);
+            }}
             maxLength={80}
             className="h-12 text-base"
           />
