@@ -119,28 +119,135 @@ function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
 
 function ImageGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
-  
-  if (!images || images.length === 0) return (
-    <div className="aspect-video w-full bg-muted flex items-center justify-center">
-      <Store size={48} className="text-muted-foreground" />
-    </div>
-  );
+  const touchStartX = useRef<number | null>(null);
+  const touchEndX = useRef<number | null>(null);
+
+  if (!images || images.length === 0) {
+    return (
+      <div className="aspect-[4/5] sm:aspect-video w-full bg-muted flex items-center justify-center">
+        <Store size={48} className="text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const goToPrevious = () => {
+    setActive((current) =>
+      current === 0 ? images.length - 1 : current - 1
+    );
+  };
+
+  const goToNext = () => {
+    setActive((current) =>
+      current === images.length - 1 ? 0 : current + 1
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchEndX.current = null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    touchEndX.current = e.touches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (
+      touchStartX.current === null ||
+      touchEndX.current === null
+    ) {
+      return;
+    }
+
+    const distance =
+      touchStartX.current - touchEndX.current;
+
+    const minimumSwipeDistance = 50;
+
+    if (Math.abs(distance) < minimumSwipeDistance) {
+      return;
+    }
+
+    if (distance > 0) {
+      goToNext();
+    } else {
+      goToPrevious();
+    }
+
+    touchStartX.current = null;
+    touchEndX.current = null;
+  };
 
   return (
-    <div>
-      <div className="aspect-video w-full overflow-hidden rounded-b-2xl bg-muted">
-  <img
-    src={images[active]}
-    alt="Product"
-    className="w-full h-full object-cover"
-  />
-</div>
+    <div className="w-full">
+      {/* Main Image */}
+      <div
+        className="relative aspect-[4/5] sm:aspect-video w-full overflow-hidden rounded-b-2xl bg-muted touch-pan-y"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <img
+          src={images[active]}
+          alt={`Product image ${active + 1}`}
+          className="w-full h-full object-cover"
+        />
+
+        {/* Photo Counter */}
+        {images.length > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+            <div className="rounded-full bg-black/60 backdrop-blur-sm px-3 py-1 text-xs font-semibold text-white">
+              {active + 1} / {images.length}
+            </div>
+          </div>
+        )}
+
+        {/* Previous Button */}
+        {images.length > 1 && (
+          <button
+            type="button"
+            onClick={goToPrevious}
+            aria-label="Previous image"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+
+        {/* Next Button */}
+        {images.length > 1 && (
+          <button
+            type="button"
+            onClick={goToNext}
+            aria-label="Next image"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center"
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* Thumbnail Strip */}
       {images.length > 1 && (
         <div className="flex gap-2 px-4 py-3 overflow-x-auto no-scrollbar bg-card border-b border-border">
           {images.map((url, i) => (
-            <button key={i} onClick={() => setActive(i)}
-              className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${i === active ? "border-primary" : "border-transparent opacity-60"}`}>
-              <img src={url} alt={`Thumbnail ${i}`} className="w-full h-full object-cover" />
+            <button
+              key={`${url}-${i}`}
+              type="button"
+              onClick={() => setActive(i)}
+              aria-label={`View image ${i + 1}`}
+              className={`flex-shrink-0 w-14 h-14 rounded-xl overflow-hidden border-2 transition-all ${
+                i === active
+                  ? "border-primary"
+                  : "border-transparent opacity-60"
+              }`}
+            >
+              <img
+                src={url}
+                alt={`Thumbnail ${i + 1}`}
+                loading="lazy"
+                className="w-full h-full object-cover"
+              />
             </button>
           ))}
         </div>
@@ -148,8 +255,6 @@ function ImageGallery({ images }: { images: string[] }) {
     </div>
   );
 }
-
-
 export default function ProductDetail() {
 const [showOptions, setShowOptions] = useState(false);
 const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -212,27 +317,78 @@ const handleReply = () => {
   } as Product;
 
   setProduct(currentProduct);
+// ============================================================
+// RELATED PRODUCTS
+// 1. Get products from the same subcategory first.
+// 2. If fewer than 6, fill remaining slots from same category.
+// 3. Exclude the current product.
+// 4. Avoid duplicate products.
+// ============================================================
 
-  const relatedQuery = query(
-  collection(db, "products"),
-  where(
-    currentProduct.subcategory ? "subcategory" : "category",
-    "==",
-    currentProduct.subcategory ?? currentProduct.category
-  ),
-  where("status", "==", "active"),
-  limit(6)
-);
-  const relatedSnap = await getDocs(relatedQuery);
+const RELATED_LIMIT = 6;
 
-  setRelatedProducts(
-    relatedSnap.docs
-      .filter((doc) => doc.id !== currentProduct.id)
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Product))
+let relatedItems: Product[] = [];
+
+// ------------------------------------------------------------
+// STEP 1: SAME SUBCATEGORY
+// ------------------------------------------------------------
+
+if (currentProduct.subcategory) {
+  const subcategoryQuery = query(
+    collection(db, "products"),
+    where("subcategory", "==", currentProduct.subcategory),
+    where("status", "==", "active"),
+    limit(RELATED_LIMIT + 1)
   );
+
+  const subcategorySnap = await getDocs(subcategoryQuery);
+
+  relatedItems = subcategorySnap.docs
+    .filter((doc) => doc.id !== currentProduct.id)
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    } as Product))
+    .slice(0, RELATED_LIMIT);
+}
+
+// ------------------------------------------------------------
+// STEP 2: SAME CATEGORY FALLBACK
+// ------------------------------------------------------------
+
+if (relatedItems.length < RELATED_LIMIT) {
+  const remainingSlots =
+    RELATED_LIMIT - relatedItems.length;
+
+  const categoryQuery = query(
+    collection(db, "products"),
+    where("category", "==", currentProduct.category),
+    where("status", "==", "active"),
+    limit(RELATED_LIMIT + 5)
+  );
+
+  const categorySnap = await getDocs(categoryQuery);
+
+  const existingIds = new Set([
+    currentProduct.id,
+    ...relatedItems.map((item) => item.id),
+  ]);
+
+  const categoryFallback = categorySnap.docs
+    .filter((doc) => !existingIds.has(doc.id))
+    .map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    } as Product))
+    .slice(0, remainingSlots);
+
+  relatedItems = [
+    ...relatedItems,
+    ...categoryFallback,
+  ];
+}
+
+setRelatedProducts(relatedItems);
 
   setLoading(false);
 })();
