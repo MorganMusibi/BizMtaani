@@ -407,13 +407,20 @@ const handleReply = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  useEffect(() => {
+    useEffect(() => {
   if (!navigator.geolocation) {
     return;
   }
 
   navigator.geolocation.getCurrentPosition(
     (position) => {
+      // Optional: Log or handle cases where GPS accuracy is too broad (e.g., > 100 meters)
+      if (position.coords.accuracy > 100) {
+        console.warn(
+          `GPS fix has low accuracy (${position.coords.accuracy.toFixed(0)}m radius).`
+        );
+      }
+
       setUserCoords({
         lat: position.coords.latitude,
         lng: position.coords.longitude,
@@ -430,12 +437,13 @@ const handleReply = () => {
       // as the recommendation fallback.
     },
     {
-      enableHighAccuracy: false,
-      timeout: 10000,
-      maximumAge: 5 * 60 * 1000,
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0,
     }
   );
 }, []);
+
    // 1. Fetch main product and base related items when ID changes
 useEffect(() => {
   if (!id) return;
