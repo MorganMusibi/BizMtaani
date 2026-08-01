@@ -49,19 +49,6 @@ interface Product {
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
   createdAt: { seconds: number } | null;
-
-  // Advert visibility fields
-  visibilityScope?: "local" | "county" | "all_areas";
-  visibilityRadiusKm?: number;
-
-  // Premium / subscription fields
-  plan?: string;
-  isPremium?: boolean;
-  verified?: boolean;
-
-  // Advert status
-  status?: string;
-  expiresAt?: { seconds: number } | null;
 }
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
@@ -416,14 +403,6 @@ const handleReply = () => {
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const recommendationCoords = userCoords ?? (product &&
-  typeof product.lat === "number" &&
-  typeof product.lng === "number"
-    ? {
-        lat: product.lat,
-        lng: product.lng,
-      }
-    : null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
    
 useEffect(() => {
