@@ -404,6 +404,35 @@ const handleReply = () => {
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  useEffect(() => {
+  if (!navigator.geolocation) {
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      setUserCoords({
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+      });
+    },
+    (error) => {
+      console.warn(
+        "Unable to get user location for product details:",
+        error
+      );
+
+      // Keep userCoords as null.
+      // The product's own location will be used
+      // as the recommendation fallback.
+    },
+    {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 5 * 60 * 1000,
+    }
+  );
+}, []);
    
 useEffect(() => {
   if (!id) return;
