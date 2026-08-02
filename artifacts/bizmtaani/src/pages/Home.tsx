@@ -31,10 +31,6 @@ const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
-
-function fmtDist(km: number) {
-  return km < 1 ? `${Math.round(km * 1000)}m` : `${km.toFixed(1)}km`;
-}
 function getThumbnailUrl(url: string): string {
   if (!url) return "";
 
@@ -184,11 +180,16 @@ function ProductCard({
             ) : null}
             <p className="text-xs text-muted-foreground truncate">{product.sellerName}</p>
           </div>
-          {distance !== null && (
-            <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground flex-shrink-0">
-              <MapPin size={10} /><span>{fmtDist(distance)}</span>
-            </div>
-          )}
+          {(product.ward || product.constituency) && (
+  <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground flex-shrink-0 max-w-[50%]">
+    <MapPin size={10} className="flex-shrink-0" />
+    <span className="truncate">
+      {product.ward}
+      {product.ward && product.constituency ? " · " : ""}
+      {product.constituency}
+    </span>
+  </div>
+)}
         </div>
       </div>
     </div>
