@@ -40,9 +40,11 @@ export interface Product {
   imageUrls?: (string | ProductImage)[];
 
   lat: number;
-  lng: number;
+lng: number;
 
-  ward?: string;
+ward?: string;
+constituency?: string;
+county?: string;
 
   // Supports both old and new pricing fields
   priceType?: "fixed" | "negotiable";
