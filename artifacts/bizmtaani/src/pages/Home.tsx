@@ -167,29 +167,18 @@ function ProductCard({
       </div>
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
-        <div className="flex items-center justify-between mt-1.5 gap-1">
-          <div className="flex items-center gap-1 min-w-0">
-            {product.sellerType === "business" ? (
-              <span className="flex-shrink-0 text-[9px] font-black bg-primary/10 text-primary px-1.5 py-0.5 rounded-full leading-none">
-                BIZ
-              </span>
-            ) : product.sellerType === "individual" ? (
-              <span className="flex-shrink-0 text-[9px] font-black bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full leading-none">
-                IND
-              </span>
-            ) : null}
-            <p className="text-xs text-muted-foreground truncate">{product.sellerName}</p>
-          </div>
-          {(product.ward || product.constituency) && (
-  <div className="flex items-center gap-0.5 text-[10px] text-muted-foreground flex-shrink-0 max-w-[50%]">
-    <MapPin size={10} className="flex-shrink-0" />
-    <span className="truncate">
-      {product.ward}
-      {product.ward && product.constituency ? " · " : ""}
-      {product.constituency}
-    </span>
-  </div>
-)}
+        <div className="mt-1.5">
+  {(product.ward || product.constituency) && (
+    <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
+      <MapPin size={11} className="flex-shrink-0" />
+      <span className="truncate">
+        {product.ward}
+        {product.ward && product.constituency ? " · " : ""}
+        {product.constituency}
+      </span>
+    </div>
+  )}
+</div>
         </div>
       </div>
     </div>
