@@ -364,14 +364,33 @@ for (const name of nearbyNames.slice(0, 3)) {
   });
 }
     // Make sure the primary match is first
-    if (primaryMatch) {
-      const primaryName = toTitleCase(primaryMatch.ward);
-      const idx = choices.findIndex((c) => c.wardName === primaryName);
-      if (idx > 0) {
-        const [item] = choices.splice(idx, 1);
-        choices.unshift(item);
-      }
+    // Make sure the primary canonical ward is first
+if (primaryMatch) {
+  const primaryCanonical =
+    await resolveCanonicalLocation(
+      primaryMatch.ward,
+      primaryMatch.constituency,
+      primaryMatch.county
+    );
+
+  if (primaryCanonical) {
+    const primaryName =
+      primaryCanonical.wardName;
+
+    const idx =
+      choices.findIndex(
+        (c) =>
+          c.wardName === primaryName
+      );
+
+    if (idx > 0) {
+      const [item] =
+        choices.splice(idx, 1);
+
+      choices.unshift(item);
     }
+  }
+}
     return choices;
   }
 
