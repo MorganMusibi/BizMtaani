@@ -61,33 +61,39 @@ function getCanonicalProductLocation(product: Product): {
   };
 }
 function ProductCard({
-  product, userCoords, onClick,
+  product,
+  userCoords,
+  onClick,
+  hierarchyReady,
 }: {
-  product: Product; 
-  userCoords: [number, number] | null; 
+  product: Product;
+  userCoords: [number, number] | null;
   onClick: (e: React.MouseEvent | React.TouchEvent) => void;
+  hierarchyReady: boolean;
 }) {
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
     : null;
-const canonicalLocation = product.ward
-  ? findWardLocationSync(product.ward)
-  : undefined;
+const canonicalLocation =
+  hierarchyReady && product.ward
+    ? findWardLocationSync(product.ward)
+    : undefined;
 
-const displayWard =
-  canonicalLocation?.wardName ??
-  product.ward?.trim() ??
-  "";
+const displayWard = hierarchyReady
+  ? canonicalLocation?.wardName ??
+    product.ward?.trim() ??
+    ""
+  : product.ward?.trim() ?? "";
 
-const displayConstituency =
-  canonicalLocation?.constituencyName ??
-  product.constituency?.trim() ??
-  "";
+const displayConstituency = hierarchyReady
+  ? canonicalLocation?.constituencyName ??
+    ""
+  : product.constituency?.trim() ?? "";
 
-const displayCounty =
-  canonicalLocation?.countyName ??
-  product.county?.trim() ??
-  "";
+const displayCounty = hierarchyReady
+  ? canonicalLocation?.countyName ??
+    ""
+  : product.county?.trim() ?? "";
   const badgeColor = getCategoryBadgeColor(product.category);
 
   const isAccommodation =
@@ -226,18 +232,34 @@ export default function Home() {
   const [gpsGranted, setGpsGranted] = useState(false);
   const [gpsReady, setGpsReady] = useState(false);
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
-
+  const [hierarchyReady, setHierarchyReady] = useState(false);
   const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
 
   useEffect(() => {
-  getLocationHierarchy().catch((error) => {
-    console.error(
-      "Failed to load MasterHierarchy.json:",
-      error
-    );
-  });
+  let cancelled = false;
+
+  getLocationHierarchy()
+    .then(() => {
+      if (!cancelled) {
+        setHierarchyReady(true);
+      }
+    })
+    .catch((error) => {
+      console.error(
+        "Failed to load MasterHierarchy.json:",
+        error
+      );
+
+      if (!cancelled) {
+        setHierarchyReady(true);
+      }
+    });
+
+  return () => {
+    cancelled = true;
+  };
 }, []);
   useEffect(() => {
     let cancelled = false;
