@@ -313,7 +313,7 @@ export default function ShopCatalogue() {
       try {
         setLoading(true);
 
-                const productsQuery =
+      const productsQuery =
           query(
             collection(
               db,
@@ -324,16 +324,12 @@ export default function ShopCatalogue() {
               "==",
               userId
             ),
-            where(
-              "status",
-              "==",
-              "active"
-            ),
             orderBy(
               "createdAt",
               "desc"
             )
           );
+      
 
         const snapshot =
           await getDocs(
