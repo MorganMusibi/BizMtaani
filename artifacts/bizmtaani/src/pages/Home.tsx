@@ -587,8 +587,8 @@ const totalVisible = rankedProducts.length;
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
-                {gpsReady && (
+            <div className="flex-1 overflow-y-auto">
+        {gpsReady && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
             <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
             <p className="text-xs text-muted-foreground flex-1 truncate">
@@ -601,7 +601,7 @@ const totalVisible = rankedProducts.length;
                 onClick={(e) => {
                   e.stopPropagation();
                   if (!navigator.geolocation) {
-                    alert("Geolocation is not supported by your browser");
+                    alert("Geolocation is not supported by your browser.");
                     return;
                   }
                   
@@ -618,7 +618,9 @@ const totalVisible = rankedProducts.length;
                     },
                     (err) => {
                       console.error("GPS re-detect error:", err);
-                      alert("Could not get your location. Please check your GPS permissions.");
+                      alert(
+                        "Location access is turned off or blocked. Please enable GPS permissions in your phone settings to discover products and services right around your neighborhood."
+                      );
                     },
                     { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
                   );
@@ -630,7 +632,7 @@ const totalVisible = rankedProducts.length;
             </div>
           </div>
         )}
-
+              
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
