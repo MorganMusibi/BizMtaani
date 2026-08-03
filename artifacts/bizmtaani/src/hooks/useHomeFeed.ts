@@ -422,8 +422,10 @@ export function useHomeFeeds({
   userCoords: [number, number] | null;
   isSearchMode: boolean;
   locationInfo: {
-    wardName?: string;
-  } | null;
+  wardName?: string;
+  constituency?: string;
+  county?: string;
+} | null;
 }) {
 
 const [wardProducts, setWardProducts] = useState<Product[]>([]);
@@ -799,7 +801,14 @@ const sortedBuffer = sortNearbyProducts(
 
     run();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [gpsReady, isSearchMode, locationInfo?.wardName, userCoords]);
+}, [
+  gpsReady,
+  isSearchMode,
+  locationInfo?.wardName,
+  locationInfo?.constituency,
+  locationInfo?.county,
+  userCoords,
+]);
 
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
