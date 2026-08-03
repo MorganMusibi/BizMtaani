@@ -18,7 +18,15 @@ import {
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { getWardInfo, getAreaChoices, type ResolvedLocation } from "@/lib/location";
+import {
+  getWardInfo,
+  getAreaChoices,
+  type ResolvedLocation,
+} from "@/lib/location";
+import {
+  findWardLocationSync,
+  getLocationHierarchy,
+} from "@/lib/locationHierarchy";
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
@@ -46,7 +54,21 @@ function getThumbnailUrl(url: string): string {
   // Non-Cloudinary images are returned unchanged.
   return url;
 }
+function getCanonicalProductLocation(product: Product): {
+  ward: string;
+  constituency: string;
+  county: string;
+} {
+  const ward = product.ward?.trim() ?? "";
+  const constituency = product.constituency?.trim() ?? "";
+  const county = product.county?.trim() ?? "";
 
+  return {
+    ward,
+    constituency,
+    county,
+  };
+}
 function ProductCard({
   product, userCoords, onClick,
 }: {
@@ -57,7 +79,24 @@ function ProductCard({
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
     : null;
+const canonicalLocation = product.ward
+  ? findWardLocationSync(product.ward)
+  : undefined;
 
+const displayWard =
+  canonicalLocation?.wardName ??
+  product.ward?.trim() ??
+  "";
+
+const displayConstituency =
+  canonicalLocation?.constituencyName ??
+  product.constituency?.trim() ??
+  "";
+
+const displayCounty =
+  canonicalLocation?.countyName ??
+  product.county?.trim() ??
+  "";
   const badgeColor = getCategoryBadgeColor(product.category);
 
   const isAccommodation =
@@ -168,16 +207,21 @@ function ProductCard({
       <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
         <div className="mt-1.5">
-  {(product.ward || product.constituency) && (
-    <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
-      <MapPin size={11} className="flex-shrink-0" />
-      <span className="truncate">
-        {product.ward}
-        {product.ward && product.constituency ? " · " : ""}
-        {product.constituency}
-      </span>
-    </div>
-  )}
+  {(displayWard || displayConstituency) && (
+  <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
+    <MapPin size={11} className="flex-shrink-0" />
+
+    <span className="truncate">
+      {displayWard}
+
+      {displayWard && displayConstituency
+        ? " · "
+        : ""}
+
+      {displayConstituency}
+    </span>
+  </div>
+)}
         </div>
       </div>
     </div>
@@ -196,6 +240,14 @@ export default function Home() {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
 
+  useEffect(() => {
+  getLocationHierarchy().catch((error) => {
+    console.error(
+      "Failed to load MasterHierarchy.json:",
+      error
+    );
+  });
+}, []);
   useEffect(() => {
     let cancelled = false;
 
