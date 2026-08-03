@@ -361,8 +361,9 @@ function ImageGallery({ images }: { images: string[] }) {
   );
 }
 export default function ProductDetail() {
-const [showOptions, setShowOptions] = useState(false);
-const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showOptions, setShowOptions] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false); // <--- ADD THIS HERE
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 function handlePressStart() {
   pressTimer.current = setTimeout(() => {
@@ -649,14 +650,27 @@ useEffect(() => {
     </div>
   );
       
-    async function handleDeleteProduct() {
+        async function handleDeleteProduct() {
     if (!product || !user) return;
-
-    const confirmDelete = window.confirm("Are you sure you want to delete this advert?");
-    if (!confirmDelete) return;
 
     try {
       const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      await deleteAdvert({ productId: product.id });
+
+      toast({ 
+        title: "Advert deleted", 
+        description: "Your advert has been removed." 
+      });
+      setLocation("/");
+    } catch (error) {
+      console.error("Delete error:", error);
+      toast({ 
+        title: "Delete failed", 
+        description: "Please try again.", 
+        variant: "destructive" 
+      });
+    }
+  }
       await deleteAdvert({ productId: product.id });
 
       toast({ 
