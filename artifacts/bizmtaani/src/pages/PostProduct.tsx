@@ -42,9 +42,7 @@ const PRICING_BASIS_OPTIONS = [
   { value: "per_session", label: "Per Session" },
   { value: "quote_only", label: "Quote Only" },
 ];
-
 type Step = 1 | 2 | 3 | 4 | 5;
-
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium,
 } = useAuth();
@@ -368,7 +366,6 @@ function handleImageFiles(files: FileList | null) {
 
     return true;
   }
-
 // Vehicle validation
   if (isVehicle) {
     if (!title.trim()) {
@@ -398,8 +395,7 @@ function handleImageFiles(files: FileList | null) {
 
     return true;
   }
-
-  // Professional service validation
+ // Professional service validation
   if (isProfessionalService) {
     if (!title.trim()) {
       toast({
@@ -430,8 +426,7 @@ function handleImageFiles(files: FileList | null) {
 
     return true;
   }
-
-  // Normal advert validation
+// Normal advert validation
   if (!title.trim()) {
     toast({
       title: "Enter a title",
@@ -468,24 +463,26 @@ const requiresPrice =
 
     return true;
 
-    if (step === 3) {
-  if (!coords) {
-    toast({
-      title: "Location not ready",
-      description: "Please wait for your location to be detected.",
-      variant: "destructive",
-    });
-    return false;
+        if (step === 3) {
+      if (!coords) {
+        toast({
+          title: "Location not ready",
+          description: "Please wait for your location to be detected.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      if (!validateAdvertLocation()) {
+        return false;
+      }
+
+      return true;
+    }
+
+    return true;
   }
-
-  if (!validateAdvertLocation()) {
-    return false;
-  }
-
-  return true;
-}
-
-  function isValidKenyanPhone(phone: string): boolean {
+function isValidKenyanPhone(phone: string): boolean {
   const cleaned = phone.replace(/\s+/g, "").trim();
 
   return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
@@ -504,8 +501,7 @@ const requiresPrice =
     });
     return false;
   }
-
-  const isValid = validateLocationHierarchy(
+const isValid = validateLocationHierarchy(
     county,
     constituency,
     ward
@@ -546,8 +542,7 @@ async function handleInitiate(
   if (!validateAdvertLocation()) {
     throw new Error("Invalid advert location");
   }
-
-  const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
+const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
   if (!isValidKenyanPhone(cleanedPhone)) {
     toast({
