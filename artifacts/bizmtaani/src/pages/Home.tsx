@@ -614,14 +614,15 @@ const totalVisible = rankedProducts.length;
     <div className="grid grid-cols-2 gap-3">
       {rankedProducts.map((p) => (
         <ProductCard
-          key={p.id}
-          product={p}
-          userCoords={userCoords}
-          onClick={(e) => {
-            e.stopPropagation();
-            setLocation(`/product/${p.id}`);
-          }}
-        />
+  key={p.id}
+  product={p}
+  userCoords={userCoords}
+  hierarchyReady={hierarchyReady}
+  onClick={(e) => {
+    e.stopPropagation();
+    setLocation(`/product/${p.id}`);
+  }}
+/>
       ))}
     </div>
   </>
