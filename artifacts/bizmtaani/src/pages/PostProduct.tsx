@@ -1680,62 +1680,64 @@ const data = result.data as PublishAdvertResponse;
     )}
   </>
 )}
-        
-        {/* ========== STEP 3: Photos & Location ========== */}
+                {/* ========== STEP 3: Photos & Location ========== */}
         {step === 3 && (
           <>
-            {!isEatery && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  {/* Change the label and the span to use MAX_PHOTO_LIMIT */}
-<label className="text-sm font-bold">
-  Photos (optional • up to {MAX_PHOTO_LIMIT[plan]})
-</label>
-<span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
-                </div>
-
-            {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
-  <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
-    <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
-    <div className="flex-1">
-      <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
-      <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Weekly or Monthly Premium for unlimited photos.</p>
-    </div>
-  </div>
-)}
-
-                <div className="grid grid-cols-3 gap-2">
-                  {imagePreviews.map((src, i) => (
-                    <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
-                      <img src={src} alt="" className="w-full h-full object-cover" />
-                      {i === 0 && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-1 font-semibold">
-                          Cover
-                        </div>
-                      )}
-                      <button onClick={() => removeImage(i)}
-                        className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
-                        <X size={12} />
-                      </button>
-                    </div>
-                  ))}
-                  {imageFiles.length < photoLimit && (
-                    <button onClick={() => setShowImageMenu(true)}
-                      className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
-                      <Camera size={22} />
-                      <span className="text-[10px] font-semibold">Add photo</span>
-                    </button>
-                  )}
-                </div>
-
-                <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
-                  onChange={(e) => handleImageFiles(e.target.files)} />
-                <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
-                  onChange={(e) => handleImageFiles(e.target.files)} />
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold">
+                  Photos (Optional • up to {MAX_PHOTO_LIMIT[plan]})
+                </label>
+                <span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
               </div>
-            )}
 
-            <div className="space-y-2">
+              {imageFiles.length === 0 && (
+                <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 text-xs text-muted-foreground">
+                  Photos are optional. You can proceed to the next step without uploading a photo.
+                </div>
+              )}
+
+              {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
+                <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                  <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Weekly or Monthly Premium for more photos.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2">
+                {imagePreviews.map((src, i) => (
+                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    {i === 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-1 font-semibold">
+                        Cover
+                      </div>
+                    )}
+                    <button onClick={() => removeImage(i)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                {imageFiles.length < photoLimit && (
+                  <button onClick={() => setShowImageMenu(true)}
+                    className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                    <Camera size={22} />
+                    <span className="text-[10px] font-semibold">Add photo</span>
+                  </button>
+                )}
+              </div>
+
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+            </div>
+
+            <div className="space-y-2 mt-4">
               <label className="text-sm font-bold">Location</label>
               <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
                 <MapPin size={16} className="text-primary flex-shrink-0" />
@@ -1753,7 +1755,7 @@ const data = result.data as PublishAdvertResponse;
 
               <div className="flex gap-2">
                 <Input placeholder="Search a different location..."
-                  value={locationSearch} onChange={(e) => setLocationSearch(e.target.value)}
+                  value={locationSearch} onChange={(e) => locationSearch && setLocationSearch(e.target.value)} // Keep your existing handler here
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchLocation(); } }}
                   className="flex-1 h-10 text-sm" />
                 <Button type="button" variant="outline" size="sm" onClick={searchLocation}
