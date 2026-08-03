@@ -313,23 +313,19 @@ export default function ShopCatalogue() {
       try {
         setLoading(true);
 
-            const productsQuery =
+                    const productsQuery =
           query(
             collection(
               db,
-              "products" // <-- Change to lowercase 'p' to match firestore.rules
+              "products"
             ),
             where(
               "sellerId",
               "==",
               userId
-            ),
-            orderBy(
-              "createdAt",
-              "desc"
             )
           );
-      
+
 
         const snapshot =
           await getDocs(
