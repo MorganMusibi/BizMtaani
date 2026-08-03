@@ -820,7 +820,7 @@ useEffect(() => {
         {/*Title, Price, Description, Menu) ... */}
 
         
-        <Card className="p-5">
+                <Card className="p-5">
   <h2 className="text-lg font-bold mb-4">Seller</h2>
 
   <div
@@ -876,6 +876,7 @@ useEffect(() => {
     {isSeller ? "View My Shop" : "View Shop"}
   </Button>
 </Card>
+
          {relatedProducts.length > 0 && (
   <section className="space-y-4">
     {/* Related Products Heading */}
