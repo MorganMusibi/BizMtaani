@@ -313,11 +313,11 @@ export default function ShopCatalogue() {
       try {
         setLoading(true);
 
-        const productsQuery =
+                const productsQuery =
           query(
             collection(
               db,
-              "products"
+              "Products"
             ),
             where(
               "sellerId",
