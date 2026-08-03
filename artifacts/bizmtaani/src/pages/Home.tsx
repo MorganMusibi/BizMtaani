@@ -255,7 +255,7 @@ export default function Home() {
   const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
-
+  const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   useEffect(() => {
   let cancelled = false;
 
@@ -596,7 +596,7 @@ const totalVisible = rankedProducts.length;
             </p>
             
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button
+                            <button
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -611,6 +611,7 @@ const totalVisible = rankedProducts.length;
                       const lng = pos.coords.longitude;
                       setUserCoords([lat, lng]);
                       setGpsGranted(true);
+                      setLocationErrorMsg(null); // Clears error on success
                       const resolved = await getWardInfo(lat, lng);
                       if (resolved) setLocationInfo(resolved);
                       const choices = await getAreaChoices(lat, lng);
@@ -618,7 +619,8 @@ const totalVisible = rankedProducts.length;
                     },
                     (err) => {
                       console.error("GPS re-detect error:", err);
-                      alert(
+                      // Sets the professional message instead of alert()
+                      setLocationErrorMsg(
                         "Location access is turned off or blocked. Please enable GPS permissions in your phone settings to discover products and services right around your neighborhood."
                       );
                     },
@@ -632,7 +634,26 @@ const totalVisible = rankedProducts.length;
             </div>
           </div>
         )}
-              
+             {locationErrorMsg && (
+          <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in">
+            <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+                GPS Permission Required
+              </p>
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                {locationErrorMsg}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLocationErrorMsg(null)}
+              className="text-amber-900 dark:text-amber-200 hover:opacity-70 text-xs font-bold px-1"
+            >
+              ✕
+            </button>
+          </div>
+        )} 
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
