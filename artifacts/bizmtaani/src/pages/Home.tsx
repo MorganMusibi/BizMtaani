@@ -334,7 +334,7 @@ export default function Home() {
         return;
       }
 
-      navigator.geolocation.getCurrentPosition(
+            navigator.geolocation.getCurrentPosition(
         async (position) => {
           if (cancelled) return;
           const lat = position.coords.latitude;
@@ -379,8 +379,13 @@ export default function Home() {
             setShowAreaPicker(true);
           }
         },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 300000 }
+        { 
+          enableHighAccuracy: true, 
+          timeout: 15000, // Increased to 15s for reliable hardware GPS lock
+          maximumAge: 0   // Forces fresh coordinates instead of reading stale cache
+        }
       );
+          
     };
 
     if (user && !userProfile) return;
@@ -583,18 +588,53 @@ const totalVisible = rankedProducts.length;
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {gpsReady && (
-          <div
-            className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30 cursor-pointer"
-            onClick={() => {
-              if (areaChoices.length > 1) setShowAreaPicker(true);
-            }}
-          >
-            <MapPin size={12} className={gpsGranted ? "text-secondary" : "text-amber-500"} />
-            <p className="text-xs text-muted-foreground flex-1">{bannerText()}</p>
-            {areaChoices.length > 1 && (
-              <span className="text-[10px] font-semibold text-primary flex-shrink-0">Change area</span>
-            )}
+                {gpsReady && (
+          <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
+            <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
+            <p 
+              className="text-xs text-muted-foreground flex-1 cursor-pointer truncate"
+              onClick={() => {
+                if (areaChoices.length > 1) setShowAreaPicker(true);
+              }}
+            >
+              {bannerText()}
+            </p>
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      async (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        setUserCoords([lat, lng]);
+                        setGpsGranted(true);
+                        const resolved = await getWardInfo(lat, lng);
+                        if (resolved) setLocationInfo(resolved);
+                        const choices = await getAreaChoices(lat, lng);
+                        setAreaChoices(choices ?? []);
+                      },
+                      () => {},
+                      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    );
+                  }
+                }}
+                className="text-[10px] font-bold text-primary hover:underline"
+              >
+                Re-detect GPS
+              </button>
+
+              {areaChoices.length > 1 && (
+                <span 
+                  className="text-[10px] font-semibold text-primary cursor-pointer hover:underline"
+                  onClick={() => setShowAreaPicker(true)}
+                >
+                  Change area
+                </span>
+              )}
+            </div>
           </div>
         )}
 
