@@ -502,7 +502,6 @@ const totalVisible = rankedProducts.length;
   }
 
   return (
-    return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center justify-between gap-3 z-40">
         <div className="flex items-center gap-2">
