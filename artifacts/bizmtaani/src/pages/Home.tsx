@@ -588,7 +588,7 @@ const totalVisible = rankedProducts.length;
       </div>
 
       <div className="flex-1 overflow-y-auto">
-                {gpsReady && (
+                  {gpsReady && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
             <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
             <p 
@@ -603,25 +603,32 @@ const totalVisible = rankedProducts.length;
             <div className="flex items-center gap-2 flex-shrink-0">
               <button
                 type="button"
-                onClick={() => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                      async (pos) => {
-                        const lat = pos.coords.latitude;
-                        const lng = pos.coords.longitude;
-                        setUserCoords([lat, lng]);
-                        setGpsGranted(true);
-                        const resolved = await getWardInfo(lat, lng);
-                        if (resolved) setLocationInfo(resolved);
-                        const choices = await getAreaChoices(lat, lng);
-                        setAreaChoices(choices ?? []);
-                      },
-                      () => {},
-                      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                    );
+                onClick={(e) => {
+                  e.stopPropagation(); // Stops parent click handlers from firing
+                  if (!navigator.geolocation) {
+                    alert("Geolocation is not supported by your browser");
+                    return;
                   }
+                  
+                  navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                      const lat = pos.coords.latitude;
+                      const lng = pos.coords.longitude;
+                      setUserCoords([lat, lng]);
+                      setGpsGranted(true);
+                      const resolved = await getWardInfo(lat, lng);
+                      if (resolved) setLocationInfo(resolved);
+                      const choices = await getAreaChoices(lat, lng);
+                      setAreaChoices(choices ?? []);
+                    },
+                    (err) => {
+                      console.error("GPS re-detect error:", err);
+                      alert("Could not get your location. Please check your GPS permissions.");
+                    },
+                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                  );
                 }}
-                className="text-[10px] font-bold text-primary hover:underline"
+                className="text-[10px] font-bold text-primary hover:underline active:opacity-70"
               >
                 Re-detect GPS
               </button>
@@ -629,7 +636,10 @@ const totalVisible = rankedProducts.length;
               {areaChoices.length > 1 && (
                 <span 
                   className="text-[10px] font-semibold text-primary cursor-pointer hover:underline"
-                  onClick={() => setShowAreaPicker(true)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowAreaPicker(true);
+                  }}
                 >
                   Change area
                 </span>
@@ -637,6 +647,7 @@ const totalVisible = rankedProducts.length;
             </div>
           </div>
         )}
+      
 
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
