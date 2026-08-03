@@ -335,16 +335,34 @@ export async function getAreaChoices(lat: number, lng: number): Promise<Resolved
 
     // Map names to full ResolvedLocation objects
     const choices: ResolvedLocation[] = [];
-    for (const name of nearbyNames.slice(0, 3)) {
-      const feat = features.find((f) => toTitleCase(f.properties.ward) === name);
-      if (!feat) continue;
-      choices.push({
-        wardName: name,
-        constituency: toTitleCase(feat.properties.constituency),
-        county: toTitleCase(feat.properties.county),
-        displayName: `${name}, ${toTitleCase(feat.properties.county)}`,
-      });
-    }
+
+for (const name of nearbyNames.slice(0, 3)) {
+  const feat = features.find(
+    (f) =>
+      toTitleCase(f.properties.ward) === name
+  );
+
+  if (!feat) continue;
+
+  // GeoJSON identifies the physical ward.
+  // MasterHierarchy.json is the final source of truth.
+  const canonical =
+    await resolveCanonicalLocation(
+      feat.properties.ward,
+      feat.properties.constituency,
+      feat.properties.county
+    );
+
+  if (!canonical) continue;
+
+  choices.push({
+    wardName: canonical.wardName,
+    constituency: canonical.constituencyName,
+    county: canonical.countyName,
+    displayName:
+      `${canonical.wardName}, ${canonical.constituencyName}`,
+  });
+}
     // Make sure the primary match is first
     if (primaryMatch) {
       const primaryName = toTitleCase(primaryMatch.ward);
@@ -370,21 +388,47 @@ export async function getAreaChoices(lat: number, lng: number): Promise<Resolved
   );
 
   const seen = new Set<string>();
-  const choices: ResolvedLocation[] = [];
+const choices: ResolvedLocation[] = [];
 
-  for (const r of results) {
-    if (r.status !== "fulfilled") continue;
-    const info = r.value;
-    if (!info.wardName || seen.has(info.wardName)) continue;
-    seen.add(info.wardName);
-    choices.push({
-      wardName: info.wardName,
-      constituency: info.constituency ?? "",
-      county: info.county ?? "",
-      displayName: info.displayName ?? info.wardName,
-    });
-    if (choices.length >= 3) break;
+for (const r of results) {
+  if (r.status !== "fulfilled") continue;
+
+  const info = r.value;
+
+  if (!info.wardName) continue;
+
+  // Resolve Nominatim's ward through MasterHierarchy.json.
+  const canonical =
+    await resolveCanonicalLocation(
+      info.wardName,
+      info.constituency,
+      info.county
+    );
+
+  if (!canonical) continue;
+
+  if (
+    seen.has(
+      canonical.wardName.toLowerCase()
+    )
+  ) {
+    continue;
   }
+
+  seen.add(
+    canonical.wardName.toLowerCase()
+  );
+
+  choices.push({
+    wardName: canonical.wardName,
+    constituency: canonical.constituencyName,
+    county: canonical.countyName,
+    displayName:
+      `${canonical.wardName}, ${canonical.constituencyName}`,
+  });
+
+  if (choices.length >= 3) break;
+}
 
   return choices.length > 0 ? choices : [await getWardInfo(lat, lng)];
 }
