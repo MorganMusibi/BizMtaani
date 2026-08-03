@@ -1045,8 +1045,8 @@ const itemDistance =
               <h3 className="font-bold text-center mb-2">Advert Options</h3>
               <Button variant="ghost" className="w-full justify-start" onClick={handleShare}>Share Advert</Button>
               <Button variant="ghost" className="w-full justify-start" onClick={handleReply}>Reply to Advert</Button>
-              {isSeller && (
-                <Button variant="destructive" className="w-full justify-start" onClick={() => { handleDeleteProduct(); setShowOptions(false); }}>
+                            {isSeller && (
+                <Button variant="destructive" className="w-full justify-start" onClick={() => { setShowOptions(false); setShowDeleteDialog(true); }}>
                   Delete Advert
                 </Button>
               )}
@@ -1067,10 +1067,10 @@ const itemDistance =
         This is your listing
       </div>
 
-      <Button
+            <Button
         variant="destructive"
         className="w-full"
-        onClick={handleDeleteProduct}
+        onClick={() => setShowDeleteDialog(true)}
       >
         Delete Advert
       </Button>
