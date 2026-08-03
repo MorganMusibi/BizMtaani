@@ -671,22 +671,6 @@ useEffect(() => {
       });
     }
   }
-      await deleteAdvert({ productId: product.id });
-
-      toast({ 
-        title: "Advert deleted", 
-        description: "Your advert has been removed." 
-      });
-      setLocation("/");
-    } catch (error) {
-      console.error("Delete error:", error);
-      toast({ 
-        title: "Delete failed", 
-        description: "Please try again.", 
-        variant: "destructive" 
-      });
-    }
-  }
 
   const isSeller = user?.uid === product.sellerId;
 
@@ -1125,6 +1109,50 @@ const itemDistance =
 </div>
 
       <BottomNav />
+
+      {/* --- PROFESSIONAL DELETE CONFIRMATION MODAL --- */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl max-w-sm w-full p-6 shadow-xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center mx-auto">
+              <Tag size={24} />
+            </div>
+            
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg">Delete this advert?</h3>
+              <p className="text-sm text-muted-foreground">
+                This action cannot be undone. Your listing and its photos will be permanently removed from BizMtaani.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-12 font-bold rounded-2xl border-2"
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1 h-12 font-bold rounded-2xl shadow-lg"
+                onClick={() => {
+                  setShowDeleteDialog(false);
+                  handleDeleteProduct();
+                }}
+              >
+                Yes, Delete
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
     </div>
   );
 }
