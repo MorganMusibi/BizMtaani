@@ -184,18 +184,47 @@ useEffect(() => {
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
   : null;
 
-const isAccommodation = selectedCategory === "Accommodation";
+const isAccommodation =
+  selectedCategory === "Accommodation";
+
 const isEatery =
   selectedSubcategory === "Hotels / Eateries" ||
-  selectedSubcategory === "Restaurants & Cooked Food";
+  selectedSubcategory === "Restaurants & Cooked Food" ||
+  selectedSubcategory === "Catering Services";
 
 const isTransport =
-  selectedSubcategory === "Delivery & Transport";
+  selectedSubcategory === "Delivery Services" ||
+  selectedSubcategory === "Courier Services" ||
+  selectedSubcategory === "Transport Services" ||
+  selectedSubcategory === "Moving Services";
+
 const isJobSeeking =
   selectedSubcategory === "Job Seeking & CVs";
 
+const PROFESSIONAL_SERVICE_SUBCATEGORIES = [
+  "Accounting & Bookkeeping",
+  "Legal Services",
+  "Consulting",
+  "Marketing & Advertising",
+  "Real Estate Services",
+  "Insurance Services",
+  "Business & Digital Services",
+  "Web & App Development",
+  "Graphic Design",
+  "Social Media Services",
+  "Printing Services",
+  "Photography",
+  "Videography",
+  "Tutoring & Education",
+  "Fitness Training",
+  "Freelance Services",
+];
+
 const isProfessionalService =
-  selectedSubcategory === "Professional Services";
+  selectedCategory === "Services" &&
+  PROFESSIONAL_SERVICE_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
 
 const isVehicle =
   selectedCategory === "Vehicles";
@@ -209,11 +238,10 @@ const isAnimalsAndPets =
 const isOtherCategory =
   selectedCategory === "Other & Miscellaneous";
 
- const isNormalAdvertCategory =
+const isNormalAdvertCategory =
   isBabiesAndKids ||
   isAnimalsAndPets ||
-  isOtherCategory; 
-
+  isOtherCategory;
 const subcategories =
   catDef?.subcategories ?? [];
   
@@ -222,11 +250,10 @@ const subcategories =
     return [];
   }
 
-  // Accommodation uses monthly rent instead of normal pricing.
   if (isAccommodation) {
     return [];
   }
-// Delivery & Transport supports service-based pricing.
+
   if (isTransport) {
     return [
       { value: "fixed", label: "Fixed Price" },
@@ -234,20 +261,31 @@ const subcategories =
       { value: "contact", label: "Contact for Price" },
     ];
   }
-// All Services, including Professional Services,
-  // should support contact or quote-based pricing.
-  if (selectedCategory === "Services") {
+
+  if (isProfessionalService) {
     return [
+      { value: "fixed", label: "Fixed Price" },
+      { value: "negotiable", label: "Negotiable" },
       { value: "contact", label: "Contact for Price" },
       { value: "quote", label: "Request Quote" },
     ];
   }
-// Normal products and other categories.
+
+  if (selectedCategory === "Services") {
+    return [
+      { value: "fixed", label: "Fixed Price" },
+      { value: "negotiable", label: "Negotiable" },
+      { value: "contact", label: "Contact for Price" },
+      { value: "quote", label: "Request Quote" },
+    ];
+  }
+
   return [
     { value: "fixed", label: "Fixed Price" },
     { value: "negotiable", label: "Negotiable" },
   ];
 }
+  
 function handleImageFiles(files: FileList | null) {
   if (!files) return;
   
