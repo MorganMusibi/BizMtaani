@@ -61,31 +61,129 @@ export async function getLocationHierarchy(): Promise<County[]> {
  * has already been loaded into memory.
  */
 export function findWardLocationSync(
-  wardName: string
+  wardName: string,
+  constituencyName?: string,
+  countyName?: string
 ): {
   countyCode: number;
   countyName: string;
   constituencyName: string;
   wardName: string;
 } | undefined {
-  if (!hierarchyCache) {
+  if (!hierarchyCache || !wardName?.trim()) {
     return undefined;
   }
 
-  const normalizedWard = wardName.trim().toLowerCase();
+  const normalizedWard =
+    wardName.trim().toLowerCase();
+
+  const normalizedConstituency =
+    constituencyName?.trim().toLowerCase() ?? "";
+
+  const normalizedCounty =
+    countyName?.trim().toLowerCase() ?? "";
+
+  // ============================================================
+  // 1. Exact County + Constituency + Ward match
+  // ============================================================
+
+  if (
+    normalizedCounty &&
+    normalizedConstituency
+  ) {
+    for (const county of hierarchyCache) {
+      if (
+        county.county_name.trim().toLowerCase() !==
+        normalizedCounty
+      ) {
+        continue;
+      }
+
+      for (const constituency of county.constituencies) {
+        if (
+          constituency.constituency_name
+            .trim()
+            .toLowerCase() !==
+          normalizedConstituency
+        ) {
+          continue;
+        }
+
+        const matchingWard =
+          constituency.wards.find(
+            (ward) =>
+              ward.trim().toLowerCase() ===
+              normalizedWard
+          );
+
+        if (matchingWard) {
+          return {
+            countyCode: county.county_code,
+            countyName: county.county_name,
+            constituencyName:
+              constituency.constituency_name,
+            wardName: matchingWard,
+          };
+        }
+      }
+    }
+  }
+
+  // ============================================================
+  // 2. Constituency + Ward match
+  // ============================================================
+
+  if (normalizedConstituency) {
+    for (const county of hierarchyCache) {
+      for (const constituency of county.constituencies) {
+        if (
+          constituency.constituency_name
+            .trim()
+            .toLowerCase() !==
+          normalizedConstituency
+        ) {
+          continue;
+        }
+
+        const matchingWard =
+          constituency.wards.find(
+            (ward) =>
+              ward.trim().toLowerCase() ===
+              normalizedWard
+          );
+
+        if (matchingWard) {
+          return {
+            countyCode: county.county_code,
+            countyName: county.county_name,
+            constituencyName:
+              constituency.constituency_name,
+            wardName: matchingWard,
+          };
+        }
+      }
+    }
+  }
+
+  // ============================================================
+  // 3. Ward-only fallback
+  // ============================================================
 
   for (const county of hierarchyCache) {
     for (const constituency of county.constituencies) {
-      const matchingWard = constituency.wards.find(
-        (ward) =>
-          ward.trim().toLowerCase() === normalizedWard
-      );
+      const matchingWard =
+        constituency.wards.find(
+          (ward) =>
+            ward.trim().toLowerCase() ===
+            normalizedWard
+        );
 
       if (matchingWard) {
         return {
           countyCode: county.county_code,
           countyName: county.county_name,
-          constituencyName: constituency.constituency_name,
+          constituencyName:
+            constituency.constituency_name,
           wardName: matchingWard,
         };
       }
@@ -94,6 +192,7 @@ export function findWardLocationSync(
 
   return undefined;
 }
+
 
 /**
  * Get all counties.
