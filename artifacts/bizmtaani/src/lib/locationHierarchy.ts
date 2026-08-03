@@ -269,6 +269,125 @@ export async function getAllWards(): Promise<
 
   return results;
 }
+export interface CanonicalLocation {
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+  countyCode: number;
+}
+
+/**
+ * Resolve a location against MasterHierarchy.json.
+ *
+ * MasterHierarchy.json is the FINAL source of truth.
+ *
+ * Matching priority:
+ * 1. Ward + constituency + county
+ * 2. Ward + constituency
+ * 3. Ward only
+ *
+ * This allows older or incorrect Firestore location fields
+ * to be corrected automatically.
+ */
+export async function resolveCanonicalLocation(
+  wardName: string,
+  constituencyName?: string,
+  countyName?: string
+): Promise<CanonicalLocation | undefined> {
+  if (!wardName?.trim()) {
+    return undefined;
+  }
+
+  const counties = await getLocationHierarchy();
+
+  const normalizedWard =
+    wardName.trim().toLowerCase();
+
+  const normalizedConstituency =
+    constituencyName?.trim().toLowerCase() ?? "";
+
+  const normalizedCounty =
+    countyName?.trim().toLowerCase() ?? "";
+
+  // ============================================================
+  // 1. Exact full hierarchy match
+  // ============================================================
+
+  for (const county of counties) {
+    const countyMatches =
+      !normalizedCounty ||
+      county.county_name.trim().toLowerCase() ===
+        normalizedCounty;
+
+    if (!countyMatches) {
+      continue;
+    }
+
+    for (const constituency of county.constituencies) {
+      const constituencyMatches =
+        !normalizedConstituency ||
+        constituency.constituency_name
+          .trim()
+          .toLowerCase() ===
+          normalizedConstituency;
+
+      if (!constituencyMatches) {
+        continue;
+      }
+
+      const matchingWard =
+        constituency.wards.find(
+          (ward) =>
+            ward.trim().toLowerCase() ===
+            normalizedWard
+        );
+
+      if (matchingWard) {
+        return {
+          wardName: matchingWard,
+          constituencyName:
+            constituency.constituency_name,
+          countyName:
+            county.county_name,
+          countyCode:
+            county.county_code,
+        };
+      }
+    }
+  }
+
+  // ============================================================
+  // 2. Ward-only canonical lookup
+  //
+  // Used when Firestore or GeoJSON has an incorrect
+  // constituency/county.
+  // ============================================================
+
+  for (const county of counties) {
+    for (const constituency of county.constituencies) {
+      const matchingWard =
+        constituency.wards.find(
+          (ward) =>
+            ward.trim().toLowerCase() ===
+            normalizedWard
+        );
+
+      if (matchingWard) {
+        return {
+          wardName: matchingWard,
+          constituencyName:
+            constituency.constituency_name,
+          countyName:
+            county.county_name,
+          countyCode:
+            county.county_code,
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
 
 /**
  * Clear the cached hierarchy.
