@@ -15,15 +15,9 @@ import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
 import { getWardInfo, type ResolvedLocation } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import {
-  initiateStkPush,
-  MAX_PHOTO_LIMIT,
-  PLAN_AMOUNTS,
-  type ListingPlan,
-  type PaidListingPlan,
+import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
-
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
 interface PublishAdvertResponse {
@@ -52,15 +46,10 @@ const PRICING_BASIS_OPTIONS = [
 type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function PostProduct() {
-  const {
-  user,
-  userProfile,
-  subscriptionPlan,
-  hasActivePremium,
+  const { user, userProfile, subscriptionPlan, hasActivePremium,
 } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
-
   const [step, setStep] = useState<Step>(1);
 
   // Step 1 — Category
@@ -132,11 +121,10 @@ const [priceDisplay, setPriceDisplay] =
 }, [hasActivePremium, subscriptionPlan]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [publishingFree, setPublishingFree] = useState(false);
-
+  const [limitModalMessage, setLimitModalMessage] = useState<string | null>(null);
   const [showImageMenu, setShowImageMenu] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
-
   const photoLimit = MAX_PHOTO_LIMIT[plan];
 
   useEffect(() => {
@@ -198,7 +186,6 @@ useEffect(() => {
   : null;
 
 const isAccommodation = selectedCategory === "Accommodation";
-
 const isEatery =
   selectedSubcategory === "Hotels / Eateries" ||
   selectedSubcategory === "Restaurants & Cooked Food";
@@ -232,8 +219,6 @@ const subcategories =
   catDef?.subcategories ?? [];
   
   function getPriceOptions() {
-  // People seeking work are not selling a product,
-  // so they should not be asked to enter a price.
   if (isJobSeeking) {
     return [];
   }
@@ -242,8 +227,7 @@ const subcategories =
   if (isAccommodation) {
     return [];
   }
-
-  // Delivery & Transport supports service-based pricing.
+// Delivery & Transport supports service-based pricing.
   if (isTransport) {
     return [
       { value: "fixed", label: "Fixed Price" },
@@ -251,8 +235,7 @@ const subcategories =
       { value: "contact", label: "Contact for Price" },
     ];
   }
-
-  // All Services, including Professional Services,
+// All Services, including Professional Services,
   // should support contact or quote-based pricing.
   if (selectedCategory === "Services") {
     return [
@@ -260,15 +243,13 @@ const subcategories =
       { value: "quote", label: "Request Quote" },
     ];
   }
-
-  // Normal products and other categories.
+// Normal products and other categories.
   return [
     { value: "fixed", label: "Fixed Price" },
     { value: "negotiable", label: "Negotiable" },
   ];
 }
-
-  function handleImageFiles(files: FileList | null) {
+function handleImageFiles(files: FileList | null) {
   if (!files) return;
   
   // Use the new MAX_PHOTO_LIMIT constant
@@ -388,8 +369,7 @@ const subcategories =
     return true;
   }
 
-
-  // Vehicle validation
+// Vehicle validation
   if (isVehicle) {
     if (!title.trim()) {
       toast({
@@ -459,8 +439,7 @@ const subcategories =
     });
     return false;
   }
-
-  // Accommodation must always have rent
+// Accommodation must always have rent
   if (isAccommodation && !rentPerMonth) {
     toast({
       title: "Enter monthly rent",
@@ -468,8 +447,7 @@ const subcategories =
     });
     return false;
   }
-
-  const requiresPrice =
+const requiresPrice =
     !isAccommodation &&
     !isEatery &&
     (priceDisplay === "fixed" ||
@@ -662,8 +640,7 @@ serviceDetails: isProfessionalService
 /**
  * Corrected handlePublishFree
  */
-
-  async function handlePublishFree() {
+async function handlePublishFree() {
   const cleanedPhone = phone.replace(/\s+/g, "").trim();
 
   if (!isValidKenyanPhone(cleanedPhone)) {
@@ -786,22 +763,35 @@ const data = result.data as PublishAdvertResponse;
     else {
       throw new Error("Publishing failed.");
     }
-  } catch (error: unknown) {
-  console.error("Publish free advert failed:", error);
+    } catch (error: any) {
+    console.error("Publish free advert failed:", error);
 
-  const message = getFirebaseErrorMessage(
-    error,
-    "Unable to publish your advert. Please try again."
-  );
+    const errorMessage = error?.message || "";
 
-  toast({
-    title: "Failed to publish",
-    description: message,
-    variant: "destructive",
-  });
+    if (
+      errorMessage.toLowerCase().includes("limit") || 
+      errorMessage.toLowerCase().includes("maximum") || 
+      errorMessage.toLowerCase().includes("expired") || 
+      errorMessage.toLowerCase().includes("archived")
+    ) {
+      setLimitModalMessage(
+        "You have reached your maximum limit of 5 active free adverts, or have 5 archived items. Please upgrade your plan or delete/manage existing listings to post a new one."
+      );
+    } else {
+      const message = getFirebaseErrorMessage(
+        error,
+        "Unable to publish your advert. Please try again."
+      );
+toast({
+        title: "Failed to publish",
+        description: message,
+        variant: "destructive",
+      });
+    }
   } finally {
     setPublishingFree(false);
   }
+
 }
   async function handlePublishPremiumSubscriber() {
   setPublishingFree(true);
@@ -831,8 +821,7 @@ const data = result.data as PublishAdvertResponse;
     setPublishingFree(false);
   }
 }
-
-  const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
+const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -1391,9 +1380,6 @@ const data = result.data as PublishAdvertResponse;
          NORMAL ADVERT FORM
          Includes:
          - Babies & Kids
-         - Animals & Pets
-         - Other & Miscellaneous
-         - All other existing categories
          ========================================================= */
       <div className="space-y-5">
 
@@ -2046,6 +2032,34 @@ const data = result.data as PublishAdvertResponse;
           navigate(`/product/${pid}`);
         }}
       />
+            {/* Limit Reached Professional Modal */}
+      {limitModalMessage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl max-w-sm w-full p-6 shadow-xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+              <Shield size={24} />
+            </div>
+            
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg">Listing Limit Reached</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {limitModalMessage}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="button"
+                className="w-full h-12 font-bold rounded-2xl shadow-lg"
+                onClick={() => setLimitModalMessage(null)}
+              >
+                Got it
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
