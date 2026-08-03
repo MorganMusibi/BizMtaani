@@ -125,6 +125,40 @@ const [priceDisplay, setPriceDisplay] =
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const photoLimit = MAX_PHOTO_LIMIT[plan];
+  // Property / rental
+const [propertyType, setPropertyType] = useState("");
+const [bedrooms, setBedrooms] = useState("");
+const [bathrooms, setBathrooms] = useState("");
+const [propertySize, setPropertySize] = useState("");
+const [deposit, setDeposit] = useState("");
+const [furnished, setFurnished] = useState("");
+const [amenities, setAmenities] = useState("");
+
+// Sale / hire
+const [transactionType, setTransactionType] = useState<"sale" | "hire">("sale");
+const [hireRate, setHireRate] = useState("");
+const [hireRateBasis, setHireRateBasis] = useState("");
+
+// Equipment
+const [equipmentType, setEquipmentType] = useState("");
+const [equipmentCondition, setEquipmentCondition] = useState("");
+
+// Furniture
+const [furnitureType, setFurnitureType] = useState("");
+const [furnitureMaterial, setFurnitureMaterial] = useState("");
+const [furnitureCondition, setFurnitureCondition] = useState("");
+
+// Commercial property
+const [commercialPropertyType, setCommercialPropertyType] = useState("");
+
+// Events
+const [eventType, setEventType] = useState("");
+const [eventDate, setEventDate] = useState("");
+const [eventStartTime, setEventStartTime] = useState("");
+const [eventEndTime, setEventEndTime] = useState("");
+const [eventVenue, setEventVenue] = useState("");
+const [eventOrganizer, setEventOrganizer] = useState("");
+const [ticketPrice, setTicketPrice] = useState("");
 
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
@@ -242,6 +276,38 @@ const isNormalAdvertCategory =
   isBabiesAndKids ||
   isAnimalsAndPets ||
   isOtherCategory;
+  const isResidentialRental =
+  selectedCategory === "Accommodation" &&
+  ![
+    "Houses for Sale",
+    "Apartments for Sale",
+    "Residential Land for Sale",
+    "Residential Land for Rent",
+  ].includes(selectedSubcategory);
+
+const isPropertySale =
+  selectedCategory === "Accommodation" &&
+  [
+    "Houses for Sale",
+    "Apartments for Sale",
+    "Residential Land for Sale",
+  ].includes(selectedSubcategory);
+
+const isCommercialProperty =
+  selectedCategory === "Commercial Property";
+
+const isEquipment =
+  selectedCategory === "Commercial Equipment & Tools";
+
+const isFurniture =
+  selectedCategory === "Home, Furniture & Appliances";
+
+const isEvent =
+  selectedCategory === "Entertainment & Events";
+
+const isTransportService =
+  selectedCategory === "Services" &&
+  selectedSubcategory === "Transport Services";
 const subcategories =
   catDef?.subcategories ?? [];
   
