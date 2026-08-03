@@ -466,8 +466,8 @@ const requiresPrice =
     return false;
   }
 
-  return true;
-}
+    return true;
+
     if (step === 3) {
   if (!coords) {
     toast({
@@ -2109,6 +2109,5 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </div>
       )}
 </div>
-    </div>
   );
 }
