@@ -90,14 +90,11 @@ function ProductCard({
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
     : null;
-// Force the master hierarchy lookup first using product.ward (case-insensitive)
 const canonicalLocation =
   hierarchyReady && product.ward
     ? findWardLocationSync(product.ward.trim())
     : undefined;
 
-// If hierarchy is ready and found, force the canonical ward and constituency names.
-// This completely overrides incorrect values saved in the database.
 const displayWard =
   canonicalLocation?.wardName ??
   product.ward?.trim() ??
@@ -105,7 +102,7 @@ const displayWard =
 
 const displayConstituency =
   canonicalLocation?.constituencyName ??
-  (product.ward?.trim().toLowerCase() === "babadogo" ? "Ruaraka" : product.constituency?.trim()) ??
+  product.constituency?.trim() ??
   "";
 
 const displayCounty =
