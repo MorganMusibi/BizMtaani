@@ -52,6 +52,48 @@ export async function getLocationHierarchy(): Promise<County[]> {
 
   return data;
 }
+/**
+ * Find a ward in the already-loaded hierarchy.
+ *
+ * Returns the canonical county, constituency, and ward names.
+ *
+ * This is synchronous and only works after the hierarchy
+ * has already been loaded into memory.
+ */
+export function findWardLocationSync(
+  wardName: string
+): {
+  countyCode: number;
+  countyName: string;
+  constituencyName: string;
+  wardName: string;
+} | undefined {
+  if (!hierarchyCache) {
+    return undefined;
+  }
+
+  const normalizedWard = wardName.trim().toLowerCase();
+
+  for (const county of hierarchyCache) {
+    for (const constituency of county.constituencies) {
+      const matchingWard = constituency.wards.find(
+        (ward) =>
+          ward.trim().toLowerCase() === normalizedWard
+      );
+
+      if (matchingWard) {
+        return {
+          countyCode: county.county_code,
+          countyName: county.county_name,
+          constituencyName: constituency.constituency_name,
+          wardName: matchingWard,
+        };
+      }
+    }
+  }
+
+  return undefined;
+}
 
 /**
  * Get all counties.
