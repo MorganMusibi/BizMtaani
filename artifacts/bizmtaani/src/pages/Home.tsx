@@ -588,15 +588,10 @@ const totalVisible = rankedProducts.length;
       </div>
 
       <div className="flex-1 overflow-y-auto">
-                  {gpsReady && (
+                {gpsReady && (
           <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
             <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
-            <p 
-              className="text-xs text-muted-foreground flex-1 cursor-pointer truncate"
-              onClick={() => {
-                if (areaChoices.length > 1) setShowAreaPicker(true);
-              }}
-            >
+            <p className="text-xs text-muted-foreground flex-1 truncate">
               {bannerText()}
             </p>
             
@@ -604,7 +599,7 @@ const totalVisible = rankedProducts.length;
               <button
                 type="button"
                 onClick={(e) => {
-                  e.stopPropagation(); // Stops parent click handlers from firing
+                  e.stopPropagation();
                   if (!navigator.geolocation) {
                     alert("Geolocation is not supported by your browser");
                     return;
@@ -632,22 +627,9 @@ const totalVisible = rankedProducts.length;
               >
                 Re-detect GPS
               </button>
-
-              {areaChoices.length > 1 && (
-                <span 
-                  className="text-[10px] font-semibold text-primary cursor-pointer hover:underline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowAreaPicker(true);
-                  }}
-                >
-                  Change area
-                </span>
-              )}
             </div>
           </div>
         )}
-      
 
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
