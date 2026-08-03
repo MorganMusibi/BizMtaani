@@ -634,8 +634,8 @@ const totalVisible = rankedProducts.length;
             </div>
           </div>
         )}
-             {locationErrorMsg && (
-          <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm animate-in fade-in">
+                      {locationErrorMsg && (
+          <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
@@ -644,6 +644,48 @@ const totalVisible = rankedProducts.length;
               <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
                 {locationErrorMsg}
               </p>
+              
+              <div className="flex items-center gap-2 mt-2">
+                {/* Try Again Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.geolocation.getCurrentPosition(
+                      async (pos) => {
+                        const lat = pos.coords.latitude;
+                        const lng = pos.coords.longitude;
+                        setUserCoords([lat, lng]);
+                        setGpsGranted(true);
+                        setLocationErrorMsg(null);
+                        const resolved = await getWardInfo(lat, lng);
+                        if (resolved) setLocationInfo(resolved);
+                        const choices = await getAreaChoices(lat, lng);
+                        setAreaChoices(choices ?? []);
+                      },
+                      (err) => {
+                        console.error("Retry error:", err);
+                      },
+                      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+                    );
+                  }}
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                >
+                  Try Again
+                </button>
+
+                {/* Open Permissions / Guide Button */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert(
+                      "To enable location permissions:\n\n1. Tap the lock (🔒) or settings icon in your browser's address bar.\n2. Look for 'Permissions' or 'Location'.\n3. Change it to 'Allow'.\n4. Refresh the page or tap 'Re-detect GPS'."
+                    );
+                  }}
+                  className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] font-bold rounded-lg transition-colors border border-amber-500/30"
+                >
+                  Open Permissions Guide
+                </button>
+              </div>
             </div>
             <button
               type="button"
@@ -653,7 +695,8 @@ const totalVisible = rankedProducts.length;
               ✕
             </button>
           </div>
-        )} 
+        )}
+
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
