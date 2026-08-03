@@ -13,7 +13,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
-import { getWardInfo, validateLocationHierarchy, type ResolvedLocation } from "@/lib/location";
+import { validateLocationHierarchy, } from "@/lib/locationHierarchy";
+import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
