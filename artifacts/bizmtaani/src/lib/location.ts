@@ -4,7 +4,9 @@
  *  2. Module-level result cache   (avoids repeated work)
  *  3. OSM Nominatim               (fallback, also used for border detection)
  */
-
+import {
+  resolveCanonicalLocation,
+} from "@/lib/locationHierarchy";
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -186,27 +188,125 @@ export async function getWardInfo(lat: number, lng: number): Promise<ResolvedLoc
 
   const features = await loadWards();
   if (features) {
-    const match = findWard(lat, lng, features);
-    if (match) {
-      const wardName = toTitleCase(match.ward);
-      const county = toTitleCase(match.county);
-      const constituency = toTitleCase(match.constituency);
-      const displayName = county ? `${wardName}, ${county}` : wardName;
-      const result: ResolvedLocation = { wardName, constituency, county, displayName };
-      resolvedCache.set(key, result);
+  const match = findWard(
+    lat,
+    lng,
+    features
+  );
+
+  if (match) {
+    // GeoJSON identifies the physical ward.
+    // MasterHierarchy.json determines the
+    // canonical County → Constituency → Ward.
+    const canonical =
+      await resolveCanonicalLocation(
+        match.ward,
+        match.constituency,
+        match.county
+      );
+
+    if (canonical) {
+      const result: ResolvedLocation = {
+        wardName:
+          canonical.wardName,
+
+        constituency:
+          canonical.constituencyName,
+
+        county:
+          canonical.countyName,
+
+        displayName:
+          `${canonical.wardName}, ${canonical.constituencyName}`,
+      };
+
+      resolvedCache.set(
+        key,
+        result
+      );
+
       return result;
     }
-  }
 
-  const fallback = await nominatimFallback(lat, lng);
-  const result: ResolvedLocation = {
-    wardName: fallback.wardName ?? "",
-    constituency: fallback.constituency ?? "",
-    county: fallback.county ?? "",
-    displayName: fallback.displayName ?? "your area",
-  };
-  resolvedCache.set(key, result);
-  return result;
+    // Safety fallback if the GeoJSON ward
+    // does not exist in MasterHierarchy.json.
+    const wardName =
+      toTitleCase(match.ward);
+
+    const county =
+      toTitleCase(match.county);
+
+    const constituency =
+      toTitleCase(match.constituency);
+
+    const result: ResolvedLocation = {
+      wardName,
+      constituency,
+      county,
+      displayName:
+        `${wardName}, ${constituency}`,
+    };
+
+    resolvedCache.set(
+      key,
+      result
+    );
+
+    return result;
+  }
+}
+
+  const fallback =
+  await nominatimFallback(
+    lat,
+    lng
+  );
+
+const canonical =
+  fallback.wardName
+    ? await resolveCanonicalLocation(
+        fallback.wardName,
+        fallback.constituency,
+        fallback.county
+      )
+    : undefined;
+
+const result: ResolvedLocation =
+  canonical
+    ? {
+        wardName:
+          canonical.wardName,
+
+        constituency:
+          canonical.constituencyName,
+
+        county:
+          canonical.countyName,
+
+        displayName:
+          `${canonical.wardName}, ${canonical.constituencyName}`,
+      }
+    : {
+        wardName:
+          fallback.wardName ?? "",
+
+        constituency:
+          fallback.constituency ?? "",
+
+        county:
+          fallback.county ?? "",
+
+        displayName:
+          fallback.displayName ??
+          "your area",
+      };
+
+resolvedCache.set(
+  key,
+  result
+);
+
+return result;
 }
 
 export async function getWardName(lat: number, lng: number): Promise<string> {
