@@ -497,3 +497,31 @@ export async function resolveCanonicalLocation(
 export function clearLocationHierarchyCache(): void {
   hierarchyCache = null;
 }
+export function validateLocationHierarchy(
+  countyName: string,
+  constituencyName: string,
+  wardName: string
+): boolean {
+  const normalize = (value: string) =>
+    value.trim().toLowerCase();
+
+  const county = LOCATION_HIERARCHY.find(
+    (county) =>
+      normalize(county.county_name) === normalize(countyName)
+  );
+
+  if (!county) return false;
+
+  const constituency = county.constituencies.find(
+    (constituency) =>
+      normalize(constituency.constituency_name) ===
+      normalize(constituencyName)
+  );
+
+  if (!constituency) return false;
+
+  return constituency.wards.some(
+    (ward) =>
+      normalize(ward) === normalize(wardName)
+  );
+}
