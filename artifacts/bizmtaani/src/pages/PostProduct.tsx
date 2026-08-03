@@ -1830,7 +1830,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
               <div className="flex gap-2">
                 <Input placeholder="Search a different location..."
-                  value={locationSearch} onChange={(e) => locationSearch && setLocationSearch(e.target.value)} // Keep your existing handler here
+                  value={locationSearch}  onChange={(e) => setLocationSearch(e.target.value)}// Keep your existing handler here
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchLocation(); } }}
                   className="flex-1 h-10 text-sm" />
                 <Button type="button" variant="outline" size="sm" onClick={searchLocation}
