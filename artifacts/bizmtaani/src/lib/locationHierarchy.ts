@@ -52,6 +52,30 @@ export async function getLocationHierarchy(): Promise<County[]> {
 
   return data;
 }
+export async function validateLocationHierarchy(
+  countyName: string,
+  constituencyName: string,
+  wardName: string
+): Promise<boolean> {
+  const canonical = await resolveCanonicalLocation(
+    wardName,
+    constituencyName,
+    countyName
+  );
+
+  if (!canonical) {
+    return false;
+  }
+
+  return (
+    canonical.countyName.trim().toLowerCase() ===
+      countyName.trim().toLowerCase() &&
+    canonical.constituencyName.trim().toLowerCase() ===
+      constituencyName.trim().toLowerCase() &&
+    canonical.wardName.trim().toLowerCase() ===
+      wardName.trim().toLowerCase()
+  );
+}
 /**
  * Get all counties.
  */
