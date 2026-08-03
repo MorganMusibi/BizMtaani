@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
-import { getWardInfo, type ResolvedLocation } from "@/lib/location";
+import { getWardInfo, validateLocationHierarchy, type ResolvedLocation } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
@@ -335,8 +335,7 @@ function handleImageFiles(files: FileList | null) {
       setLocationLoading(false);
     }
   }
-
-  function validateStep(): boolean {
+    function validateStep(): boolean {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
       if (subcategories.length > 0 && !selectedSubcategory) {
@@ -347,123 +346,129 @@ function handleImageFiles(files: FileList | null) {
       }
       return true;
     }
-        if (step === 2) {
+    
+    if (step === 2) {
+      // Job seeker validation
+      if (isJobSeeking) {
+        if (!jobTitle.trim()) {
+          toast({
+            title: "Enter the job title",
+            description: "Tell employers what position you are looking for.",
+            variant: "destructive",
+          });
+          return false;
+        }
 
-  // Job seeker validation
-  if (isJobSeeking) {
-    if (!jobTitle.trim()) {
-      toast({
-        title: "Enter the job title",
-        description: "Tell employers what position you are looking for.",
-        variant: "destructive",
-      });
-      return false;
+        if (!title.trim()) {
+          setTitle(jobTitle.trim());
+        }
+
+        return true;
+      }
+      
+      // Vehicle validation
+      if (isVehicle) {
+        if (!title.trim()) {
+          toast({
+            title: "Enter an advert title",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        if (!vehicleMake.trim() || !vehicleModel.trim()) {
+          toast({
+            title: "Enter vehicle details",
+            description: "Make and model are required.",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        if (!price || parseFloat(price) <= 0) {
+          toast({
+            title: "Enter a valid vehicle price",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        return true;
+      }
+      
+      // Professional service validation
+      if (isProfessionalService) {
+        if (!title.trim()) {
+          toast({
+            title: "Enter a service title",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        if (!servicePricingType) {
+          toast({
+            title: "Choose a pricing method",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        if (
+          servicePricingType !== "quote_only" &&
+          (!price || parseFloat(price) <= 0)
+        ) {
+          toast({
+            title: "Enter a valid service price",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        return true;
+      }
+      
+      // Normal advert validation
+      if (!title.trim()) {
+        toast({
+          title: "Enter a title",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      // Accommodation must always have rent
+      if (isAccommodation && !rentPerMonth) {
+        toast({
+          title: "Enter monthly rent",
+          variant: "destructive",
+        });
+        return false;
+      }
+      
+      const requiresPrice =
+        !isAccommodation &&
+        !isEatery &&
+        (priceDisplay === "fixed" ||
+          priceDisplay === "negotiable");
+
+      if (
+        requiresPrice &&
+        (!price || parseFloat(price) <= 0)
+      ) {
+        toast({
+          title: "Enter a valid price",
+          description:
+            "Or choose 'Contact for Price' or 'Request Quote'.",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      return true;
     }
 
-    if (!title.trim()) {
-      setTitle(jobTitle.trim());
-    }
-
-    return true;
-  }
-// Vehicle validation
-  if (isVehicle) {
-    if (!title.trim()) {
-      toast({
-        title: "Enter an advert title",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!vehicleMake.trim() || !vehicleModel.trim()) {
-      toast({
-        title: "Enter vehicle details",
-        description: "Make and model are required.",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!price || parseFloat(price) <= 0) {
-      toast({
-        title: "Enter a valid vehicle price",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
-  }
- // Professional service validation
-  if (isProfessionalService) {
-    if (!title.trim()) {
-      toast({
-        title: "Enter a service title",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (!servicePricingType) {
-      toast({
-        title: "Choose a pricing method",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    if (
-      servicePricingType !== "quote_only" &&
-      (!price || parseFloat(price) <= 0)
-    ) {
-      toast({
-        title: "Enter a valid service price",
-        variant: "destructive",
-      });
-      return false;
-    }
-
-    return true;
-  }
-// Normal advert validation
-  if (!title.trim()) {
-    toast({
-      title: "Enter a title",
-      variant: "destructive",
-    });
-    return false;
-  }
-// Accommodation must always have rent
-  if (isAccommodation && !rentPerMonth) {
-    toast({
-      title: "Enter monthly rent",
-      variant: "destructive",
-    });
-    return false;
-  }
-const requiresPrice =
-    !isAccommodation &&
-    !isEatery &&
-    (priceDisplay === "fixed" ||
-      priceDisplay === "negotiable");
-
-  if (
-    requiresPrice &&
-    (!price || parseFloat(price) <= 0)
-  ) {
-    toast({
-      title: "Enter a valid price",
-      description:
-        "Or choose 'Contact for Price' or 'Request Quote'.",
-      variant: "destructive",
-    });
-    return false;
-  }
-
-    return true;
-
-        if (step === 3) {
+    if (step === 3) {
       if (!coords) {
         toast({
           title: "Location not ready",
@@ -482,6 +487,7 @@ const requiresPrice =
 
     return true;
   }
+
 function isValidKenyanPhone(phone: string): boolean {
   const cleaned = phone.replace(/\s+/g, "").trim();
 
