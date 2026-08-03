@@ -1,13 +1,4 @@
-/**
- * Home feed — two-phase area-first advert loader.
- * 
- * Location priority:
- * 1. Live GPS (if permitted)
- * 2. Saved home area from the user's Firestore profile
- * 3. If neither exists, wait for the user to provide/select an area.
- * 
- * No artificial Nairobi fallback is used.
- */
+
 import {
   useHomeFeeds,
   type Product,
