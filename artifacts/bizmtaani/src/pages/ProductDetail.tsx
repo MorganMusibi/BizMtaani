@@ -1152,7 +1152,3 @@ const itemDistance =
     </div>
   );
 }
-
-    </div>
-  );
-}
