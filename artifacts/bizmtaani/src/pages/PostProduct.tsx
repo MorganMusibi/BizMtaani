@@ -2108,7 +2108,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         </div>
       )}
-
+</div>
     </div>
   );
 }
