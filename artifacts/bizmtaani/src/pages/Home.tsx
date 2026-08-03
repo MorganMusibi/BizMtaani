@@ -280,7 +280,7 @@ export default function Home() {
     cancelled = true;
   };
 }, []);
-  useEffect(() => {
+    useEffect(() => {
     let cancelled = false;
 
     const applyResolvedLocation = (location: ResolvedLocation) => {
@@ -292,7 +292,7 @@ export default function Home() {
       setGpsReady(true);
     };
 
-    const useSavedProfileLocation = () => {
+    const useSavedProfileLocation = (): boolean => {
       const saved = userProfile?.homeLocation;
       if (saved && typeof saved.lat === "number" && typeof saved.lng === "number") {
         const savedLocation: ResolvedLocation = {
@@ -308,7 +308,7 @@ export default function Home() {
       return false;
     };
 
-    const usePreviouslySelectedArea = () => {
+    const usePreviouslySelectedArea = (): boolean => {
       try {
         const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
         if (!stored) return false;
@@ -363,8 +363,16 @@ export default function Home() {
         },
         () => {
           setGpsGranted(false);
-          if (useSavedProfileLocation()) return;
-          if (usePreviouslySelectedArea()) return;
+          
+          if (useSavedProfileLocation()) {
+            setGpsReady(true);
+            return;
+          }
+          if (usePreviouslySelectedArea()) {
+            setGpsReady(true);
+            return;
+          }
+
           setGpsReady(true);
           if (!hasPromptedArea.current) {
             hasPromptedArea.current = true;
