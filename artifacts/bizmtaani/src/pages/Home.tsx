@@ -217,24 +217,27 @@ const displayCounty =
             </div>
         )}
       </div>
-      <div className="px-3 py-2.5">
+            <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
         <div className="mt-1.5">
-  {(displayWard || displayConstituency) && (
-  <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
-    <MapPin size={11} className="flex-shrink-0" />
+          {(displayWard || displayConstituency) && (
+            <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
+              <MapPin size={11} className="flex-shrink-0" />
 
-    <span className="truncate">
-      {displayWard}
-
-      {displayWard && displayConstituency
-        ? " · "
-        : ""}
-
-      {displayConstituency}
-    </span>
-  </div>
-)}
+              <span className="truncate">
+                {[displayWard, displayConstituency]
+                  .filter(Boolean)
+                  .map((text) =>
+                    text
+                      .toLowerCase()
+                      .split(" ")
+                      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+                      .join(" ")
+                  )
+                  .join(".")}
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>
