@@ -54,8 +54,9 @@ function getCanonicalProductLocation(product: Product): {
   const constituency = product.constituency?.trim() ?? "";
   const county = product.county?.trim() ?? "";
 
-  // First use the canonical hierarchy lookup.
-  if (ward) {
+  // Use MasterHierarchy.json as the source of truth.
+  // The ward determines its constituency and county.
+  if (hierarchyReady && ward) {
     const canonical = findWardLocationSync(ward);
 
     if (canonical) {
@@ -67,13 +68,14 @@ function getCanonicalProductLocation(product: Product): {
     }
   }
 
-  // Fallback to the values stored directly on the advert.
+  // Fallback to the location saved on the advert.
   return {
     ward,
     constituency,
     county,
   };
 }
+
 function ProductCard({
   product,
   userCoords,
@@ -88,13 +90,25 @@ function ProductCard({
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
     : null;
-const canonicalLocation = getCanonicalProductLocation(product);
+const canonicalLocation =
+  hierarchyReady && product.ward
+    ? findWardLocationSync(product.ward)
+    : undefined;
 
-const displayWard = canonicalLocation.ward;
+const displayWard =
+  canonicalLocation?.wardName ??
+  product.ward?.trim() ??
+  "";
 
-const displayConstituency = canonicalLocation.constituency;
+const displayConstituency =
+  canonicalLocation?.constituencyName ??
+  product.constituency?.trim() ??
+  "";
 
-const displayCounty = canonicalLocation.county;
+const displayCounty =
+  canonicalLocation?.countyName ??
+  product.county?.trim() ??
+  "";
 
   const badgeColor = getCategoryBadgeColor(product.category);
 
