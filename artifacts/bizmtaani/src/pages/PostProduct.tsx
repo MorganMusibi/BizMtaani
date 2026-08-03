@@ -630,9 +630,9 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     lat: coords.lat,
     lng: coords.lng,
 
-    ward: locationName || wardInfo?.wardName || "",
-    constituency: wardInfo?.constituency ?? "",
-    county: wardInfo?.county ?? "",
+    ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
+constituency: wardInfo?.constituency?.trim() || "",
+county: wardInfo?.county?.trim() || "",
 
     geohash: encodeGeohash(coords.lat, coords.lng),
 
@@ -781,9 +781,9 @@ setPublishingFree(true);
 
       lat: coords.lat,
       lng: coords.lng,
-      ward: locationName || wardInfo?.wardName || "",
-      constituency: wardInfo?.constituency ?? "",
-      county: wardInfo?.county ?? "",
+      ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
+constituency: wardInfo?.constituency?.trim() || "",
+county: wardInfo?.county?.trim() || "",
       geohash: encodeGeohash(coords.lat, coords.lng),
 
       sellerId: user.uid,
