@@ -469,19 +469,60 @@ const requiresPrice =
   return true;
 }
     if (step === 3) {
-       
-      if (!coords) { toast({ title: "Location not ready", variant: "destructive" }); return false; }
-      return true;
-    }
-    return true;
+  if (!coords) {
+    toast({
+      title: "Location not ready",
+      description: "Please wait for your location to be detected.",
+      variant: "destructive",
+    });
+    return false;
   }
+
+  if (!validateAdvertLocation()) {
+    return false;
+  }
+
+  return true;
+}
 
   function isValidKenyanPhone(phone: string): boolean {
   const cleaned = phone.replace(/\s+/g, "").trim();
 
   return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
   }
-  
+  function validateAdvertLocation(): boolean {
+  const ward = wardInfo?.wardName?.trim() || locationName.trim();
+  const constituency = wardInfo?.constituency?.trim() || "";
+  const county = wardInfo?.county?.trim() || "";
+
+  if (!ward || !constituency || !county) {
+    toast({
+      title: "Location information incomplete",
+      description:
+        "We could not determine the correct ward, constituency, and county for this advert.",
+      variant: "destructive",
+    });
+    return false;
+  }
+
+  const isValid = validateLocationHierarchy(
+    county,
+    constituency,
+    ward
+  );
+
+  if (!isValid) {
+    toast({
+      title: "Invalid location",
+      description:
+        `"${ward}" does not belong to "${constituency}", "${county}". Please select a valid location.`,
+      variant: "destructive",
+    });
+    return false;
+  }
+
+  return true;
+  }
   function goNext() {
   if (!validateStep()) return;
 
@@ -500,6 +541,10 @@ async function handleInitiate(
 }> {
   if (!user || !coords) {
     throw new Error("Not ready");
+  }
+
+  if (!validateAdvertLocation()) {
+    throw new Error("Invalid advert location");
   }
 
   const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
@@ -652,16 +697,20 @@ async function handlePublishFree() {
     return;
   }
 
-  if (!user || !coords) {
-    toast({
-      title: "Location not ready",
-      description: "Please wait for your location to be detected.",
-      variant: "destructive",
-    });
-    return;
-  }
+if (!user || !coords) {
+  toast({
+    title: "Location not ready",
+    description: "Please wait for your location to be detected.",
+    variant: "destructive",
+  });
+  return;
+}
 
-  setPublishingFree(true);
+if (!validateAdvertLocation()) {
+  return;
+}
+
+setPublishingFree(true);
 
   try {
     // Upload images
