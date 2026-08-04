@@ -125,14 +125,14 @@ const [priceDisplay, setPriceDisplay] =
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const photoLimit = MAX_PHOTO_LIMIT[plan];
-  // Property / rental
-const [propertyType, setPropertyType] = useState("");
+// Property / rental
 const [bedrooms, setBedrooms] = useState("");
 const [bathrooms, setBathrooms] = useState("");
-const [propertySize, setPropertySize] = useState("");
-const [deposit, setDeposit] = useState("");
-const [furnished, setFurnished] = useState("");
-const [amenities, setAmenities] = useState("");
+const [furnishing, setFurnishing] = useState("");
+const [landSize, setLandSize] = useState("");
+const [stayDetails, setStayDetails] = useState("");
+const [spaceDetails, setSpaceDetails] = useState("");
+const [sharedHousingDetails, setSharedHousingDetails] = useState("");
 
 // Sale / hire
 const [transactionType, setTransactionType] = useState<"sale" | "hire">("sale");
@@ -485,10 +485,6 @@ const subcategories =
     return [];
   }
 
-  if (isAccommodation) {
-    return [];
-  }
-
   if (isTransport) {
     return [
       { value: "fixed", label: "Fixed Price" },
@@ -711,14 +707,14 @@ function handleImageFiles(files: FileList | null) {
         return false;
       }
       
-      // Accommodation must always have rent
-      if (isAccommodation && !rentPerMonth) {
-        toast({
-          title: "Enter monthly rent",
-          variant: "destructive",
-        });
-        return false;
-      }
+      // Accommodation must always have rent (except Sale/Land, which use price instead)
+if (isAccommodation && !isAccommodationSale && !isAccommodationLand && !rentPerMonth) {
+  toast({
+    title: "Enter monthly rent",
+    variant: "destructive",
+  });
+  return false;
+}
       
       const requiresPrice =
         !isAccommodation &&
