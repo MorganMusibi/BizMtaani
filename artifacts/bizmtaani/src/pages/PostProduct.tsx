@@ -2473,27 +2473,140 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               </div>
 
               <div className="flex items-center justify-between border-t border-border pt-4">
-                <span className="text-sm font-bold text-primary">
-  {isAccommodation
-    ? `KES ${rentPerMonth}/mo`
-    : priceDisplay === "contact"
-    ? "Contact for Price"
-    : priceDisplay === "quote"
-    ? "Request Quote"
-    : priceDisplay === "negotiable"
-    ? `KES ${price} (Negotiable)`
-    : `KES ${price}`}
-</span>
-                <span className="text-sm text-muted-foreground">{selectedCategory} / {selectedSubcategory}</span>
-              </div>
+  <span className="text-sm font-bold text-primary">
+    {isAccommodationLand
+      ? `KES ${price}`
+      : isAccommodationSale
+      ? `KES ${price}${priceDisplay === "negotiable" ? " (Negotiable)" : ""}`
+      : isAccommodation
+      ? `KES ${rentPerMonth}/mo`
+      : priceDisplay === "contact"
+      ? "Contact for Price"
+      : priceDisplay === "quote"
+      ? "Request Quote"
+      : priceDisplay === "negotiable"
+      ? `KES ${price} (Negotiable)`
+      : `KES ${price}`}
+  </span>
+
+  <span className="text-sm text-muted-foreground">
+    {selectedCategory} / {selectedSubcategory}
+  </span>
+</div>
 
               <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">Price</span>
-                <span className="text-sm font-bold text-primary">
-                  {isAccommodation ? `KES ${rentPerMonth}/mo` : price ? `KES ${price}` : "Negotiable"}
-                </span>
-              </div>
+  <span className="text-sm font-semibold">
+    {isAccommodationLand
+      ? "Land Price"
+      : isAccommodationSale
+      ? "Sale Price"
+      : isAccommodation
+      ? "Monthly Rent"
+      : "Price"}
+  </span>
 
+  <span className="text-sm font-bold text-primary">
+    {isAccommodationLand
+      ? price
+        ? `KES ${price}`
+        : "Not specified"
+      : isAccommodationSale
+      ? price
+        ? `KES ${price}`
+        : "Not specified"
+      : isAccommodation
+      ? rentPerMonth
+        ? `KES ${rentPerMonth}/mo`
+        : "Not specified"
+      : price
+      ? `KES ${price}`
+      : "Negotiable"}
+  </span>
+</div>
+{isAccommodation && (
+  <div className="space-y-2 border-t border-border pt-4">
+
+    {isAccommodationLand ? (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Land Size
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {landSize || "Not specified"}
+        </span>
+      </div>
+    ) : (
+      <>
+        {bedrooms && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Bedrooms
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {bedrooms}
+            </span>
+          </div>
+        )}
+
+        {bathrooms && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Bathrooms
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {bathrooms}
+            </span>
+          </div>
+        )}
+
+        {furnishing && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Furnishing
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {furnishing}
+            </span>
+          </div>
+        )}
+      </>
+    )}
+
+    {stayDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Stay Details
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {stayDetails}
+        </span>
+      </div>
+    )}
+
+    {spaceDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Space Details
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {spaceDetails}
+        </span>
+      </div>
+    )}
+
+    {sharedHousingDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Shared Housing
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {sharedHousingDetails}
+        </span>
+      </div>
+    )}
+
+  </div>
+)}
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold">Plan</span>
                 <span className="text-sm font-bold capitalize">{plan}</span>
