@@ -716,26 +716,42 @@ if (isAccommodation && !isAccommodationSale && !isAccommodationLand && !rentPerM
   return false;
 }
       
-      const requiresPrice =
-        !isAccommodation &&
-        !isEatery &&
-        (priceDisplay === "fixed" ||
-          priceDisplay === "negotiable");
+      // Transport uses pricingBasis, not priceDisplay — validate separately
+if (isTransport) {
+  if (
+    pricingBasis !== "quote_only" &&
+    (!price || parseFloat(price) <= 0)
+  ) {
+    toast({
+      title: "Enter a valid price",
+      description: "Or choose 'Quote Only' as the pricing basis.",
+      variant: "destructive",
+    });
+    return false;
+  }
+  return true;
+}
 
-      if (
-        requiresPrice &&
-        (!price || parseFloat(price) <= 0)
-      ) {
-        toast({
-          title: "Enter a valid price",
-          description:
-            "Or choose 'Contact for Price' or 'Request Quote'.",
-          variant: "destructive",
-        });
-        return false;
-      }
+const requiresPrice =
+  !isAccommodation &&
+  !isEatery &&
+  (priceDisplay === "fixed" ||
+    priceDisplay === "negotiable");
 
-      return true;
+if (
+  requiresPrice &&
+  (!price || parseFloat(price) <= 0)
+) {
+  toast({
+    title: "Enter a valid price",
+    description:
+      "Or choose 'Contact for Price' or 'Request Quote'.",
+    variant: "destructive",
+  });
+  return false;
+}
+
+return true;
     }
 
     if (step === 3) {
@@ -835,32 +851,32 @@ const isValid = validateLocationHierarchy(
         return;
       }
         } else if (
-      selectedSubcategory === "Airbnb / Short Stays" ||
-      selectedSubcategory === "Vacation Rentals" ||
-      selectedSubcategory === "Lodges / Guest Houses" ||
-      selectedSubcategory === "Serviced Apartments"
-    ) {
-      if (!price || parseFloat(price) <= 0) {
-        toast({
-          title: "Price required",
-          description: "Please enter a valid price for this short-stay accommodation.",
-          variant: "destructive",
-        });
-        return;
-      }
-    } else if (
-      selectedSubcategory === "Parking Spaces" ||
-      selectedSubcategory === "Garages"
-    ) {
-      if (!price || parseFloat(price) <= 0) {
-        toast({
-          title: "Price required",
-          description: "Please enter a valid price for this listing.",
-          variant: "destructive",
-        });
-        return;
-      }
-    } else {
+  selectedSubcategory === "Airbnb / Short Stays" ||
+  selectedSubcategory === "Vacation Rentals" ||
+  selectedSubcategory === "Lodges / Guest Houses" ||
+  selectedSubcategory === "Serviced Apartments"
+) {
+  if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
+    toast({
+      title: "Rate required",
+      description: "Please enter a valid rate for this short-stay accommodation.",
+      variant: "destructive",
+    });
+    return;
+  }
+} else if (
+  selectedSubcategory === "Parking Spaces" ||
+  selectedSubcategory === "Garages"
+) {
+  if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
+    toast({
+      title: "Fee required",
+      description: "Please enter a valid fee for this listing.",
+      variant: "destructive",
+    });
+    return;
+  }
+} else {
       if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
         toast({
           title: "Monthly rent required",
@@ -2101,17 +2117,21 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="space-y-1.5">
 
         <label className="text-sm font-bold">
-          Monthly Rent (KES) *
-        </label>
+  {isShortStay
+    ? "Rate (KES) *"
+    : (selectedSubcategory === "Parking Spaces" || selectedSubcategory === "Garages")
+    ? "Parking Fee (KES) *"
+    : "Monthly Rent (KES) *"}
+</label>
 
-        <Input
-          type="number"
-          inputMode="numeric"
-          placeholder="e.g. 7500"
-          value={rentPerMonth}
-          onChange={(e) => setRentPerMonth(e.target.value)}
-          className="h-12 text-base"
-        />
+<Input
+  type="number"
+  inputMode="numeric"
+  placeholder={isShortStay ? "e.g. 3500 per night" : "e.g. 7500"}
+  value={rentPerMonth}
+  onChange={(e) => setRentPerMonth(e.target.value)}
+  className="h-12 text-base"
+/>
 
         <div className="flex gap-2">
           {getPriceOptions().map((option) => (
