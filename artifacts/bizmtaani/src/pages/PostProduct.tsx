@@ -218,80 +218,18 @@ useEffect(() => {
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
   : null;
 
+// ============================================================
+// CATEGORY CLASSIFICATION
+// Keep all category/subcategory behavior centralized here.
+// CATEGORY_DEFS in categories.ts remains the source of truth
+// for the actual category and subcategory names.
+// ============================================================
+
 const isAccommodation =
   selectedCategory === "Accommodation";
 
-const isEatery =
-  selectedSubcategory === "Hotels / Eateries" ||
-  selectedSubcategory === "Restaurants & Cooked Food" ||
-  selectedSubcategory === "Catering Services";
-
-const isTransport =
-  selectedSubcategory === "Delivery Services" ||
-  selectedSubcategory === "Courier Services" ||
-  selectedSubcategory === "Transport Services" ||
-  selectedSubcategory === "Moving Services";
-
-const isJobSeeking =
-  selectedSubcategory === "Job Seeking & CVs";
-
-const PROFESSIONAL_SERVICE_SUBCATEGORIES = [
-  "Accounting & Bookkeeping",
-  "Legal Services",
-  "Consulting",
-  "Marketing & Advertising",
-  "Real Estate Services",
-  "Insurance Services",
-  "Business & Digital Services",
-  "Web & App Development",
-  "Graphic Design",
-  "Social Media Services",
-  "Printing Services",
-  "Photography",
-  "Videography",
-  "Tutoring & Education",
-  "Fitness Training",
-  "Freelance Services",
-];
-
-const isProfessionalService =
-  selectedCategory === "Services" &&
-  PROFESSIONAL_SERVICE_SUBCATEGORIES.includes(
-    selectedSubcategory
-  );
-
 const isVehicle =
   selectedCategory === "Vehicles";
-
-const isBabiesAndKids =
-  selectedCategory === "Babies & Kids";
-
-const isAnimalsAndPets =
-  selectedCategory === "Animals & Pets";
-
-const isOtherCategory =
-  selectedCategory === "Other & Miscellaneous";
-
-const isNormalAdvertCategory =
-  isBabiesAndKids ||
-  isAnimalsAndPets ||
-  isOtherCategory;
-  const isResidentialRental =
-  selectedCategory === "Accommodation" &&
-  ![
-    "Houses for Sale",
-    "Apartments for Sale",
-    "Residential Land for Sale",
-    "Residential Land for Rent",
-  ].includes(selectedSubcategory);
-
-const isPropertySale =
-  selectedCategory === "Accommodation" &&
-  [
-    "Houses for Sale",
-    "Apartments for Sale",
-    "Residential Land for Sale",
-  ].includes(selectedSubcategory);
 
 const isCommercialProperty =
   selectedCategory === "Commercial Property";
@@ -305,9 +243,227 @@ const isFurniture =
 const isEvent =
   selectedCategory === "Entertainment & Events";
 
+const isLeisure =
+  selectedCategory === "Leisure & Activities";
+
+const isFashion =
+  selectedCategory === "Fashion & Clothing";
+
+const isElectronics =
+  selectedCategory === "Electronics & Tech";
+
+const isGeneralProduct =
+  selectedCategory === "General Products";
+
+const isSecondHand =
+  selectedCategory === "Second-Hand / Used Items";
+
+const isBabiesAndKids =
+  selectedCategory === "Babies & Kids";
+
+const isAnimalsAndPets =
+  selectedCategory === "Animals & Pets";
+
+const isOtherCategory =
+  selectedCategory === "Other & Miscellaneous";
+
+
+// ============================================================
+// ACCOMMODATION / RESIDENTIAL PROPERTY CLASSIFICATION
+// ============================================================
+
+const RESIDENTIAL_RENTAL_SUBCATEGORIES = [
+  "Single Rooms",
+  "Bedsitters",
+  "Studios",
+  "1 Bedroom Apartments",
+  "2 Bedroom Apartments",
+  "3 Bedroom Apartments",
+  "4+ Bedroom Apartments",
+  "1 Bedroom Houses",
+  "2 Bedroom Houses",
+  "3 Bedroom Houses",
+  "4+ Bedroom Houses",
+  "Houses to Rent",
+  "Apartments to Rent",
+  "Hostels & Student Housing",
+  "Serviced Apartments",
+  "Furnished Apartments",
+  "Maisonettes",
+  "Bungalows",
+  "Townhouses",
+  "Gated Community Homes",
+];
+
+const RESIDENTIAL_PROPERTY_SALE_SUBCATEGORIES = [
+  "Houses for Sale",
+  "Apartments for Sale",
+  "Residential Land for Sale",
+];
+
+const RESIDENTIAL_LAND_RENT_SUBCATEGORIES = [
+  "Residential Land for Rent",
+];
+
+const SHORT_STAY_SUBCATEGORIES = [
+  "Airbnb / Short Stays",
+  "Lodges / Guest Houses",
+  "Vacation Rentals",
+];
+
+const SHARED_HOUSING_SUBCATEGORIES = [
+  "Roommates / Shared Housing",
+];
+
+const PARKING_SUBCATEGORIES = [
+  "Parking Spaces",
+  "Garages",
+];
+
+const isResidentialRental =
+  isAccommodation &&
+  RESIDENTIAL_RENTAL_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+const isPropertySale =
+  isAccommodation &&
+  RESIDENTIAL_PROPERTY_SALE_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+const isResidentialLandForRent =
+  isAccommodation &&
+  RESIDENTIAL_LAND_RENT_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+const isShortStay =
+  isAccommodation &&
+  SHORT_STAY_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+const isSharedHousing =
+  isAccommodation &&
+  SHARED_HOUSING_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+const isParking =
+  isAccommodation &&
+  PARKING_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+
+// ============================================================
+// FOOD / EATERY CLASSIFICATION
+// ============================================================
+
+const EATERY_SUBCATEGORIES = [
+  "Restaurants & Cooked Food",
+  "Hotels / Eateries",
+  "Catering Services",
+];
+
+const isEatery =
+  selectedCategory === "Food & Groceries" &&
+  EATERY_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+
+// ============================================================
+// TRANSPORT / DELIVERY CLASSIFICATION
+// ============================================================
+
+const TRANSPORT_SUBCATEGORIES = [
+  "Delivery Services",
+  "Courier Services",
+  "Transport Services",
+  "Moving Services",
+];
+
+const isTransport =
+  selectedCategory === "Services" &&
+  TRANSPORT_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
 const isTransportService =
   selectedCategory === "Services" &&
   selectedSubcategory === "Transport Services";
+
+
+// ============================================================
+// JOB SEEKING
+// ============================================================
+
+const isJobSeeking =
+  selectedCategory === "Services" &&
+  selectedSubcategory === "Job Seeking & CVs";
+
+
+// ============================================================
+// PROFESSIONAL / SERVICE PROVIDER CLASSIFICATION
+// ============================================================
+
+const PROFESSIONAL_SERVICE_SUBCATEGORIES = [
+  // Professional
+  "Accounting & Bookkeeping",
+  "Legal Services",
+  "Consulting",
+  "Marketing & Advertising",
+  "Real Estate Services",
+  "Insurance Services",
+
+  // Personal
+  "Beauty & Personal Care",
+  "Photography",
+  "Videography",
+  "Tutoring & Education",
+  "Fitness Training",
+
+  // Business & digital
+  "Business & Digital Services",
+  "Web & App Development",
+  "Graphic Design",
+  "Social Media Services",
+  "Printing Services",
+
+  // Jobs / freelance
+  "Freelance Services",
+];
+
+const isProfessionalService =
+  selectedCategory === "Services" &&
+  PROFESSIONAL_SERVICE_SUBCATEGORIES.includes(
+    selectedSubcategory
+  );
+
+
+// ============================================================
+// NORMAL ADVERT CATEGORIES
+// These categories currently use the generic product/ad form.
+// They will be expanded with specialized forms in later steps.
+// ============================================================
+
+const isNormalAdvertCategory =
+  isFashion ||
+  isElectronics ||
+  isGeneralProduct ||
+  isSecondHand ||
+  isBabiesAndKids ||
+  isAnimalsAndPets ||
+  isLeisure ||
+  isOtherCategory;
+
+
+// ============================================================
+// SUBCATEGORY LIST FOR SELECTED CATEGORY
+// ============================================================
+
 const subcategories =
   catDef?.subcategories ?? [];
   
