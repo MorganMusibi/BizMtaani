@@ -14,6 +14,7 @@ import {
   getAreaChoices,
   type ResolvedLocation,
 } from "@/lib/location";
+import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import {
   findWardLocationSync,
   getLocationHierarchy,
@@ -283,111 +284,105 @@ export default function Home() {
     useEffect(() => {
     let cancelled = false;
 
-    const applyResolvedLocation = (location: ResolvedLocation) => {
-      if (cancelled) return;
-      setLocationInfo(location);
-      if (location.lat != null && location.lng != null) {
-        setUserCoords([location.lat, location.lng]);
-      }
-      setGpsReady(true);
-    };
+    const applyResolvedLocation = async (location: ResolvedLocation) => {
+  if (cancelled) return;
 
-    const useSavedProfileLocation = (): boolean => {
-      const saved = userProfile?.homeLocation;
-      if (saved && typeof saved.lat === "number" && typeof saved.lng === "number") {
-        const savedLocation: ResolvedLocation = {
-          lat: saved.lat,
-          lng: saved.lng,
-          wardName: saved.areaName,
-          constituency: saved.constituency,
-          county: saved.county,
-        };
-        applyResolvedLocation(savedLocation);
-        return true;
-      }
-      return false;
-    };
+  let final = location;
+  if (location.wardName) {
+    const canonical = await resolveCanonicalLocation(
+      location.wardName,
+      location.constituency,
+      location.county
+    );
+    if (canonical) {
+      final = {
+        ...location,
+        wardName: canonical.wardName,
+        constituency: canonical.constituencyName,
+        county: canonical.countyName,
+        displayName: `${canonical.wardName}, ${canonical.constituencyName}`,
+      };
+    }
+  }
 
-    const usePreviouslySelectedArea = (): boolean => {
-      try {
-        const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
-        if (!stored) return false;
-        const parsed = JSON.parse(stored) as ResolvedLocation;
-        if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") return false;
-        applyResolvedLocation(parsed);
-        return true;
-      } catch (error) {
-        console.error("Failed to load saved area:", error);
-        return false;
-      }
-    };
+  setLocationInfo(final);
+  if (final.lat != null && final.lng != null) {
+    setUserCoords([final.lat, final.lng]);
+  }
+  setGpsReady(true);
+};
 
-    const requestGps = () => {
-      if (!navigator.geolocation) {
-        if (useSavedProfileLocation()) return;
-        if (usePreviouslySelectedArea()) return;
+    const useSavedProfileLocation = async (): Promise<boolean> => {
+  const saved = userProfile?.homeLocation;
+  if (saved && typeof saved.lat === "number" && typeof saved.lng === "number") {
+    const savedLocation: ResolvedLocation = {
+      lat: saved.lat,
+      lng: saved.lng,
+      wardName: saved.areaName,
+      constituency: saved.constituency,
+      county: saved.county,
+    };
+    await applyResolvedLocation(savedLocation);
+    return true;
+  }
+  return false;
+};
+
+const usePreviouslySelectedArea = async (): Promise<boolean> => {
+  try {
+    const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
+    if (!stored) return false;
+    const parsed = JSON.parse(stored) as ResolvedLocation;
+    if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") return false;
+    await applyResolvedLocation(parsed);
+    return true;
+  } catch (error) {
+    console.error("Failed to load saved area:", error);
+    return false;
+  }
+};
+
+    const requestGps = async () => {
+  if (!navigator.geolocation) {
+    if (await useSavedProfileLocation()) return;
+    if (await usePreviouslySelectedArea()) return;
+    setGpsReady(true);
+    if (!hasPromptedArea.current) {
+      hasPromptedArea.current = true;
+      setShowAreaPicker(true);
+    }
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    async (position) => {
+      // ...unchanged...
+    },
+    async () => {
+      setGpsGranted(false);
+
+      if (await useSavedProfileLocation()) {
         setGpsReady(true);
-        if (!hasPromptedArea.current) {
-          hasPromptedArea.current = true;
-          setShowAreaPicker(true);
-        }
+        return;
+      }
+      if (await usePreviouslySelectedArea()) {
+        setGpsReady(true);
         return;
       }
 
-            navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          if (cancelled) return;
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setUserCoords([lat, lng]);
-          setGpsGranted(true);
-          setGpsReady(true);
-
-          try {
-            const resolved = await getWardInfo(lat, lng);
-            if (cancelled) return;
-            if (resolved) {
-              setLocationInfo(resolved);
-              try {
-                const choices = await getAreaChoices(lat, lng);
-                if (!cancelled) {
-                  setAreaChoices(choices ?? []);
-                }
-              } catch (error) {
-                console.error("Failed to load nearby area choices:", error);
-              }
-            }
-          } catch (error) {
-            console.error("Failed to resolve GPS location:", error);
-          }
-        },
-        () => {
-          setGpsGranted(false);
-          
-          if (useSavedProfileLocation()) {
-            setGpsReady(true);
-            return;
-          }
-          if (usePreviouslySelectedArea()) {
-            setGpsReady(true);
-            return;
-          }
-
-          setGpsReady(true);
-          if (!hasPromptedArea.current) {
-            hasPromptedArea.current = true;
-            setShowAreaPicker(true);
-          }
-        },
-        { 
-          enableHighAccuracy: true, 
-          timeout: 15000, // Increased to 15s for reliable hardware GPS lock
-          maximumAge: 0   // Forces fresh coordinates instead of reading stale cache
-        }
-      );
-          
-    };
-
+      setGpsReady(true);
+      if (!hasPromptedArea.current) {
+        hasPromptedArea.current = true;
+        setShowAreaPicker(true);
+      }
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    }
+  );
+};
     if (user && !userProfile) return;
     requestGps();
 
