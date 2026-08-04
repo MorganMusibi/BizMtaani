@@ -1858,55 +1858,82 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </p>
         </div>
         
-                       {isAccommodation && !isAccommodationLand && (
+                        {isAccommodation && !isAccommodationLand && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold">Bedrooms</label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="e.g. 1"
-                  value={bedrooms}
-                  onChange={(e) => setBedrooms(e.target.value)}
-                  className="h-12"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-sm font-bold">Bathrooms</label>
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="e.g. 1"
-                  value={bathrooms}
-                  onChange={(e) => setBathrooms(e.target.value)}
-                  className="h-12"
-                />
-              </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="text-sm font-bold">Furnishing</label>
-              <div className="grid grid-cols-3 gap-2">
-                {["Unfurnished", "Semi-Furnished", "Furnished"].map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => setFurnishing(option)}
-                    className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
-                      furnishing === option
-                        ? "border-primary bg-primary/5 text-primary"
-                        : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+            {(selectedSubcategory.includes("Bedroom") ||
+              selectedSubcategory.includes("Houses") ||
+              selectedSubcategory.includes("Apartments") ||
+              selectedSubcategory === "Bedsitters" ||
+              selectedSubcategory === "Studios" ||
+              selectedSubcategory === "Single Rooms" ||
+              selectedSubcategory === "Maisonettes" ||
+              selectedSubcategory === "Bungalows" ||
+              selectedSubcategory === "Townhouses" ||
+              selectedSubcategory === "Gated Community Homes") && (
+              <>
+                <div className="grid grid-cols-2 gap-3">
 
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">
+                      Bedrooms
+                    </label>
+
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="e.g. 2"
+                      value={bedrooms}
+                      onChange={(e) => setBedrooms(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">
+                      Bathrooms
+                    </label>
+
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="e.g. 1"
+                      value={bathrooms}
+                      onChange={(e) => setBathrooms(e.target.value)}
+                      className="h-12"
+                    />
+                  </div>
+
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">
+                    Furnishing
+                  </label>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      "Unfurnished",
+                      "Semi-Furnished",
+                      "Furnished",
+                    ].map((option) => (
+                      <button
+                        key={option}
+                        type="button"
+                        onClick={() => setFurnishing(option)}
+                        className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                          furnishing === option
+                            ? "border-primary bg-primary/5 text-primary"
+                            : "border-border text-muted-foreground"
+                        }`}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
             {(selectedSubcategory === "Airbnb / Short Stays" ||
               selectedSubcategory === "Vacation Rentals" ||
               selectedSubcategory === "Lodges / Guest Houses" ||
