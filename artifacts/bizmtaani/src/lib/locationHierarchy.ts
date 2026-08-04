@@ -497,15 +497,17 @@ export async function resolveCanonicalLocation(
 export function clearLocationHierarchyCache(): void {
   hierarchyCache = null;
 }
-export function validateLocationHierarchy(
+export async function validateLocationHierarchy(
   countyName: string,
   constituencyName: string,
   wardName: string
-): boolean {
+): Promise<boolean> {
+  const counties = await getLocationHierarchy();
+
   const normalize = (value: string) =>
     value.trim().toLowerCase();
 
-  const county = LOCATION_HIERARCHY.find(
+  const county = counties.find(
     (county) =>
       normalize(county.county_name) === normalize(countyName)
   );
