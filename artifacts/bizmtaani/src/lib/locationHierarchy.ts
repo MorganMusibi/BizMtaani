@@ -48,19 +48,28 @@ export async function getLocationHierarchy(): Promise<County[]> {
     return hierarchyCache;
   }
 
-  const response = await fetch("/MasterHierarchy.json");
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to load MasterHierarchy.json: ${response.status} ${response.statusText}`
-    );
+  try {
+    const response = await fetch("/MasterHierarchy.json", {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load MasterHierarchy.json: ${response.status} ${response.statusText}`
+      );
+    }
+
+    const data: County[] = await response.json();
+
+    hierarchyCache = data;
+
+    return data;
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data: County[] = await response.json();
-
-  hierarchyCache = data;
-
-  return data;
 }
 /**
  * Find a ward in the already-loaded hierarchy.
