@@ -89,7 +89,7 @@ function App() {
         <AuthProvider>
           <NotificationSetup />
           <EmailVerificationBanner />
-          <WouterRouter>
+          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
             <Router />
           </WouterRouter>
           <ProfileSetupGate />
