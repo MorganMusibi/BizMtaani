@@ -227,7 +227,20 @@ useEffect(() => {
 
 const isAccommodation =
   selectedCategory === "Accommodation";
+const isAccommodationSale =
+  selectedCategory === "Accommodation" &&
+  (
+    selectedSubcategory === "Houses for Sale" ||
+    selectedSubcategory === "Apartments for Sale" ||
+    selectedSubcategory === "Residential Land for Sale"
+  );
 
+const isAccommodationLand =
+  selectedCategory === "Accommodation" &&
+  (
+    selectedSubcategory === "Residential Land for Sale" ||
+    selectedSubcategory === "Residential Land for Rent"
+  );
 const isVehicle =
   selectedCategory === "Vehicles";
 
@@ -1731,13 +1744,19 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <div className="space-y-1.5">
 
             <label className="text-sm font-bold">
-              Monthly Rent (KES) *
-            </label>
+  {isAccommodationSale
+    ? "Selling Price (KES) *"
+    : "Monthly Rent (KES) *"}
+</label>
 
             <Input
               type="number"
               inputMode="numeric"
-              placeholder="e.g. 7500"
+              placeholder={
+  isAccommodationSale
+    ? "e.g. 8500000"
+    : "e.g. 7500"
+}
               value={rentPerMonth}
               onChange={(e) => setRentPerMonth(e.target.value)}
               className="h-12 text-base"
