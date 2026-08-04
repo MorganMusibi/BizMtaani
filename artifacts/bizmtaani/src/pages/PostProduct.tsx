@@ -811,7 +811,7 @@ function isValidKenyanPhone(phone: string): boolean {
 
   return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
   }
-  function validateAdvertLocation(): boolean {
+  async function validateAdvertLocation(): Promise<boolean> {
   const ward = wardInfo?.wardName?.trim() || locationName.trim();
   const constituency = wardInfo?.constituency?.trim() || "";
   const county = wardInfo?.county?.trim() || "";
@@ -825,7 +825,7 @@ function isValidKenyanPhone(phone: string): boolean {
     });
     return false;
   }
-const isValid = validateLocationHierarchy(
+const isValid = await validateLocationHierarchy(
     county,
     constituency,
     ward
