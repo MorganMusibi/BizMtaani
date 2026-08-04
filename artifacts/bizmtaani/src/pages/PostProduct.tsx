@@ -800,6 +800,81 @@ const isValid = validateLocationHierarchy(
   return true;
   }
   function goNext() {
+      // Accommodation validation
+  if (step === 2 && isAccommodation) {
+    if (!title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a title for your accommodation advert.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isAccommodationLand) {
+      if (!landSize.trim()) {
+        toast({
+          title: "Land size required",
+          description: "Please enter the size of the land.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Price required",
+          description: "Please enter a valid price for the land.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (isAccommodationSale) {
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Sale price required",
+          description: "Please enter a valid sale price.",
+          variant: "destructive",
+        });
+        return;
+      }
+        } else if (
+      selectedSubcategory === "Airbnb / Short Stays" ||
+      selectedSubcategory === "Vacation Rentals" ||
+      selectedSubcategory === "Lodges / Guest Houses" ||
+      selectedSubcategory === "Serviced Apartments"
+    ) {
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Price required",
+          description: "Please enter a valid price for this short-stay accommodation.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (
+      selectedSubcategory === "Parking Spaces" ||
+      selectedSubcategory === "Garages"
+    ) {
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Price required",
+          description: "Please enter a valid price for this listing.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
+        toast({
+          title: "Monthly rent required",
+          description: "Please enter a valid monthly rent.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+  }
   if (!validateStep()) return;
 
   if (step < 5) {
