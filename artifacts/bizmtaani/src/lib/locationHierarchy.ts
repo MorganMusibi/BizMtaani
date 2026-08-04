@@ -505,7 +505,7 @@ export async function validateLocationHierarchy(
   countyName: string,
   constituencyName: string,
   wardName: string
-): Promise<boolean> {
+): Promise<CanonicalLocation | null> {
   const counties = await getLocationHierarchy();
 
   const county = counties.find(
@@ -513,7 +513,7 @@ export async function validateLocationHierarchy(
       normalize(county.county_name) === normalize(countyName)
   );
 
-  if (!county) return false;
+  if (!county) return null;
 
   const constituency = county.constituencies.find(
     (constituency) =>
@@ -521,10 +521,18 @@ export async function validateLocationHierarchy(
       normalize(constituencyName)
   );
 
-  if (!constituency) return false;
+  if (!constituency) return null;
 
-  return constituency.wards.some(
-    (ward) =>
-      normalize(ward) === normalize(wardName)
+  const matchingWard = constituency.wards.find(
+    (ward) => normalize(ward) === normalize(wardName)
   );
+
+  if (!matchingWard) return null;
+
+  return {
+    wardName: matchingWard,
+    constituencyName: constituency.constituency_name,
+    countyName: county.county_name,
+    countyCode: county.county_code,
+  };
 }
