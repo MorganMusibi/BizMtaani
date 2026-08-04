@@ -802,7 +802,8 @@ return true;
 
       return true;
     }
-
+return true;
+  }
 function isValidKenyanPhone(phone: string): boolean {
   const cleaned = phone.replace(/\s+/g, "").trim();
 
