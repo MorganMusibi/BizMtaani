@@ -1137,10 +1137,11 @@ serviceDetails: isProfessionalService
           : "",
     }
   : null,
-  };
-  commercialPropertyDetails: isCommercialProperty
+    commercialPropertyDetails: isCommercialProperty
   ? { landSize: isCommercialPropertyLand ? landSize : "" }
   : null,
+  };
+  
   // 3. Ask backend to create the advert
   const publishAdvert = httpsCallable<
     typeof docData,
@@ -2800,9 +2801,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
     {selectedCategory} / {selectedSubcategory}
   </span>
 </div>
-
-              <div className="flex items-center justify-between">
-  <span className="text-sm font-semibold">
+ <div className="flex items-center justify-between">
 <span className="text-sm font-semibold">
     {isAccommodationLand || isCommercialPropertyLand
       ? "Land Price"
