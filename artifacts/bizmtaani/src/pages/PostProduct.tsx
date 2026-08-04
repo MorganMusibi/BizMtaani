@@ -844,13 +844,14 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     title: title.trim(),
     description: description.trim(),
 
-    price: isAccommodation
-  ? parseFloat(rentPerMonth) || 0
-  : isProfessionalService && servicePricingType === "quote_only"
-    ? 0
-    : isTransport && pricingBasis === "quote_only"
+    price:
+  isAccommodation && !isAccommodationSale && !isAccommodationLand
+    ? parseFloat(rentPerMonth) || 0
+    : isProfessionalService && servicePricingType === "quote_only"
       ? 0
-      : parseFloat(price) || 0,
+      : isTransport && pricingBasis === "quote_only"
+        ? 0
+        : parseFloat(price) || 0,
 
     category: selectedCategory,
 
@@ -923,6 +924,48 @@ serviceDetails: isProfessionalService
       serviceType: serviceType.trim(),
       serviceArea: serviceArea.trim(),
       pricingType: servicePricingType,
+    }
+  : null,
+    accommodationDetails: isAccommodation
+  ? {
+      bedrooms:
+        !isAccommodationLand
+          ? bedrooms
+          : "",
+
+      bathrooms:
+        !isAccommodationLand
+          ? bathrooms
+          : "",
+
+      furnishing:
+        !isAccommodationLand
+          ? furnishing
+          : "",
+
+      landSize:
+        isAccommodationLand
+          ? landSize
+          : "",
+
+      stayDetails:
+        selectedSubcategory === "Airbnb / Short Stays" ||
+        selectedSubcategory === "Vacation Rentals" ||
+        selectedSubcategory === "Lodges / Guest Houses" ||
+        selectedSubcategory === "Serviced Apartments"
+          ? stayDetails
+          : "",
+
+      spaceDetails:
+        selectedSubcategory === "Parking Spaces" ||
+        selectedSubcategory === "Garages"
+          ? spaceDetails
+          : "",
+
+      sharedHousingDetails:
+        selectedSubcategory === "Roommates / Shared Housing"
+          ? sharedHousingDetails
+          : "",
     }
   : null,
   };
