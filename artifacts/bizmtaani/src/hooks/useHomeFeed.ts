@@ -600,13 +600,17 @@ try {
 
   let collectedProducts: Product[] = [];
   let allPrefixesDone = false;
+  let iterations = 0;
+  const MAX_ITERATIONS = 15;
 
     const currentRadius = HOME_FEED_RADIUS_STEPS[0];
 
   while (
     collectedProducts.length < AREA_BUFFER_FETCH &&
-    !allPrefixesDone
+    !allPrefixesDone &&
+    iterations < MAX_ITERATIONS
   ) {
+    iterations++;
   const prefixes = getNearbyGeohashPrefixes(
   userCoords[0],
   userCoords[1],
@@ -944,6 +948,8 @@ if (!areaDone && !areaLoading) {
     let collectedProducts: Product[] = [];
 
     let allPrefixesDone = false;
+    let iterations = 0;
+    const MAX_ITERATIONS = 15;
 
     // ==========================================================
     // STEP 3 — FETCH ENOUGH PRODUCTS FOR THE BUFFER
@@ -952,8 +958,10 @@ if (!areaDone && !areaLoading) {
     while (
       collectedProducts.length <
         AREA_BUFFER_FETCH &&
-      !allPrefixesDone
+      !allPrefixesDone &&
+      iterations < MAX_ITERATIONS
     ) {
+      iterations++;
       const prefixes =
         getNearbyGeohashPrefixes(
           userCoords[0],
