@@ -1740,48 +1740,137 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </p>
         </div>
 
-        {isAccommodation ? (
-          <div className="space-y-1.5">
+{isAccommodation ? (
+  <div className="space-y-4">
 
-            <label className="text-sm font-bold">
-  {isAccommodationSale
-    ? "Selling Price (KES) *"
-    : "Monthly Rent (KES) *"}
-</label>
+    {isAccommodationLand ? (
+      <>
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">
+            Land Size
+          </label>
+          <Input
+            placeholder="e.g. 50 x 100 ft or 1/8 acre"
+            value={landSize}
+            onChange={(e) => setLandSize(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
 
-            <Input
-              type="number"
-              inputMode="numeric"
-              placeholder={
-  isAccommodationSale
-    ? "e.g. 8500000"
-    : "e.g. 7500"
-}
-              value={rentPerMonth}
-              onChange={(e) => setRentPerMonth(e.target.value)}
-              className="h-12 text-base"
-            />
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">
+            Price (KES) *
+          </label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 2500000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
 
-            <div className="flex gap-2">
-              {getPriceOptions().map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() =>
-                    setPriceDisplay(option.value as PriceDisplay)
-                  }
-                  className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
-                    priceDisplay === option.value
-                      ? "border-primary bg-primary/5 text-primary"
-                      : "border-border text-muted-foreground"
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">
+            Price Display
+          </label>
 
+          <div className="flex gap-2">
+            {getPriceOptions().map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  setPriceDisplay(option.value as PriceDisplay)
+                }
+                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
           </div>
+        </div>
+      </>
+    ) : isAccommodationSale ? (
+      <div className="space-y-1.5">
+
+        <label className="text-sm font-bold">
+          Sale Price (KES) *
+        </label>
+
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder="e.g. 8500000"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="h-12 text-base"
+        />
+
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() =>
+                setPriceDisplay(option.value as PriceDisplay)
+              }
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+      </div>
+    ) : (
+      <div className="space-y-1.5">
+
+        <label className="text-sm font-bold">
+          Monthly Rent (KES) *
+        </label>
+
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder="e.g. 7500"
+          value={rentPerMonth}
+          onChange={(e) => setRentPerMonth(e.target.value)}
+          className="h-12 text-base"
+        />
+
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() =>
+                setPriceDisplay(option.value as PriceDisplay)
+              }
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+      </div>
+    )}
+
+  </div>
 
         ) : isTransport ? (
 
