@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Store, User, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 
 interface HomeLocation {
   lat: number; lng: number;
@@ -22,32 +23,59 @@ interface HomeLocation {
  * Try to geocode an area name → coordinates + ward info.
  * Times out in 4 s. Returns null on any failure — never throws.
  */
+
+import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
+
 async function geocodeArea(area: string): Promise<HomeLocation | null> {
+  const trimmed = area.trim();
+
+  // Validate what the user typed against MasterHierarchy.json directly.
+  // Handles "babadogo" -> "Baba Dogo" even if geocoding fails or times out.
+  const directCanonical = await resolveCanonicalLocation(trimmed);
+
   try {
     const controller = new AbortController();
     const tid = setTimeout(() => controller.abort(), 4000);
     const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(area.trim() + ", Kenya")}&limit=1`,
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed + ", Kenya")}&limit=1`,
       { signal: controller.signal }
     );
     clearTimeout(tid);
     const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
-    if (!results.length) return null;
+
+    if (!results.length) {
+      // No geocode hit — use the direct hierarchy match if we found one
+      return directCanonical
+        ? {
+            lat: 0, lng: 0,
+            areaName: directCanonical.wardName,
+            constituency: directCanonical.constituencyName,
+            county: directCanonical.countyName,
+          }
+        : null;
+    }
+
     const { lat, lon } = results[0];
     const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
-    const info = await getWardInfo(c.lat, c.lng);
-    return {
-      lat: c.lat,
-      lng: c.lng,
-      areaName: info?.wardName || area.trim(),
-      constituency: info?.constituency ?? "",
-      county: info?.county ?? "",
-    };
+    const info = await getWardInfo(c.lat, c.lng); // already canonicalized internally
+
+    // Prefer reverse-geocode result, then direct text match — never raw input
+    const areaName = info?.wardName || directCanonical?.wardName || trimmed;
+    const constituency = info?.constituency || directCanonical?.constituencyName || "";
+    const county = info?.county || directCanonical?.countyName || "";
+
+    return { lat: c.lat, lng: c.lng, areaName, constituency, county };
   } catch {
-    return null;
+    return directCanonical
+      ? {
+          lat: 0, lng: 0,
+          areaName: directCanonical.wardName,
+          constituency: directCanonical.constituencyName,
+          county: directCanonical.countyName,
+        }
+      : null;
   }
 }
-
 export function ProfileSetupModal() {
   const { user, refreshProfile, setProfileDirectly } = useAuth();
   const { toast } = useToast();
