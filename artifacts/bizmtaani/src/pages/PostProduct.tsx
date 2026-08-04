@@ -2025,19 +2025,23 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
   <div className="space-y-4">
 
     {isAccommodationLand ? (
-      <>
-        <label className="text-sm font-bold">
-  Land Size *
-</label>
-            onChange={(e) => setLandSize(e.target.value)}
-            className="h-12 text-base"
-          />
-        </div>
+  <>
+    <div className="space-y-1.5">
+      <label className="text-sm font-bold">
+        Land Size *
+      </label>
+      <Input
+        placeholder="e.g. 50 x 100 ft or 1/8 acre"
+        value={landSize}
+        onChange={(e) => setLandSize(e.target.value)}
+        className="h-12 text-base"
+      />
+    </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold">
-            Price (KES) *
-          </label>
+    <div className="space-y-1.5">
+      <label className="text-sm font-bold">
+        Price (KES) *
+      </label>
           <Input
             type="number"
             inputMode="numeric"
