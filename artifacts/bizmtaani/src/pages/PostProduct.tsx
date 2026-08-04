@@ -368,7 +368,30 @@ const isParking =
   PARKING_SUBCATEGORIES.includes(
     selectedSubcategory
   );
+// ============================================================
+// COMMERCIAL PROPERTY CLASSIFICATION
+// ============================================================
 
+const COMMERCIAL_LAND_SUBCATEGORIES = [
+  "Commercial Land for Sale",
+  "Commercial Land for Rent",
+  "Industrial Land",
+];
+
+const COMMERCIAL_SALE_SUBCATEGORIES = [
+  "Shops for Sale",
+  "Offices for Sale",
+  "Commercial Buildings for Sale",
+];
+
+const isCommercialPropertyLand =
+  isCommercialProperty &&
+  COMMERCIAL_LAND_SUBCATEGORIES.includes(selectedSubcategory);
+
+const isCommercialPropertySale =
+  isCommercialProperty &&
+  !isCommercialPropertyLand &&
+  COMMERCIAL_SALE_SUBCATEGORIES.includes(selectedSubcategory);
 
 // ============================================================
 // FOOD / EATERY CLASSIFICATION
@@ -715,6 +738,14 @@ if (isAccommodation && !isAccommodationSale && !isAccommodationLand && !rentPerM
   });
   return false;
 }
+      // Commercial Property must always have rent (except Sale/Land, which use price instead)
+if (isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand && !rentPerMonth) {
+  toast({
+    title: "Enter monthly rent",
+    variant: "destructive",
+  });
+  return false;
+}
       
       // Transport uses pricingBasis, not priceDisplay — validate separately
 if (isTransport) {
@@ -734,6 +765,7 @@ if (isTransport) {
 
 const requiresPrice =
   !isAccommodation &&
+  !isCommercialProperty &&
   !isEatery &&
   (priceDisplay === "fixed" ||
     priceDisplay === "negotiable");
@@ -877,6 +909,54 @@ const isValid = validateLocationHierarchy(
     return;
   }
 } else {
+      if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
+        toast({
+          title: "Monthly rent required",
+          description: "Please enter a valid monthly rent.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+  }
+    // Commercial Property validation
+  if (step === 2 && isCommercialProperty) {
+    if (!title.trim()) {
+      toast({
+        title: "Title required",
+        description: "Please enter a title for your commercial property advert.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isCommercialPropertyLand) {
+      if (!landSize.trim()) {
+        toast({
+          title: "Land size required",
+          description: "Please enter the size of the land.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Price required",
+          description: "Please enter a valid price for the land.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (isCommercialPropertySale) {
+      if (!price || parseFloat(price) <= 0) {
+        toast({
+          title: "Sale price required",
+          description: "Please enter a valid sale price.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
       if (!rentPerMonth || parseFloat(rentPerMonth) <= 0) {
         toast({
           title: "Monthly rent required",
