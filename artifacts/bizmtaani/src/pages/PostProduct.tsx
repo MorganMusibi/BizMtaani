@@ -823,13 +823,14 @@ function isValidKenyanPhone(phone: string): boolean {
     });
     return false;
   }
-const isValid = await validateLocationHierarchy(
+
+  const canonical = await validateLocationHierarchy(
     county,
     constituency,
     ward
   );
 
-  if (!isValid) {
+  if (!canonical) {
     toast({
       title: "Invalid location",
       description:
@@ -839,8 +840,18 @@ const isValid = await validateLocationHierarchy(
     return false;
   }
 
+  // Save the canonical spelling so what gets submitted matches MasterHierarchy.json exactly
+  setWardInfo((prev) => ({
+    ...(prev ?? { displayName: canonical.wardName }),
+    wardName: canonical.wardName,
+    constituency: canonical.constituencyName,
+    county: canonical.countyName,
+  }));
+  setLocationName(canonical.wardName);
+
   return true;
   }
+  
   async function goNext() {
       // Accommodation validation
   if (step === 2 && isAccommodation) {
