@@ -1014,11 +1014,13 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     price:
   isAccommodation && !isAccommodationSale && !isAccommodationLand
     ? parseFloat(rentPerMonth) || 0
-    : isProfessionalService && servicePricingType === "quote_only"
-      ? 0
-      : isTransport && pricingBasis === "quote_only"
+    : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+      ? parseFloat(rentPerMonth) || 0
+      : isProfessionalService && servicePricingType === "quote_only"
         ? 0
-        : parseFloat(price) || 0,
+        : isTransport && pricingBasis === "quote_only"
+          ? 0
+          : parseFloat(price) || 0,
 
     category: selectedCategory,
 
@@ -1135,8 +1137,11 @@ serviceDetails: isProfessionalService
           : "",
     }
   : null,
+    commercialPropertyDetails: isCommercialProperty
+  ? { landSize: isCommercialPropertyLand ? landSize : "" }
+  : null,
   };
-
+  
   // 3. Ask backend to create the advert
   const publishAdvert = httpsCallable<
     typeof docData,
@@ -1207,13 +1212,16 @@ setPublishingFree(true);
     const docData: any = {
       title: title.trim(),
       description: description.trim(),
-      price: isAccommodation
-  ? parseFloat(rentPerMonth) || 0
-  : isProfessionalService && servicePricingType === "quote_only"
-    ? 0
-    : isTransport && pricingBasis === "quote_only"
-      ? 0
-      : parseFloat(price) || 0,
+      price:
+  isAccommodation && !isAccommodationSale && !isAccommodationLand
+    ? parseFloat(rentPerMonth) || 0
+    : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+      ? parseFloat(rentPerMonth) || 0
+      : isProfessionalService && servicePricingType === "quote_only"
+        ? 0
+        : isTransport && pricingBasis === "quote_only"
+          ? 0
+          : parseFloat(price) || 0,
 
       category: selectedCategory,
       subcategory:
@@ -1921,14 +1929,16 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <label className="text-sm font-bold">Title *</label>
           <Input
             placeholder={
-              isAccommodation
-                ? "e.g. 1 bedroom bedsitter in Kariobangi"
-                : isEatery
-                ? "e.g. Mama Njeri Restaurant"
-                : isTransport
-                ? "e.g. Toyota Probox taxi — Eastleigh"
-                : "e.g. iPhone 13 Pro 256GB"
-            }
+  isAccommodation
+    ? "e.g. 1 bedroom bedsitter in Kariobangi"
+    : isCommercialProperty
+    ? "e.g. 2000 sqft shop in Nairobi CBD"
+    : isEatery
+    ? "e.g. Mama Njeri Restaurant"
+    : isTransport
+    ? "e.g. Toyota Probox taxi — Eastleigh"
+    : "e.g. iPhone 13 Pro 256GB"
+}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             maxLength={80}
@@ -2232,6 +2242,113 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           ))}
         </div>
 
+      </div>
+    )}
+
+  </div>
+
+) : isCommercialProperty ? (
+  <div className="space-y-4">
+
+    {isCommercialPropertyLand ? (
+      <>
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Land Size *</label>
+          <Input
+            placeholder="e.g. 1 acre or 50 x 100 ft"
+            value={landSize}
+            onChange={(e) => setLandSize(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Price (KES) *</label>
+          <Input
+            type="number"
+            inputMode="numeric"
+            placeholder="e.g. 5000000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Price Display</label>
+          <div className="flex gap-2">
+            {getPriceOptions().map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    ) : isCommercialPropertySale ? (
+      <div className="space-y-1.5">
+        <label className="text-sm font-bold">Sale Price (KES) *</label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder="e.g. 15000000"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="h-12 text-base"
+        />
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="space-y-1.5">
+        <label className="text-sm font-bold">Monthly Rent (KES) *</label>
+        <Input
+          type="number"
+          inputMode="numeric"
+          placeholder="e.g. 45000"
+          value={rentPerMonth}
+          onChange={(e) => setRentPerMonth(e.target.value)}
+          className="h-12 text-base"
+        />
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
       </div>
     )}
 
@@ -2665,11 +2782,11 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
               <div className="flex items-center justify-between border-t border-border pt-4">
   <span className="text-sm font-bold text-primary">
-    {isAccommodationLand
+    {isAccommodationLand || isCommercialPropertyLand
       ? `KES ${price}`
-      : isAccommodationSale
+      : isAccommodationSale || isCommercialPropertySale
       ? `KES ${price}${priceDisplay === "negotiable" ? " (Negotiable)" : ""}`
-      : isAccommodation
+      : isAccommodation || isCommercialProperty
       ? `KES ${rentPerMonth}/mo`
       : priceDisplay === "contact"
       ? "Contact for Price"
@@ -2687,25 +2804,26 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
               <div className="flex items-center justify-between">
   <span className="text-sm font-semibold">
-    {isAccommodationLand
+<span className="text-sm font-semibold">
+    {isAccommodationLand || isCommercialPropertyLand
       ? "Land Price"
-      : isAccommodationSale
+      : isAccommodationSale || isCommercialPropertySale
       ? "Sale Price"
-      : isAccommodation
+      : isAccommodation || isCommercialProperty
       ? "Monthly Rent"
       : "Price"}
   </span>
 
   <span className="text-sm font-bold text-primary">
-    {isAccommodationLand
+    {isAccommodationLand || isCommercialPropertyLand
       ? price
         ? `KES ${price}`
         : "Not specified"
-      : isAccommodationSale
+      : isAccommodationSale || isCommercialPropertySale
       ? price
         ? `KES ${price}`
         : "Not specified"
-      : isAccommodation
+      : isAccommodation || isCommercialProperty
       ? rentPerMonth
         ? `KES ${rentPerMonth}/mo`
         : "Not specified"
@@ -2796,6 +2914,16 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       </div>
     )}
 
+  </div>
+)}
+                {isCommercialPropertyLand && (
+  <div className="space-y-2 border-t border-border pt-4">
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-semibold">Land Size</span>
+      <span className="text-sm text-muted-foreground">
+        {landSize || "Not specified"}
+      </span>
+    </div>
   </div>
 )}
               <div className="flex items-center justify-between">
