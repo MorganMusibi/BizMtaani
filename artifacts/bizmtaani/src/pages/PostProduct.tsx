@@ -1137,11 +1137,10 @@ serviceDetails: isProfessionalService
           : "",
     }
   : null,
-    commercialPropertyDetails: isCommercialProperty
+  };
+  commercialPropertyDetails: isCommercialProperty
   ? { landSize: isCommercialPropertyLand ? landSize : "" }
   : null,
-  };
-  
   // 3. Ask backend to create the advert
   const publishAdvert = httpsCallable<
     typeof docData,
