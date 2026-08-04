@@ -628,7 +628,7 @@ function handleImageFiles(files: FileList | null) {
       setLocationLoading(false);
     }
   }
-    function validateStep(): boolean {
+    async function validateStep(): Promise<boolean> {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
       if (subcategories.length > 0 && !selectedSubcategory) {
@@ -796,15 +796,12 @@ return true;
         return false;
       }
 
-      if (!validateAdvertLocation()) {
+      if (!(await validateAdvertLocation())) {
         return false;
       }
 
       return true;
     }
-
-    return true;
-  }
 
 function isValidKenyanPhone(phone: string): boolean {
   const cleaned = phone.replace(/\s+/g, "").trim();
@@ -843,7 +840,7 @@ const isValid = await validateLocationHierarchy(
 
   return true;
   }
-  function goNext() {
+  async function goNext() {
       // Accommodation validation
   if (step === 2 && isAccommodation) {
     if (!title.trim()) {
@@ -967,7 +964,7 @@ const isValid = await validateLocationHierarchy(
       }
     }
   }
-  if (!validateStep()) return;
+  if (!(await validateStep())) return;
 
   if (step < 5) {
     setStep((prev) => (prev + 1) as Step);
@@ -986,7 +983,7 @@ async function handleInitiate(
     throw new Error("Not ready");
   }
 
-  if (!validateAdvertLocation()) {
+if (!(await validateAdvertLocation())) {
     throw new Error("Invalid advert location");
   }
 const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
@@ -1196,7 +1193,7 @@ if (!user || !coords) {
   return;
 }
 
-if (!validateAdvertLocation()) {
+if (!(await validateAdvertLocation())) {
   return;
 }
 
