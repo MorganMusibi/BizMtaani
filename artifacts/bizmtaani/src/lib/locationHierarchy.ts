@@ -25,6 +25,16 @@ export interface County {
 
 // Cache the hierarchy so we only fetch the JSON once
 let hierarchyCache: County[] | null = null;
+/**
+ * Normalize a location name for comparison.
+ *
+ * Strips whitespace differences and casing so that variants like
+ * "Baba Dogo" (JSON) and "Babadogo" (Google reverse geocoding)
+ * are treated as the same ward.
+ */
+function normalize(value: string): string {
+  return value.trim().toLowerCase().replace(/\s+/g, "");
+}
 
 /**
  * Load the complete location hierarchy.
@@ -74,15 +84,9 @@ export function findWardLocationSync(
     return undefined;
   }
 
-  const normalizedWard =
-    wardName.trim().toLowerCase();
-
-  const normalizedConstituency =
-    constituencyName?.trim().toLowerCase() ?? "";
-
-  const normalizedCounty =
-    countyName?.trim().toLowerCase() ?? "";
-
+  const normalizedWard = normalize(wardName);
+  const normalizedConstituency = constituencyName ? normalize(constituencyName) : "";
+  const normalizedCounty = countyName ? normalize(countyName) : "";
   // ============================================================
   // 1. Exact County + Constituency + Ward match
   // ============================================================
@@ -503,9 +507,6 @@ export async function validateLocationHierarchy(
   wardName: string
 ): Promise<boolean> {
   const counties = await getLocationHierarchy();
-
-  const normalize = (value: string) =>
-    value.trim().toLowerCase();
 
   const county = counties.find(
     (county) =>
