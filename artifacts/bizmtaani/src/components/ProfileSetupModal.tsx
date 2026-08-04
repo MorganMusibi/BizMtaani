@@ -7,12 +7,13 @@ import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getWardInfo } from "@/lib/location";
+import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, Store, User, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
+
 
 interface HomeLocation {
   lat: number; lng: number;
