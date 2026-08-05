@@ -627,54 +627,6 @@ const totalVisible = rankedProducts.length;
             <p className="text-xs text-muted-foreground flex-1 truncate">
               {bannerText()}
             </p>
-            
-            <div className="flex items-center gap-2 flex-shrink-0">
-                            <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (!navigator.geolocation) {
-                    alert("Geolocation is not supported by your browser.");
-                    return;
-                  }
-                  
-                  navigator.geolocation.getCurrentPosition(
-                    async (pos) => {
-                      const lat = pos.coords.latitude;
-                      const lng = pos.coords.longitude;
-                      setUserCoords((prev) => {
-  if (
-    prev &&
-    prev[0] === lat &&
-    prev[1] === lng
-  ) {
-    return prev;
-  }
-
-  return [lat, lng];
-});
-                      setGpsGranted(true);
-                      setLocationErrorMsg(null); // Clears error on success
-                      const resolved = await getWardInfo(lat, lng);
-                      if (resolved) setLocationInfo(resolved);
-                      const choices = await getAreaChoices(lat, lng);
-                      setAreaChoices(choices ?? []);
-                    },
-                    (err) => {
-                      console.error("GPS re-detect error:", err);
-                      // Sets the professional message instead of alert()
-                      setLocationErrorMsg(
-                        "Location access is turned off or blocked. Please enable GPS permissions in your phone settings to discover products and services right around your neighborhood."
-                      );
-                    },
-                    { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                  );
-                }}
-                className="text-[10px] font-bold text-primary hover:underline active:opacity-70"
-              >
-                Re-detect GPS
-              </button>
-            </div>
           </div>
         )}
                       {locationErrorMsg && (
