@@ -536,6 +536,7 @@ setAreaDone(true);
   }
 
   setInitialLoading(false);
+  console.log("[FEED] run() end (search mode), initialLoading set false");
   return;
 }
     // ============================================================
