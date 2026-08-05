@@ -409,7 +409,7 @@ export async function resolveCanonicalLocation(
   if (!wardName?.trim()) {
     return undefined;
   }
-
+  const counties = await getLocationHierarchy();
   const normalizedWard = normalize(wardName);
 
 const normalizedConstituency =
@@ -424,8 +424,8 @@ const normalizedCounty =
 
   for (const county of counties) {
     const countyMatches =
-      !normalizedCounty ||
-      normalize(county.county_name) === normalizedCounty
+  !normalizedCounty ||
+  normalize(county.county_name) === normalizedCounty;
 
     if (!countyMatches) {
       continue;
@@ -433,9 +433,9 @@ const normalizedCounty =
 
     for (const constituency of county.constituencies) {
       const constituencyMatches =
-        !normalizedConstituency ||
-        normalize(constituency.constituency_name) ===
-normalizedConstituency
+  !normalizedConstituency ||
+  normalize(constituency.constituency_name) ===
+    normalizedConstituency;
 
       if (!constituencyMatches) {
         continue;
