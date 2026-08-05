@@ -478,6 +478,7 @@ setAreaRadiusStage(0);
 setSearchCursor(null);
 setSearchDone(false);
   const run = async () => {
+    console.log("[FEED] run() start", { isSearchMode, wardName: locationInfo?.wardName, userCoords });
 
     // ============================================================
     // SEARCH MODE
@@ -801,6 +802,7 @@ const sortedBuffer = sortNearbyProducts(
     
 
     setInitialLoading(false);
+    console.log("[FEED] run() end, initialLoading set false");
   };
 
     run();
