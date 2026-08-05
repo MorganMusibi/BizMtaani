@@ -393,17 +393,18 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
       maximumAge: 0
     }
   );
- };
-
-    // Removed the blocking check on userProfile === null. 
-    // It will now immediately attempt to fetch GPS or fallback storage.
+};
+    if (user && !userProfile) {
+      console.log("[LOC] SKIPPING requestGps — user exists but userProfile not loaded", { user: !!user, userProfile });
+      return;
+    }
     console.log("[LOC] calling requestGps");
     requestGps();
 
     return () => {
       cancelled = true;
     };
-  }, [user]); // Only run once when auth user state settles, preventing infinite re-triggers
+  }, [user, userProfile]);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -823,4 +824,4 @@ const totalVisible = rankedProducts.length;
       <BottomNav />
     </div>
   );
-}
+    }
