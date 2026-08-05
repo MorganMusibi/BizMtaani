@@ -307,7 +307,20 @@ const applyResolvedLocation = async (location: ResolvedLocation) => {
     }
   }
 
-  setLocationInfo(final);
+  setLocationInfo((prev) => {
+  if (
+    prev &&
+    prev.lat === final.lat &&
+    prev.lng === final.lng &&
+    prev.wardName === final.wardName &&
+    prev.constituency === final.constituency &&
+    prev.county === final.county
+  ) {
+    return prev;
+  }
+
+  return final;
+});
   if (final.lat != null && final.lng != null) {
     setUserCoords((prev) => {
   if (
