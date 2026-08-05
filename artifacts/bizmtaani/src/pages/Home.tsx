@@ -393,21 +393,17 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
       maximumAge: 0
     }
   );
-};
-        // Allow GPS and location resolution to proceed even if userProfile 
-    // hasn't loaded yet. We can check userProfile inside requestGps optionally.
-    if (user && userProfile === undefined) {
-      console.log("[LOC] userProfile is still initializing, waiting...");
-      return;
-    }
-    
+ };
+
+    // Removed the blocking check on userProfile === null. 
+    // It will now immediately attempt to fetch GPS or fallback storage.
     console.log("[LOC] calling requestGps");
     requestGps();
 
     return () => {
       cancelled = true;
     };
-  }, [user, userProfile]);
+  }, [user]); // Only run once when auth user state settles, preventing infinite re-triggers
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
