@@ -394,10 +394,13 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     }
   );
 };
-    if (user && !userProfile) {
-      console.log("[LOC] SKIPPING requestGps — user exists but userProfile not loaded", { user: !!user, userProfile });
+        // Allow GPS and location resolution to proceed even if userProfile 
+    // hasn't loaded yet. We can check userProfile inside requestGps optionally.
+    if (user && userProfile === undefined) {
+      console.log("[LOC] userProfile is still initializing, waiting...");
       return;
     }
+    
     console.log("[LOC] calling requestGps");
     requestGps();
 
