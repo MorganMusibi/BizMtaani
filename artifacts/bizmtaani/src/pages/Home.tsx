@@ -283,17 +283,19 @@ export default function Home() {
 }, []);
     useEffect(() => {
     let cancelled = false;
-
-    const applyResolvedLocation = async (location: ResolvedLocation) => {
+const applyResolvedLocation = async (location: ResolvedLocation) => {
+  console.log("[LOC] applyResolvedLocation start", location);
   if (cancelled) return;
 
   let final = location;
   if (location.wardName) {
+    console.log("[LOC] calling resolveCanonicalLocation");
     const canonical = await resolveCanonicalLocation(
       location.wardName,
       location.constituency,
       location.county
     );
+    console.log("[LOC] resolveCanonicalLocation done", canonical);
     if (canonical) {
       final = {
         ...location,
@@ -310,6 +312,7 @@ export default function Home() {
     setUserCoords([final.lat, final.lng]);
   }
   setGpsReady(true);
+  console.log("[LOC] applyResolvedLocation done, gpsReady set true");
 };
 
     const useSavedProfileLocation = async (): Promise<boolean> => {
@@ -329,20 +332,28 @@ export default function Home() {
 };
 
 const usePreviouslySelectedArea = async (): Promise<boolean> => {
+  console.log("[LOC] usePreviouslySelectedArea start");
   try {
     const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
+    console.log("[LOC] stored value:", stored);
     if (!stored) return false;
     const parsed = JSON.parse(stored) as ResolvedLocation;
-    if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") return false;
+    console.log("[LOC] parsed:", parsed);
+    if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") {
+      console.log("[LOC] invalid lat/lng, bailing");
+      return false;
+    }
     await applyResolvedLocation(parsed);
+    console.log("[LOC] usePreviouslySelectedArea done");
     return true;
   } catch (error) {
-    console.error("Failed to load saved area:", error);
+    console.error("[LOC] Failed to load saved area:", error);
     return false;
   }
 };
 
     const requestGps = async () => {
+  console.log("[LOC] requestGps start, geolocation available:", !!navigator.geolocation);
   if (!navigator.geolocation) {
     if (await useSavedProfileLocation()) return;
     if (await usePreviouslySelectedArea()) return;
@@ -383,7 +394,11 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     }
   );
 };
-    if (user && !userProfile) return;
+    if (user && !userProfile) {
+      console.log("[LOC] SKIPPING requestGps — user exists but userProfile not loaded", { user: !!user, userProfile });
+      return;
+    }
+    console.log("[LOC] calling requestGps");
     requestGps();
 
     return () => {
