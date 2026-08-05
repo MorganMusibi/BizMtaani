@@ -309,7 +309,17 @@ const applyResolvedLocation = async (location: ResolvedLocation) => {
 
   setLocationInfo(final);
   if (final.lat != null && final.lng != null) {
-    setUserCoords([final.lat, final.lng]);
+    setUserCoords((prev) => {
+  if (
+    prev &&
+    prev[0] === final.lat &&
+    prev[1] === final.lng
+  ) {
+    return prev;
+  }
+
+  return [final.lat, final.lng];
+});
   }
   setGpsReady(true);
   console.log("[LOC] applyResolvedLocation done, gpsReady set true");
@@ -619,7 +629,17 @@ const totalVisible = rankedProducts.length;
                     async (pos) => {
                       const lat = pos.coords.latitude;
                       const lng = pos.coords.longitude;
-                      setUserCoords([lat, lng]);
+                      setUserCoords((prev) => {
+  if (
+    prev &&
+    prev[0] === lat &&
+    prev[1] === lng
+  ) {
+    return prev;
+  }
+
+  return [lat, lng];
+});
                       setGpsGranted(true);
                       setLocationErrorMsg(null); // Clears error on success
                       const resolved = await getWardInfo(lat, lng);
@@ -664,7 +684,17 @@ const totalVisible = rankedProducts.length;
                       async (pos) => {
                         const lat = pos.coords.latitude;
                         const lng = pos.coords.longitude;
-                        setUserCoords([lat, lng]);
+                        setUserCoords((prev) => {
+  if (
+    prev &&
+    prev[0] === lat &&
+    prev[1] === lng
+  ) {
+    return prev;
+  }
+
+  return [lat, lng];
+});
                         setGpsGranted(true);
                         setLocationErrorMsg(null);
                         const resolved = await getWardInfo(lat, lng);
