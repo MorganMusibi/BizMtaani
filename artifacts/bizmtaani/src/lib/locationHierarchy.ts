@@ -410,16 +410,13 @@ export async function resolveCanonicalLocation(
     return undefined;
   }
 
-  const counties = await getLocationHierarchy();
+  const normalizedWard = normalize(wardName);
 
-  const normalizedWard =
-    wardName.trim().toLowerCase();
+const normalizedConstituency =
+  constituencyName ? normalize(constituencyName) : "";
 
-  const normalizedConstituency =
-    constituencyName?.trim().toLowerCase() ?? "";
-
-  const normalizedCounty =
-    countyName?.trim().toLowerCase() ?? "";
+const normalizedCounty =
+  countyName ? normalize(countyName) : "";
 
   // ============================================================
   // 1. Exact full hierarchy match
@@ -428,8 +425,7 @@ export async function resolveCanonicalLocation(
   for (const county of counties) {
     const countyMatches =
       !normalizedCounty ||
-      county.county_name.trim().toLowerCase() ===
-        normalizedCounty;
+      normalize(county.county_name) === normalizedCounty
 
     if (!countyMatches) {
       continue;
@@ -438,10 +434,8 @@ export async function resolveCanonicalLocation(
     for (const constituency of county.constituencies) {
       const constituencyMatches =
         !normalizedConstituency ||
-        constituency.constituency_name
-          .trim()
-          .toLowerCase() ===
-          normalizedConstituency;
+        normalize(constituency.constituency_name) ===
+normalizedConstituency
 
       if (!constituencyMatches) {
         continue;
@@ -450,8 +444,7 @@ export async function resolveCanonicalLocation(
       const matchingWard =
         constituency.wards.find(
           (ward) =>
-            ward.trim().toLowerCase() ===
-            normalizedWard
+            normalize(ward) === normalizedWard
         );
 
       if (matchingWard) {
@@ -478,11 +471,11 @@ export async function resolveCanonicalLocation(
   for (const county of counties) {
     for (const constituency of county.constituencies) {
       const matchingWard =
-        constituency.wards.find(
-          (ward) =>
-            ward.trim().toLowerCase() ===
-            normalizedWard
-        );
+  constituency.wards.find(
+    (ward) =>
+      normalize(ward) ===
+      normalizedWard
+  );
 
       if (matchingWard) {
         return {
