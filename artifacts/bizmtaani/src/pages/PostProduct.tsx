@@ -787,19 +787,6 @@ return true;
     }
 
     if (step === 3) {
-      if (!coords) {
-        toast({
-          title: "Location not ready",
-          description: "Please wait for your location to be detected.",
-          variant: "destructive",
-        });
-        return false;
-      }
-
-      if (!(await validateAdvertLocation())) {
-        return false;
-      }
-
       return true;
     }
 return true;
@@ -991,13 +978,10 @@ async function handleInitiate(
   checkoutRequestId: string;
   productId: string;
 }> {
-  if (!user || !coords) {
+  if (!user) {
     throw new Error("Not ready");
   }
 
-if (!(await validateAdvertLocation())) {
-    throw new Error("Invalid advert location");
-  }
 const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
   if (!isValidKenyanPhone(cleanedPhone)) {
@@ -1041,14 +1025,14 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     imageUrl: uploadedImages[0]?.url ?? "",
     imageUrls: uploadedImages,
 
-    lat: coords.lat,
-    lng: coords.lng,
+    lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
 
     ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
 constituency: wardInfo?.constituency?.trim() || "",
 county: wardInfo?.county?.trim() || "",
 
-    geohash: encodeGeohash(coords.lat, coords.lng),
+    geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
 
     sellerId: user.uid,
     sellerName:
@@ -1196,16 +1180,11 @@ async function handlePublishFree() {
     return;
   }
 
-if (!user || !coords) {
+if (!user) {
   toast({
-    title: "Location not ready",
-    description: "Please wait for your location to be detected.",
+    title: "Please sign in",
     variant: "destructive",
   });
-  return;
-}
-
-if (!(await validateAdvertLocation())) {
   return;
 }
 
@@ -1241,12 +1220,14 @@ setPublishingFree(true);
       imageUrl: uploadedImages[0]?.url ?? "",
       imageUrls: uploadedImages,
 
-      lat: coords.lat,
-      lng: coords.lng,
-      ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
+      lat: coords?.lat ?? null,
+    lng: coords?.lng ?? null,
+
+    ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
 constituency: wardInfo?.constituency?.trim() || "",
 county: wardInfo?.county?.trim() || "",
-      geohash: encodeGeohash(coords.lat, coords.lng),
+
+    geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
 
       sellerId: user.uid,
       sellerName:
