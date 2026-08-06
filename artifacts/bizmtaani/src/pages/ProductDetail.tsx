@@ -959,9 +959,8 @@ const itemDistance =
         ) {
           itemPriceLabel = "Free";
         } else {
-          itemPriceLabel = `KES ${item.price.toLocaleString()}`;
+          itemPriceLabel = `KES ${item.priceRaw || item.price.toLocaleString()}`;
         }
-
         return (
           <button
             key={item.id}
