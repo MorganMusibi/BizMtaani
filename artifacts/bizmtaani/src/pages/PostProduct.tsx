@@ -27,6 +27,10 @@ interface PublishAdvertResponse {
   requiresPayment: boolean;
   plan: ListingPlan;
 }
+function extractPriceValue(input: string): number {
+  const match = input.match(/[\d,]+(\.\d+)?/);
+  return match ? parseFloat(match[0].replace(/,/g, "")) : 0;
+}
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
   { key: "breakfast", label: "Breakfast" },
@@ -1005,14 +1009,17 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
     price:
   isAccommodation && !isAccommodationSale && !isAccommodationLand
-    ? parseFloat(rentPerMonth) || 0
+    ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
-      ? parseFloat(rentPerMonth) || 0
+      ? extractPriceValue(rentPerMonth)
       : isProfessionalService && servicePricingType === "quote_only"
         ? 0
         : isTransport && pricingBasis === "quote_only"
           ? 0
-          : parseFloat(price) || 0,
+          : extractPriceValue(price),
+
+    priceRaw: price.trim(),
+    rentPerMonthRaw: rentPerMonth.trim(),
 
     category: selectedCategory,
 
@@ -1201,14 +1208,17 @@ setPublishingFree(true);
       description: description.trim(),
       price:
   isAccommodation && !isAccommodationSale && !isAccommodationLand
-    ? parseFloat(rentPerMonth) || 0
+    ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
-      ? parseFloat(rentPerMonth) || 0
+      ? extractPriceValue(rentPerMonth)
       : isProfessionalService && servicePricingType === "quote_only"
         ? 0
         : isTransport && pricingBasis === "quote_only"
           ? 0
-          : parseFloat(price) || 0,
+          : extractPriceValue(price),
+
+      priceRaw: price.trim(),
+      rentPerMonthRaw: rentPerMonth.trim(),
 
       category: selectedCategory,
       subcategory:
