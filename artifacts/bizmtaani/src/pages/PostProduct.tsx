@@ -222,7 +222,6 @@ useEffect(() => {
 // CATEGORY CLASSIFICATION
 // Keep all category/subcategory behavior centralized here.
 // CATEGORY_DEFS in categories.ts remains the source of truth
-// for the actual category and subcategory names.
 // ============================================================
 
 const isAccommodation =
