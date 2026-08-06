@@ -1752,8 +1752,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <label className="text-sm font-bold">Price (KES) *</label>
 
           <Input
-            type="number"
-            inputMode="numeric"
+            type="text"
+            inputMode="text"
             placeholder="e.g. 850000"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -1882,8 +1882,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <div className="space-y-1.5">
             <label className="text-sm font-bold">Price (KES) *</label>
             <Input
-              type="number"
-              inputMode="numeric"
+              type="text"
+              inputMode="text"
               placeholder="e.g. 5000"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
@@ -2122,8 +2122,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         Price (KES) *
       </label>
           <Input
-            type="number"
-            inputMode="numeric"
+            type="text"
+            inputMode="text"
             placeholder="e.g. 2500000"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -2164,8 +2164,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </label>
 
         <Input
-          type="number"
-          inputMode="numeric"
+          type="text"
+          inputMode="text"
           placeholder="e.g. 8500000"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
@@ -2204,8 +2204,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 </label>
 
 <Input
-  type="number"
-  inputMode="numeric"
+  type="text"
+  inputMode="text"
   placeholder={isShortStay ? "e.g. 3500 per night" : "e.g. 7500"}
   value={rentPerMonth}
   onChange={(e) => setRentPerMonth(e.target.value)}
@@ -2254,8 +2254,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Price (KES) *</label>
           <Input
-            type="number"
-            inputMode="numeric"
+            type="text"
+            inputMode="text"
             placeholder="e.g. 5000000"
             value={price}
             onChange={(e) => setPrice(e.target.value)}
@@ -2287,8 +2287,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="space-y-1.5">
         <label className="text-sm font-bold">Sale Price (KES) *</label>
         <Input
-          type="number"
-          inputMode="numeric"
+          type="text"
+          inputMode="text"
           placeholder="e.g. 15000000"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
@@ -2315,8 +2315,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="space-y-1.5">
         <label className="text-sm font-bold">Monthly Rent (KES) *</label>
         <Input
-          type="number"
-          inputMode="numeric"
+          type="text"
+          inputMode="text"
           placeholder="e.g. 45000"
           value={rentPerMonth}
           onChange={(e) => setRentPerMonth(e.target.value)}
@@ -2377,8 +2377,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 </label>
 
                 <Input
-                  type="number"
-                  inputMode="numeric"
+                  type="text"
+                  inputMode="text"
                   placeholder={
                     pricingBasis === "per_km"
                       ? "e.g. 50 per km"
@@ -2406,8 +2406,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 </label>
 
                 <Input
-                  type="number"
-                  inputMode="numeric"
+                  type="text"
+                  inputMode="text"
                   placeholder="e.g. 1500"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
@@ -2505,8 +2505,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   />
 
                   <Input
-                    type="number"
-                    inputMode="numeric"
+                    type="text"
+                    inputMode="text"
                     placeholder="KES"
                     value={newItems[key].price}
                     onChange={(e) =>
