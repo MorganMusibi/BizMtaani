@@ -96,6 +96,9 @@ const [priceDisplay, setPriceDisplay] =
   useState<PriceDisplay>("fixed");
   const [pricingBasis, setPricingBasis] = useState("per_trip");
   const [phone, setPhone] = useState("");
+  const [eateryPaymentMethod, setEateryPaymentMethod] = useState<"till" | "paybill" | "pochi" | "">("");
+  const [eateryPaymentNumber, setEateryPaymentNumber] = useState("");
+  const [eateryPaybillAccount, setEateryPaybillAccount] = useState("");
 
   // Hotel menu
   const [hotelMenu, setHotelMenu] = useState<HotelMenu>({ breakfast: [], lunch: [], supper: [] });
@@ -1059,6 +1062,13 @@ county: wardInfo?.county?.trim() || "",
     hotelMenu: isEatery
       ? hotelMenu
       : null,
+    eateryPayment: isEatery
+      ? {
+          method: eateryPaymentMethod,
+          number: eateryPaymentNumber.trim(),
+          accountNumber: eateryPaymentMethod === "paybill" ? eateryPaybillAccount.trim() : "",
+        }
+      : null,
 
     plan,
     phone: cleanedPhone,
@@ -1250,6 +1260,13 @@ county: wardInfo?.county?.trim() || "",
       priceDisplay,
      pricingBasis: isTransport ? pricingBasis : null,
       hotelMenu: isEatery ? hotelMenu : null,
+      eateryPayment: isEatery
+      ? {
+          method: eateryPaymentMethod,
+          number: eateryPaymentNumber.trim(),
+          accountNumber: eateryPaymentMethod === "paybill" ? eateryPaybillAccount.trim() : "",
+        }
+      : null,
       plan: "free",
 
 phone: cleanedPhone,
@@ -2452,6 +2469,72 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
         {isEatery && (
           <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="font-black text-base">Payment Method</p>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { value: "till", label: "Till Number" },
+                  { value: "pochi", label: "Pochi la Biashara" },
+                  { value: "paybill", label: "Paybill" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setEateryPaymentMethod(option.value as typeof eateryPaymentMethod)}
+                    className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                      eateryPaymentMethod === option.value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {(eateryPaymentMethod === "till" || eateryPaymentMethod === "pochi") && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">
+                    {eateryPaymentMethod === "till" ? "Till Number *" : "Pochi la Biashara Number *"}
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 123456"
+                    value={eateryPaymentNumber}
+                    onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "paybill" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">Paybill Number *</label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="e.g. 400200"
+                      value={eateryPaymentNumber}
+                      onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">Account Number *</label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. Your name/shop"
+                      value={eateryPaybillAccount}
+                      onChange={(e) => setEateryPaybillAccount(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
 
             <p className="font-black text-base">
               Hotel / Restaurant Menu
