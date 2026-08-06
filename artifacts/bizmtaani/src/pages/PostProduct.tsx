@@ -18,7 +18,6 @@ import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
-const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
 interface PublishAdvertResponse {
@@ -163,6 +162,16 @@ const [ticketPrice, setTicketPrice] = useState("");
   useEffect(() => {
     if (!user) { navigate("/login"); return; }
     if (user.phoneNumber) setPhone(user.phoneNumber);
+
+    // Show profile's saved area immediately so the field isn't blank
+    // while we wait for GPS to resolve (GPS will override this if it succeeds).
+    if (userProfile?.homeLocation) {
+      const hl = userProfile.homeLocation;
+      setCoords({ lat: hl.lat, lng: hl.lng });
+      setWardInfo({ wardName: hl.areaName, constituency: hl.constituency, county: hl.county, displayName: hl.areaName });
+      setLocationName(hl.areaName);
+    }
+
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const c = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -173,15 +182,13 @@ const [ticketPrice, setTicketPrice] = useState("");
         });
       },
       () => {
-        // GPS denied — use saved home location from profile, or Nairobi as last resort
-        if (userProfile?.homeLocation) {
-          const hl = userProfile.homeLocation;
-          setCoords({ lat: hl.lat, lng: hl.lng });
-          setWardInfo({ wardName: hl.areaName, constituency: hl.constituency, county: hl.county, displayName: hl.areaName });
-          setLocationName(hl.areaName);
-        } else {
-          setCoords(NAIROBI);
-          getWardInfo(NAIROBI.lat, NAIROBI.lng).then(setWardInfo);
+        // GPS denied/failed. If we already have a profile home location, keep it.
+        // Otherwise, don't guess a location — let the user set it manually via search.
+        if (!userProfile?.homeLocation) {
+          toast({
+            title: "Set your location",
+            description: "We couldn't detect your location. Please search for your area below.",
+          });
         }
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
