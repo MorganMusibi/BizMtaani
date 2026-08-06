@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { encodeGeohash } from "@/lib/geohash";
-import { validateLocationHierarchy, } from "@/lib/locationHierarchy";
+import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
@@ -796,6 +796,32 @@ function isValidKenyanPhone(phone: string): boolean {
   return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
   }
    async function validateAdvertLocation(): Promise<boolean> {
+  const ward = wardInfo?.wardName?.trim() || locationName.trim();
+  const constituency = wardInfo?.constituency?.trim() || "";
+  const county = wardInfo?.county?.trim() || "";
+
+  // No ward info at all — nothing to correct, just proceed.
+  if (!ward) return true;
+
+  try {
+    const canonical = await resolveCanonicalLocation(ward, constituency, county);
+
+    if (canonical) {
+      // Found a match (exact or ward-only) — correct spelling/constituency/county
+      setWardInfo((prev) => ({
+        ...(prev ?? { displayName: canonical.wardName }),
+        wardName: canonical.wardName,
+        constituency: canonical.constituencyName,
+        county: canonical.countyName,
+      }));
+      setLocationName(canonical.wardName);
+    }
+    // No match found anywhere in the hierarchy — keep the GPS/geocoded
+    // guess as-is and let the user post anyway.
+  } catch {
+    // Hierarchy failed to load or lookup errored — never block posting over this.
+  }
+
   return true;
 }
   
@@ -924,6 +950,12 @@ function isValidKenyanPhone(phone: string): boolean {
     }
   }
   if (!(await validateStep())) return;
+
+  if (!(await validateStep())) return;
+
+  if (step === 3) {
+    await validateAdvertLocation();
+  }
 
   if (step < 5) {
     setStep((prev) => (prev + 1) as Step);
