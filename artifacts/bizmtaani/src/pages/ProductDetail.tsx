@@ -25,7 +25,9 @@ interface Product {
   title: string;
   description: string;
   price: number;
+  priceRaw?: string;
   rentPerMonth?: number;
+  rentPerMonthRaw?: string;
   category: string;
   subcategory?: string;
   plan?: string;
@@ -760,9 +762,9 @@ useEffect(() => {
 </div>
 <Card className="mt-5 p-4">
 
-  {isAccommodation ? (
+{isAccommodation ? (
     <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
-      KES {(product.rentPerMonth ?? product.price).toLocaleString()} / month
+      KES {product.rentPerMonthRaw || (product.rentPerMonth ?? product.price).toLocaleString()} / month
     </h2>
 
   ) : product.priceDisplay === "contact" ? (
@@ -781,8 +783,9 @@ useEffect(() => {
     </h2>
 
   ) : (
+    ) : (
     <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
-      KES {product.price.toLocaleString()}
+      KES {product.priceRaw || product.price.toLocaleString()}
     </h2>
   )}
 
