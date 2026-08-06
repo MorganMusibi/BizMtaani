@@ -24,6 +24,7 @@ import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { useToast } from "@/hooks/use-toast";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 
@@ -248,6 +249,7 @@ const displayCounty =
 export default function Home() {
   const [, setLocation] = useLocation();
   const { user, userProfile } = useAuth();
+  const { toast } = useToast();
   const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
   const [gpsGranted, setGpsGranted] = useState(false);
   const [gpsReady, setGpsReady] = useState(false);
