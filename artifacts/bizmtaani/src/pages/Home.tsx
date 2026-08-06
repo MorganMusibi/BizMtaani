@@ -406,7 +406,21 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
 
   navigator.geolocation.getCurrentPosition(
     async (position) => {
-      // ...unchanged...
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      setGpsGranted(true);
+
+      const resolved = await getWardInfo(lat, lng);
+
+      if (resolved) {
+        await applyResolvedLocation({ ...resolved, lat, lng });
+      } else {
+        // Couldn't resolve a ward for these coordinates — still use raw GPS coords
+        await applyResolvedLocation({ lat, lng } as ResolvedLocation);
+      }
+
+      const choices = await getAreaChoices(lat, lng);
+      setAreaChoices(choices ?? []);
     },
     async () => {
       setGpsGranted(false);
