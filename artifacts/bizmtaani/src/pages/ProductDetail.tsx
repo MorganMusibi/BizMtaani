@@ -50,6 +50,12 @@ interface Product {
   county?: string;
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
+  eateryPayment?: {
+    method: "mpesa" | "till" | "paybill" | "pochi" | "other" | "";
+    number: string;
+    accountNumber?: string;
+    otherDescription?: string;
+  };
   createdAt: { seconds: number } | null;
 }
 
@@ -769,7 +775,17 @@ useEffect(() => {
       Payment
     </p>
     <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
-      {product.phone ? `M-Pesa: ${product.phone}` : "Contact for payment details"}
+      {product.eateryPayment?.method === "mpesa"
+        ? `M-Pesa: ${product.eateryPayment.number}`
+        : product.eateryPayment?.method === "till"
+        ? `Till Number: ${product.eateryPayment.number}`
+        : product.eateryPayment?.method === "pochi"
+        ? `Pochi la Biashara: ${product.eateryPayment.number}`
+        : product.eateryPayment?.method === "paybill"
+        ? `Paybill: ${product.eateryPayment.number} (Acc: ${product.eateryPayment.accountNumber})`
+        : product.eateryPayment?.method === "other"
+        ? product.eateryPayment.otherDescription || "Contact for payment details"
+        : "Contact for payment details"}
     </h2>
   </div>
 ) : isAccommodation ? (
