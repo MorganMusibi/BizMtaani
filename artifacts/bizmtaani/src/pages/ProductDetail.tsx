@@ -365,6 +365,7 @@ function ImageGallery({ images }: { images: string[] }) {
 export default function ProductDetail() {
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false); // <--- ADD THIS HERE
+  const [showMenu, setShowMenu] = useState(false);
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 function handlePressStart() {
@@ -762,7 +763,16 @@ useEffect(() => {
 </div>
 <Card className="mt-5 p-4">
 
-{isAccommodation ? (
+{isEatery ? (
+  <div className="select-none">
+    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+      Payment
+    </p>
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
+      {product.phone ? `M-Pesa: ${product.phone}` : "Contact for payment details"}
+    </h2>
+  </div>
+) : isAccommodation ? (
     <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       KES {product.rentPerMonthRaw || (product.rentPerMonth ?? product.price).toLocaleString()} / month
     </h2>
@@ -815,8 +825,15 @@ useEffect(() => {
 )}
 
 {/* Hotel/eatery menu */}
-{isEatery && product.hotelMenu && <HotelMenuDisplay menu={product.hotelMenu} />}
-
+{isEatery && product.hotelMenu && (
+  <Button
+    variant="outline"
+    className="w-full gap-2"
+    onClick={() => setShowMenu(true)}
+  >
+    View Menu
+  </Button>
+)}
         {/*Title, Price, Description, Menu) ... */}
 
         
@@ -1110,6 +1127,23 @@ const itemDistance =
 </div>
 
       <BottomNav />
+    {/* --- MENU MODAL --- */}
+      {showMenu && product.hotelMenu && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
+          <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-lg">Menu</h3>
+              <button
+                onClick={() => setShowMenu(false)}
+                className="text-muted-foreground hover:text-foreground text-sm font-bold"
+              >
+                Close
+              </button>
+            </div>
+            <HotelMenuDisplay menu={product.hotelMenu} />
+          </div>
+        </div>
+      )}
 
       {/* --- PROFESSIONAL DELETE CONFIRMATION MODAL --- */}
       {showDeleteDialog && (
