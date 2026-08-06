@@ -281,6 +281,20 @@ export default function Home() {
     cancelled = true;
   };
 }, []);
+  useEffect(() => {
+  if (!("geolocation" in navigator)) return;
+
+  if ("permissions" in navigator) {
+    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((status) => {
+      if (status.state === "prompt" || status.state === "denied") {
+        toast({
+          title: "Turn on location",
+          description: "Enable GPS/location so we can show your area accurately on adverts and listings nearby.",
+        });
+      }
+    });
+  }
+}, []);
     useEffect(() => {
     let cancelled = false;
 const applyResolvedLocation = async (location: ResolvedLocation) => {
