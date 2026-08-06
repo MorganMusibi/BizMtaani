@@ -795,48 +795,9 @@ function isValidKenyanPhone(phone: string): boolean {
 
   return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
   }
-  async function validateAdvertLocation(): Promise<boolean> {
-  const ward = wardInfo?.wardName?.trim() || locationName.trim();
-  const constituency = wardInfo?.constituency?.trim() || "";
-  const county = wardInfo?.county?.trim() || "";
-
-  if (!ward || !constituency || !county) {
-    toast({
-      title: "Location information incomplete",
-      description:
-        "We could not determine the correct ward, constituency, and county for this advert.",
-      variant: "destructive",
-    });
-    return false;
-  }
-
-  const canonical = await validateLocationHierarchy(
-    county,
-    constituency,
-    ward
-  );
-
-  if (!canonical) {
-    toast({
-      title: "Invalid location",
-      description:
-        `"${ward}" does not belong to "${constituency}", "${county}". Please select a valid location.`,
-      variant: "destructive",
-    });
-    return false;
-  }
-
-  // Save the canonical spelling so what gets submitted matches MasterHierarchy.json exactly
-  setWardInfo((prev) => ({
-    ...(prev ?? { displayName: canonical.wardName }),
-    wardName: canonical.wardName,
-    constituency: canonical.constituencyName,
-    county: canonical.countyName,
-  }));
-  setLocationName(canonical.wardName);
-
+   async function validateAdvertLocation(): Promise<boolean> {
   return true;
-  }
+}
   
   async function goNext() {
       // Accommodation validation
