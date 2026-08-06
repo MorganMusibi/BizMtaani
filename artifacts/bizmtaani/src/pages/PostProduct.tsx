@@ -96,7 +96,8 @@ const [priceDisplay, setPriceDisplay] =
   useState<PriceDisplay>("fixed");
   const [pricingBasis, setPricingBasis] = useState("per_trip");
   const [phone, setPhone] = useState("");
-  const [eateryPaymentMethod, setEateryPaymentMethod] = useState<"till" | "paybill" | "pochi" | "">("");
+  const [eateryPaymentMethod, setEateryPaymentMethod] = useState<"mpesa" | "till" | "paybill" | "pochi" | "other" | "">("");
+  const [eateryPaymentOther, setEateryPaymentOther] = useState("");
   const [eateryPaymentNumber, setEateryPaymentNumber] = useState("");
   const [eateryPaybillAccount, setEateryPaybillAccount] = useState("");
 
@@ -1067,6 +1068,7 @@ county: wardInfo?.county?.trim() || "",
           method: eateryPaymentMethod,
           number: eateryPaymentNumber.trim(),
           accountNumber: eateryPaymentMethod === "paybill" ? eateryPaybillAccount.trim() : "",
+          otherDescription: eateryPaymentMethod === "other" ? eateryPaymentOther.trim() : "",
         }
       : null,
 
@@ -1265,6 +1267,7 @@ county: wardInfo?.county?.trim() || "",
           method: eateryPaymentMethod,
           number: eateryPaymentNumber.trim(),
           accountNumber: eateryPaymentMethod === "paybill" ? eateryPaybillAccount.trim() : "",
+          otherDescription: eateryPaymentMethod === "other" ? eateryPaymentOther.trim() : "",
         }
       : null,
       plan: "free",
@@ -2472,11 +2475,13 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             <div className="space-y-3">
               <p className="font-black text-base">Payment Method</p>
 
-              <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 gap-2">
                 {[
+                  { value: "mpesa", label: "Direct M-Pesa (Phone)" },
                   { value: "till", label: "Till Number" },
                   { value: "pochi", label: "Pochi la Biashara" },
                   { value: "paybill", label: "Paybill" },
+                  { value: "other", label: "Other" },
                 ].map((option) => (
                   <button
                     key={option.value}
@@ -2496,7 +2501,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               {(eateryPaymentMethod === "till" || eateryPaymentMethod === "pochi") && (
                 <div className="space-y-1.5">
                   <label className="text-sm font-bold">
-                    {eateryPaymentMethod === "till" ? "Till Number *" : "Pochi la Biashara Number *"}
+                    {eateryPaymentMethod === "till" ? "Till Number" : "Pochi la Biashara Number"}
                   </label>
                   <Input
                     type="text"
@@ -2504,6 +2509,32 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                     placeholder="e.g. 123456"
                     value={eateryPaymentNumber}
                     onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "mpesa" && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">M-Pesa Phone Number</label>
+                  <Input
+                    type="tel"
+                    placeholder="e.g. 0712345678"
+                    value={eateryPaymentNumber}
+                    onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "other" && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">Describe Payment Method</label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Cash on delivery, Bank transfer..."
+                    value={eateryPaymentOther}
+                    onChange={(e) => setEateryPaymentOther(e.target.value)}
                     className="h-12 text-base"
                   />
                 </div>
