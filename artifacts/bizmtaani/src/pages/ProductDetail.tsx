@@ -299,6 +299,7 @@ function ImageGallery({ images }: { images: string[] }) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
+        >
       <img
           src={images[active]}
           alt={`Product image ${active + 1}`}
@@ -356,6 +357,7 @@ function ImageGallery({ images }: { images: string[] }) {
                   ? "border-primary"
                   : "border-transparent opacity-60"
               }`}
+              >
             <img
                 src={url}
                 alt={`Thumbnail ${i + 1}`}
