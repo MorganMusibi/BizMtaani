@@ -204,7 +204,6 @@ await userRef
     premiumEndsAt: premiumEndsTimestamp,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
-      }
       } else {
         // Payment failed or was cancelled by the user
         await paymentRef.update({
