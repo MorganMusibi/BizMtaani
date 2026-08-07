@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import { doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -372,7 +372,18 @@ export default function ProductDetail() {
   const [showOptions, setShowOptions] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false); // <--- ADD THIS HERE
   const [showMenu, setShowMenu] = useState(false);
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editingMenu, setEditingMenu] = useState(false);
+  const [editableMenu, setEditableMenu] = useState<HotelMenu | null>(null);
+  const [newMenuItem, setNewMenuItem] = useState<Record<keyof HotelMenu, { name: string; price: string }>>({
+  breakfast: { name: "", price: "" },
+  lunch: { name: "", price: "" },
+  supper: { name: "", price: "" },
+});
+const [savingMenu, setSavingMenu] = useState(false);
+const [showReportModal, setShowReportModal] = useState(false);
+const [reportReason, setReportReason] = useState("");
+const [submittingReport, setSubmittingReport] = useState(false);
+const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 function handlePressStart() {
   pressTimer.current = setTimeout(() => {
@@ -658,7 +669,78 @@ useEffect(() => {
       <Button onClick={() => setLocation("/")}>Go back</Button>
     </div>
   );
-      
+
+  function startEditingMenu() {
+  setEditableMenu(
+    product?.hotelMenu ?? { breakfast: [], lunch: [], supper: [] }
+  );
+  setEditingMenu(true);
+}
+
+function removeEditableMenuItem(period: keyof HotelMenu, index: number) {
+  setEditableMenu((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      [period]: prev[period].filter((_, i) => i !== index),
+    };
+  });
+}
+
+function addEditableMenuItem(period: keyof HotelMenu) {
+  const item = newMenuItem[period];
+  if (!item.name.trim() || !item.price) return;
+  setEditableMenu((prev) => {
+    if (!prev) return prev;
+    return {
+      ...prev,
+      [period]: [...prev[period], { name: item.name.trim(), price: parseFloat(item.price) }],
+    };
+  });
+  setNewMenuItem((prev) => ({ ...prev, [period]: { name: "", price: "" } }));
+}
+
+async function saveMenuChanges() {
+  if (!product || !editableMenu) return;
+  setSavingMenu(true);
+  try {
+    await updateDoc(doc(db, "products", product.id), { hotelMenu: editableMenu });
+    setProduct((prev) => (prev ? { ...prev, hotelMenu: editableMenu } : prev));
+    setEditingMenu(false);
+    toast({ title: "Menu updated" });
+  } catch (error) {
+    console.error("Failed to update menu:", error);
+    toast({ title: "Failed to save menu", variant: "destructive" });
+  } finally {
+    setSavingMenu(false);
+  }
+      }
+  async function submitReport() {
+  if (!product || !reportReason.trim()) {
+    toast({ title: "Please select or describe a reason", variant: "destructive" });
+    return;
+  }
+  setSubmittingReport(true);
+  try {
+    await addDoc(collection(db, "reports"), {
+      productId: product.id,
+      productTitle: product.title,
+      sellerId: product.sellerId,
+      reporterId: user?.uid ?? null,
+      reason: reportReason.trim(),
+      createdAt: serverTimestamp(),
+      status: "pending",
+    });
+    toast({ title: "Report submitted", description: "Thank you — our team will review this advert." });
+    setShowReportModal(false);
+    setReportReason("");
+  } catch (error) {
+    console.error("Failed to submit report:", error);
+    toast({ title: "Failed to submit report", variant: "destructive" });
+  } finally {
+    setSubmittingReport(false);
+  }
+      }
         async function handleDeleteProduct() {
     if (!product || !user) return;
 
@@ -1079,6 +1161,15 @@ const itemDistance =
               <h3 className="font-bold text-center mb-2">Advert Options</h3>
               <Button variant="ghost" className="w-full justify-start" onClick={handleShare}>Share Advert</Button>
               <Button variant="ghost" className="w-full justify-start" onClick={handleReply}>Reply to Advert</Button>
+              {!isSeller && (
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start text-destructive"
+                  onClick={() => { setShowOptions(false); setShowReportModal(true); }}
+                >
+                  Report Advert
+                </Button>
+              )}
                             {isSeller && (
                 <Button variant="destructive" className="w-full justify-start" onClick={() => { setShowOptions(false); setShowDeleteDialog(true); }}>
                   Delete Advert
@@ -1143,20 +1234,168 @@ const itemDistance =
 </div>
 
       <BottomNav />
-    {/* --- MENU MODAL --- */}
+    {/* --- REPORT MODAL --- */}
+      {showReportModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl max-w-sm w-full p-6 shadow-xl space-y-4">
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg">Report this advert</h3>
+              <p className="text-sm text-muted-foreground">
+                Let us know what's wrong. Our team will review it.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                "Scam or fraud",
+                "Prohibited item",
+                "Wrong category",
+                "Offensive content",
+                "Duplicate listing",
+                "Other",
+              ].map((reason) => (
+                <button
+                  key={reason}
+                  type="button"
+                  onClick={() => setReportReason(reason)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    reportReason === reason
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {reason}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => { setShowReportModal(false); setReportReason(""); }}
+                disabled={submittingReport}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                className="flex-1"
+                onClick={submitReport}
+                disabled={submittingReport}
+              >
+                {submittingReport ? <Loader2 size={16} className="animate-spin" /> : "Submit"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+{/* --- MENU MODAL --- */}
       {showMenu && product.hotelMenu && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
           <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-lg">Menu</h3>
-              <button
-                onClick={() => setShowMenu(false)}
-                className="text-muted-foreground hover:text-foreground text-sm font-bold"
-              >
-                Close
-              </button>
+              <div className="flex items-center gap-3">
+                {isSeller && !editingMenu && (
+                  <button
+                    onClick={startEditingMenu}
+                    className="text-primary text-sm font-bold"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    setShowMenu(false);
+                    setEditingMenu(false);
+                  }}
+                  className="text-muted-foreground hover:text-foreground text-sm font-bold"
+                >
+                  Close
+                </button>
+              </div>
             </div>
-            <HotelMenuDisplay menu={product.hotelMenu} />
+
+            {!editingMenu ? (
+              <HotelMenuDisplay menu={product.hotelMenu} />
+            ) : (
+              <div className="space-y-4">
+                {MEAL_PERIODS.map(({ key, label }) => (
+                  <div key={key} className="rounded-2xl border border-border overflow-hidden">
+                    <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
+                      <span className="font-bold text-sm text-rose-700 dark:text-rose-400">{label}</span>
+                    </div>
+
+                    {editableMenu && editableMenu[key].length > 0 && (
+                      <div className="divide-y divide-border">
+                        {editableMenu[key].map((item, i) => (
+                          <div key={i} className="flex items-center px-4 py-2.5 gap-2">
+                            <span className="flex-1 text-sm font-medium">{item.name}</span>
+                            <span className="text-sm font-bold text-primary">KES {item.price}</span>
+                            <button
+                              onClick={() => removeEditableMenuItem(key, i)}
+                              className="ml-2 text-muted-foreground hover:text-destructive"
+                            >
+                              <ChevronLeft size={0} />
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 p-3">
+                      <input
+                        placeholder="Dish name"
+                        value={newMenuItem[key].name}
+                        onChange={(e) =>
+                          setNewMenuItem((prev) => ({ ...prev, [key]: { ...prev[key], name: e.target.value } }))
+                        }
+                        className="flex-1 h-9 px-2 rounded-lg border border-border text-sm bg-background"
+                      />
+                      <input
+                        type="number"
+                        placeholder="KES"
+                        value={newMenuItem[key].price}
+                        onChange={(e) =>
+                          setNewMenuItem((prev) => ({ ...prev, [key]: { ...prev[key], price: e.target.value } }))
+                        }
+                        className="w-20 h-9 px-2 rounded-lg border border-border text-sm bg-background"
+                      />
+                      <button
+                        onClick={() => addEditableMenuItem(key)}
+                        className="h-9 w-9 rounded-lg bg-primary text-white flex items-center justify-center flex-shrink-0 font-bold"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="flex gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => setEditingMenu(false)}
+                    disabled={savingMenu}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    className="flex-1"
+                    onClick={saveMenuChanges}
+                    disabled={savingMenu}
+                  >
+                    {savingMenu ? <Loader2 size={16} className="animate-spin" /> : "Save Menu"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
