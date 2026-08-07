@@ -205,6 +205,14 @@ await userRef
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
       }
+      } else {
+        // Payment failed or was cancelled by the user
+        await paymentRef.update({
+          status: "failed",
+          failureReason: callback.ResultDesc ?? "Payment failed",
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
     }
   } catch (err) { console.error(err); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
