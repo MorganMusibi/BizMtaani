@@ -28,6 +28,7 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
@@ -99,7 +100,13 @@ export default function AdminDashboard() {
   const [pendingReportsCount, setPendingReportsCount] = useState<number | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
-
+// Today's insights
+  const [todayActiveAdverts, setTodayActiveAdverts] = useState<number | null>(null);
+  const [todayNewUsers, setTodayNewUsers] = useState<number | null>(null);
+  const [expiredCount, setExpiredCount] = useState<number | null>(null);
+  const [premiumExpiringSoon, setPremiumExpiringSoon] = useState<number | null>(null);
+  const [failedPayments, setFailedPayments] = useState<number | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
   // Reports tab
   const [reports, setReports] = useState<ProductReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
@@ -198,6 +205,85 @@ export default function AdminDashboard() {
     }
 
     loadDashboardStats();
+  }, [adminLoading, user, isAdmin]);
+  useEffect(() => {
+    if (adminLoading || !user || !isAdmin) return;
+
+    async function loadInsights() {
+      try {
+        setInsightsLoading(true);
+
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const startOfTodayTs = Timestamp.fromDate(startOfToday);
+        const nowTs = Timestamp.now();
+        const in48h = Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000));
+        const todayDateStr = startOfToday.toISOString().split("T")[0];
+
+        // Active adverts posted today
+        const activeTodaySnap = await getCountFromServer(
+          query(
+            collection(db, "products"),
+            where("status", "==", "active"),
+            where("createdAt", ">=", startOfTodayTs)
+          )
+        );
+        setTodayActiveAdverts(activeTodaySnap.data().count);
+
+        // New users today — adjust field/format if your users store createdAt differently
+        try {
+          const newUsersSnap = await getCountFromServer(
+            query(
+              collection(db, "users"),
+              where("createdAt", ">=", startOfToday.toISOString())
+            )
+          );
+          setTodayNewUsers(newUsersSnap.data().count);
+        } catch {
+          setTodayNewUsers(null);
+        }
+
+        // Expired adverts still marked active (not yet cleaned up)
+        const expiredAdvertsSnap = await getCountFromServer(
+          query(
+            collection(db, "products"),
+            where("status", "==", "active"),
+            where("expiresAt", "<", nowTs)
+          )
+        );
+
+        // Expired jobs (deadline passed) — deadline stored as "YYYY-MM-DD" string
+        const expiredJobsSnap = await getCountFromServer(
+          query(collection(db, "jobs"), where("deadline", "<", todayDateStr))
+        );
+
+        setExpiredCount(expiredAdvertsSnap.data().count + expiredJobsSnap.data().count);
+
+        // Premium adverts expiring in the next 48 hours
+        const premiumExpiringSnap = await getCountFromServer(
+          query(
+            collection(db, "products"),
+            where("status", "==", "active"),
+            where("plan", "in", ["premium_weekly", "premium_monthly"]),
+            where("expiresAt", ">", nowTs),
+            where("expiresAt", "<=", in48h)
+          )
+        );
+        setPremiumExpiringSoon(premiumExpiringSnap.data().count);
+
+        // Failed M-Pesa payments (requires the Cloud Function fix above)
+        const failedPaymentsSnap = await getCountFromServer(
+          query(collection(db, "payments"), where("status", "==", "failed"))
+        );
+        setFailedPayments(failedPaymentsSnap.data().count);
+      } catch (error) {
+        console.error("Failed to load insights:", error);
+      } finally {
+        setInsightsLoading(false);
+      }
+    }
+
+    loadInsights();
   }, [adminLoading, user, isAdmin]);
 
   // -------------------------------------------------------
@@ -474,6 +560,26 @@ export default function AdminDashboard() {
                   <p className="text-sm text-destructive">{statsError}</p>
                 </div>
               )}
+              <div className="mt-8">
+                <h3 className="text-lg font-semibold mb-4">Today's Insights</h3>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                  {[
+                    { label: "Active Adverts Today", value: todayActiveAdverts, emoji: "🟢" },
+                    { label: "New Users Today", value: todayNewUsers, emoji: "👤" },
+                    { label: "Expired Adverts & Jobs", value: expiredCount, emoji: "🔴" },
+                    { label: "Premium Expiring Soon", value: premiumExpiringSoon, emoji: "⭐" },
+                    { label: "Failed M-Pesa Payments", value: failedPayments, emoji: "💳" },
+                  ].map((card) => (
+                    <div key={card.label} className="rounded-xl border bg-card p-4">
+                      <p className="text-xl mb-1">{card.emoji}</p>
+                      <p className="text-2xl font-bold">
+                        {insightsLoading ? "..." : card.value ?? "—"}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {!!pendingReportsCount && (
                 <button
