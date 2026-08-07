@@ -356,12 +356,14 @@ function ImageGallery({ images }: { images: string[] }) {
                   ? "border-primary"
                   : "border-transparent opacity-60"
               }`}
-            >
-              <img
+            <img
                 src={url}
                 alt={`Thumbnail ${i + 1}`}
                 loading="lazy"
                 className="w-full h-full object-cover"
+                onContextMenu={(e) => e.preventDefault()}
+                draggable={false}
+                style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
               />
             </button>
           ))}
