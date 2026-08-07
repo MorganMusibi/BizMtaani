@@ -88,7 +88,7 @@ interface ShopCacheEntry {
   timestamp: number;
 }
 const shopCache = new Map<string, ShopCacheEntry>();
-const SHOP_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes — shop catalogues change infrequently
+const SHOP_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes — shop catalogues change infrequently
 function getDistanceKm(
   lat1: number,
   lng1: number,
