@@ -7,7 +7,7 @@ interface ProductImage { url: string; public_id?: string;
 }
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
-const AREA_BUFFER_FETCH = 40;
+const AREA_BUFFER_FETCH = 20;
 // Internal geographic discovery stages.
 //
 // These are NOT user-selected visibility distances.
@@ -603,7 +603,7 @@ try {
   let collectedProducts: Product[] = [];
   let allPrefixesDone = false;
   let iterations = 0;
-  const MAX_ITERATIONS = 15;
+  const MAX_ITERATIONS = 6;
 
     const currentRadius = HOME_FEED_RADIUS_STEPS[0];
 
@@ -952,7 +952,7 @@ if (!areaDone && !areaLoading) {
 
     let allPrefixesDone = false;
     let iterations = 0;
-    const MAX_ITERATIONS = 15;
+    const MAX_ITERATIONS = 6;
 
     // ==========================================================
     // STEP 3 — FETCH ENOUGH PRODUCTS FOR THE BUFFER
