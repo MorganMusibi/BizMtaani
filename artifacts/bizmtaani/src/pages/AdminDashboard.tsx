@@ -130,7 +130,7 @@ export default function AdminDashboard() {
       const paymentsSnapshot = await getCountFromServer(
         query(
           collection(db, "payments"),
-          where("status", "==", "success")
+          where("status", "==", "completed")
         )
       );
 
