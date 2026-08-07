@@ -133,7 +133,6 @@ function getAvatarThumbnailUrl(url: string): string {
 }
 
 function getProductImages(product: ShopProduct): string[] {
-function getProductImages(product: ShopProduct): string[] {
   if (Array.isArray(product.imageUrls)) {
     const urls = product.imageUrls
       .map((image) =>
