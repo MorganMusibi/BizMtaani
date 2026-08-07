@@ -77,7 +77,18 @@ interface ShopProduct {
 
   createdAt: { seconds: number } | null;
 }
-
+interface ShopCacheEntry {
+  products: ShopProduct[];
+  sellerProfile: {
+    displayName?: string;
+    businessName?: string;
+    isBusinessOwner?: boolean;
+    homeLocation?: { areaName?: string; county?: string };
+  } | null;
+  timestamp: number;
+}
+const shopCache = new Map<string, ShopCacheEntry>();
+const SHOP_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes — shop catalogues change infrequently
 function getDistanceKm(
   lat1: number,
   lng1: number,
@@ -105,6 +116,23 @@ function getDistanceKm(
   );
 }
 
+function getThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_fill/");
+  }
+  return url;
+}
+
+function getAvatarThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_128,h_128,c_fill/");
+  }
+  return url;
+}
+
+function getProductImages(product: ShopProduct): string[] {
 function getProductImages(product: ShopProduct): string[] {
   if (Array.isArray(product.imageUrls)) {
     const urls = product.imageUrls
@@ -312,32 +340,18 @@ export default function ShopCatalogue() {
    * ------------------------------------------------------------
    */
 
-  useEffect(() => {
+useEffect(() => {
     if (!userId) {
+      setProducts([]);
       setSellerProfile(null);
+      setLoading(false);
       return;
     }
 
-    let cancelled = false;
-
-    getDoc(doc(db, "users", userId))
-      .then((snap) => {
-        if (cancelled) return;
-        setSellerProfile(snap.exists() ? snap.data() : null);
-      })
-      .catch((error) => {
-        console.error("Failed to load seller profile:", error);
-        if (!cancelled) setSellerProfile(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [userId]);
-
-  useEffect(() => {
-    if (!userId) {
-      setProducts([]);
+    const cached = shopCache.get(userId);
+    if (cached && Date.now() - cached.timestamp < SHOP_CACHE_TTL_MS) {
+      setProducts(cached.products);
+      setSellerProfile(cached.sellerProfile);
       setLoading(false);
       return;
     }
@@ -348,79 +362,53 @@ export default function ShopCatalogue() {
       try {
         setLoading(true);
 
-             const productsQuery =
-          query(
-            collection(
-              db,
-              "products"
-            ),
-            where(
-              "sellerId",
-              "==",
-              userId
-            ),
-            where(
-              "status",
-              "==",
-              "active"
-            ),
-            orderBy(
-              "createdAt",
-              "desc"
-            ),
-            limit(60)
-          );       
+        const productsQuery = query(
+          collection(db, "products"),
+          where("sellerId", "==", userId),
+          where("status", "==", "active"),
+          orderBy("createdAt", "desc"),
+          limit(60)
+        );
 
+        const [snapshot, profileSnap] = await Promise.all([
+          getDocs(productsQuery),
+          getDoc(doc(db, "users", userId)),
+        ]);
 
-        const snapshot =
-          await getDocs(
-            productsQuery
-          );
-
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
 
         const nowSec = Date.now() / 1000;
 
-        const loadedProducts =
-          snapshot.docs
-            .map(
-              (doc) =>
-                ({
-                  id: doc.id,
-                  ...doc.data(),
-                } as ShopProduct)
-            )
-            .filter((product) => {
-              if (
-                product.expiresAt &&
-                product.expiresAt.seconds <= nowSec
-              ) {
-                return false;
-              }
-              return true;
-            });
+        const loadedProducts = snapshot.docs
+          .map((doc) => ({ id: doc.id, ...doc.data() } as ShopProduct))
+          .filter((product) => {
+            if (product.expiresAt && product.expiresAt.seconds <= nowSec) {
+              return false;
+            }
+            return true;
+          });
 
-        setProducts(
-          loadedProducts
-        );
+        const loadedProfile = profileSnap.exists() ? profileSnap.data() : null;
+
+        setProducts(loadedProducts);
+        setSellerProfile(loadedProfile);
+
+        shopCache.set(userId, {
+          products: loadedProducts,
+          sellerProfile: loadedProfile,
+          timestamp: Date.now(),
+        });
       } catch (error) {
-        console.error(
-          "Failed to load shop:",
-          error
-        );
+        console.error("Failed to load shop:", error);
 
         if (!cancelled) {
           setProducts([]);
+          setSellerProfile(null);
 
           toast({
-            title:
-              "Unable to load shop",
-            description:
-              "Please try again.",
-            variant:
-              "destructive",
+            title: "Unable to load shop",
+            description: "Please try again.",
+            variant: "destructive",
           });
         }
       } finally {
@@ -436,12 +424,6 @@ export default function ShopCatalogue() {
       cancelled = true;
     };
   }, [userId, toast]);
-
-  /*
-   * ------------------------------------------------------------
-   * SELLER INFORMATION
-   * ------------------------------------------------------------
-   */
 
   const sellerName =
     sellerProfile?.businessName ||
@@ -712,7 +694,7 @@ export default function ShopCatalogue() {
           <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center overflow-hidden flex-shrink-0 border border-border">
             {sellerAvatar ? (
               <img
-                src={sellerAvatar}
+                src={getAvatarThumbnailUrl(sellerAvatar)}
                 alt={sellerName}
                 className="w-full h-full object-cover"
               />
@@ -969,7 +951,7 @@ export default function ShopCatalogue() {
                               {displayImage ? (
                                 <img
                                   src={
-                                    displayImage
+                                    getThumbnailUrl(displayImage)
                                   }
                                   alt={
                                     product.title
