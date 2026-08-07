@@ -53,6 +53,8 @@ interface AdminUser {
   role?: string;
   subscriptionPlan?: string;
   createdAt?: string;
+  blocked?: boolean;
+  blockReason?: string;
 }
 
 interface AdminProduct {
@@ -116,6 +118,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersLoaded, setUsersLoaded] = useState(false);
+  const [processingUserId, setProcessingUserId] = useState<string | null>(null);
+  const [reportCountsBySeller, setReportCountsBySeller] = useState<Record<string, number>>({});
 
   // Adverts tab
   const [adverts, setAdverts] = useState<AdminProduct[]>([]);
@@ -302,8 +306,15 @@ export default function AdminDashboard() {
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProductReport)));
+        const reportsList = snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProductReport));
+        setReports(reportsList);
         setReportsLoading(false);
+
+        const counts: Record<string, number> = {};
+        reportsList.forEach((r) => {
+          if (r.sellerId) counts[r.sellerId] = (counts[r.sellerId] ?? 0) + 1;
+        });
+        setReportCountsBySeller(counts);
       },
       (error) => {
         console.error("Failed to load reports:", error);
@@ -383,6 +394,29 @@ export default function AdminDashboard() {
       alert("Failed to delete the advert. It may already be removed.");
     } finally {
       setProcessingReportId(null);
+    }
+  }
+  async function toggleUserBlock(targetUser: AdminUser) {
+    const willBlock = !targetUser.blocked;
+    const reason = willBlock ? prompt("Reason for blocking this user (optional):") ?? "" : "";
+
+    setProcessingUserId(targetUser.id);
+    try {
+      await updateDoc(doc(db, "users", targetUser.id), {
+        blocked: willBlock,
+        blockReason: willBlock ? reason : "",
+        blockedAt: willBlock ? new Date().toISOString() : null,
+      });
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === targetUser.id ? { ...u, blocked: willBlock, blockReason: reason } : u
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update block status:", error);
+      alert("Failed to update user status.");
+    } finally {
+      setProcessingUserId(null);
     }
   }
 
@@ -685,35 +719,83 @@ export default function AdminDashboard() {
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
               ) : (
-                <div className="rounded-xl border bg-card overflow-hidden">
+                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Name</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Plan</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Role</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {users.map((u) => (
-                        <tr key={u.id} className="border-t border-border">
-                          <td className="px-4 py-2.5">{u.displayName || "—"}</td>
-                          <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
-                          <td className="px-4 py-2.5">
-                            {u.role === "admin" ? (
-                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                                <Shield className="h-3 w-3" /> Admin
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">User</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {users.map((u) => {
+                        const reportCount = reportCountsBySeller[u.id] ?? 0;
+                        return (
+                          <tr key={u.id} className="border-t border-border">
+                            <td className="px-4 py-2.5">
+                              <div className="flex items-center gap-2">
+                                {u.displayName || "—"}
+                                {reportCount > 0 && (
+                                  <span
+                                    title={`${reportCount} pending report(s)`}
+                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                                  >
+                                    🚩 {reportCount}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
+                            <td className="px-4 py-2.5">
+                              {u.role === "admin" ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                                  <Shield className="h-3 w-3" /> Admin
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">User</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {u.blocked ? (
+                                <span
+                                  title={u.blockReason || "Blocked"}
+                                  className="text-xs font-semibold text-destructive"
+                                >
+                                  Blocked
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Active</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              {u.role !== "admin" && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleUserBlock(u)}
+                                  disabled={processingUserId === u.id}
+                                  className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
+                                    u.blocked ? "text-primary" : "text-destructive"
+                                  }`}
+                                >
+                                  {processingUserId === u.id
+                                    ? "..."
+                                    : u.blocked
+                                    ? "Unblock"
+                                    : "Block"}
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
+              
             </>
           )}
 
