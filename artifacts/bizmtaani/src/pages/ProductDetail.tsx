@@ -1339,7 +1339,6 @@ const itemDistance =
                               onClick={() => removeEditableMenuItem(key, i)}
                               className="ml-2 text-muted-foreground hover:text-destructive"
                             >
-                              <ChevronLeft size={0} />
                               ✕
                             </button>
                           </div>
