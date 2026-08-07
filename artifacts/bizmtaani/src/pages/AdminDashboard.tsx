@@ -63,6 +63,15 @@ interface AdminProduct {
   price?: number;
   createdAt?: { seconds: number } | null;
 }
+interface AdminJob {
+  id: string;
+  title?: string;
+  company?: string;
+  jobType?: string;
+  posterId?: string;
+  deadline?: string;
+  createdAt?: { seconds: number } | null;
+}
 
 function timeAgo(createdAt: { seconds: number } | null | undefined) {
   if (!createdAt) return "";
@@ -107,6 +116,46 @@ export default function AdminDashboard() {
   const [advertsLoaded, setAdvertsLoaded] = useState(false);
   const [processingAdvertId, setProcessingAdvertId] = useState<string | null>(null);
 
+  // Jobs tab
+  const [jobs, setJobs] = useState<AdminJob[]>([]);
+  const [jobsLoading, setJobsLoading] = useState(false);
+  const [jobsLoaded, setJobsLoaded] = useState(false);
+  const [processingJobId, setProcessingJobId] = useState<string | null>(null);
+  
+  async function loadJobs() {
+    if (jobsLoaded) return;
+    setJobsLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "jobs"), orderBy("createdAt", "desc"), limit(50))
+      );
+      setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminJob)));
+      setJobsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load jobs:", error);
+    } finally {
+      setJobsLoading(false);
+    }
+  }
+
+  async function deleteJobDirect(jobId: string, title: string) {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setProcessingJobId(jobId);
+    try {
+      await deleteDoc(doc(db, "jobs", jobId));
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+      alert("Failed to delete the job.");
+    } finally {
+      setProcessingJobId(null);
+    }
+  }
+
+  function isJobExpired(deadline?: string) {
+    if (!deadline) return false;
+    return new Date(`${deadline}T23:59:59`) < new Date();
+      }
   // -------------------------------------------------------
   // OVERVIEW STATS
   // -------------------------------------------------------
@@ -219,6 +268,7 @@ export default function AdminDashboard() {
     setActiveTab(tab);
     if (tab === "users") loadUsers();
     if (tab === "adverts") loadAdverts();
+    if (tab === "jobs") loadJobs();
   }
 
   // -------------------------------------------------------
@@ -611,9 +661,63 @@ export default function AdminDashboard() {
           )}
 
           {activeTab === "jobs" && (
-            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-              Job listings management coming soon.
-            </div>
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Jobs</h2>
+                <p className="mt-1 text-muted-foreground">Most recent 50 job posts.</p>
+              </div>
+
+              {jobsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : jobs.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No job posts yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {jobs.map((j) => {
+                    const expired = isJobExpired(j.deadline);
+                    return (
+                      <div
+                        key={j.id}
+                        className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{j.title || "Untitled"}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {j.company || "—"} • {j.jobType || "—"}
+                            {expired && (
+                              <span className="ml-2 text-destructive font-semibold">Expired</span>
+                            )}
+                            {" • "}{timeAgo(j.createdAt)}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <a
+                            href={`/jobs/${j.id}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs font-semibold text-primary hover:underline"
+                          >
+                            View
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => deleteJobDirect(j.id, j.title || "this job")}
+                            disabled={processingJobId === j.id}
+                            className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                          >
+                            {processingJobId === j.id ? "..." : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === "payments" && (
