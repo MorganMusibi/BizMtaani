@@ -25,6 +25,19 @@ const HOME_FEED_RADIUS_STEPS = [
 ];
 
 const HOME_FEED_MAX_RADIUS_KM = 50;
+interface FeedCacheEntry {
+  wardProducts: Product[];
+  wardCursor: Cursor | null;
+  wardDone: boolean;
+  areaProducts: Product[];
+  areaBuffer: Product[];
+  areaCursors: Record<string, Cursor | null>;
+  areaDonePrefixes: Record<string, boolean>;
+  areaDone: boolean;
+  timestamp: number;
+}
+const feedCache = new Map<string, FeedCacheEntry>();
+const FEED_CACHE_TTL_MS = 2 * 60 * 1000;
 
 export interface Product {
   id: string;
@@ -480,6 +493,24 @@ setSearchDone(false);
   const run = async () => {
     console.log("[FEED] run() start", { isSearchMode, wardName: locationInfo?.wardName, userCoords });
 
+    const cacheKey = `${locationInfo?.wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
+
+    if (!isSearchMode) {
+      const cached = feedCache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
+        setWardProducts(cached.wardProducts);
+        setWardCursor(cached.wardCursor);
+        setWardDone(cached.wardDone);
+        setAreaProducts(cached.areaProducts);
+        setAreaBuffer(cached.areaBuffer);
+        setAreaCursors(cached.areaCursors);
+        setAreaDonePrefixes(cached.areaDonePrefixes);
+        setAreaDone(cached.areaDone);
+        setInitialLoading(false);
+        return;
+      }
+    }
+
     // ============================================================
     // SEARCH MODE
     // Search ALL products across Kenya.
@@ -546,6 +577,10 @@ setAreaDone(true);
 
     const wardName = locationInfo?.wardName ?? "";
 
+    let localWardProducts: Product[] = [];
+    let localWardCursor: Cursor | null = null;
+    let localWardDone = true;
+
     if (wardName) {
       try {
         const snap = await getDocs(
@@ -557,20 +592,13 @@ setAreaDone(true);
   userCoords
 );
 
-setWardProducts(
-  sortNearbyProducts(
-    docs,
-    userCoords
-  )
-);
+        localWardProducts = sortNearbyProducts(docs, userCoords);
+        localWardCursor = snap.docs[snap.docs.length - 1] ?? null;
+        localWardDone = snap.docs.length < WARD_PAGE;
 
-        setWardCursor(
-          snap.docs[snap.docs.length - 1] ?? null
-        );
-
-        setWardDone(
-          snap.docs.length < WARD_PAGE
-        );
+setWardProducts(localWardProducts);
+setWardCursor(localWardCursor);
+setWardDone(localWardDone);
 
       } catch (error) {
         console.error(
@@ -771,23 +799,27 @@ const sortedBuffer = sortNearbyProducts(
 
   // First 20 products become visible.
   // Everything else stays in the buffer.
-  setAreaProducts(
-    sortedBuffer.slice(0, AREA_PAGE)
-  );
+  const localAreaProducts = sortedBuffer.slice(0, AREA_PAGE);
+  const localAreaBuffer = sortedBuffer.slice(AREA_PAGE);
+  const localAreaDone = allPrefixesDone && sortedBuffer.length <= AREA_PAGE;
 
-  setAreaBuffer(
-    sortedBuffer.slice(AREA_PAGE)
-  );
-
+  setAreaProducts(localAreaProducts);
+  setAreaBuffer(localAreaBuffer);
   setAreaCursors(currentCursors);
   setAreaDonePrefixes(currentDonePrefixes);
+  setAreaDone(localAreaDone);
 
-  // We are done only when Firestore has no more prefixes
-  // AND there are no buffered products waiting to be shown.
-  setAreaDone(
-    allPrefixesDone &&
-    sortedBuffer.length <= AREA_PAGE
-  );
+  feedCache.set(cacheKey, {
+    wardProducts: localWardProducts,
+    wardCursor: localWardCursor,
+    wardDone: localWardDone,
+    areaProducts: localAreaProducts,
+    areaBuffer: localAreaBuffer,
+    areaCursors: currentCursors,
+    areaDonePrefixes: currentDonePrefixes,
+    areaDone: localAreaDone,
+    timestamp: Date.now(),
+  });
 
 } catch (error) {
   console.error(
