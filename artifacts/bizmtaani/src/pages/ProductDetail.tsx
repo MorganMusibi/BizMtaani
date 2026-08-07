@@ -299,11 +299,13 @@ function ImageGallery({ images }: { images: string[] }) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-      >
-        <img
+      <img
           src={images[active]}
           alt={`Product image ${active + 1}`}
           className="w-full h-full object-cover"
+          onContextMenu={(e) => e.preventDefault()}
+          draggable={false}
+          style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
         />
 
         {/* Photo Counter */}
