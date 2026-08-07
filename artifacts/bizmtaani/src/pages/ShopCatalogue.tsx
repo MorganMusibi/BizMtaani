@@ -446,7 +446,7 @@ export default function ShopCatalogue() {
   const sellerName =
     sellerProfile?.businessName ||
     sellerProfile?.displayName ||
-    products[0]?.sellerName ??
+    products[0]?.sellerName ||
     "Seller";
 
   const sellerAvatar =
@@ -455,12 +455,12 @@ export default function ShopCatalogue() {
 
   const sellerWard =
     sellerProfile?.homeLocation?.areaName ||
-    products[0]?.ward ??
+    products[0]?.ward ||
     "";
 
   const sellerCounty =
     sellerProfile?.homeLocation?.county ||
-    products[0]?.county ??
+    products[0]?.county ||
     "";
 
   const sellerPhone =
