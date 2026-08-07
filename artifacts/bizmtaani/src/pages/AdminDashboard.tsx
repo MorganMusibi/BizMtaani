@@ -9,245 +9,298 @@ import {
   Flag,
   LayoutDashboard,
   LogOut,
+  Loader2,
+  ExternalLink,
+  Check,
+  Trash2,
+  X,
+  Shield,
 } from "lucide-react";
 import {
   collection,
   getCountFromServer,
   query,
   where,
+  orderBy,
+  limit,
+  getDocs,
+  onSnapshot,
+  doc,
+  updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports";
+
+interface ProductReport {
+  id: string;
+  productId: string;
+  productTitle: string;
+  sellerId: string;
+  reporterId: string;
+  reason: string;
+  status: "pending" | "resolved" | "dismissed";
+  createdAt: { seconds: number } | null;
+}
+
+interface AdminUser {
+  id: string;
+  displayName?: string;
+  role?: string;
+  subscriptionPlan?: string;
+  createdAt?: string;
+}
+
+interface AdminProduct {
+  id: string;
+  title: string;
+  sellerName?: string;
+  category?: string;
+  status?: string;
+  price?: number;
+  createdAt?: { seconds: number } | null;
+}
+
+function timeAgo(createdAt: { seconds: number } | null | undefined) {
+  if (!createdAt) return "";
+  const seconds = Math.floor(Date.now() / 1000) - createdAt.seconds;
+  if (seconds < 60) return "Just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function AdminDashboard() {
-  const {
-    user,
-    isAdmin,
-    adminLoading,
-  } = useAuth();
-
+  const { user, isAdmin, adminLoading } = useAuth();
   const [, navigate] = useLocation();
 
+  const [activeTab, setActiveTab] = useState<Tab>("overview");
+
+  // Overview stats
   const [totalUsers, setTotalUsers] = useState<number | null>(null);
   const [activeAdverts, setActiveAdverts] = useState<number | null>(null);
   const [totalJobs, setTotalJobs] = useState<number | null>(null);
   const [successfulPayments, setSuccessfulPayments] = useState<number | null>(null);
-
+  const [pendingReportsCount, setPendingReportsCount] = useState<number | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
 
-  // Load real dashboard statistics from Firestore
+  // Reports tab
+  const [reports, setReports] = useState<ProductReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+  const [processingReportId, setProcessingReportId] = useState<string | null>(null);
+
+  // Users tab
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+
+  // Adverts tab
+  const [adverts, setAdverts] = useState<AdminProduct[]>([]);
+  const [advertsLoading, setAdvertsLoading] = useState(false);
+  const [advertsLoaded, setAdvertsLoaded] = useState(false);
+  const [processingAdvertId, setProcessingAdvertId] = useState<string | null>(null);
+
+  // -------------------------------------------------------
+  // OVERVIEW STATS
+  // -------------------------------------------------------
   useEffect(() => {
-    if (adminLoading || !user || !isAdmin) {
-      return;
-    }
+    if (adminLoading || !user || !isAdmin) return;
 
     async function loadDashboardStats() {
-  try {
-    setStatsLoading(true);
-    setStatsError("");
+      try {
+        setStatsLoading(true);
+        setStatsError("");
 
-    // =====================================
-    // TEST 1: USERS
-    // =====================================
-    try {
-      const usersSnapshot = await getCountFromServer(
-        collection(db, "users")
-      );
+        const usersSnapshot = await getCountFromServer(collection(db, "users"));
+        setTotalUsers(usersSnapshot.data().count);
 
-      const count = usersSnapshot.data().count;
-      setTotalUsers(count);
+        const activeAdvertsSnapshot = await getCountFromServer(
+          query(collection(db, "products"), where("status", "==", "active"))
+        );
+        setActiveAdverts(activeAdvertsSnapshot.data().count);
 
-      console.log("ADMIN DASHBOARD - USERS SUCCESS:", count);
-    } catch (error) {
-      console.error("ADMIN DASHBOARD - USERS FAILED:", error);
-      throw new Error(
-        `Users query failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+        const jobsSnapshot = await getCountFromServer(collection(db, "jobs"));
+        setTotalJobs(jobsSnapshot.data().count);
+
+        const paymentsSnapshot = await getCountFromServer(
+          query(collection(db, "payments"), where("status", "==", "completed"))
+        );
+        setSuccessfulPayments(paymentsSnapshot.data().count);
+
+        const reportsCountSnapshot = await getCountFromServer(
+          query(collection(db, "reports"), where("status", "==", "pending"))
+        );
+        setPendingReportsCount(reportsCountSnapshot.data().count);
+      } catch (error) {
+        console.error("ADMIN DASHBOARD - STATS FAILED:", error);
+        setStatsError(
+          error instanceof Error ? error.message : "Unable to load dashboard statistics."
+        );
+      } finally {
+        setStatsLoading(false);
+      }
     }
-
-
-    // =====================================
-    // TEST 2: PRODUCTS / ACTIVE ADVERTS
-    // =====================================
-    try {
-      const activeAdvertsSnapshot = await getCountFromServer(
-        query(
-          collection(db, "products"),
-          where("status", "==", "active")
-        )
-      );
-
-      const count = activeAdvertsSnapshot.data().count;
-      setActiveAdverts(count);
-
-      console.log(
-        "ADMIN DASHBOARD - ACTIVE PRODUCTS SUCCESS:",
-        count
-      );
-    } catch (error) {
-      console.error(
-        "ADMIN DASHBOARD - ACTIVE PRODUCTS FAILED:",
-        error
-      );
-
-      throw new Error(
-        `Products query failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-
-
-    // =====================================
-    // TEST 3: JOBS
-    // =====================================
-    try {
-      const jobsSnapshot = await getCountFromServer(
-        collection(db, "jobs")
-      );
-
-      const count = jobsSnapshot.data().count;
-      setTotalJobs(count);
-
-      console.log("ADMIN DASHBOARD - JOBS SUCCESS:", count);
-    } catch (error) {
-      console.error("ADMIN DASHBOARD - JOBS FAILED:", error);
-
-      throw new Error(
-        `Jobs query failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-
-
-    // =====================================
-    // TEST 4: PAYMENTS
-    // =====================================
-    try {
-      const paymentsSnapshot = await getCountFromServer(
-        query(
-          collection(db, "payments"),
-          where("status", "==", "completed")
-        )
-      );
-
-      const count = paymentsSnapshot.data().count;
-      setSuccessfulPayments(count);
-
-      console.log(
-        "ADMIN DASHBOARD - PAYMENTS SUCCESS:",
-        count
-      );
-    } catch (error) {
-      console.error(
-        "ADMIN DASHBOARD - PAYMENTS FAILED:",
-        error
-      );
-
-      throw new Error(
-        `Payments query failed: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
-    }
-
-  } catch (error) {
-    console.error(
-      "ADMIN DASHBOARD - FINAL ERROR:",
-      error
-    );
-
-    setStatsError(
-      error instanceof Error
-        ? error.message
-        : "Unable to load dashboard statistics."
-    );
-
-  } finally {
-    setStatsLoading(false);
-  }
-}
-    
 
     loadDashboardStats();
   }, [adminLoading, user, isAdmin]);
+
+  // -------------------------------------------------------
+  // REPORTS — live subscription, only once admin confirmed
+  // -------------------------------------------------------
+  useEffect(() => {
+    if (adminLoading || !user || !isAdmin) return;
+
+    const q = query(
+      collection(db, "reports"),
+      where("status", "==", "pending"),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    );
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as ProductReport)));
+        setReportsLoading(false);
+      },
+      (error) => {
+        console.error("Failed to load reports:", error);
+        setReportsLoading(false);
+      }
+    );
+
+    return () => unsub();
+  }, [adminLoading, user, isAdmin]);
+
+  // -------------------------------------------------------
+  // USERS — loaded lazily when tab is opened
+  // -------------------------------------------------------
+  async function loadUsers() {
+    if (usersLoaded) return;
+    setUsersLoading(true);
+    try {
+      const snap = await getDocs(query(collection(db, "users"), limit(50)));
+      setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminUser)));
+      setUsersLoaded(true);
+    } catch (error) {
+      console.error("Failed to load users:", error);
+    } finally {
+      setUsersLoading(false);
+    }
+  }
+
+  // -------------------------------------------------------
+  // ADVERTS — loaded lazily when tab is opened
+  // -------------------------------------------------------
+  async function loadAdverts() {
+    if (advertsLoaded) return;
+    setAdvertsLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "products"), orderBy("createdAt", "desc"), limit(50))
+      );
+      setAdverts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminProduct)));
+      setAdvertsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load adverts:", error);
+    } finally {
+      setAdvertsLoading(false);
+    }
+  }
+
+  function selectTab(tab: Tab) {
+    setActiveTab(tab);
+    if (tab === "users") loadUsers();
+    if (tab === "adverts") loadAdverts();
+  }
+
+  // -------------------------------------------------------
+  // REPORT ACTIONS
+  // -------------------------------------------------------
+  async function dismissReport(reportId: string) {
+    setProcessingReportId(reportId);
+    try {
+      await updateDoc(doc(db, "reports", reportId), { status: "dismissed" });
+    } catch (error) {
+      console.error("Failed to dismiss report:", error);
+    } finally {
+      setProcessingReportId(null);
+    }
+  }
+
+  async function removeReportedAdvert(report: ProductReport) {
+    if (!confirm(`Delete "${report.productTitle}"? This cannot be undone.`)) return;
+    setProcessingReportId(report.id);
+    try {
+      const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      await deleteAdvert({ productId: report.productId });
+      await updateDoc(doc(db, "reports", report.id), { status: "resolved" });
+    } catch (error) {
+      console.error("Failed to remove reported advert:", error);
+      alert("Failed to delete the advert. It may already be removed.");
+    } finally {
+      setProcessingReportId(null);
+    }
+  }
+
+  // -------------------------------------------------------
+  // ADVERT ACTIONS
+  // -------------------------------------------------------
+  async function deleteAdvertDirect(productId: string, title: string) {
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setProcessingAdvertId(productId);
+    try {
+      const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      await deleteAdvert({ productId });
+      setAdverts((prev) => prev.filter((a) => a.id !== productId));
+    } catch (error) {
+      console.error("Failed to delete advert:", error);
+      alert("Failed to delete the advert.");
+    } finally {
+      setProcessingAdvertId(null);
+    }
+  }
 
   // Wait while Firebase checks the admin custom claim
   if (adminLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">
-            Checking administrator access...
-          </p>
-        </div>
+        <p className="text-sm text-muted-foreground">Checking administrator access...</p>
       </div>
     );
   }
 
-  // User is not logged in
   if (!user) {
     navigate("/login");
     return null;
   }
 
-  // User is logged in but is not an admin
   if (!isAdmin) {
     navigate("/");
     return null;
   }
 
   const stats = [
-    {
-      title: "Total Users",
-      value: totalUsers,
-      icon: Users,
-    },
-    {
-      title: "Active Adverts",
-      value: activeAdverts,
-      icon: Package,
-    },
-    {
-      title: "Jobs",
-      value: totalJobs,
-      icon: Briefcase,
-    },
-    {
-      title: "Payments",
-      value: successfulPayments,
-      icon: CreditCard,
-    },
+    { title: "Total Users", value: totalUsers, icon: Users },
+    { title: "Active Adverts", value: activeAdverts, icon: Package },
+    { title: "Jobs", value: totalJobs, icon: Briefcase },
+    { title: "Payments", value: successfulPayments, icon: CreditCard },
   ];
 
-  const menuItems = [
-    {
-      title: "Overview",
-      icon: LayoutDashboard,
-    },
-    {
-      title: "Users",
-      icon: Users,
-    },
-    {
-      title: "Adverts",
-      icon: Package,
-    },
-    {
-      title: "Jobs",
-      icon: Briefcase,
-    },
-    {
-      title: "Payments",
-      icon: CreditCard,
-    },
-    {
-      title: "Reports",
-      icon: Flag,
-    },
+  const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
+    { title: "Overview", icon: LayoutDashboard, tab: "overview" },
+    { title: "Users", icon: Users, tab: "users" },
+    { title: "Adverts", icon: Package, tab: "adverts" },
+    { title: "Jobs", icon: Briefcase, tab: "jobs" },
+    { title: "Payments", icon: CreditCard, tab: "payments" },
+    { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
   ];
 
   return (
@@ -256,28 +309,16 @@ export default function AdminDashboard() {
       <header className="border-b bg-background">
         <div className="flex h-16 items-center justify-between px-4 md:px-8">
           <div>
-            <h1 className="text-xl font-bold">
-              BizMtaani Admin
-            </h1>
-
-            <p className="text-sm text-muted-foreground">
-              Platform management dashboard
-            </p>
+            <h1 className="text-xl font-bold">BizMtaani Admin</h1>
+            <p className="text-sm text-muted-foreground">Platform management dashboard</p>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Admin account */}
             <div className="hidden text-right sm:block">
-              <p className="text-sm font-medium">
-                {user.displayName || "Administrator"}
-              </p>
-
-              <p className="text-xs text-muted-foreground">
-                {user.email || "Admin account"}
-              </p>
+              <p className="text-sm font-medium">{user.displayName || "Administrator"}</p>
+              <p className="text-xs text-muted-foreground">{user.email || "Admin account"}</p>
             </div>
 
-            {/* Exit dashboard */}
             <button
               type="button"
               onClick={() => navigate("/")}
@@ -296,87 +337,292 @@ export default function AdminDashboard() {
           <nav className="space-y-1 p-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
-
+              const active = activeTab === item.tab;
               return (
                 <button
                   key={item.title}
                   type="button"
-                  className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted"
+                  onClick={() => selectTab(item.tab)}
+                  className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                    active ? "bg-primary text-white" : "hover:bg-muted"
+                  }`}
                 >
-                  <Icon className="h-5 w-5" />
-                  <span>{item.title}</span>
+                  <span className="flex items-center gap-3">
+                    <Icon className="h-5 w-5" />
+                    {item.title}
+                  </span>
+                  {!!item.badge && (
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                      active ? "bg-white/20" : "bg-destructive text-white"
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
           </nav>
         </aside>
 
+        {/* Mobile tab bar */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border flex overflow-x-auto no-scrollbar">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            const active = activeTab === item.tab;
+            return (
+              <button
+                key={item.title}
+                onClick={() => selectTab(item.tab)}
+                className={`flex-1 min-w-[70px] flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold relative ${
+                  active ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Icon className="h-5 w-5" />
+                {item.title}
+                {!!item.badge && (
+                  <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-destructive" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-8">
-          {/* Page heading */}
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold">
-              Dashboard Overview
-            </h2>
+        <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
+          {activeTab === "overview" && (
+            <>
+              <div className="mb-8">
+                <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Monitor and manage the BizMtaani marketplace.
+                </p>
+              </div>
 
-            <p className="mt-1 text-muted-foreground">
-              Monitor and manage the BizMtaani marketplace.
-            </p>
-          </div>
-
-          {/* Statistics */}
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {stats.map((stat) => {
-              const Icon = stat.icon;
-
-              return (
-                <div
-                  key={stat.title}
-                  className="rounded-xl border bg-card p-6 shadow-sm"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        {stat.title}
-                      </p>
-
-                      <p className="mt-2 text-3xl font-bold">
-                        {statsLoading
-                          ? "..."
-                          : stat.value ?? "—"}
-                      </p>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {stats.map((stat) => {
+                  const Icon = stat.icon;
+                  return (
+                    <div key={stat.title} className="rounded-xl border bg-card p-6 shadow-sm">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-muted-foreground">{stat.title}</p>
+                          <p className="mt-2 text-3xl font-bold">
+                            {statsLoading ? "..." : stat.value ?? "—"}
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-muted p-3">
+                          <Icon className="h-6 w-6" />
+                        </div>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <div className="rounded-lg bg-muted p-3">
-                      <Icon className="h-6 w-6" />
+              {statsError && (
+                <div className="mt-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+                  <p className="text-sm text-destructive">{statsError}</p>
+                </div>
+              )}
+
+              {!!pendingReportsCount && (
+                <button
+                  onClick={() => selectTab("reports")}
+                  className="mt-6 w-full flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Flag className="h-5 w-5 text-destructive" />
+                    <div>
+                      <p className="font-semibold text-sm">
+                        {pendingReportsCount} pending report{pendingReportsCount === 1 ? "" : "s"}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Needs your review</p>
                     </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </>
+          )}
 
-          {/* Error message */}
-          {statsError && (
-            <div className="mt-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-              <p className="text-sm text-destructive">
-                {statsError}
-              </p>
+          {activeTab === "reports" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Reports</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Adverts flagged by users, awaiting review.
+                </p>
+              </div>
+
+              {reportsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : reports.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No pending reports. All clear.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reports.map((report) => (
+                    <div key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm truncate">{report.productTitle}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Reason: <span className="font-medium text-foreground">{report.reason}</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {timeAgo(report.createdAt)}
+                          </p>
+                        </div>
+                        <a
+                          href={`/product/${report.productId}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                        >
+                          View <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dismissReport(report.id)}
+                          disabled={processingReportId === report.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+                        >
+                          <Check className="h-3.5 w-3.5" /> Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeReportedAdvert(report)}
+                          disabled={processingReportId === report.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-destructive text-white px-3 py-2 text-xs font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                        >
+                          {processingReportId === report.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Trash2 className="h-3.5 w-3.5" /> Delete Advert
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "users" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Users</h2>
+                <p className="mt-1 text-muted-foreground">Most recent 50 users.</p>
+              </div>
+
+              {usersLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="rounded-xl border bg-card overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Name</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Plan</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((u) => (
+                        <tr key={u.id} className="border-t border-border">
+                          <td className="px-4 py-2.5">{u.displayName || "—"}</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
+                          <td className="px-4 py-2.5">
+                            {u.role === "admin" ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                                <Shield className="h-3 w-3" /> Admin
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">User</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "adverts" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Adverts</h2>
+                <p className="mt-1 text-muted-foreground">Most recent 50 adverts.</p>
+              </div>
+
+              {advertsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {adverts.map((a) => (
+                    <div
+                      key={a.id}
+                      className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-sm truncate">{a.title}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {a.category} • {a.status} • {timeAgo(a.createdAt)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <a
+                          href={`/product/${a.id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-semibold text-primary hover:underline"
+                        >
+                          View
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => deleteAdvertDirect(a.id, a.title)}
+                          disabled={processingAdvertId === a.id}
+                          className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                        >
+                          {processingAdvertId === a.id ? "..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "jobs" && (
+            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+              Job listings management coming soon.
             </div>
           )}
 
-          {/* Recent Activity */}
-          <div className="mt-8 rounded-xl border bg-card p-6 shadow-sm">
-            <h3 className="text-lg font-semibold">
-              Recent Activity
-            </h3>
-
-            <div className="mt-6 flex min-h-[200px] items-center justify-center text-sm text-muted-foreground">
-              Recent platform activity will appear here.
+          {activeTab === "payments" && (
+            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+              Payment history view coming soon.
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>
   );
-}
+  }
