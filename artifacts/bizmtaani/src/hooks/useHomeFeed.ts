@@ -37,7 +37,7 @@ interface FeedCacheEntry {
   timestamp: number;
 }
 const feedCache = new Map<string, FeedCacheEntry>();
-const FEED_CACHE_TTL_MS = 2 * 60 * 1000;
+const FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export interface Product {
   id: string;
