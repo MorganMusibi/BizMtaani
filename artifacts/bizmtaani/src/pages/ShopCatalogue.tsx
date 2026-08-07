@@ -5,7 +5,10 @@ import {
   query,
   where,
   orderBy,
+  limit,
   getDocs,
+  doc,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -254,6 +257,15 @@ export default function ShopCatalogue() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [sellerProfile, setSellerProfile] = useState<{
+    displayName?: string;
+    businessName?: string;
+    isBusinessOwner?: boolean;
+    homeLocation?: {
+      areaName?: string;
+      county?: string;
+    };
+  } | null>(null);
 
   const isOwn =
     user?.uid === userId;
@@ -302,6 +314,29 @@ export default function ShopCatalogue() {
 
   useEffect(() => {
     if (!userId) {
+      setSellerProfile(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    getDoc(doc(db, "users", userId))
+      .then((snap) => {
+        if (cancelled) return;
+        setSellerProfile(snap.exists() ? snap.data() : null);
+      })
+      .catch((error) => {
+        console.error("Failed to load seller profile:", error);
+        if (!cancelled) setSellerProfile(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!userId) {
       setProducts([]);
       setLoading(false);
       return;
@@ -313,7 +348,7 @@ export default function ShopCatalogue() {
       try {
         setLoading(true);
 
-                    const productsQuery =
+             const productsQuery =
           query(
             collection(
               db,
@@ -323,8 +358,18 @@ export default function ShopCatalogue() {
               "sellerId",
               "==",
               userId
-            )
-          );
+            ),
+            where(
+              "status",
+              "==",
+              "active"
+            ),
+            orderBy(
+              "createdAt",
+              "desc"
+            ),
+            limit(60)
+          );       
 
 
         const snapshot =
@@ -336,14 +381,26 @@ export default function ShopCatalogue() {
           return;
         }
 
+        const nowSec = Date.now() / 1000;
+
         const loadedProducts =
-          snapshot.docs.map(
-            (doc) =>
-              ({
-                id: doc.id,
-                ...doc.data(),
-              } as ShopProduct)
-          );
+          snapshot.docs
+            .map(
+              (doc) =>
+                ({
+                  id: doc.id,
+                  ...doc.data(),
+                } as ShopProduct)
+            )
+            .filter((product) => {
+              if (
+                product.expiresAt &&
+                product.expiresAt.seconds <= nowSec
+              ) {
+                return false;
+              }
+              return true;
+            });
 
         setProducts(
           loadedProducts
@@ -387,6 +444,8 @@ export default function ShopCatalogue() {
    */
 
   const sellerName =
+    sellerProfile?.businessName ||
+    sellerProfile?.displayName ||
     products[0]?.sellerName ??
     "Seller";
 
@@ -395,16 +454,19 @@ export default function ShopCatalogue() {
     "";
 
   const sellerWard =
+    sellerProfile?.homeLocation?.areaName ||
     products[0]?.ward ??
     "";
 
   const sellerCounty =
+    sellerProfile?.homeLocation?.county ||
     products[0]?.county ??
     "";
 
   const sellerPhone =
     products[0]?.phone ??
     "";
+  
 
   const sellerLat =
     products[0]?.lat;
