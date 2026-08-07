@@ -354,6 +354,14 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
   // Check if the user has an active premium subscription
 const userSnap = await db.collection("users").doc(uid).get();
 
+// Block suspended/scammer accounts from posting
+if (userSnap.exists && userSnap.data()?.blocked === true) {
+  throw new HttpsError(
+    "permission-denied",
+    "Your account has been suspended and cannot post adverts. Contact support if you believe this is a mistake."
+  );
+}
+
 let effectivePlan = plan;
 let hasActiveSubscription = false;
 
