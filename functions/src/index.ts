@@ -538,7 +538,7 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
   try {
     // Set the admin custom claim
     await admin.auth().setCustomUserClaims(uid, {
-      admin: true,
+      isAdmin: true,
     });
 
     // Also record the role in Firestore for easy display/management.
