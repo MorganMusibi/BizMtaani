@@ -2810,7 +2810,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Free</span>
-          <p className="text-sm text-muted-foreground">7 days · 1 photo · 5 max active adverts</p>
+          <p className="text-sm text-muted-foreground">7 days · 1 photo · 3 max active adverts</p>
         </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
@@ -2821,7 +2821,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Weekly Premium</span>
-          <p className="text-sm text-muted-foreground">7 days · Unlimited photos · Unlimited active adverts</p>
+          <p className="text-sm text-muted-foreground">7 days · Up to 3 photos · Up to 8 active adverts</p>
         </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
@@ -2832,7 +2832,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Monthly Premium</span>
-          <p className="text-sm text-muted-foreground">30 days · Unlimited photos · Unlimited active adverts</p>
+          <p className="text-sm text-muted-foreground">30 days · Up to 3 photos · Up to 10 active adverts</p>
         </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
