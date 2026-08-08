@@ -562,7 +562,7 @@ useEffect(() => {
           collection(db, "products"),
           where("subcategory", "==", currentProduct.subcategory),
           where("status", "==", "active"),
-          limit(20)
+          limit(10)
         );
         const subcategorySnap = await getDocs(subcategoryQuery);
         relatedItems = subcategorySnap.docs
@@ -575,7 +575,7 @@ useEffect(() => {
           collection(db, "products"),
           where("category", "==", currentProduct.category),
           where("status", "==", "active"),
-          limit(20)
+          limit(10)
         );
         const categorySnap = await getDocs(categoryQuery);
         relatedItems = categorySnap.docs
