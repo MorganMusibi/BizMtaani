@@ -1,5 +1,6 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import imageCompression from "browser-image-compression";
 
 export type ImageUploadType = "avatar" | "product" | "community";
 
@@ -10,6 +11,38 @@ interface CloudinarySignatureResult {
   apiKey: string;
   cloudName: string;
 }
+/**
+ * Compress an image client-side before it ever reaches Cloudinary.
+ * Cuts storage credits at upload time, and bandwidth credits every
+ * single time the image is viewed afterwards.
+ *
+ * Falls back to the original file if compression fails for any
+ * reason (e.g. unsupported format) — never blocks a user's upload.
+ */
+async function compressImageBeforeUpload(
+  file: File,
+  type: ImageUploadType
+): Promise<File> {
+  // Skip compression for tiny files — not worth the CPU cost
+  if (file.size < 150 * 1024) {
+    return file;
+  }
+
+  const options =
+    type === "avatar"
+      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
+      : { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker: true };
+
+  try {
+    const compressed = await imageCompression(file, options);
+    return compressed;
+  } catch (error) {
+    console.warn("Image compression failed, uploading original:", error);
+    return file;
+  }
+}
+
+export async function uploadImage(
 
 /**
  * Upload an image via Firebase Cloud Functions + Cloudinary direct upload.
@@ -30,6 +63,8 @@ export async function uploadImage(
   url: string;
   public_id: string;
 }> {
+  const compressedFile = await compressImageBeforeUpload(file, type);
+
   const functions = getFunctions(app, "us-central1");
   const getSignature = httpsCallable<
     { uploadType: string },
@@ -42,7 +77,7 @@ export async function uploadImage(
   // Adding extra params here would cause Cloudinary to reject with
   // "Invalid Signature".
   const form = new FormData();
-  form.append("file", file);
+  form.append("file", compressedFile);
   form.append("api_key", sig.apiKey);
   form.append("timestamp", String(sig.timestamp));
   form.append("signature", sig.signature);
