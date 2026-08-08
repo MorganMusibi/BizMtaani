@@ -20,6 +20,20 @@ import { isProductVisibleToUser, } from "@/hooks/useHomeFeed";
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
 
+// Persists across ProductDetail unmount/remount so returning to a
+// product you already viewed doesn't re-fetch from Firestore.
+interface ProductDetailCacheEntry {
+  product: Product;
+  relatedProducts: Product[];
+  timestamp: number;
+}
+const productDetailCache = new Map<string, ProductDetailCacheEntry>();
+const PRODUCT_DETAIL_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+
+// GPS location persists indefinitely for the session — no reason to
+// re-request it every time this page mounts.
+let cachedUserCoords: { lat: number; lng: number } | null = null;
+
 interface Product {
   id: string;
   title: string;
@@ -457,9 +471,14 @@ const handleReply = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [chatLoading, setChatLoading] = useState(false);
-  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(cachedUserCoords);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     useEffect(() => {
+  if (cachedUserCoords) {
+    // Already resolved earlier this session — skip re-requesting GPS.
+    return;
+  }
+
   if (!navigator.geolocation) {
     return;
   }
@@ -473,10 +492,12 @@ const handleReply = () => {
         );
       }
 
-      setUserCoords({
+      const coords = {
         lat: position.coords.latitude,
         lng: position.coords.longitude,
-      });
+      };
+      cachedUserCoords = coords;
+      setUserCoords(coords);
     },
     (error) => {
       console.warn(
@@ -501,6 +522,14 @@ useEffect(() => {
   if (!id) return;
 
   let cancelled = false;
+
+  const cached = productDetailCache.get(id);
+  if (cached && Date.now() - cached.timestamp < PRODUCT_DETAIL_CACHE_TTL_MS) {
+    setProduct(cached.product);
+    setRelatedProducts(cached.relatedProducts);
+    setLoading(false);
+    return;
+  }
 
   (async () => {
     try {
@@ -573,7 +602,14 @@ useEffect(() => {
       );
 
       if (!cancelled) {
-        setRelatedProducts(rankedRelatedProducts.slice(0, 6));
+        const finalRelated = rankedRelatedProducts.slice(0, 6);
+        setRelatedProducts(finalRelated);
+
+        productDetailCache.set(id, {
+          product: currentProduct,
+          relatedProducts: finalRelated,
+          timestamp: Date.now(),
+        });
       }
     } catch (error) {
       console.error("Failed to load product or related adverts:", error);
