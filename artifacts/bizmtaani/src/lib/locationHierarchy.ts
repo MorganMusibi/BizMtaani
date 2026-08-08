@@ -25,6 +25,7 @@ export interface County {
 
 // Cache the hierarchy so we only fetch the JSON once
 let hierarchyCache: County[] | null = null;
+const HIERARCHY_SESSION_KEY = "bizmtaani_master_hierarchy";
 /**
  * Normalize a location name for comparison.
  *
@@ -43,9 +44,23 @@ function normalize(value: string): string {
  * public/MasterHierarchy.json
  */
 export async function getLocationHierarchy(): Promise<County[]> {
-  // Return cached data if already loaded
+  // Return in-memory cache if already loaded this page load
   if (hierarchyCache) {
     return hierarchyCache;
+  }
+
+  // Check sessionStorage — survives a full page reload, only cleared
+  // when the browser tab/session ends. Ward boundaries essentially
+  // never change, so no TTL is needed here.
+  try {
+    const stored = sessionStorage.getItem(HIERARCHY_SESSION_KEY);
+    if (stored) {
+      const data: County[] = JSON.parse(stored);
+      hierarchyCache = data;
+      return data;
+    }
+  } catch {
+    // Corrupt or inaccessible sessionStorage — fall through to fetch.
   }
 
   const controller = new AbortController();
@@ -65,6 +80,13 @@ export async function getLocationHierarchy(): Promise<County[]> {
     const data: County[] = await response.json();
 
     hierarchyCache = data;
+
+    try {
+      sessionStorage.setItem(HIERARCHY_SESSION_KEY, JSON.stringify(data));
+    } catch {
+      // sessionStorage full or unavailable — in-memory cache still works
+      // for the rest of this page load, just won't survive a reload.
+    }
 
     return data;
   } finally {
@@ -502,6 +524,11 @@ const normalizedCounty =
  */
 export function clearLocationHierarchyCache(): void {
   hierarchyCache = null;
+  try {
+    sessionStorage.removeItem(HIERARCHY_SESSION_KEY);
+  } catch {
+    // Ignore — nothing to clean up if sessionStorage is unavailable.
+  }
 }
 export async function validateLocationHierarchy(
   countyName: string,
