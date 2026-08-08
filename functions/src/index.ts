@@ -102,6 +102,30 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
 export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, plan, productId } = request.data as { phone: string; plan: string; productId: string };
+
+  if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
+    throw new HttpsError("invalid-argument", "Invalid plan selected.");
+  }
+
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "Product ID is required.");
+  }
+
+  const productSnap = await db.collection("products").doc(productId).get();
+
+  if (!productSnap.exists) {
+    throw new HttpsError("not-found", "Advert not found.");
+  }
+
+  const productData = productSnap.data()!;
+
+  if (productData.sellerId !== request.auth.uid) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only initiate payment for your own adverts."
+    );
+  }
+
   const formattedPhone = normalizePhone(phone);
   const token = await getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
   const ts = mpesaTimestamp();
@@ -133,6 +157,16 @@ export const mpesaCallback = onRequest(async (req, res) => {
     const paymentSnap = await paymentRef.get();
     
     if (paymentSnap.exists && paymentSnap.data()?.callbackToken === req.query["cbtoken"]) {
+      const existingStatus = paymentSnap.data()?.status;
+
+      // Idempotency guard: Safaricom may deliver the same callback
+      // more than once. If we've already processed this payment,
+      // acknowledge and exit without repeating any updates.
+      if (existingStatus === "completed" || existingStatus === "failed") {
+        res.json({ ResultCode: 0, ResultDesc: "Already processed" });
+        return;
+      }
+
       if (callback.ResultCode === 0) {
   const paymentData = paymentSnap.data()!;
 
@@ -415,6 +449,7 @@ if (userSnap.exists) {
     .collection("products")
     .where("sellerId", "==", uid)
     .where("status", "==", "active")
+    .limit(activeAdLimit + 1)
     .get();
 
   if (userAds.size >= activeAdLimit) {
@@ -437,15 +472,51 @@ if (userSnap.exists) {
     ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000))
     : null;
 
-  // 7. Save Ad
+  // 7. Save Ad — explicitly allowlist every field instead of
+  // spreading otherData, so a malicious client can't inject
+  // unexpected fields (e.g. verified, isPremium, visibilityScope).
   let newProductRef;
 
 try {
   newProductRef = await db.collection("products").add({
-    ...otherData,
     title,
+    description: typeof otherData.description === "string" ? otherData.description : "",
     price,
+    priceRaw: typeof otherData.priceRaw === "string" ? otherData.priceRaw : "",
+    rentPerMonthRaw: typeof otherData.rentPerMonthRaw === "string" ? otherData.rentPerMonthRaw : "",
+
+    category: typeof otherData.category === "string" ? otherData.category : "",
+    subcategory: typeof otherData.subcategory === "string" ? otherData.subcategory : "",
+
+    imageUrl: typeof otherData.imageUrl === "string" ? otherData.imageUrl : "",
     imageUrls,
+
+    lat: typeof otherData.lat === "number" ? otherData.lat : null,
+    lng: typeof otherData.lng === "number" ? otherData.lng : null,
+
+    ward: typeof otherData.ward === "string" ? otherData.ward : "",
+    constituency: typeof otherData.constituency === "string" ? otherData.constituency : "",
+    county: typeof otherData.county === "string" ? otherData.county : "",
+
+    geohash: typeof otherData.geohash === "string" ? otherData.geohash : "",
+
+    sellerName: typeof otherData.sellerName === "string" ? otherData.sellerName : "",
+    sellerType: otherData.sellerType === "business" ? "business" : "individual",
+
+    priceDisplay: typeof otherData.priceDisplay === "string" ? otherData.priceDisplay : "fixed",
+    pricingBasis: typeof otherData.pricingBasis === "string" ? otherData.pricingBasis : null,
+
+    hotelMenu: otherData.hotelMenu ?? null,
+    eateryPayment: otherData.eateryPayment ?? null,
+
+    phone: typeof otherData.phone === "string" ? otherData.phone : "",
+
+    jobDetails: otherData.jobDetails ?? null,
+    vehicleDetails: otherData.vehicleDetails ?? null,
+    serviceDetails: otherData.serviceDetails ?? null,
+    accommodationDetails: otherData.accommodationDetails ?? null,
+    commercialPropertyDetails: otherData.commercialPropertyDetails ?? null,
+
     plan: effectivePlan,
     ownerId: uid,
     sellerId: uid,
