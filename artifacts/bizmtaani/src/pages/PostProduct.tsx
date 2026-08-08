@@ -578,12 +578,12 @@ function handleImageFiles(files: FileList | null) {
   }
   
   const toAdd = Array.from(files).slice(0, remaining);
-  const oversized = toAdd.filter((f) => f.size > 8 * 1024 * 1024);
+  const oversized = toAdd.filter((f) => f.size > 4 * 1024 * 1024);
   
   if (oversized.length > 0) {
     toast({ 
       title: "Some images too large", 
-      description: "Max 8 MB per image.", 
+      description: "Max 4 MB per image.", 
       variant: "destructive" 
     });
     return;
