@@ -2,9 +2,9 @@
  * Frontend M-Pesa helpers — listing activation payments.
  *
  * Plans:
- * free            — 0 KES, 1 photo, 7 days, up to 5 active adverts
- * premium_weekly  — 100 KES, Unlimited photos, 7 days, Unlimited active adverts
- * premium_monthly — 350 KES, Unlimited photos, 30 days, Unlimited active adverts
+ * free            — 0 KES, 1 photo per advert, 7 days, up to 3 active adverts
+ * premium_weekly  — 100 KES, up to 3 photos per advert, 7 days, up to 8 active adverts
+ * premium_monthly — 350 KES, up to 3 photos per advert, 30 days, up to 10 active adverts
  *
  * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
  * which calls the Daraja STK push API server-side.
@@ -42,9 +42,9 @@ export const LISTING_DURATION_DAYS: Record<ListingPlan, number> = {
 // ============================================================
 
 export const MAX_ACTIVE_ADVERTS: Record<ListingPlan, number> = {
-  free: 5,
-  premium_weekly: Infinity,
-  premium_monthly: Infinity,
+  free: 3,
+  premium_weekly: 8,
+  premium_monthly: 10,
 };
 
 // ============================================================
@@ -53,8 +53,8 @@ export const MAX_ACTIVE_ADVERTS: Record<ListingPlan, number> = {
 
 export const MAX_PHOTO_LIMIT: Record<ListingPlan, number> = {
   free: 1,
-  premium_weekly: Infinity,
-  premium_monthly: Infinity,
+  premium_weekly: 3,
+  premium_monthly: 3,
 };
 
 // ============================================================
