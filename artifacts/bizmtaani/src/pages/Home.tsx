@@ -31,12 +31,23 @@ const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 // Persists across Home unmount/remount (e.g. navigating away and back)
 // so GPS/location resolution only runs once per app session instead of
 // every time the user returns to the home screen.
-let cachedLocationState: {
-  userCoords: [number, number] | null;
-  gpsGranted: boolean;
-  gpsReady: boolean;
-  locationInfo: ResolvedLocation | null;
-} | null = null;
+const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
+
+function loadCachedLocationState() {
+  try {
+    const raw = sessionStorage.getItem(LOCATION_STATE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) as {
+      userCoords: [number, number] | null;
+      gpsGranted: boolean;
+      gpsReady: boolean;
+      locationInfo: ResolvedLocation | null;
+    } : null;
+  } catch {
+    return null;
+  }
+}
+
+let cachedLocationState = loadCachedLocationState();
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -274,6 +285,11 @@ export default function Home() {
   // GPS/geocoding entirely.
   useEffect(() => {
     cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo };
+    try {
+      sessionStorage.setItem(LOCATION_STATE_STORAGE_KEY, JSON.stringify(cachedLocationState));
+    } catch {
+      // sessionStorage full or unavailable — in-memory cache still works for same-session nav
+    }
   }, [userCoords, gpsGranted, gpsReady, locationInfo]);
 
   useEffect(() => {
