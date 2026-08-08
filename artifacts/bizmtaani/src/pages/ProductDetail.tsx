@@ -880,7 +880,7 @@ async function saveMenuChanges() {
   </div>
 
 </div>
-<Card className="mt-5 p-4">
+<Card className={`mt-5 p-4 ${isEatery ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900" : "bg-primary/5 border-primary/10"}`}>
 
 {isEatery ? (
   <div className="select-none">
@@ -939,7 +939,7 @@ async function saveMenuChanges() {
 
         
         {product.description && (
-  <Card>
+  <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
     <div className="p-5 space-y-3">
       <h2 className="text-lg font-bold">Description</h2>
 
@@ -977,8 +977,8 @@ async function saveMenuChanges() {
         {/*Title, Price, Description, Menu) ... */}
 
         
-                <Card className="p-5">
-  <h2 className="text-lg font-bold mb-4">Seller</h2>
+          <Card className="p-5 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+  <h2 className="text-lg font-bold mb-4">Seller</h2>      
 
   <div
     onClick={() => setLocation(`/shop/${product.sellerId}`)}
