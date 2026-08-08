@@ -35,7 +35,7 @@ const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
 
 function loadCachedLocationState() {
   try {
-    const raw = sessionStorage.getItem(LOCATION_STATE_STORAGE_KEY);
+    const raw = localStorage.getItem(LOCATION_STATE_STORAGE_KEY);
     return raw ? JSON.parse(raw) as {
       userCoords: [number, number] | null;
       gpsGranted: boolean;
@@ -48,7 +48,6 @@ function loadCachedLocationState() {
 }
 
 let cachedLocationState = loadCachedLocationState();
-
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
@@ -286,9 +285,9 @@ export default function Home() {
   useEffect(() => {
     cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo };
     try {
-      sessionStorage.setItem(LOCATION_STATE_STORAGE_KEY, JSON.stringify(cachedLocationState));
+      localStorage.setItem(LOCATION_STATE_STORAGE_KEY, JSON.stringify(cachedLocationState));
     } catch {
-      // sessionStorage full or unavailable — in-memory cache still works for same-session nav
+      // localStorage full or unavailable — in-memory cache still works for same-session nav
     }
   }, [userCoords, gpsGranted, gpsReady, locationInfo]);
 
