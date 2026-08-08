@@ -971,7 +971,7 @@ async function saveMenuChanges() {
     className="w-full gap-2"
     onClick={() => setShowPriceList(true)}
   >
-    View List
+    View other items
   </Button>
 )}
         {/*Title, Price, Description, Menu) ... */}
@@ -1445,7 +1445,7 @@ const itemDistance =
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
           <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-lg">Other Products / Services</h3>
+              <h3 className="font-black text-lg">Other Items</h3>
               <button
                 onClick={() => setShowPriceList(false)}
                 className="text-muted-foreground hover:text-foreground text-sm font-bold"
