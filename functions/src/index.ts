@@ -50,8 +50,6 @@ const LISTING_DURATIONS: Record<string, number> = {
   premium_weekly: 7,
   premium_monthly: 30,
 };
-const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
 }
@@ -133,7 +131,7 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   const projectId = process.env.GCLOUD_PROJECT ?? "";
   const stkBody = {
     BusinessShortCode: process.env.MPESA_SHORTCODE ?? "174379",
-    Password: Buffer.from(`${process.env.MPESA_SHORTCODE ?? "174379"}${mpesaPasskey.value() || SANDBOX_PASSKEY}${ts}`).toString("base64"),
+    Password: Buffer.from(`${process.env.MPESA_SHORTCODE ?? "174379"}${mpesaPasskey.value()}${ts}`).toString("base64"),
     Timestamp: ts,
     TransactionType: "CustomerPayBillOnline",
     Amount: PLAN_AMOUNTS[plan],
