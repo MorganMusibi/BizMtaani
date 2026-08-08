@@ -36,8 +36,37 @@ interface FeedCacheEntry {
   areaDone: boolean;
   timestamp: number;
 }
-const feedCache = new Map<string, FeedCacheEntry>();
 const FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
+  try {
+    const raw = sessionStorage.getItem("bizmtaani_feed_cache");
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, Omit<FeedCacheEntry, "wardCursor" | "areaCursors"> & { wardCursor: null; areaCursors: Record<string, null> }>;
+    const map = new Map<string, FeedCacheEntry>();
+    Object.entries(parsed).forEach(([key, entry]) => {
+      map.set(key, { ...entry, wardCursor: null, areaCursors: {} });
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
+  try {
+    const serializable: Record<string, unknown> = {};
+    cache.forEach((entry, key) => {
+      const { wardCursor, areaCursors, ...rest } = entry;
+      serializable[key] = rest;
+    });
+    sessionStorage.setItem("bizmtaani_feed_cache", JSON.stringify(serializable));
+  } catch {
+    // sessionStorage full or unavailable — cache just won't persist across reload
+  }
+}
+
+const feedCache = loadFeedCacheFromStorage();
 
 export interface Product {
   id: string;
