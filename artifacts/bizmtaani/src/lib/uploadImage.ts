@@ -42,8 +42,6 @@ async function compressImageBeforeUpload(
   }
 }
 
-export async function uploadImage(
-
 /**
  * Upload an image via Firebase Cloud Functions + Cloudinary direct upload.
  *
