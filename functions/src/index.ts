@@ -243,6 +243,31 @@ await userRef
     premiumEndsAt: premiumEndsTimestamp,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+        // Reactivate any archived hotel menu adverts now that the
+        // subscription has renewed. Bounded to 50 reads so this stays
+        // cheap even if it never needs to write anything.
+        const archivedAds = await db
+          .collection("products")
+          .where("sellerId", "==", paymentData.buyerId)
+          .where("status", "==", "archived")
+          .limit(50)
+          .get();
+
+        const reactivateBatch = db.batch();
+        let reactivatedCount = 0;
+        archivedAds.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.hotelMenu !== undefined && data.hotelMenu !== null) {
+            reactivateBatch.update(doc.ref, {
+              status: "active",
+              expiresAt: premiumEndsTimestamp,
+            });
+            reactivatedCount++;
+          }
+        });
+        if (reactivatedCount > 0) {
+          await reactivateBatch.commit();
+        }
       } else {
         // Payment failed or was cancelled by the user
         await paymentRef.update({
