@@ -420,6 +420,83 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
   return { success: true };
 });
 // ═══════════════════════════════════════════════════════════════════════════
+// 4B. REVERSE GEOCODING (Nominatim proxy with cache + rate limiting)
+// ═══════════════════════════════════════════════════════════════════════════
+
+let lastNominatimCallAt = 0;
+
+async function throttleNominatim() {
+  const minGapMs = 1100; // stay safely under Nominatim's 1 req/sec policy
+  const elapsed = Date.now() - lastNominatimCallAt;
+  if (elapsed < minGapMs) {
+    await new Promise((resolve) => setTimeout(resolve, minGapMs - elapsed));
+  }
+  lastNominatimCallAt = Date.now();
+}
+
+export const reverseGeocode = onCall(
+  {
+    cors: true,
+    maxInstances: 1, // forces all calls through one instance, serializing requests
+    concurrency: 1,  // ensures that one instance only processes one call at a time
+  },
+  async (request) => {
+    const { lat, lng } = request.data as { lat?: number; lng?: number };
+
+    if (typeof lat !== "number" || typeof lng !== "number") {
+      throw new HttpsError("invalid-argument", "lat and lng are required numbers.");
+    }
+
+    const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
+    const cacheRef = db.collection("geocodeCache").doc(cacheKey);
+
+    // 1. Check persistent cache first — avoids hitting Nominatim at all
+    const cached = await cacheRef.get();
+    if (cached.exists) {
+      return cached.data();
+    }
+
+    // 2. Not cached — throttle, then call Nominatim
+    await throttleNominatim();
+
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
+
+    const res = await fetch(url, {
+      headers: {
+        "Accept-Language": "en",
+        // Nominatim's usage policy requires a real identifying User-Agent
+        "User-Agent": "BizMtaani/1.0 (contact: morganmusibi@gmail.com)",
+      },
+    });
+
+    if (!res.ok) {
+      throw new HttpsError("internal", "Reverse geocoding failed.");
+    }
+
+    const data = (await res.json()) as { address?: Record<string, string> };
+    const addr = data.address ?? {};
+
+    const result = {
+      suburb: addr.suburb ?? null,
+      neighbourhood: addr.neighbourhood ?? null,
+      quarter: addr.quarter ?? null,
+      village: addr.village ?? null,
+      hamlet: addr.hamlet ?? null,
+      town: addr.town ?? null,
+      municipality: addr.municipality ?? null,
+      city_district: addr.city_district ?? null,
+      county_district: addr.county_district ?? null,
+      state: addr.state ?? null,
+      county: addr.county ?? null,
+    };
+
+    // 3. Save to cache permanently — ward boundaries don't move
+    await cacheRef.set(result);
+
+    return result;
+  }
+);
+// ═══════════════════════════════════════════════════════════════════════════
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
