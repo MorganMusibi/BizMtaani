@@ -2763,11 +2763,6 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
                 onChange={(e) => handleImageFiles(e.target.files)} />
             </div>
-<input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
-                onChange={(e) => handleImageFiles(e.target.files)} />
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
-                onChange={(e) => handleImageFiles(e.target.files)} />
-            </div>
 
             {/* Other products / services list */}
             <div className="space-y-3 mt-4">
@@ -2827,8 +2822,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
             <div className="space-y-2 mt-4">
               <label className="text-sm font-bold">Location</label>
-            <div className="space-y-2 mt-4">
-              <label className="text-sm font-bold">Location</label>
+              <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
               <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
                 <MapPin size={16} className="text-primary flex-shrink-0" />
                 <div className="flex-1">
