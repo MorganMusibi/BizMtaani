@@ -28,6 +28,16 @@ import { useToast } from "@/hooks/use-toast";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 
+// Persists across Home unmount/remount (e.g. navigating away and back)
+// so GPS/location resolution only runs once per app session instead of
+// every time the user returns to the home screen.
+let cachedLocationState: {
+  userCoords: [number, number] | null;
+  gpsGranted: boolean;
+  gpsReady: boolean;
+  locationInfo: ResolvedLocation | null;
+} | null = null;
+
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
@@ -250,15 +260,22 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [gpsGranted, setGpsGranted] = useState(false);
-  const [gpsReady, setGpsReady] = useState(false);
-  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
+  const [userCoords, setUserCoords] = useState<[number, number] | null>(cachedLocationState?.userCoords ?? null);
+  const [gpsGranted, setGpsGranted] = useState(cachedLocationState?.gpsGranted ?? false);
+  const [gpsReady, setGpsReady] = useState(cachedLocationState?.gpsReady ?? false);
+  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cachedLocationState?.locationInfo ?? null);
   const [hierarchyReady, setHierarchyReady] = useState(false);
   const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
+
+  // Keep the module-level cache in sync so a later remount can skip
+  // GPS/geocoding entirely.
+  useEffect(() => {
+    cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo };
+  }, [userCoords, gpsGranted, gpsReady, locationInfo]);
+
   useEffect(() => {
   let cancelled = false;
 
@@ -447,11 +464,15 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     }
   );
 };
-    if (user && !userProfile) {
-      console.log("[LOC] SKIPPING requestGps — user exists but userProfile not loaded", { user: !!user, userProfile });
+    if (gpsReady) {
+      // Already resolved (cached from a previous mount) — skip
+      // GPS/geocoding entirely on remount.
       return;
     }
-    console.log("[LOC] calling requestGps");
+
+    if (user && !userProfile) {
+      return;
+    }
     requestGps();
 
     return () => {
