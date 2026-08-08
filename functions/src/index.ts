@@ -623,7 +623,7 @@ try {
 
     hotelMenu: otherData.hotelMenu ?? null,
     eateryPayment: otherData.eateryPayment ?? null,
-
+    priceList: Array.isArray(otherData.priceList) ? otherData.priceList : null,
     phone: typeof otherData.phone === "string" ? otherData.phone : "",
 
     jobDetails: otherData.jobDetails ?? null,
