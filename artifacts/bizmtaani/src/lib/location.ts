@@ -7,6 +7,8 @@
 import {
   resolveCanonicalLocation,
 } from "@/lib/locationHierarchy";
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -134,14 +136,12 @@ function findNearbyWardNames(lat: number, lng: number, features: WardFeature[]):
 
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
-    // zoom=14 targets ward/suburb level; zoom=12 would give sub-county
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
-    const res = await fetch(url, {
-      headers: { "Accept-Language": "en", "User-Agent": "BizMtaani/1.0" },
-    });
-    if (!res.ok) throw new Error("Nominatim error");
-    const data = await res.json();
-    const addr = data.address ?? {};
+    const functions = getFunctions(app, "us-central1");
+    const reverseGeocode = httpsCallable<{ lat: number; lng: number }, Record<string, string | null>>(
+      functions,
+      "reverseGeocode"
+    );
+    const { data: addr } = await reverseGeocode({ lat, lng });
 
     // Priority order for Kenya ward names:
     // suburb / neighbourhood / quarter  → ward-level (most accurate)
