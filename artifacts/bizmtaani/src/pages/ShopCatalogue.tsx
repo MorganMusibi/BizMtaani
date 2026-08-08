@@ -77,7 +77,7 @@ interface ShopProduct {
 
   createdAt: { seconds: number } | null;
 }
-interface ShopCacheEntry {
+ interface ShopCacheEntry {
   products: ShopProduct[];
   sellerProfile: {
     displayName?: string;
@@ -87,8 +87,26 @@ interface ShopCacheEntry {
   } | null;
   timestamp: number;
 }
-const shopCache = new Map<string, ShopCacheEntry>();
 const SHOP_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes — shop catalogues change infrequently
+const SHOP_CACHE_PREFIX = "bizmtaani_shop_cache_";
+
+function readShopCache(userId: string): ShopCacheEntry | null {
+  try {
+    const raw = sessionStorage.getItem(SHOP_CACHE_PREFIX + userId);
+    if (!raw) return null;
+    return JSON.parse(raw) as ShopCacheEntry;
+  } catch {
+    return null;
+  }
+}
+
+function writeShopCache(userId: string, entry: ShopCacheEntry): void {
+  try {
+    sessionStorage.setItem(SHOP_CACHE_PREFIX + userId, JSON.stringify(entry));
+  } catch {
+    // sessionStorage may be full or unavailable — fail silently, cache is a performance optimization only
+  }
+}
 function getDistanceKm(
   lat1: number,
   lng1: number,
@@ -347,7 +365,7 @@ useEffect(() => {
       return;
     }
 
-    const cached = shopCache.get(userId);
+    const cached = readShopCache(userId);
     if (cached && Date.now() - cached.timestamp < SHOP_CACHE_TTL_MS) {
       setProducts(cached.products);
       setSellerProfile(cached.sellerProfile);
@@ -392,7 +410,7 @@ useEffect(() => {
         setProducts(loadedProducts);
         setSellerProfile(loadedProfile);
 
-        shopCache.set(userId, {
+        writeShopCache(userId, {
           products: loadedProducts,
           sellerProfile: loadedProfile,
           timestamp: Date.now(),
