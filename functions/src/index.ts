@@ -50,6 +50,7 @@ const LISTING_DURATIONS: Record<string, number> = {
   premium_weekly: 7,
   premium_monthly: 30,
 };
+const CLEANUP_LIMIT = 200;
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
 }
@@ -289,6 +290,7 @@ async function runCleanup() {
   const expiredActive = await db.collection("products")
     .where("status", "==", "active")
     .where("expiresAt", "<", now)
+    limit(CLEANUP_LIMIT)
     .get();
 
   // Delete abandoned pending payment adverts older than 1 hour
@@ -299,10 +301,12 @@ async function runCleanup() {
   const expiredPending = await db.collection("products")
     .where("status", "==", "pending_payment")
     .where("createdAt", "<", oneHourAgo)
+    limit(CLEANUP_LIMIT)
     .get();
   const expiredPayments = await db.collection("payments")
   .where("status", "==", "pending")
   .where("createdAt", "<", oneHourAgo)
+    limit(CLEANUP_LIMIT)
   .get();
 
   const batch = db.batch();
@@ -328,8 +332,12 @@ for (const doc of expiredPending.docs) {
           ? null
           : img.public_id;
 
-      if (publicId) {
-        await deleteCloudinaryImage(publicId);
+  if (publicId) {
+        try {
+          await deleteCloudinaryImage(publicId);
+        } catch (error) {
+          console.error(`Cloudinary delete failed for ${publicId}:`, error);
+        }
       }
     }
   }
@@ -352,7 +360,7 @@ expiredPayments.docs.forEach((doc) => {
 
 export const scheduledCleanup = onSchedule(
   {
-    schedule: "every 1 hours",
+    schedule: "every 6 hours",
     secrets: [
       cloudinaryApiKey,
       cloudinaryApiSecret,
