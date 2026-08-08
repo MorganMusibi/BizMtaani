@@ -197,6 +197,31 @@ function timeAgo(createdAt: { seconds: number } | null) {
   return `${years} year${years === 1 ? "" : "s"} ago`;
 }
 
+function getThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_fill/");
+  }
+  return url;
+}
+
+function getDetailImageUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_1000,c_limit/");
+  }
+  return url;
+}
+
+function getAvatarThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_128,h_128,c_fill/");
+  }
+  return url;
+}
+
+function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
 function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
   const periodsWithItems = MEAL_PERIODS.filter(({ key }) => (menu[key]?.length ?? 0) > 0);
   if (periodsWithItems.length === 0) return null;
@@ -301,7 +326,7 @@ function ImageGallery({ images }: { images: string[] }) {
         onTouchEnd={handleTouchEnd}
         >
       <img
-          src={images[active]}
+          src={getDetailImageUrl(images[active])}
           alt={`Product image ${active + 1}`}
           className="w-full h-full object-cover"
           onContextMenu={(e) => e.preventDefault()}
@@ -359,7 +384,7 @@ function ImageGallery({ images }: { images: string[] }) {
               }`}
               >
             <img
-                src={url}
+                src={getThumbnailUrl(url)}
                 alt={`Thumbnail ${i + 1}`}
                 loading="lazy"
                 className="w-full h-full object-cover"
@@ -950,7 +975,7 @@ async function saveMenuChanges() {
   >
     {product.sellerAvatar ? (
       <img
-        src={product.sellerAvatar}
+        src={getAvatarThumbnailUrl(product.sellerAvatar)}
         alt={product.sellerName}
         className="w-14 h-14 rounded-full object-cover"
       />
@@ -1096,7 +1121,7 @@ const itemDistance =
             <div className="relative aspect-square bg-muted">
               {itemImages.length > 0 ? (
                 <img
-                  src={itemImages[0]}
+                  src={getThumbnailUrl(itemImages[0])}
                   alt={item.title}
                   loading="lazy"
                   className="w-full h-full object-cover"
