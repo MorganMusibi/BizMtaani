@@ -376,9 +376,49 @@ export const scheduledCleanup = onSchedule(
 // ═══════════════════════════════════════════════════════════════════════════
 export const sendNotification = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
-  await admin.messaging().send({ token: request.data.token, notification: { title: request.data.title, body: request.data.body ?? "" }, data: request.data.data ?? {} });
-  return { success: true };
+
+  const { token, title, body, data } = request.data as {
+    token?: unknown;
+    title?: unknown;
+    body?: unknown;
+    data?: unknown;
+  };
+
+  if (typeof token !== "string" || !token.trim()) {
+    throw new HttpsError("invalid-argument", "A valid FCM token is required.");
+  }
+
+  if (typeof title !== "string" || !title.trim() || title.length > 100) {
+    throw new HttpsError("invalid-argument", "A valid title (max 100 characters) is required.");
+  }
+
+  if (body !== undefined && (typeof body !== "string" || body.length > 500)) {
+    throw new HttpsError("invalid-argument", "Body must be a string under 500 characters.");
+  }
+
+  // Only allow the recipient to be notified about themselves,
+  // or a chat/product they are actually part of — this stops any
+  // signed-in user from blasting arbitrary notifications to anyone.
+  const recipientTokenDoc = await db
+    .collection("fcmTokens")
+    .doc(request.auth.uid)
+    .get();
+
+  if (!recipientTokenDoc.exists || recipientTokenDoc.data()?.token !== token) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only send notifications to your own registered device."
+    );
+  }
+
+  await admin.messaging().send({
+    token,
+    notification: { title, body: typeof body === "string" ? body : "" },
+    data: data && typeof data === "object" ? (data as Record<string, string>) : {},
   });
+
+  return { success: true };
+});
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
@@ -623,8 +663,12 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
   }
 
   try {
-    // Set the admin custom claim
+    // Preserve any existing custom claims (e.g. future roles like
+    // moderator, verified) instead of overwriting them entirely.
+    const targetUser = await admin.auth().getUser(uid);
+
     await admin.auth().setCustomUserClaims(uid, {
+      ...(targetUser.customClaims || {}),
       admin: true,
     });
 
