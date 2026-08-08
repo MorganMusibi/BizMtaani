@@ -64,7 +64,6 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
     // localStorage full or unavailable — cache just won't persist across reload
   }
 }
-function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
 
 const feedCache = loadFeedCacheFromStorage();
 
@@ -838,17 +837,6 @@ const sortedBuffer = sortNearbyProducts(
   setAreaDonePrefixes(currentDonePrefixes);
   setAreaDone(localAreaDone);
 
-  feedCache.set(cacheKey, {
-    wardProducts: localWardProducts,
-    wardCursor: localWardCursor,
-    wardDone: localWardDone,
-    areaProducts: localAreaProducts,
-    areaBuffer: localAreaBuffer,
-    areaCursors: currentCursors,
-    areaDonePrefixes: currentDonePrefixes,
-    areaDone: localAreaDone,
-    timestamp: Date.now(),
-  });
   feedCache.set(cacheKey, {
     wardProducts: localWardProducts,
     wardCursor: localWardCursor,
