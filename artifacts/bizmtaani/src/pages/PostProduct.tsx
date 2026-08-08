@@ -2769,7 +2769,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               <div>
                 <label className="text-sm font-bold">Other Products / Services (Optional)</label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Selling more than one thing? List other items with their prices — buyers will see a "View List" option on this advert.
+                  Selling more than one thing? List other items with their prices — buyers will see a "View other items" option on this advert.
                 </p>
               </div>
 
