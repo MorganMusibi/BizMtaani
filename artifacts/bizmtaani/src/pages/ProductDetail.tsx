@@ -220,8 +220,6 @@ function getAvatarThumbnailUrl(url: string): string {
   }
   return url;
 }
-
-function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
 function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
   const periodsWithItems = MEAL_PERIODS.filter(({ key }) => (menu[key]?.length ?? 0) > 0);
   if (periodsWithItems.length === 0) return null;
