@@ -108,6 +108,9 @@ const [priceDisplay, setPriceDisplay] =
     lunch: { name: "", price: "" },
     supper: { name: "", price: "" },
   });
+  // Other products / services list (shown on Product Detail as "View List")
+  const [priceListItems, setPriceListItems] = useState<{ name: string; price: string }[]>([]);
+  const [newPriceListItem, setNewPriceListItem] = useState({ name: "", price: "" });
 
   // Step 3 — Images + location
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -616,6 +619,18 @@ function handleImageFiles(files: FileList | null) {
       [period]: prev[period].filter((_, idx) => idx !== i),
     }));
   }
+  function addPriceListItem() {
+    if (!newPriceListItem.name.trim() || !newPriceListItem.price) return;
+    setPriceListItems((prev) => [
+      ...prev,
+      { name: newPriceListItem.name.trim(), price: newPriceListItem.price },
+    ]);
+    setNewPriceListItem({ name: "", price: "" });
+  }
+
+  function removePriceListItem(i: number) {
+    setPriceListItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
 
   async function searchLocation() {
     if (!locationSearch.trim()) return;
@@ -1071,6 +1086,13 @@ county: wardInfo?.county?.trim() || "",
           otherDescription: eateryPaymentMethod === "other" ? eateryPaymentOther.trim() : "",
         }
       : null,
+    priceList:
+      priceListItems.length > 0
+        ? priceListItems.map((item) => ({
+            name: item.name,
+            price: parseFloat(item.price) || 0,
+          }))
+        : null,
 
     plan,
     phone: cleanedPhone,
@@ -1270,6 +1292,13 @@ county: wardInfo?.county?.trim() || "",
           otherDescription: eateryPaymentMethod === "other" ? eateryPaymentOther.trim() : "",
         }
       : null,
+      priceList:
+        priceListItems.length > 0
+          ? priceListItems.map((item) => ({
+              name: item.name,
+              price: parseFloat(item.price) || 0,
+            }))
+          : null,
       plan: "free",
 
 phone: cleanedPhone,
@@ -2734,7 +2763,70 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
                 onChange={(e) => handleImageFiles(e.target.files)} />
             </div>
+<input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+            </div>
 
+            {/* Other products / services list */}
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="text-sm font-bold">Other Products / Services (Optional)</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Selling more than one thing? List other items with their prices — buyers will see a "View List" option on this advert.
+                </p>
+              </div>
+
+              {priceListItems.length > 0 && (
+                <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border">
+                  {priceListItems.map((item, i) => (
+                    <div key={i} className="flex items-center px-4 py-2.5 gap-2">
+                      <span className="flex-1 text-sm font-medium">{item.name}</span>
+                      <span className="text-sm font-bold text-primary">KES {item.price}</span>
+                      <button
+                        type="button"
+                        onClick={() => removePriceListItem(i)}
+                        className="ml-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Item name"
+                  value={newPriceListItem.name}
+                  onChange={(e) =>
+                    setNewPriceListItem((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="flex-1 h-9 text-sm"
+                />
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="KES"
+                  value={newPriceListItem.price}
+                  onChange={(e) =>
+                    setNewPriceListItem((prev) => ({ ...prev, price: e.target.value }))
+                  }
+                  className="w-24 h-9 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addPriceListItem}
+                  className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-4">
+              <label className="text-sm font-bold">Location</label>
             <div className="space-y-2 mt-4">
               <label className="text-sm font-bold">Location</label>
               <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
