@@ -590,10 +590,21 @@ if (userSnap.exists) {
     : "pending_payment";
 
   // 6. Logic: Dynamic Expiry (Only if active immediately)
+  // Hotel menu adverts follow the seller's subscription instead of a fixed
+  // listing duration — archived (never deleted) when premium lapses,
+  // reactivated automatically on renewal (see mpesaCallback).
+  const isHotelMenu = otherData.hotelMenu !== undefined && otherData.hotelMenu !== null;
   const durationDays = LISTING_DURATIONS[effectivePlan] ?? 7;
-  const expiresAt = status === 'active' 
-    ? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000))
-    : null;
+
+  let expiresAt: admin.firestore.Timestamp | null = null;
+  if (status === "active") {
+    if (isHotelMenu && hasActiveSubscription) {
+      expiresAt = userSnap.data()?.premiumEndsAt
+        ?? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
+    } else {
+      expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
+    }
+  }
 
   // 7. Save Ad — explicitly allowlist every field instead of
   // spreading otherData, so a malicious client can't inject
