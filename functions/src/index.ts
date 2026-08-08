@@ -35,8 +35,14 @@ const PLAN_AMOUNTS: Record<string, number> = {
 // If you are using limits in your backend, update them here:
 const MAX_PHOTO_LIMIT: Record<string, number> = {
   free: 1,
-  premium_weekly: Infinity, // Unlimited
-  premium_monthly: Infinity, // Unlimited
+  premium_weekly: 3,
+  premium_monthly: 3,
+};
+
+const MAX_ACTIVE_ADS: Record<string, number> = {
+  free: 3,
+  premium_weekly: 8,
+  premium_monthly: 10,
 };
 // Add this in your Constants section
 const LISTING_DURATIONS: Record<string, number> = {
@@ -402,24 +408,21 @@ if (userSnap.exists) {
     throw new HttpsError("failed-precondition", `Your plan allows a maximum of ${limit} photos.`);
   }
 
-  // 4. Logic: Free Ad Limit Enforcement
-  // --- UPDATED BACKEND CODE ---
-  if (effectivePlan === "free") {
-    const userAds = await db
-      .collection("products")
-      .where("sellerId", "==", uid) // <--- Use sellerId
-      .where("status", "==", "active")
-      .get();
-// ----------------------------
+  // 4. Logic: Active Ad Limit Enforcement (applies to every plan)
+  const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
+  const userAds = await db
+    .collection("products")
+    .where("sellerId", "==", uid)
+    .where("status", "==", "active")
+    .get();
 
-  if (userAds.size >= 5) {
+  if (userAds.size >= activeAdLimit) {
     throw new HttpsError(
       "failed-precondition",
-      "You have reached the maximum of 5 free ads."
+      `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
     );
   }
-}
 
   // 5. Logic: Status Determination
   // Paid plans start as 'pending_payment'; Free plans start as 'active'
