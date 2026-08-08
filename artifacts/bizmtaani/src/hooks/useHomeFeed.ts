@@ -37,10 +37,9 @@ interface FeedCacheEntry {
   timestamp: number;
 }
 const FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-
 function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   try {
-    const raw = sessionStorage.getItem("bizmtaani_feed_cache");
+    const raw = localStorage.getItem("bizmtaani_feed_cache");
     if (!raw) return new Map();
     const parsed = JSON.parse(raw) as Record<string, Omit<FeedCacheEntry, "wardCursor" | "areaCursors"> & { wardCursor: null; areaCursors: Record<string, null> }>;
     const map = new Map<string, FeedCacheEntry>();
@@ -60,11 +59,12 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
       const { wardCursor, areaCursors, ...rest } = entry;
       serializable[key] = rest;
     });
-    sessionStorage.setItem("bizmtaani_feed_cache", JSON.stringify(serializable));
+    localStorage.setItem("bizmtaani_feed_cache", JSON.stringify(serializable));
   } catch {
-    // sessionStorage full or unavailable — cache just won't persist across reload
+    // localStorage full or unavailable — cache just won't persist across reload
   }
 }
+function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
 
 const feedCache = loadFeedCacheFromStorage();
 
