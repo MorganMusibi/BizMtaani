@@ -28,7 +28,7 @@ interface ProductDetailCacheEntry {
   timestamp: number;
 }
 const productDetailCache = new Map<string, ProductDetailCacheEntry>();
-const PRODUCT_DETAIL_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const PRODUCT_DETAIL_CACHE_TTL_MS = 10 * 60 * 1000; // 2 minutes
 
 // GPS location persists indefinitely for the session — no reason to
 // re-request it every time this page mounts.
