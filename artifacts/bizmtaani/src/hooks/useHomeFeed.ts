@@ -849,6 +849,18 @@ const sortedBuffer = sortNearbyProducts(
     areaDone: localAreaDone,
     timestamp: Date.now(),
   });
+  feedCache.set(cacheKey, {
+    wardProducts: localWardProducts,
+    wardCursor: localWardCursor,
+    wardDone: localWardDone,
+    areaProducts: localAreaProducts,
+    areaBuffer: localAreaBuffer,
+    areaCursors: currentCursors,
+    areaDonePrefixes: currentDonePrefixes,
+    areaDone: localAreaDone,
+    timestamp: Date.now(),
+  });
+  saveFeedCacheToStorage(feedCache);
 
 } catch (error) {
   console.error(
