@@ -63,6 +63,7 @@ function Router() {
       <Route path="/my-listings" component={MyListings} />
       <Route path="/chats" component={ChatList} />
       <Route path="/chat/:chatId" component={ChatThread} />
+      <Route path="/about" component={About} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/business" component={Business} />
