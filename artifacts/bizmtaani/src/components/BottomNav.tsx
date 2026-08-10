@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
-import { LayoutGrid, Package, MessageCircle, User, Briefcase } from "lucide-react";
+import { LayoutGrid, Package, MessageCircle, User, Briefcase, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -38,6 +38,7 @@ export function BottomNav() {
     { path: "/jobs", label: "Jobs", icon: Briefcase, badge: false },
     { path: "/my-listings", label: "Listings", icon: Package, badge: false },
     { path: "/chats", label: "Chats", icon: MessageCircle, badge: hasUnread },
+    { path: "/about", label: "About", icon: Info, badge: false },
     { path: "/profile", label: "Profile", icon: User, badge: false },
   ];
 
