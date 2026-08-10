@@ -81,7 +81,7 @@ export default function AboutUs() {
           </div>
           <h1 className="text-xl font-black mb-2">Buy, sell, and connect locally</h1>
           <p className="text-sm text-muted-foreground leading-relaxed">
-            BizMtaani connects buyers and sellers within their own neighborhoods
+            BizMtaani connects buyers and sellers within their own neighborhoods and beyond
             across Kenya — from products and vehicles to services, accommodation,
             and local eateries.
           </p>
@@ -144,7 +144,7 @@ export default function AboutUs() {
           </h2>
           <div className="space-y-2">
             <a
-              href="https://wa.me/254700000000"
+              href="https://wa.me/254702278606"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
@@ -159,7 +159,7 @@ export default function AboutUs() {
             </a>
 
             <a
-              href="tel:+254700000000"
+              href="tel:+254702278606"
               className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -167,12 +167,12 @@ export default function AboutUs() {
               </div>
               <div>
                 <p className="font-bold text-sm">Call support</p>
-                <p className="text-xs text-muted-foreground">+254 700 000 000</p>
+                <p className="text-xs text-muted-foreground">+254 702278606</p>
               </div>
             </a>
 
             <a
-              href="mailto:support@bizmtaani.com"
+              href="mailto:morganmusibi@gmail.com"
               className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -180,7 +180,7 @@ export default function AboutUs() {
               </div>
               <div>
                 <p className="font-bold text-sm">Email us</p>
-                <p className="text-xs text-muted-foreground">support@bizmtaani.com</p>
+                <p className="text-xs text-muted-foreground">morganmusibi@gmail.com</p>
               </div>
             </a>
           </div>
