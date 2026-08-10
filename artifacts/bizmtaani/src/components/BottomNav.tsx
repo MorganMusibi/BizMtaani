@@ -55,7 +55,7 @@ export function BottomNav() {
           return (
             <Link
               key={path}
-              href={user || path === "/" || path === "/jobs" ? path : "/login"}
+              href={path}
               data-testid={`nav-${label.toLowerCase()}`}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
                 isActive
