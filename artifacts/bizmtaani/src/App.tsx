@@ -16,6 +16,7 @@ import Register from "@/pages/Register";
 import About from "@/pages/About";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
+import Report from "@/pages/Report";
 import PostProduct from "@/pages/PostProduct";
 import ProductDetail from "@/pages/ProductDetail";
 import MyListings from "@/pages/MyListings";
@@ -71,6 +72,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/report" component={Report} />
       <Route path="/profile" component={Profile} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/business" component={Business} />
