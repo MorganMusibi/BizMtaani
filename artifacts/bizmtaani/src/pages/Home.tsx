@@ -523,7 +523,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
   const sentinelRef = useRef<HTMLDivElement>(null);
-
+  const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     wardProducts,
     areaProducts,
@@ -547,14 +547,24 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          loadMore();
+          if (loadMoreDebounceRef.current) {
+            clearTimeout(loadMoreDebounceRef.current);
+          }
+          loadMoreDebounceRef.current = setTimeout(() => {
+            loadMore();
+          }, 300);
         }
       },
       { rootMargin: "100px" }
     );
 
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (loadMoreDebounceRef.current) {
+        clearTimeout(loadMoreDebounceRef.current);
+      }
+    };
   }, [loadMore]);
   
   const handleAreaSelect = useCallback(
