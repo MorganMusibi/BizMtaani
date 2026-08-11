@@ -673,7 +673,13 @@ const totalVisible = rankedProducts.length;
             <button
               key={key}
               data-testid={`filter-${key.toLowerCase().replace(/[\s/&]+/g, "-")}`}
-              onClick={() => setActiveKey(key)}
+              onClick={() => {
+                if (key === "All") {
+                  setActiveKey(key);
+                } else {
+                  setLocation(`/category/${encodeURIComponent(key)}`);
+                }
+              }}
               className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
                 activeKey === key
                   ? "bg-primary text-white"
