@@ -29,6 +29,54 @@ const REPORT_TYPES = [
 export default function Report() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { user } = useAuth();
+
+if (!user) {
+  return (
+    <div className="flex flex-col h-screen bg-background overflow-hidden">
+      <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center gap-3 z-40">
+        <button
+          onClick={() => setLocation("/about")}
+          className="p-2 -ml-2 rounded-xl hover:bg-muted active:scale-95 transition-all"
+          aria-label="Back to About"
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <span className="font-black text-lg tracking-tight">
+          Report a Problem
+        </span>
+      </header>
+
+      <main className="flex-1 overflow-y-auto px-4 py-8 pb-24">
+        <div className="max-w-md mx-auto text-center">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <Flag size={32} className="text-primary" />
+          </div>
+          <h1 className="text-xl font-black mb-2">Please log in</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            You need to be logged in to submit a report.
+          </p>
+          <div className="mt-6 space-y-2">
+            <button
+              onClick={() => setLocation("/login")}
+              className="w-full rounded-2xl bg-primary text-primary-foreground font-bold text-sm py-3.5 active:scale-[0.98] transition-transform"
+            >
+              Log in
+            </button>
+            <button
+              onClick={() => setLocation("/about")}
+              className="w-full rounded-2xl bg-card border border-border font-bold text-sm py-3.5 active:scale-[0.98] transition-transform"
+            >
+              Back to About
+            </button>
+          </div>
+        </div>
+      </main>
+
+      <BottomNav />
+    </div>
+  );
+}
 
   const [reportType, setReportType] = useState("advert");
   const [advertId, setAdvertId] = useState("");
@@ -73,8 +121,8 @@ export default function Report() {
       setSubmitting(true);
 
       await addDoc(collection(db, "supportReports"), {
-        userId: user?.uid ?? null,
-        userEmail: user?.email ?? null,
+        userId: user.uid,
+        userEmail: user.email ?? null,
 
         type: reportType,
 
