@@ -34,8 +34,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports";
-
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support";
 interface ProductReport {
   id: string;
   productId: string;
@@ -44,6 +43,19 @@ interface ProductReport {
   reporterId: string;
   reason: string;
   status: "pending" | "resolved" | "dismissed";
+  createdAt: { seconds: number } | null;
+}
+
+interface SupportReport {
+  id: string;
+  userId: string | null;
+  userEmail: string | null;
+  type: string;
+  advertId: string | null;
+  description: string;
+  contact: string | null;
+  status: "open" | "resolved" | "dismissed";
+  priority: "normal" | "high";
   createdAt: { seconds: number } | null;
 }
 
@@ -113,6 +125,10 @@ export default function AdminDashboard() {
   const [reports, setReports] = useState<ProductReport[]>([]);
   const [reportsLoading, setReportsLoading] = useState(true);
   const [processingReportId, setProcessingReportId] = useState<string | null>(null);
+  // Support reports tab
+const [supportReports, setSupportReports] = useState<SupportReport[]>([]);
+const [supportReportsLoading, setSupportReportsLoading] = useState(true);
+const [processingSupportReportId, setProcessingSupportReportId] = useState<string | null>(null);
 
   // Users tab
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -324,6 +340,33 @@ export default function AdminDashboard() {
 
     return () => unsub();
   }, [adminLoading, user, isAdmin]);
+  // -------------------------------------------------------
+// SUPPORT REPORTS — live subscription, only once admin confirmed
+// -------------------------------------------------------
+useEffect(() => {
+  if (adminLoading || !user || !isAdmin) return;
+
+  const q = query(
+    collection(db, "supportReports"),
+    where("status", "==", "open"),
+    orderBy("createdAt", "desc"),
+    limit(50)
+  );
+
+  const unsub = onSnapshot(
+    q,
+    (snap) => {
+      setSupportReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportReport)));
+      setSupportReportsLoading(false);
+    },
+    (error) => {
+      console.error("Failed to load support reports:", error);
+      setSupportReportsLoading(false);
+    }
+  );
+
+  return () => unsub();
+}, [adminLoading, user, isAdmin]);
 
   // -------------------------------------------------------
   // USERS — loaded lazily when tab is opened
