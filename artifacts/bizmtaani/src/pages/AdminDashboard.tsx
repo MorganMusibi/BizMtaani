@@ -112,6 +112,7 @@ export default function AdminDashboard() {
   const [totalJobs, setTotalJobs] = useState<number | null>(null);
   const [successfulPayments, setSuccessfulPayments] = useState<number | null>(null);
   const [pendingReportsCount, setPendingReportsCount] = useState<number | null>(null);
+  const [pendingSupportCount, setPendingSupportCount] = useState<number | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
 // Today's insights
@@ -214,6 +215,10 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
           query(collection(db, "reports"), where("status", "==", "pending"))
         );
         setPendingReportsCount(reportsCountSnapshot.data().count);
+        const supportCountSnapshot = await getCountFromServer(
+  query(collection(db, "supportReports"), where("status", "==", "open"))
+);
+setPendingSupportCount(supportCountSnapshot.data().count);
       } catch (error) {
         console.error("ADMIN DASHBOARD - STATS FAILED:", error);
         setStatsError(
@@ -522,11 +527,12 @@ async function dismissSupportReport(reportId: string) {
   }
 
   const stats = [
-    { title: "Total Users", value: totalUsers, icon: Users },
-    { title: "Active Adverts", value: activeAdverts, icon: Package },
-    { title: "Jobs", value: totalJobs, icon: Briefcase },
-    { title: "Payments", value: successfulPayments, icon: CreditCard },
-  ];
+  { title: "Total Users", value: totalUsers, icon: Users },
+  { title: "Active Adverts", value: activeAdverts, icon: Package },
+  { title: "Jobs", value: totalJobs, icon: Briefcase },
+  { title: "Payments", value: successfulPayments, icon: CreditCard },
+  { title: "Support Reports", value: pendingSupportCount, icon: Flag },
+];
 
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
@@ -535,7 +541,7 @@ async function dismissSupportReport(reportId: string) {
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
     { title: "Payments", icon: CreditCard, tab: "payments" },
     { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
-    { title: "Support", icon: Flag, tab: "support", badge: supportReports.length },
+    { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
   ];
 
   return (
