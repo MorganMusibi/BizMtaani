@@ -703,6 +703,23 @@ async function dismissSupportReport(reportId: string) {
                   <ExternalLink className="h-4 w-4 text-muted-foreground" />
                 </button>
               )}
+              {!!pendingSupportCount && (
+  <button
+    onClick={() => selectTab("support")}
+    className="mt-3 w-full flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10 transition-colors"
+  >
+    <div className="flex items-center gap-3">
+      <Flag className="h-5 w-5 text-destructive" />
+      <div>
+        <p className="font-semibold text-sm">
+          {pendingSupportCount} support report{pendingSupportCount === 1 ? "" : "s"}
+        </p>
+        <p className="text-xs text-muted-foreground">Needs your review</p>
+      </div>
+    </div>
+    <ExternalLink className="h-4 w-4 text-muted-foreground" />
+  </button>
+)}
             </>
           )}
 
