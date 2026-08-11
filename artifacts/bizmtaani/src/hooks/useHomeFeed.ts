@@ -657,11 +657,10 @@ try {
   let currentDonePrefixes: Record<string, boolean> = {};
 
   let collectedProducts: Product[] = [];
-  let allPrefixesDone = false;
   let iterations = 0;
-  const MAX_ITERATIONS = 6;
+  const MAX_ITERATIONS = 3;
 
-    const currentRadius = HOME_FEED_RADIUS_STEPS[0];
+  const currentRadius = HOME_FEED_RADIUS_STEPS[0];
 
   while (
     collectedProducts.length < AREA_BUFFER_FETCH &&
