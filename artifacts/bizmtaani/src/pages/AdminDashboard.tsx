@@ -424,6 +424,27 @@ useEffect(() => {
       setProcessingReportId(null);
     }
   }
+  async function resolveSupportReport(reportId: string) {
+  setProcessingSupportReportId(reportId);
+  try {
+    await updateDoc(doc(db, "supportReports", reportId), { status: "resolved" });
+  } catch (error) {
+    console.error("Failed to resolve support report:", error);
+  } finally {
+    setProcessingSupportReportId(null);
+  }
+}
+
+async function dismissSupportReport(reportId: string) {
+  setProcessingSupportReportId(reportId);
+  try {
+    await updateDoc(doc(db, "supportReports", reportId), { status: "dismissed" });
+  } catch (error) {
+    console.error("Failed to dismiss support report:", error);
+  } finally {
+    setProcessingSupportReportId(null);
+  }
+}
 
   async function removeReportedAdvert(report: ProductReport) {
     if (!confirm(`Delete "${report.productTitle}"? This cannot be undone.`)) return;
@@ -514,6 +535,7 @@ useEffect(() => {
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
     { title: "Payments", icon: CreditCard, tab: "payments" },
     { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
+    { title: "Support", icon: Flag, tab: "support", badge: supportReports.length },
   ];
 
   return (
@@ -749,6 +771,84 @@ useEffect(() => {
               )}
             </>
           )}
+
+          {activeTab === "support" && (
+  <>
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold">Support Reports</h2>
+      <p className="mt-1 text-muted-foreground">
+        Problems reported directly by users.
+      </p>
+    </div>
+
+    {supportReportsLoading ? (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    ) : supportReports.length === 0 ? (
+      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+        No open support reports. All clear.
+      </div>
+    ) : (
+      <div className="space-y-3">
+        {supportReports.map((report) => (
+          <div key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm capitalize">{report.type}</span>
+                  {report.priority === "high" && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-destructive text-white">
+                      HIGH
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                  {report.description}
+                </p>
+                {report.advertId && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Advert ID: <span className="font-mono">{report.advertId}</span>
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  {report.userEmail || report.contact || "No contact provided"}
+                  {" • "}
+                  {timeAgo(report.createdAt)}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => dismissSupportReport(report.id)}
+                disabled={processingSupportReportId === report.id}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+              >
+                <X className="h-3.5 w-3.5" /> Dismiss
+              </button>
+              <button
+                type="button"
+                onClick={() => resolveSupportReport(report.id)}
+                disabled={processingSupportReportId === report.id}
+                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white px-3 py-2 text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
+              >
+                {processingSupportReportId === report.id ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="h-3.5 w-3.5" /> Mark Resolved
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+)}
 
           {activeTab === "users" && (
             <>
