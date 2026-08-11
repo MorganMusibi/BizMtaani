@@ -27,11 +27,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
-
-// Persists across Home unmount/remount (e.g. navigating away and back)
-// so GPS/location resolution only runs once per app session instead of
-// every time the user returns to the home screen.
 const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
+const LOCATION_PROMPT_SHOWN_KEY = "bizmtaani_location_prompt_shown";
 
 function loadCachedLocationState() {
   try {
@@ -318,17 +315,42 @@ export default function Home() {
   useEffect(() => {
   if (!("geolocation" in navigator)) return;
 
-  if ("permissions" in navigator) {
-    navigator.permissions.query({ name: "geolocation" as PermissionName }).then((status) => {
-      if (status.state === "prompt" || status.state === "denied") {
-        toast({
-          title: "Turn on location",
-          description: "Enable GPS/location so we can show your area accurately on adverts and listings nearby.",
-        });
-      }
-    });
+  // Only show the location reminder once.
+  try {
+    const alreadyShown = localStorage.getItem(LOCATION_PROMPT_SHOWN_KEY);
+
+    if (alreadyShown === "true") {
+      return;
+    }
+  } catch {
+    // If localStorage is unavailable, continue normally.
   }
-}, []);
+
+  if ("permissions" in navigator) {
+    navigator.permissions
+      .query({ name: "geolocation" as PermissionName })
+      .then((status) => {
+        // Only show the reminder if location hasn't been granted.
+        if (status.state === "prompt" || status.state === "denied") {
+          toast({
+            title: "Turn on location",
+            description:
+              "Enable GPS/location so we can show your area accurately on adverts and listings nearby.",
+          });
+
+          // Remember that the reminder has already been shown.
+          try {
+            localStorage.setItem(LOCATION_PROMPT_SHOWN_KEY, "true");
+          } catch {
+            // Ignore localStorage errors.
+          }
+        }
+      })
+      .catch((error) => {
+        console.warn("Unable to check location permission:", error);
+      });
+  }
+}, [toast]);
     useEffect(() => {
     let cancelled = false;
 const applyResolvedLocation = async (location: ResolvedLocation) => {
