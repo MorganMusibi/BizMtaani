@@ -27,6 +27,8 @@ import JobDetail from "@/pages/JobDetail";
 import ShopCatalogue from "@/pages/ShopCatalogue";
 import ResetPassword from "@/pages/ResetPassword";
 import AdminDashboard from "@/pages/AdminDashboard";
+import CategorySubcategories from "@/pages/CategorySubcategories";
+import CategoryAds from "@/pages/CategoryAds";
 
 // Configuration for API requests
 // Updated path to correctly reach the root lib folder
@@ -72,6 +74,8 @@ function Router() {
       <Route path="/jobs/post" component={PostJob} />
       <Route path="/jobs/:id" component={JobDetail} />
       <Route path="/shop/:userId" component={ShopCatalogue} />
+      <Route path="/category/:categoryKey" component={CategorySubcategories} />
+      <Route path="/category/:categoryKey/:subcategory" component={CategoryAds} />
       <Route component={NotFound} />
     </Switch>
   );
