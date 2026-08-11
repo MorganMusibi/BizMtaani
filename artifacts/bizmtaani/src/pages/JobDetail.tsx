@@ -286,43 +286,73 @@ export default function JobDetail() {
             <p>{job.requirements}</p>
           </div>
         )}
+{isOwner ? (
+  <div className="space-y-2">
+    <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
+      <p className="text-sm text-muted-foreground">
+        {isExpired ? "This job listing has expired." : "You posted this job."}
+      </p>
+    </div>
 
-        {isExpired ? (
-          <Button disabled className="w-full h-12">
-            Job Expired
+    {isExpired && (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          <Button variant="destructive" className="w-full h-12 font-bold">
+            <Trash2 className="mr-2" size={18} />
+            Delete Expired Job
           </Button>
-        ) : isOwner ? (
-          <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
-            <p className="text-sm text-muted-foreground">
-              You posted this job.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3 pt-2">
-            <Button
-              type="button"
-              className="w-full h-12 font-bold"
-              onClick={handleApplyViaChat}
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this job?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently remove your job posting from BizMtaani.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90 text-white"
             >
-              <MessageSquare className="mr-2" size={18} />
-              Apply via BizMtaani Chat
-            </Button>
+              {deleting ? <Loader2 className="animate-spin" /> : "Delete Job"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+  </div>
+) : isExpired ? (
+  <Button disabled className="w-full h-12">
+    Job Expired
+  </Button>
+) : (
+  <div className="space-y-3 pt-2">
+    <Button
+      type="button"
+      className="w-full h-12 font-bold"
+      onClick={handleApplyViaChat}
+    >
+      <MessageSquare className="mr-2" size={18} />
+      Apply via BizMtaani Chat
+    </Button>
 
-            {job.contactMethod &&
-              job.contactMethod !== "none" &&
-              job.contact?.trim() && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12"
-                  onClick={handleApply}
-                >
-                  <ApplyIcon className="mr-2" size={18} />
-                  {applyLabel}
-                </Button>
-              )}
-          </div>
-        )}
+    {job.contactMethod &&
+      job.contactMethod !== "none" &&
+      job.contact?.trim() && (
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full h-12"
+          onClick={handleApply}
+        >
+          <ApplyIcon className="mr-2" size={18} />
+          {applyLabel}
+        </Button>
+      )}
+  </div>
+)}
+        
       </div>
     </div>
   );
