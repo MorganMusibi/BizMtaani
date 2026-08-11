@@ -118,7 +118,16 @@ export default function CategoryAds() {
   return (
     <div className="min-h-screen bg-background pb-24">
       <header className="sticky top-0 z-40 bg-card border-b border-border px-4 h-14 flex items-center gap-3">
-        <button onClick={() => navigate(-1 as unknown as string)} className="p-1 text-muted-foreground hover:text-foreground">
+        <button
+          onClick={() => {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              navigate("/");
+            }
+          }}
+          className="p-1 text-muted-foreground hover:text-foreground"
+        >
           <ChevronLeft size={24} />
         </button>
         <span className="font-black text-base truncate">{subName}</span>
