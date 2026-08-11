@@ -29,8 +29,6 @@ const REPORT_TYPES = [
 export default function Report() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
-  const { user } = useAuth();
-
 if (!user) {
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
