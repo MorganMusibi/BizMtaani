@@ -550,7 +550,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
           loadMore();
         }
       },
-      { rootMargin: "400px" }
+      { rootMargin: "100px" }
     );
 
     observer.observe(el);
