@@ -704,8 +704,8 @@ useEffect(() => {
       });
 
     setLocation(
-      `/chat/${result.chatId}`
-    );
+  `/chat/${result.chatId}?ref=product`
+);
   } catch (error: unknown) {
     console.error(
       "Error opening product chat:",
