@@ -622,6 +622,12 @@ setForwardChats(
         )
       : "";
 
+  const showProductPreview =
+  chat.type === "product" &&
+  messages.length === 0 &&
+  showProductAttachment &&
+  !!chat.productTitle;
+
  /*
   |--------------------------------------------------------------------------
   | CHAT CONTEXT
