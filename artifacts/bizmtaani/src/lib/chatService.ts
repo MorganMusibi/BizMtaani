@@ -69,6 +69,11 @@ export interface ChatMessage {
   text: string;
 
   replyTo?: ReplyTo | null;
+  productContext?: {
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+  } | null;
 
   createdAt?: Timestamp | null;
 
