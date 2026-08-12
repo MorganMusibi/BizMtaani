@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, } from "react";
 import { collection, doc, onSnapshot, orderBy, query, where, } from "firebase/firestore";
-import { useLocation, useParams, Link, } from "wouter";
+import { useLocation, useParams, Link, useSearch, } from "wouter";
 import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
 import { db } from "@/lib/firebase";
@@ -71,6 +71,9 @@ export default function ChatThread() {
 
   const [, setLocation] =
     useLocation();
+  const searchString = useSearch();
+const cameFromProductReply =
+  new URLSearchParams(searchString).get("ref") === "product";
 
 /*
   |--------------------------------------------------------------------------
@@ -1045,10 +1048,10 @@ async function handleForwardMessage(
   }
 
   const showProductPreview =
-    chat.type === "product" &&
-    messages.length === 0 &&
-    showProductAttachment &&
-    !!chat.productTitle;
+  chat.type === "product" &&
+  cameFromProductReply &&
+  showProductAttachment &&
+  !!chat.productTitle;
 
   const chatContext =
     getChatContext();
