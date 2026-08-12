@@ -817,3 +817,124 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
     );
   }
 });
+// ═══════════════════════════════════════════════════════════════════════════
+// 7. REFERRALS — MARKETER COMMISSIONS + USER POINTS
+// ═══════════════════════════════════════════════════════════════════════════
+
+const COMMISSION_RATE = 0.10;
+const POINTS_PER_REFERRAL = 50;
+
+function generateReferralCode(uid: string): string {
+  return uid.slice(0, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
+}
+
+/**
+ * Admin-only: approve a marketer and issue their referral code.
+ */
+export const approveMarketer = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can approve marketers.");
+  }
+
+  const { uid } = request.data as { uid?: string };
+  if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
+
+  const code = generateReferralCode(uid);
+
+  await db.collection("marketers").doc(uid).set({
+    referralCode: code,
+    status: "active",
+    totalEarnedKES: 0,
+    totalWithdrawnKES: 0,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true, referralCode: code };
+});
+
+/**
+ * Called when a user submits a referral code (e.g. from Profile).
+ * Determines whether it's a marketer code or another user's own code,
+ * and records the relationship. A user can only be referred once, ever.
+ */
+export const submitReferralCode = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { code } = request.data as { code?: string };
+  if (!code || typeof code !== "string") {
+    throw new HttpsError("invalid-argument", "A referral code is required.");
+  }
+
+  const uid = request.auth.uid;
+  const trimmedCode = code.trim().toUpperCase();
+
+  // A user cannot be referred twice, by either track.
+  const existingReferral = await db.collection("referrals").doc(uid).get();
+  const existingUserReferral = await db.collection("userReferrals").doc(uid).get();
+  if (existingReferral.exists || existingUserReferral.exists) {
+    throw new HttpsError("failed-precondition", "A referral code has already been applied to this account.");
+  }
+
+  // 1. Check if it's a marketer code.
+  const marketerSnap = await db
+    .collection("marketers")
+    .where("referralCode", "==", trimmedCode)
+    .where("status", "==", "active")
+    .limit(1)
+    .get();
+
+  if (!marketerSnap.empty) {
+    const marketerDoc = marketerSnap.docs[0];
+    if (marketerDoc.id === uid) {
+      throw new HttpsError("failed-precondition", "You cannot use your own referral code.");
+    }
+
+    await db.collection("referrals").doc(uid).set({
+      marketerUid: marketerDoc.id,
+      referralCode: trimmedCode,
+      commissionPaidOut: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection("users").doc(uid).set(
+      { referredBy: marketerDoc.id },
+      { merge: true }
+    );
+
+    return { success: true, type: "marketer" };
+  }
+
+  // 2. Otherwise check if it's another user's own referral code.
+  const userSnap = await db
+    .collection("users")
+    .where("myReferralCode", "==", trimmedCode)
+    .limit(1)
+    .get();
+
+  if (!userSnap.empty) {
+    const referrerDoc = userSnap.docs[0];
+    if (referrerDoc.id === uid) {
+      throw new HttpsError("failed-precondition", "You cannot use your own referral code.");
+    }
+
+    await db.collection("userReferrals").doc(uid).set({
+      referrerUid: referrerDoc.id,
+      referralCode: trimmedCode,
+      pointsAwarded: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await db.collection("users").doc(uid).set(
+      { referredByUser: referrerDoc.id },
+      { merge: true }
+    );
+
+    return { success: true, type: "user" };
+  }
+
+  throw new HttpsError("not-found", "Invalid referral code.");
+});
+
