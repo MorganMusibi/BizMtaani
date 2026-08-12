@@ -550,6 +550,7 @@ setForwardChats(
 
 });
       setReplyingTo(null);
+setShowProductAttachment(false);
 
     } catch (sendError: any) {
 
