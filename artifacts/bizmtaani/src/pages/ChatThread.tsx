@@ -1042,16 +1042,19 @@ async function handleForwardMessage(
 
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-
         <p className="text-muted-foreground">
           Conversation unavailable.
         </p>
-
       </div>
     );
 
   }
 
+  const showProductPreview =
+    chat.type === "product" &&
+    messages.length === 0 &&
+    showProductAttachment &&
+    !!chat.productTitle;
 
   const chatContext =
     getChatContext();
