@@ -683,7 +683,8 @@ try {
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
   });
-} catch (error) {
+
+  } catch (error) {
 
   // Delete uploaded Cloudinary images
   for (const image of imageUrls) {
@@ -699,6 +700,34 @@ try {
     "Failed to create advert."
   );
 }
+
+  // Award referral points to whoever referred this user, on their
+  // first published advert only (proof of genuine activity).
+  try {
+    const userAdvertCount = await db
+      .collection("products")
+      .where("sellerId", "==", uid)
+      .limit(2)
+      .get();
+
+    if (userAdvertCount.size === 1) {
+      // This was their first advert.
+      const userReferralSnap = await db.collection("userReferrals").doc(uid).get();
+
+      if (userReferralSnap.exists && !userReferralSnap.data()?.pointsAwarded) {
+        const referrerUid = userReferralSnap.data()!.referrerUid;
+
+        await db.collection("users").doc(referrerUid).update({
+          points: admin.firestore.FieldValue.increment(POINTS_PER_REFERRAL),
+        });
+
+        await userReferralSnap.ref.update({ pointsAwarded: true });
+      }
+    }
+  } catch (error) {
+    // Never let a referral-points hiccup block advert creation.
+    console.error("Failed to award referral points:", error);
+  }
 
   // 8. Return the generated productId
   return {
