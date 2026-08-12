@@ -918,7 +918,6 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 const COMMISSION_RATE = 0.142;
-const POINTS_PER_REFERRAL = 50;
 
 function generateReferralCode(name: string, uid: string): string {
   // Take the first name only, strip anything that isn't a letter,
