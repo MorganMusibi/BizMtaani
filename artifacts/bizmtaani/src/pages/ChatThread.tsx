@@ -27,6 +27,12 @@ interface Message {
 
   replyTo?: ReplyTo | null;
 
+  productContext?: {
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+  } | null;
+
   createdAt?: {
     seconds: number;
     nanoseconds?: number;
@@ -313,6 +319,9 @@ const [selectedMessage, setSelectedMessage] =
 replyTo:
   data.replyTo || null,
 
+productContext:
+  data.productContext || null,
+
 createdAt:
   data.createdAt || null,
 
@@ -548,6 +557,15 @@ setForwardChats(
 
           text:
             replyingTo.text,
+        }
+      : null,
+
+  productContext:
+    showProductPreview
+      ? {
+          productId: chat.productId || "",
+          productTitle: chat.productTitle || "",
+          productImage: chat.productImage || "",
         }
       : null,
 
@@ -1314,7 +1332,43 @@ async function handleForwardMessage(
     </p>
   </div>
 )}
+{message.replyTo && !message.deletedForEveryone && (
+  <div className="mb-2 border-l-2 border-primary/60 bg-black/5 dark:bg-white/5 rounded-r-md px-2 py-1.5">
+    <p className="text-[10px] font-semibold text-primary truncate">
+      {message.replyTo.senderId === user.uid
+        ? "You"
+        : message.replyTo.senderName ||
+          getParticipantName(
+            chat,
+            message.replyTo.senderId
+          )}
+    </p>
 
+    <p className="text-xs opacity-70 truncate">
+      {message.replyTo.text}
+    </p>
+  </div>
+)}
+
+{message.productContext && !message.deletedForEveryone && (
+  <div className="mb-2 flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-2 py-1.5">
+    {message.productContext.productImage ? (
+      <img
+        src={getChatThumbnailUrl(message.productContext.productImage)}
+        alt={message.productContext.productTitle}
+        className="w-8 h-8 rounded object-cover flex-shrink-0"
+      />
+    ) : (
+      <div className="w-8 h-8 rounded bg-primary/10 flex items-center justify-center flex-shrink-0 text-[10px] font-bold text-primary">
+        {message.productContext.productTitle.charAt(0).toUpperCase()}
+      </div>
+    )}
+    <p className="text-xs font-semibold truncate">{message.productContext.productTitle}</p>
+  </div>
+)}
+
+<p
+  className={`text-sm leading-relaxed break-words whitespace-pre-wrap ${
 <p
   className={`text-sm leading-relaxed break-words whitespace-pre-wrap ${
     message.deletedForEveryone
