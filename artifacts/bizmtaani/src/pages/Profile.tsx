@@ -455,14 +455,22 @@ export default function Profile() {
           )}
 
           {isMarketer && (
-            <button
-              onClick={() => setLocation("/marketer")}
-              className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-[#00A651]/10 text-[#00A651] font-bold text-sm"
-            >
-              View Marketer Dashboard
-              <ChevronRight size={16} />
-            </button>
-          )}
+          <button
+            onClick={() => setLocation("/marketer")}
+            className="w-full flex items-center gap-4 px-4 py-4 bg-gradient-to-r from-[#00A651]/10 to-emerald-50 border-2 border-[#00A651]/30 rounded-2xl hover:border-[#00A651] transition-all text-left active:scale-[0.98]"
+          >
+            <div className="w-11 h-11 rounded-xl bg-[#00A651] flex items-center justify-center flex-shrink-0">
+              <Gift size={22} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">Marketer Dashboard</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                View earnings & your referral code
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+          </button>
+        )}
         </div>
         {/* Business management — only for business owners */}
         {isBusinessOwner && (
