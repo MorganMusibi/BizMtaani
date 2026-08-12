@@ -41,6 +41,12 @@ export interface UserProfile {
   // Actual admin authorization should rely on
   // the Firebase Authentication custom claim.
   role?: string;
+
+  // Referrals & rewards
+  myReferralCode?: string;
+  points?: number;
+  referredBy?: string;       // set if signed up using a marketer's code
+  referredByUser?: string;   // set if signed up using another user's own code
 }
 
 interface AuthContextType {
