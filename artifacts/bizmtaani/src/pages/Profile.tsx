@@ -1,14 +1,15 @@
 import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, functions } from "@/lib/firebase";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
-import { useRef, useState } from "react";
+import { httpsCallable } from "firebase/functions";
+import { useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { signOut, updateProfile } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check } from "lucide-react";
 import { Link } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
 import imageCompression from "browser-image-compression";
@@ -23,6 +24,65 @@ export default function Profile() {
   const [showAvatarMenu, setShowAvatarMenu] = useState(false);
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const hasPhoto = !!user?.photoURL;
+
+  const [referralInput, setReferralInput] = useState("");
+  const [submittingReferral, setSubmittingReferral] = useState(false);
+  const [codeCopied, setCodeCopied] = useState(false);
+  const [isMarketer, setIsMarketer] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    import("@/lib/firebase").then(({ db }) => {
+      import("firebase/firestore").then(({ getDoc, doc: docRef }) => {
+        getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
+          setIsMarketer(snap.exists());
+        });
+      });
+    });
+  }, [user]);
+
+  async function handleSubmitReferralCode() {
+    if (!referralInput.trim()) return;
+
+    setSubmittingReferral(true);
+
+    try {
+      const submitCode = httpsCallable(functions, "submitReferralCode");
+      await submitCode({ code: referralInput.trim() });
+
+      toast({ title: "Referral code applied!" });
+      setReferralInput("");
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Could not apply code",
+        description: error?.message ?? "Please check the code and try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingReferral(false);
+    }
+  }
+
+  function handleCopyReferralCode() {
+    const code = (userProfile as any)?.myReferralCode;
+    if (!code) return;
+    navigator.clipboard.writeText(code);
+    setCodeCopied(true);
+    setTimeout(() => setCodeCopied(false), 2000);
+  }
+
+  function handleShareReferralCode() {
+    const code = (userProfile as any)?.myReferralCode;
+    if (!code) return;
+    const message = `Join BizMtaani using my referral code ${code} and let's both get rewarded! ${window.location.origin}`;
+    if (navigator.share) {
+      navigator.share({ title: "Join BizMtaani", text: message });
+    } else {
+      navigator.clipboard.writeText(message);
+      toast({ title: "Referral message copied!" });
+    }
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -331,6 +391,79 @@ export default function Profile() {
             <MessageCircle size={22} className="text-primary" />
             <span className="font-semibold text-xs text-center">Messages</span>
           </Link>
+        </div>
+
+        {/* Referrals & Rewards */}
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Gift size={18} className="text-primary" />
+            <p className="font-black text-sm">Referrals & Rewards</p>
+          </div>
+
+          <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
+            <div>
+              <p className="text-xs text-muted-foreground">Your points</p>
+              <p className="font-black text-lg text-primary">
+                {(userProfile as any)?.points ?? 0}
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground text-right max-w-[55%]">
+              Earn points when friends you refer post their first advert
+            </p>
+          </div>
+
+          {(userProfile as any)?.myReferralCode && (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-muted-foreground">Your referral code</p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-11 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center font-black text-base tracking-wider">
+                  {(userProfile as any).myReferralCode}
+                </div>
+                <button
+                  onClick={handleCopyReferralCode}
+                  className="h-11 w-11 rounded-xl border border-border flex items-center justify-center flex-shrink-0"
+                >
+                  {codeCopied ? <Check size={18} className="text-[#00A651]" /> : <Copy size={18} />}
+                </button>
+              </div>
+              <Button onClick={handleShareReferralCode} variant="outline" className="w-full gap-2">
+                <Gift size={15} />
+                Share with friends
+              </Button>
+            </div>
+          )}
+
+          {!(userProfile as any)?.referredBy && !(userProfile as any)?.referredByUser && (
+            <div className="space-y-2 pt-2 border-t border-border">
+              <p className="text-xs font-semibold text-muted-foreground">Have a referral code?</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter code"
+                  value={referralInput}
+                  onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                  className="flex-1 h-11 px-3 rounded-xl border border-border bg-background text-sm font-semibold"
+                />
+                <Button
+                  onClick={handleSubmitReferralCode}
+                  disabled={submittingReferral || !referralInput.trim()}
+                  className="flex-shrink-0"
+                >
+                  {submittingReferral ? <Loader2 size={16} className="animate-spin" /> : "Apply"}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {isMarketer && (
+            <button
+              onClick={() => setLocation("/marketer")}
+              className="w-full flex items-center justify-between px-3 py-3 rounded-xl bg-[#00A651]/10 text-[#00A651] font-bold text-sm"
+            >
+              View Marketer Dashboard
+              <ChevronRight size={16} />
+            </button>
+          )}
         </div>
 
         {/* Business management — only for business owners */}
