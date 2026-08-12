@@ -291,11 +291,14 @@ export default function PostJob() {
 
         {/* Location info */}
         {(ward || county) && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-4 py-3 rounded-xl">
-            <span>📍</span>
-            <span>Your job will be shown to seekers in <strong>{ward ? `${ward} area` : county}</strong></span>
-          </div>
-        )}
+  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-4 py-3 rounded-xl">
+    <span>📍</span>
+    <span>
+      Your job is visible to all job seekers, and will show first to those around and near{" "}
+      <strong>{ward ? `${ward} area` : county}</strong>
+    </span>
+  </div>
+)}
       </form>
 
       {/* Submit */}
