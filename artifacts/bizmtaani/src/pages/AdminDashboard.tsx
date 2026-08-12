@@ -646,16 +646,6 @@ async function dismissSupportReport(reportId: string) {
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
   ];
 
-  const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
-    { title: "Overview", icon: LayoutDashboard, tab: "overview" },
-    { title: "Users", icon: Users, tab: "users" },
-    { title: "Adverts", icon: Package, tab: "adverts" },
-    { title: "Jobs", icon: Briefcase, tab: "jobs" },
-    { title: "Payments", icon: CreditCard, tab: "payments" },
-    { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
-    { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
-  ];
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
