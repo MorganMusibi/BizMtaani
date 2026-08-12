@@ -100,6 +100,19 @@ function timeAgo(createdAt: { seconds: number } | null | undefined) {
   return `${days}d ago`;
 }
 
+interface DashboardStatsCache {
+  totalUsers: number | null;
+  activeAdverts: number | null;
+  totalJobs: number | null;
+  successfulPayments: number | null;
+  pendingReportsCount: number | null;
+  pendingSupportCount: number | null;
+  timestamp: number;
+}
+let dashboardStatsCache: DashboardStatsCache | null = null;
+const DASHBOARD_STATS_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+
+export default function AdminDashboard() {
 export default function AdminDashboard() {
   const { user, isAdmin, adminLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -191,35 +204,55 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   useEffect(() => {
     if (adminLoading || !user || !isAdmin) return;
 
+    if (dashboardStatsCache && Date.now() - dashboardStatsCache.timestamp < DASHBOARD_STATS_CACHE_TTL_MS) {
+      setTotalUsers(dashboardStatsCache.totalUsers);
+      setActiveAdverts(dashboardStatsCache.activeAdverts);
+      setTotalJobs(dashboardStatsCache.totalJobs);
+      setSuccessfulPayments(dashboardStatsCache.successfulPayments);
+      setPendingReportsCount(dashboardStatsCache.pendingReportsCount);
+      setPendingSupportCount(dashboardStatsCache.pendingSupportCount);
+      setStatsLoading(false);
+      return;
+    }
+
     async function loadDashboardStats() {
       try {
         setStatsLoading(true);
         setStatsError("");
 
         const usersSnapshot = await getCountFromServer(collection(db, "users"));
-        setTotalUsers(usersSnapshot.data().count);
-
         const activeAdvertsSnapshot = await getCountFromServer(
           query(collection(db, "products"), where("status", "==", "active"))
         );
-        setActiveAdverts(activeAdvertsSnapshot.data().count);
-
         const jobsSnapshot = await getCountFromServer(collection(db, "jobs"));
-        setTotalJobs(jobsSnapshot.data().count);
-
         const paymentsSnapshot = await getCountFromServer(
           query(collection(db, "payments"), where("status", "==", "completed"))
         );
-        setSuccessfulPayments(paymentsSnapshot.data().count);
-
         const reportsCountSnapshot = await getCountFromServer(
           query(collection(db, "reports"), where("status", "==", "pending"))
         );
-        setPendingReportsCount(reportsCountSnapshot.data().count);
         const supportCountSnapshot = await getCountFromServer(
-  query(collection(db, "supportReports"), where("status", "==", "open"))
-);
-setPendingSupportCount(supportCountSnapshot.data().count);
+          query(collection(db, "supportReports"), where("status", "==", "open"))
+        );
+
+        const next: DashboardStatsCache = {
+          totalUsers: usersSnapshot.data().count,
+          activeAdverts: activeAdvertsSnapshot.data().count,
+          totalJobs: jobsSnapshot.data().count,
+          successfulPayments: paymentsSnapshot.data().count,
+          pendingReportsCount: reportsCountSnapshot.data().count,
+          pendingSupportCount: supportCountSnapshot.data().count,
+          timestamp: Date.now(),
+        };
+
+        setTotalUsers(next.totalUsers);
+        setActiveAdverts(next.activeAdverts);
+        setTotalJobs(next.totalJobs);
+        setSuccessfulPayments(next.successfulPayments);
+        setPendingReportsCount(next.pendingReportsCount);
+        setPendingSupportCount(next.pendingSupportCount);
+
+        dashboardStatsCache = next;
       } catch (error) {
         console.error("ADMIN DASHBOARD - STATS FAILED:", error);
         setStatsError(
@@ -232,6 +265,7 @@ setPendingSupportCount(supportCountSnapshot.data().count);
 
     loadDashboardStats();
   }, [adminLoading, user, isAdmin]);
+  
   useEffect(() => {
     if (adminLoading || !user || !isAdmin) return;
 
