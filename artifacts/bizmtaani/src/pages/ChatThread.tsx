@@ -1332,23 +1332,6 @@ async function handleForwardMessage(
     </p>
   </div>
 )}
-{message.replyTo && !message.deletedForEveryone && (
-  <div className="mb-2 border-l-2 border-primary/60 bg-black/5 dark:bg-white/5 rounded-r-md px-2 py-1.5">
-    <p className="text-[10px] font-semibold text-primary truncate">
-      {message.replyTo.senderId === user.uid
-        ? "You"
-        : message.replyTo.senderName ||
-          getParticipantName(
-            chat,
-            message.replyTo.senderId
-          )}
-    </p>
-
-    <p className="text-xs opacity-70 truncate">
-      {message.replyTo.text}
-    </p>
-  </div>
-)}
 
 {message.productContext && !message.deletedForEveryone && (
   <div className="mb-2 flex items-center gap-2 bg-black/5 dark:bg-white/5 rounded-lg px-2 py-1.5">
@@ -1367,8 +1350,6 @@ async function handleForwardMessage(
   </div>
 )}
 
-<p
-  className={`text-sm leading-relaxed break-words whitespace-pre-wrap ${
 <p
   className={`text-sm leading-relaxed break-words whitespace-pre-wrap ${
     message.deletedForEveryone
