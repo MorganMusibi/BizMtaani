@@ -67,6 +67,11 @@ function timeAgo(seconds: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 
+function isJobExpired(deadline?: string) {
+  if (!deadline) return false;
+  return new Date(`${deadline}T23:59:59`) < new Date();
+}
+
 const TYPE_COLORS: Record<string, string> = {
   "Full-time": "bg-green-100 text-green-700",
   "Part-time": "bg-blue-100 text-blue-700",
@@ -74,6 +79,23 @@ const TYPE_COLORS: Record<string, string> = {
   "Remote": "bg-teal-100 text-teal-700",
   "Internship": "bg-amber-100 text-amber-700",
 };
+
+function sortJobs(list: JobPost[], wardName: string | null, county: string | null) {
+  return [...list].sort((a, b) => {
+    // Active jobs before expired jobs, always.
+    const expiredA = isJobExpired(a.deadline);
+    const expiredB = isJobExpired(b.deadline);
+    if (expiredA !== expiredB) return expiredA ? 1 : -1;
+
+    // Within the same active/expired group, nearest area first:
+    // same ward > same county > everywhere else.
+    const tierA = wardName && a.ward === wardName ? 0 : county && a.county === county ? 1 : 2;
+    const tierB = wardName && b.ward === wardName ? 0 : county && b.county === county ? 1 : 2;
+    if (tierA !== tierB) return tierA - tierB;
+
+    return 0; // preserve existing createdAt-desc order within the same group
+  });
+}
 
 function JobCard({ job, onClick }: { job: JobPost; onClick: () => void }) {
   return (
@@ -183,8 +205,8 @@ export default function Jobs() {
         limit(PAGE_SIZE),
     ] as Parameters<typeof query>[1][];
 
-    // TEMPORARILY REMOVE WARD FILTER
-    // We will add it back after confirming your job documents contain the ward field.
+    // No ward filter here by design — all jobs are visible everywhere.
+    // Proximity is applied client-side via sortJobs() instead.
 
     if (activeCategory !== "All") {
         constraints.unshift(where("category", "==", activeCategory));
@@ -261,7 +283,7 @@ export default function Jobs() {
     );
   }
 
-  const visible = applyLocalFilters(jobs);
+  const visible = sortJobs(applyLocalFilters(jobs), wardName, county);
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
