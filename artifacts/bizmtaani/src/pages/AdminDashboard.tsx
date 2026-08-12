@@ -167,18 +167,19 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   }
 
   async function deleteJobDirect(jobId: string, title: string) {
-    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-    setProcessingJobId(jobId);
-    try {
-      await deleteDoc(doc(db, "jobs", jobId));
-      setJobs((prev) => prev.filter((j) => j.id !== jobId));
-    } catch (error) {
-      console.error("Failed to delete job:", error);
-      alert("Failed to delete the job.");
-    } finally {
-      setProcessingJobId(null);
-    }
+  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+  setProcessingJobId(jobId);
+  try {
+    const deleteJob = httpsCallable(functions, "deleteJob");
+    await deleteJob({ jobId });
+    setJobs((prev) => prev.filter((j) => j.id !== jobId));
+  } catch (error) {
+    console.error("Failed to delete job:", error);
+    alert("Failed to delete the job.");
+  } finally {
+    setProcessingJobId(null);
   }
+}
 
   function isJobExpired(deadline?: string) {
     if (!deadline) return false;
