@@ -1659,6 +1659,38 @@ async function handleForwardMessage(
         </div>
 
       )}
+
+      {showProductPreview && (
+  <div className="flex-shrink-0 px-4 py-2 bg-card border-t border-border">
+    <div className="flex items-center gap-3">
+      {chat.productImage ? (
+        <img
+          src={getChatThumbnailUrl(chat.productImage)}
+          alt={chat.productTitle}
+          className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+        />
+      ) : (
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 font-bold text-primary text-sm">
+          {chat.productTitle?.charAt(0).toUpperCase()}
+        </div>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-primary">Attaching advert</p>
+        <p className="text-xs text-muted-foreground truncate">{chat.productTitle}</p>
+      </div>
+
+      <button
+        type="button"
+        className="flex-shrink-0 text-muted-foreground hover:text-foreground text-lg"
+        onClick={() => setShowProductAttachment(false)}
+        aria-label="Remove advert attachment"
+      >
+        ×
+      </button>
+    </div>
+  </div>
+)}
       {replyingTo && (
   <div className="flex-shrink-0 px-4 py-2 bg-card border-t border-border">
     <div className="flex items-center justify-between gap-3">
