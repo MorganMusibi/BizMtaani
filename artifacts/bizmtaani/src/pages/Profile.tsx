@@ -32,11 +32,9 @@ export default function Profile() {
 
   useEffect(() => {
     if (!user) return;
-    import("@/lib/firebase").then(({ db }) => {
-      import("firebase/firestore").then(({ getDoc, doc: docRef }) => {
-        getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
-          setIsMarketer(snap.exists());
-        });
+    import("firebase/firestore").then(({ getDoc, doc: docRef }) => {
+      getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
+        setIsMarketer(snap.exists());
       });
     });
   }, [user]);
@@ -65,7 +63,7 @@ export default function Profile() {
   }
 
   function handleCopyReferralCode() {
-    const code = (userProfile as any)?.myReferralCode;
+    const code = userProfile?.myReferralCode;
     if (!code) return;
     navigator.clipboard.writeText(code);
     setCodeCopied(true);
@@ -73,7 +71,7 @@ export default function Profile() {
   }
 
   function handleShareReferralCode() {
-    const code = (userProfile as any)?.myReferralCode;
+    const code = userProfile?.myReferralCode;
     if (!code) return;
     const message = `Join BizMtaani using my referral code ${code} and let's both get rewarded! ${window.location.origin}`;
     if (navigator.share) {
@@ -83,6 +81,7 @@ export default function Profile() {
       toast({ title: "Referral message copied!" });
     }
   }
+  
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -404,7 +403,7 @@ export default function Profile() {
             <div>
               <p className="text-xs text-muted-foreground">Your points</p>
               <p className="font-black text-lg text-primary">
-                {(userProfile as any)?.points ?? 0}
+                {userProfile?.points ?? 0}
               </p>
             </div>
             <p className="text-xs text-muted-foreground text-right max-w-[55%]">
@@ -412,12 +411,12 @@ export default function Profile() {
             </p>
           </div>
 
-          {(userProfile as any)?.myReferralCode && (
+          {userProfile?.myReferralCode && (
             <div className="space-y-2">
               <p className="text-xs font-semibold text-muted-foreground">Your referral code</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 h-11 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center font-black text-base tracking-wider">
-                  {(userProfile as any).myReferralCode}
+                  {userProfile.myReferralCode}
                 </div>
                 <button
                   onClick={handleCopyReferralCode}
@@ -433,7 +432,7 @@ export default function Profile() {
             </div>
           )}
 
-          {!(userProfile as any)?.referredBy && !(userProfile as any)?.referredByUser && (
+          {!userProfile?.referredBy && !userProfile?.referredByUser && (
             <div className="space-y-2 pt-2 border-t border-border">
               <p className="text-xs font-semibold text-muted-foreground">Have a referral code?</p>
               <div className="flex gap-2">
@@ -465,7 +464,6 @@ export default function Profile() {
             </button>
           )}
         </div>
-
         {/* Business management — only for business owners */}
         {isBusinessOwner && (
           <button
