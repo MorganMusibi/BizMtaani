@@ -5,6 +5,7 @@
 import * as crypto from "crypto";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 
@@ -1056,3 +1057,23 @@ export const submitReferralCode = onCall({ cors: true }, async (request) => {
   throw new HttpsError("not-found", "Invalid referral code.");
 });
 
+/**
+ * Automatically generates a shareable referral code for every new user,
+ * the moment their users/{uid} document is created — regardless of which
+ * part of the app created it.
+ */
+export const onUserCreated = onDocumentCreated("users/{uid}", async (event) => {
+  const snap = event.data;
+  if (!snap) return;
+
+  const data = snap.data();
+
+  // Don't overwrite if a code somehow already exists (e.g. re-triggered).
+  if (data?.myReferralCode) return;
+
+  const uid = event.params.uid;
+  const name = (data?.displayName as string | undefined) ?? "";
+  const code = generateReferralCode(name, uid);
+
+  await snap.ref.set({ myReferralCode: code, points: 0 }, { merge: true });
+});
