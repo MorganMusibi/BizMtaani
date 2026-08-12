@@ -749,6 +749,42 @@ export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, clo
 
   return { success: true, message: "Advert and associated data removed." };
 });
+export const deleteJob = onCall({ cors: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Must be signed in");
+  }
+
+  const { jobId } = request.data as { jobId: string };
+  if (!jobId) throw new HttpsError("invalid-argument", "Job ID is required.");
+
+  const jobRef = db.collection("jobs").doc(jobId);
+  const jobSnap = await jobRef.get();
+
+  if (!jobSnap.exists) throw new HttpsError("not-found", "Job not found.");
+  const job = jobSnap.data()!;
+
+  // Check ownership — admins can delete any job.
+  const isOwner = job.posterId === request.auth.uid;
+  let callerIsAdmin = false;
+  if (!isOwner) {
+    const callerToken = request.auth.token as Record<string, unknown>;
+    callerIsAdmin = callerToken?.admin === true;
+  }
+
+  if (!isOwner && !callerIsAdmin) {
+    throw new HttpsError("permission-denied", "You can only delete your own job listings.");
+  }
+
+  // Delete associated application chats (avoid ghost chats)
+  const chatQuery = await db.collection("chats").where("jobId", "==", jobId).get();
+  const batch = db.batch();
+  chatQuery.docs.forEach((doc) => batch.delete(doc.ref));
+
+  batch.delete(jobRef);
+  await batch.commit();
+
+  return { success: true, message: "Job and associated chats removed." };
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. ADMIN MANAGEMENT
