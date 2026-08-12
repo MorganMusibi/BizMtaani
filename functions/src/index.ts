@@ -198,6 +198,36 @@ await db.collection("products").doc(paymentData.productId).update({
   )
 });
 
+        // Pay marketer commission, once per referred user, on their
+        // first successful premium payment only.
+        try {
+          const referralSnap = await db.collection("referrals").doc(paymentData.buyerId).get();
+
+          if (referralSnap.exists && !referralSnap.data()?.commissionPaidOut) {
+            const { marketerUid } = referralSnap.data()!;
+            const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
+            const commission = Math.round(amountPaid * COMMISSION_RATE);
+
+            await db.collection("marketers").doc(marketerUid).update({
+              totalEarnedKES: admin.firestore.FieldValue.increment(commission),
+            });
+
+            await db.collection("referralCommissions").add({
+              marketerUid,
+              referredUserUid: paymentData.buyerId,
+              paymentId: callback.CheckoutRequestID,
+              amountPaidKES: amountPaid,
+              commissionKES: commission,
+              type: "first_premium_payment",
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            await referralSnap.ref.update({ commissionPaidOut: true });
+          }
+        } catch (error) {
+          console.error("Failed to process referral commission:", error);
+        }
+
         // Extend existing premium subscription instead of resetting it
 const userRef = db.collection("users").doc(paymentData.buyerId);
 const userSnap = await userRef.get();
