@@ -15,6 +15,7 @@ import {
   Trash2,
   X,
   Shield,
+  Megaphone,
 } from "lucide-react";
 import {
   collection,
@@ -34,7 +35,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers";
 interface ProductReport {
   id: string;
   productId: string;
@@ -67,6 +68,15 @@ interface AdminUser {
   createdAt?: string;
   blocked?: boolean;
   blockReason?: string;
+}
+
+interface Marketer {
+  id: string;
+  referralCode?: string;
+  status?: "active" | "suspended";
+  totalEarnedKES?: number;
+  totalWithdrawnKES?: number;
+  createdAt?: { seconds: number } | null;
 }
 
 interface AdminProduct {
@@ -161,6 +171,12 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
+
+  // Marketers tab — lazily loaded, matches the pattern used elsewhere
+  const [marketers, setMarketers] = useState<Marketer[]>([]);
+  const [marketersLoading, setMarketersLoading] = useState(false);
+  const [marketersLoaded, setMarketersLoaded] = useState(false);
+  const [processingMarketerId, setProcessingMarketerId] = useState<string | null>(null);
   
   async function loadJobs() {
     if (jobsLoaded) return;
@@ -197,6 +213,64 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
     if (!deadline) return false;
     return new Date(`${deadline}T23:59:59`) < new Date();
       }
+
+  // -------------------------------------------------------
+  // MARKETERS — loaded lazily when tab is opened, bounded to 50
+  // -------------------------------------------------------
+  async function loadMarketers() {
+    if (marketersLoaded) return;
+    setMarketersLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "marketers"), orderBy("createdAt", "desc"), limit(50))
+      );
+      setMarketers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Marketer)));
+      setMarketersLoaded(true);
+    } catch (error) {
+      console.error("Failed to load marketers:", error);
+    } finally {
+      setMarketersLoading(false);
+    }
+  }
+
+  async function makeMarketer(targetUser: AdminUser) {
+    if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a marketer?`)) return;
+    setProcessingUserId(targetUser.id);
+    try {
+      const approveMarketer = httpsCallable(functions, "approveMarketer");
+      const result = await approveMarketer({ uid: targetUser.id });
+      const { referralCode } = result.data as { referralCode: string };
+      alert(`Marketer approved. Their referral code is: ${referralCode}`);
+      // Invalidate the marketers cache so the Marketers tab shows this
+      // new entry next time it's opened, without an extra read now.
+      setMarketersLoaded(false);
+    } catch (error) {
+      console.error("Failed to approve marketer:", error);
+      alert("Failed to approve this user as a marketer.");
+    } finally {
+      setProcessingUserId(null);
+    }
+  }
+
+  async function toggleMarketerStatus(marketer: Marketer) {
+    const willSuspend = marketer.status !== "suspended";
+    setProcessingMarketerId(marketer.id);
+    try {
+      await updateDoc(doc(db, "marketers", marketer.id), {
+        status: willSuspend ? "suspended" : "active",
+      });
+      setMarketers((prev) =>
+        prev.map((m) =>
+          m.id === marketer.id ? { ...m, status: willSuspend ? "suspended" : "active" } : m
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update marketer status:", error);
+      alert("Failed to update marketer status.");
+    } finally {
+      setProcessingMarketerId(null);
+    }
+  }
   // -------------------------------------------------------
   // OVERVIEW STATS
   // -------------------------------------------------------
@@ -448,6 +522,7 @@ useEffect(() => {
     if (tab === "users") loadUsers();
     if (tab === "adverts") loadAdverts();
     if (tab === "jobs") loadJobs();
+    if (tab === "marketers") loadMarketers();
   }
 
   // -------------------------------------------------------
@@ -560,13 +635,16 @@ async function dismissSupportReport(reportId: string) {
     return null;
   }
 
-  const stats = [
-  { title: "Total Users", value: totalUsers, icon: Users },
-  { title: "Active Adverts", value: activeAdverts, icon: Package },
-  { title: "Jobs", value: totalJobs, icon: Briefcase },
-  { title: "Payments", value: successfulPayments, icon: CreditCard },
-  { title: "Support Reports", value: pendingSupportCount, icon: Flag },
-];
+  const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
+    { title: "Overview", icon: LayoutDashboard, tab: "overview" },
+    { title: "Users", icon: Users, tab: "users" },
+    { title: "Marketers", icon: Megaphone, tab: "marketers" },
+    { title: "Adverts", icon: Package, tab: "adverts" },
+    { title: "Jobs", icon: Briefcase, tab: "jobs" },
+    { title: "Payments", icon: CreditCard, tab: "payments" },
+    { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
+    { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
+  ];
 
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
@@ -948,15 +1026,35 @@ async function dismissSupportReport(reportId: string) {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
-                            <td className="px-4 py-2.5">
-                              {u.role === "admin" ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                                  <Shield className="h-3 w-3" /> Admin
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">User</span>
-                              )}
+                            <td className="px-4 py-2.5 text-right">
+                              <div className="flex items-center justify-end gap-3">
+                                {u.role !== "admin" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => makeMarketer(u)}
+                                    disabled={processingUserId === u.id}
+                                    className="text-xs font-semibold text-[#00A651] hover:underline disabled:opacity-50"
+                                  >
+                                    {processingUserId === u.id ? "..." : "Make Marketer"}
+                                  </button>
+                                )}
+                                {u.role !== "admin" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleUserBlock(u)}
+                                    disabled={processingUserId === u.id}
+                                    className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
+                                      u.blocked ? "text-primary" : "text-destructive"
+                                    }`}
+                                  >
+                                    {processingUserId === u.id
+                                      ? "..."
+                                      : u.blocked
+                                      ? "Unblock"
+                                      : "Block"}
+                                  </button>
+                                )}
+                              </div>
                             </td>
                             <td className="px-4 py-2.5">
                               {u.blocked ? (
@@ -1108,13 +1206,82 @@ async function dismissSupportReport(reportId: string) {
             </>
           )}
 
-          {activeTab === "payments" && (
+          {activeTab === "marketers" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Marketers</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Approved marketers and their commission earnings. To approve a new marketer, use "Make Marketer" on the Users tab.
+                </p>
+              </div>
+
+              {marketersLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : marketers.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No marketers approved yet.
+                </div>
+              ) : (
+                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earned</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Paid Out</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Balance</th>
+                        <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {marketers.map((m) => {
+                        const earned = m.totalEarnedKES ?? 0;
+                        const paid = m.totalWithdrawnKES ?? 0;
+                        return (
+                          <tr key={m.id} className="border-t border-border">
+                            <td className="px-4 py-2.5 font-mono font-semibold">{m.referralCode ?? "—"}</td>
+                            <td className="px-4 py-2.5">
+                              {m.status === "suspended" ? (
+                                <span className="text-xs font-semibold text-destructive">Suspended</span>
+                              ) : (
+                                <span className="text-xs font-semibold text-[#00A651]">Active</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">KES {earned.toLocaleString("en-GB")}</td>
+                            <td className="px-4 py-2.5">KES {paid.toLocaleString("en-GB")}</td>
+                            <td className="px-4 py-2.5 font-semibold">
+                              KES {(earned - paid).toLocaleString("en-GB")}
+                            </td>
+                            <td className="px-4 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => toggleMarketerStatus(m)}
+                                disabled={processingMarketerId === m.id}
+                                className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
+                                  m.status === "suspended" ? "text-primary" : "text-destructive"
+                                }`}
+                              >
+                                {processingMarketerId === m.id
+                                  ? "..."
+                                  : m.status === "suspended"
+                                  ? "Reactivate"
+                                  : "Suspend"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+           {activeTab === "payments" && (
             <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
               Payment history view coming soon.
             </div>
           )}
-        </main>
-      </div>
-    </div>
-  );
-  }
