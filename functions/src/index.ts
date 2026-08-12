@@ -896,7 +896,12 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
   const { uid } = request.data as { uid?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
 
-  const code = generateReferralCode(uid);
+  const marketerUserSnap = await db.collection("users").doc(uid).get();
+  const marketerName = marketerUserSnap.exists
+    ? (marketerUserSnap.data()?.displayName as string | undefined) ?? ""
+    : "";
+
+  const code = generateReferralCode(marketerName, uid);
 
   await db.collection("marketers").doc(uid).set({
     referralCode: code,
