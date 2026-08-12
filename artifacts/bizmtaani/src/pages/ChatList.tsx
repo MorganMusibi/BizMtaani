@@ -268,7 +268,7 @@ function ChatAvatar({
   if (photoURL && !imageError) {
     return (
       <img
-        src={photoURL}
+        src={getChatThumbnailUrl(photoURL)}
         alt=""
         loading="lazy"
         onError={() =>
