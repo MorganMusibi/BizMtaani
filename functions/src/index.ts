@@ -1025,36 +1025,9 @@ export const submitReferralCode = onCall({ cors: true }, async (request) => {
     return { success: true, type: "marketer" };
   }
 
-  // 2. Otherwise check if it's another user's own referral code.
-  const userSnap = await db
-    .collection("users")
-    .where("myReferralCode", "==", trimmedCode)
-    .limit(1)
-    .get();
-
-  if (!userSnap.empty) {
-    const referrerDoc = userSnap.docs[0];
-    if (referrerDoc.id === uid) {
-      throw new HttpsError("failed-precondition", "You cannot use your own referral code.");
-    }
-
-    await db.collection("userReferrals").doc(uid).set({
-      referrerUid: referrerDoc.id,
-      referralCode: trimmedCode,
-      pointsAwarded: false,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    await db.collection("users").doc(uid).set(
-      { referredByUser: referrerDoc.id },
-      { merge: true }
-    );
-
-    return { success: true, type: "user" };
-  }
-
   throw new HttpsError("not-found", "Invalid referral code.");
 });
+  
 
 /**
  * Automatically generates a shareable referral code for every new user,
