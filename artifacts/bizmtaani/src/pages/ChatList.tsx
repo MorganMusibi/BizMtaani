@@ -38,6 +38,14 @@ interface ChatListItem extends ChatData {
   id: string;
 }
 
+function getChatThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_128,h_128,c_fill/");
+  }
+  return url;
+}
+
 /*
 |--------------------------------------------------------------------------
 | FORMAT CHAT TIME
@@ -267,30 +275,6 @@ function ChatAvatar({
           setImageError(true)
         }
         className="w-12 h-12 rounded-full object-cover flex-shrink-0 bg-muted"
-      />
-    );
-  }
-
-  /*
-  |--------------------------------------------------------------------------
-  | PRODUCT IMAGE
-  |--------------------------------------------------------------------------
-  */
-
-  if (
-    chat.type === "product" &&
-    chat.productImage &&
-    !imageError
-  ) {
-    return (
-      <img
-        src={chat.productImage}
-        alt=""
-        loading="lazy"
-        onError={() =>
-          setImageError(true)
-        }
-        className="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-muted"
       />
     );
   }
