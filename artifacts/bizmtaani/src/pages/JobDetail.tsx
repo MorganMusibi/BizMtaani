@@ -3,6 +3,8 @@ import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
 import { doc, getDoc, deleteDoc,  } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
@@ -58,17 +60,18 @@ export default function JobDetail() {
   }, [params?.id]);
 
   async function handleDelete() {
-    if (!job) return;
-    setDeleting(true);
-    try {
-      await deleteDoc(doc(db, "jobs", job.id));
-      toast({ title: "Job deleted" });
-      navigate("/jobs");
-    } catch (e) {
-      toast({ title: "Failed to delete", variant: "destructive" });
-      setDeleting(false);
-    }
+  if (!job) return;
+  setDeleting(true);
+  try {
+    const deleteJob = httpsCallable(functions, "deleteJob");
+    await deleteJob({ jobId: job.id });
+    toast({ title: "Job deleted" });
+    navigate("/jobs");
+  } catch (e) {
+    toast({ title: "Failed to delete", variant: "destructive" });
+    setDeleting(false);
   }
+}
 
   async function handleApplyViaChat() {
   if (!job || !user) {
