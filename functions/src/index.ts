@@ -860,8 +860,26 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
 const COMMISSION_RATE = 0.10;
 const POINTS_PER_REFERRAL = 50;
 
-function generateReferralCode(uid: string): string {
-  return uid.slice(0, 6).toUpperCase() + Math.floor(1000 + Math.random() * 9000);
+function generateReferralCode(name: string, uid: string): string {
+  // Take the first name only, strip anything that isn't a letter,
+  // and cap length so the final code stays short and speakable.
+  const cleanName = (name || "USER")
+    .trim()
+    .split(/\s+/)[0]
+    .replace(/[^a-zA-Z]/g, "")
+    .toUpperCase()
+    .slice(0, 6) || "USER";
+
+  // Mix of letters and numbers for the suffix — much larger space
+  // than digits alone, so two people with the same first name still
+  // get distinct, easy-to-say codes like JANE7K2 or JANEQ94.
+  const suffixChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no O/0/I/1 — avoids confusion
+  let suffix = "";
+  for (let i = 0; i < 3; i++) {
+    suffix += suffixChars[Math.floor(Math.random() * suffixChars.length)];
+  }
+
+  return `${cleanName}${suffix}`;
 }
 
 /**
