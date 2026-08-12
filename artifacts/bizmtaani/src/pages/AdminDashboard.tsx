@@ -110,9 +110,8 @@ interface DashboardStatsCache {
   timestamp: number;
 }
 let dashboardStatsCache: DashboardStatsCache | null = null;
-const DASHBOARD_STATS_CACHE_TTL_MS = 3 * 60 * 1000; // 3 minutes
+const DASHBOARD_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 3 minutes
 
-export default function AdminDashboard() {
 export default function AdminDashboard() {
   const { user, isAdmin, adminLoading } = useAuth();
   const [, navigate] = useLocation();
