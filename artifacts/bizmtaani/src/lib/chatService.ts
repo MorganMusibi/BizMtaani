@@ -468,6 +468,11 @@ export async function sendChatMessage(params: {
   senderName: string;
   text: string;
   replyTo?: ReplyTo | null;
+  productContext?: {
+    productId: string;
+    productTitle: string;
+    productImage?: string;
+  } | null;
 }): Promise<void> {
 
   const {
@@ -476,6 +481,7 @@ export async function sendChatMessage(params: {
     senderName,
     text,
     replyTo,
+    productContext,
   } = params;
 
   const cleanText =
@@ -558,27 +564,15 @@ export async function sendChatMessage(params: {
 
   batch.set(messageRef, {
     senderId,
-
-    senderName:
-      senderName ||
-      "User",
-
-    text:
-      cleanText,
-
-    replyTo:
-      replyTo || null,
-
-    createdAt:
-      serverTimestamp(),
-
-    deliveredAt:
-      null,
-
-    readAt:
-      null,
+    senderName: senderName || "User",
+    text: cleanText,
+    replyTo: replyTo || null,
+    productContext: productContext || null,
+    createdAt: serverTimestamp(),
+    deliveredAt: null,
+    readAt: null,
   });
-
+  
   batch.update(chatRef, {
     lastMessage:
       cleanText,
