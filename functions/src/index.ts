@@ -857,7 +857,7 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
 // 7. REFERRALS — MARKETER COMMISSIONS + USER POINTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const COMMISSION_RATE = 0.10;
+const COMMISSION_RATE = 0.142;
 const POINTS_PER_REFERRAL = 50;
 
 function generateReferralCode(name: string, uid: string): string {
