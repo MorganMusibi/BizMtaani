@@ -91,8 +91,9 @@ interface Payout {
 
 interface MarketerApplication {
   id: string;
-  displayName?: string;
-  phone?: string;
+  fullName?: string;
+  idNumber?: string;
+  mpesaNumber?: string;
   reason?: string;
   status?: "pending" | "approved" | "rejected";
   createdAt?: { seconds: number } | null;
@@ -1348,8 +1349,11 @@ async function dismissSupportReport(reportId: string) {
                   {applications.map((a) => (
                     <div key={a.id} className="rounded-xl border bg-card p-4 space-y-3">
                       <div>
-                        <p className="font-semibold text-sm">{a.displayName || "Unnamed user"}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{a.phone}</p>
+                        <p className="font-semibold text-sm">{a.fullName || "Unnamed applicant"}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                          <span>ID: {a.idNumber || "—"}</span>
+                          <span>M-Pesa: {a.mpesaNumber || "—"}</span>
+                        </div>
                         {a.reason && (
                           <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">{a.reason}</p>
                         )}
