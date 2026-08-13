@@ -25,8 +25,6 @@ export default function Profile() {
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const hasPhoto = !!user?.photoURL;
 
-  const [referralInput, setReferralInput] = useState("");
-  const [submittingReferral, setSubmittingReferral] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
   const [marketerData, setMarketerData] = useState<any>(null);
@@ -77,29 +75,6 @@ export default function Profile() {
       });
     } finally {
       setSubmittingApplication(false);
-    }
-  }
-
-  async function handleSubmitReferralCode() {
-    if (!referralInput.trim()) return;
-
-    setSubmittingReferral(true);
-
-    try {
-      const submitCode = httpsCallable(functions, "submitReferralCode");
-      await submitCode({ code: referralInput.trim() });
-
-      toast({ title: "Referral code applied!" });
-      setReferralInput("");
-      window.location.reload();
-    } catch (error: any) {
-      toast({
-        title: "Could not apply code",
-        description: error?.message ?? "Please check the code and try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmittingReferral(false);
     }
   }
 
@@ -486,28 +461,6 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
                 <Gift size={15} />
                 Share with friends
               </Button>
-            </div>
-          )}
-
-          {!userProfile?.referredBy && !userProfile?.referredByUser && (
-            <div className="space-y-2 pt-2 border-t border-border">
-              <p className="text-xs font-semibold text-muted-foreground">Have a referral code?</p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter code"
-                  value={referralInput}
-                  onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
-                  className="flex-1 h-11 px-3 rounded-xl border border-border bg-background text-sm font-semibold"
-                />
-                <Button
-                  onClick={handleSubmitReferralCode}
-                  disabled={submittingReferral || !referralInput.trim()}
-                  className="flex-shrink-0"
-                >
-                  {submittingReferral ? <Loader2 size={16} className="animate-spin" /> : "Apply"}
-                </Button>
-              </div>
             </div>
           )}
 
