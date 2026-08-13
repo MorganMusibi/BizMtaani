@@ -35,7 +35,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications";
 interface ProductReport {
   id: string;
   productId: string;
@@ -76,6 +76,15 @@ interface Marketer {
   status?: "active" | "suspended";
   totalEarnedKES?: number;
   totalWithdrawnKES?: number;
+  createdAt?: { seconds: number } | null;
+}
+
+interface MarketerApplication {
+  id: string;
+  displayName?: string;
+  phone?: string;
+  reason?: string;
+  status?: "pending" | "approved" | "rejected";
   createdAt?: { seconds: number } | null;
 }
 
@@ -172,11 +181,17 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
 
-  // Marketers tab — lazily loaded, matches the pattern used elsewhere
+// Marketers tab — lazily loaded, matches the pattern used elsewhere
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [marketersLoading, setMarketersLoading] = useState(false);
   const [marketersLoaded, setMarketersLoaded] = useState(false);
   const [processingMarketerId, setProcessingMarketerId] = useState<string | null>(null);
+
+  // Marketer applications tab — lazily loaded, bounded, matches the pattern used elsewhere
+  const [applications, setApplications] = useState<MarketerApplication[]>([]);
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+  const [applicationsLoaded, setApplicationsLoaded] = useState(false);
+  const [processingApplicationId, setProcessingApplicationId] = useState<string | null>(null);
   
   async function loadJobs() {
     if (jobsLoaded) return;
@@ -269,6 +284,64 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
       alert("Failed to update marketer status.");
     } finally {
       setProcessingMarketerId(null);
+    }
+  }
+
+  // -------------------------------------------------------
+  // MARKETER APPLICATIONS — loaded lazily when tab is opened, bounded
+  // -------------------------------------------------------
+  async function loadApplications() {
+    if (applicationsLoaded) return;
+    setApplicationsLoading(true);
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "marketerApplications"),
+          where("status", "==", "pending"),
+          orderBy("createdAt", "desc"),
+          limit(50)
+        )
+      );
+      setApplications(snap.docs.map((d) => ({ id: d.id, ...d.data() } as MarketerApplication)));
+      setApplicationsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load marketer applications:", error);
+    } finally {
+      setApplicationsLoading(false);
+    }
+  }
+
+  async function approveApplication(application: MarketerApplication) {
+    if (!confirm(`Approve "${application.displayName || application.id}" as a marketer?`)) return;
+    setProcessingApplicationId(application.id);
+    try {
+      const approveMarketer = httpsCallable(functions, "approveMarketer");
+      const result = await approveMarketer({ uid: application.id });
+      const { referralCode } = result.data as { referralCode: string };
+      alert(`Marketer approved. Their referral code is: ${referralCode}`);
+      setApplications((prev) => prev.filter((a) => a.id !== application.id));
+      // Invalidate marketers cache so the Marketers tab reflects this on next open.
+      setMarketersLoaded(false);
+    } catch (error) {
+      console.error("Failed to approve application:", error);
+      alert("Failed to approve this application.");
+    } finally {
+      setProcessingApplicationId(null);
+    }
+  }
+
+  async function rejectApplication(application: MarketerApplication) {
+    if (!confirm(`Reject "${application.displayName || application.id}"'s application?`)) return;
+    setProcessingApplicationId(application.id);
+    try {
+      const rejectMarketerApplication = httpsCallable(functions, "rejectMarketerApplication");
+      await rejectMarketerApplication({ uid: application.id });
+      setApplications((prev) => prev.filter((a) => a.id !== application.id));
+    } catch (error) {
+      console.error("Failed to reject application:", error);
+      alert("Failed to reject this application.");
+    } finally {
+      setProcessingApplicationId(null);
     }
   }
   // -------------------------------------------------------
@@ -523,6 +596,7 @@ useEffect(() => {
     if (tab === "adverts") loadAdverts();
     if (tab === "jobs") loadJobs();
     if (tab === "marketers") loadMarketers();
+    if (tab === "applications") loadApplications();
   }
 
   // -------------------------------------------------------
@@ -646,6 +720,7 @@ async function dismissSupportReport(reportId: string) {
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
+    { title: "Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
     { title: "Marketers", icon: Megaphone, tab: "marketers" },
     { title: "Adverts", icon: Package, tab: "adverts" },
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
@@ -1198,6 +1273,71 @@ async function dismissSupportReport(reportId: string) {
             </>
           )}
 
+          {activeTab === "applications" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Marketer Applications</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Pending applications from users wanting to become marketers.
+                </p>
+              </div>
+
+              {applicationsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : applications.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No pending applications.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {applications.map((a) => (
+                    <div key={a.id} className="rounded-xl border bg-card p-4 space-y-3">
+                      <div>
+                        <p className="font-semibold text-sm">{a.displayName || "Unnamed user"}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{a.phone}</p>
+                        {a.reason && (
+                          <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">{a.reason}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground mt-2">{timeAgo(a.createdAt)}</p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => rejectApplication(a)}
+                          disabled={processingApplicationId === a.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+                        >
+                          <X className="h-3.5 w-3.5" /> Reject
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => approveApplication(a)}
+                          disabled={processingApplicationId === a.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#00A651] text-white px-3 py-2 text-xs font-semibold hover:bg-[#00A651]/90 transition-colors disabled:opacity-50"
+                        >
+                          {processingApplicationId === a.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Check className="h-3.5 w-3.5" /> Approve
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "marketers" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Marketers</h2>
           {activeTab === "marketers" && (
             <>
               <div className="mb-6">
