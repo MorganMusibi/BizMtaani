@@ -52,6 +52,7 @@ const LISTING_DURATIONS: Record<string, number> = {
   premium_monthly: 30,
 };
 const CLEANUP_LIMIT = 150;
+const ARCHIVE_RETENTION_DAYS = 45;
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
 }
@@ -351,6 +352,7 @@ async function deleteCloudinaryImage(publicId: string) {
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CLEANUP
 // ═══════════════════════════════════════════════════════════════════════════
+ 
 async function runCleanup() {
   const now = admin.firestore.Timestamp.now();
 
@@ -371,59 +373,127 @@ async function runCleanup() {
     .where("createdAt", "<", oneHourAgo)
     .limit(CLEANUP_LIMIT)
     .get();
+
   const expiredPayments = await db.collection("payments")
     .where("status", "==", "pending")
     .where("createdAt", "<", oneHourAgo)
     .limit(CLEANUP_LIMIT)
     .get();
 
+  // Permanently delete adverts that have sat archived past retention
+  const archiveCutoff = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() - ARCHIVE_RETENTION_DAYS * 86_400_000)
+  );
+
+  const staleArchived = await db.collection("products")
+    .where("status", "==", "archived")
+    .where("archivedAt", "<", archiveCutoff)
+    .limit(CLEANUP_LIMIT)
+    .get();
+
   const batch = db.batch();
 
-  // Archive expired active adverts
+  // Archive expired active adverts — stamp archivedAt so we can
+  // later purge them once ARCHIVE_RETENTION_DAYS has passed.
   expiredActive.docs.forEach((doc) => {
     batch.update(doc.ref, {
       status: "archived",
+      archivedAt: now,
     });
   });
 
   // Delete abandoned pending adverts and their Cloudinary images
-for (const doc of expiredPending.docs) {
+  for (const doc of expiredPending.docs) {
+    const data = doc.data();
 
-  const data = doc.data();
-
-  if (Array.isArray(data.imageUrls)) {
-
-    for (const img of data.imageUrls) {
-
-      const publicId =
-        typeof img === "string"
-          ? null
-          : img.public_id;
-
-  if (publicId) {
-        try {
-          await deleteCloudinaryImage(publicId);
-        } catch (error) {
-          console.error(`Cloudinary delete failed for ${publicId}:`, error);
+    if (Array.isArray(data.imageUrls)) {
+      for (const img of data.imageUrls) {
+        const publicId = typeof img === "string" ? null : img.public_id;
+        if (publicId) {
+          try {
+            await deleteCloudinaryImage(publicId);
+          } catch (error) {
+            console.error(`Cloudinary delete failed for ${publicId}:`, error);
+          }
         }
       }
     }
+
+    batch.delete(doc.ref);
   }
 
-  batch.delete(doc.ref);
-}
   // Delete abandoned pending payment records
-expiredPayments.docs.forEach((doc) => {
-  batch.delete(doc.ref);
-});
+  expiredPayments.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  // Permanently purge adverts archived past retention — delete their
+  // Cloudinary images, their chats (and messages), then the advert itself
+  let purgedChats = 0;
+  for (const doc of staleArchived.docs) {
+    const data = doc.data();
+
+    if (Array.isArray(data.imageUrls)) {
+      for (const img of data.imageUrls) {
+        const publicId = typeof img === "string" ? null : img.public_id;
+        if (publicId) {
+          try {
+            await deleteCloudinaryImage(publicId);
+          } catch (error) {
+            console.error(`Cloudinary delete failed for ${publicId}:`, error);
+          }
+        }
+      }
+    }
+
+    const relatedChats = await db.collection("chats")
+      .where("productId", "==", doc.id)
+      .get();
+
+    for (const chatDoc of relatedChats.docs) {
+      await db.recursiveDelete(chatDoc.ref);
+      purgedChats++;
+    }
+
+    batch.delete(doc.ref);
+  }
+
+  // Orphaned chats — the product or job they reference no longer
+  // exists (e.g. deleted outside the normal deleteAdvert/deleteJob
+  // path). Bounded scan so this stays cheap.
+  const orphanCandidates = await db.collection("chats")
+    .limit(CLEANUP_LIMIT)
+    .get();
+
+  let orphanedChats = 0;
+  for (const chatDoc of orphanCandidates.docs) {
+    const chat = chatDoc.data();
+    let stillReferenced = true;
+
+    if (chat.productId) {
+      const productSnap = await db.collection("products").doc(chat.productId).get();
+      stillReferenced = productSnap.exists;
+    } else if (chat.jobId) {
+      const jobSnap = await db.collection("jobs").doc(chat.jobId).get();
+      stillReferenced = jobSnap.exists;
+    }
+
+    if (!stillReferenced) {
+      await db.recursiveDelete(chatDoc.ref);
+      orphanedChats++;
+    }
+  }
 
   await batch.commit();
 
   return {
-  archived: expiredActive.size,
-  deletedPending: expiredPending.size,
-  deletedPayments: expiredPayments.size,
-};
+    archived: expiredActive.size,
+    deletedPending: expiredPending.size,
+    deletedPayments: expiredPayments.size,
+    purgedArchived: staleArchived.size,
+    purgedChatsFromPurgedAds: purgedChats,
+    orphanedChatsDeleted: orphanedChats,
+  };
 }
 
 export const scheduledCleanup = onSchedule(
@@ -438,8 +508,8 @@ export const scheduledCleanup = onSchedule(
   async () => {
     try {
       const result = await runCleanup();
-      console.log(
-  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}`
+       console.log(
+  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}, Purged old archived adverts: ${result.purgedArchived}, Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, Orphaned chats removed: ${result.orphanedChatsDeleted}`
 );
     } catch (error) {
       console.error("Cleanup failed:", error);
@@ -636,19 +706,19 @@ if (userSnap.exists) {
   // 4. Logic: Active Ad Limit Enforcement (applies to every plan)
   const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
-  const userAds = await db
-    .collection("products")
-    .where("sellerId", "==", uid)
-    .where("status", "==", "active")
-    .limit(activeAdLimit + 1)
-    .get();
+  const activeCountSnap = await db
+  .collection("products")
+  .where("sellerId", "==", uid)
+  .where("status", "==", "active")
+  .count()
+  .get();
 
-  if (userAds.size >= activeAdLimit) {
-    throw new HttpsError(
-      "failed-precondition",
-      `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
-    );
-  }
+if (activeCountSnap.data().count >= activeAdLimit) {
+  throw new HttpsError(
+    "failed-precondition",
+    `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
+  );
+}
 
   // 5. Logic: Status Determination
   // Paid plans start as 'pending_payment'; Free plans start as 'active'
