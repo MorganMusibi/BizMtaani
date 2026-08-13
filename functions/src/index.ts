@@ -525,6 +525,99 @@ export const scheduledCleanup = onSchedule(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 3B. MONTHLY MARKETER PAYOUT SNAPSHOT
+// ═══════════════════════════════════════════════════════════════════════════
+export const closeMonthlyEarnings = onSchedule(
+  { schedule: "0 0 1 * *", timeZone: "Africa/Nairobi" }, // 00:00 on the 1st of each month
+  async () => {
+    const now = new Date();
+    const closedMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const closedMonthKey = `${closedMonth.getFullYear()}-${String(closedMonth.getMonth() + 1).padStart(2, "0")}`;
+    const newMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+    const marketersSnap = await db.collection("marketers").get();
+    const batch = db.batch();
+
+    marketersSnap.docs.forEach((doc) => {
+      const data = doc.data();
+      const earnedThatMonth = data.earningsMonthKey === closedMonthKey
+        ? (data.earningsThisMonth ?? 0)
+        : 0;
+      const signupsThatMonth = data.signupsMonthKey === closedMonthKey
+        ? (data.signupsThisMonth ?? 0)
+        : 0;
+
+      const payoutRef = db.collection("payouts").doc(closedMonthKey)
+        .collection("marketers").doc(doc.id);
+
+      batch.set(payoutRef, {
+        marketerUid: doc.id,
+        referralCode: data.referralCode ?? null,
+        earningsKES: earnedThatMonth,
+        signups: signupsThatMonth,
+        monthKey: closedMonthKey,
+        paid: false,
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+
+      batch.update(doc.ref, {
+        earningsThisMonth: 0,
+        earningsMonthKey: newMonthKey,
+        signupsThisMonth: 0,
+        signupsMonthKey: newMonthKey,
+      });
+    });
+
+    await batch.commit();
+    console.log(`Closed earnings for ${closedMonthKey}: ${marketersSnap.size} marketers snapshotted.`);
+  }
+);
+
+/**
+ * Admin-only: fetch the payout list for a given month (e.g. "2026-07").
+ */
+export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can view payouts.");
+  }
+
+  const { monthKey } = request.data as { monthKey?: string };
+  if (!monthKey) throw new HttpsError("invalid-argument", "monthKey is required, e.g. '2026-07'.");
+
+  const snap = await db.collection("payouts").doc(monthKey).collection("marketers").get();
+
+  const payouts = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+  return { monthKey, payouts };
+});
+
+/**
+ * Admin-only: mark a marketer's payout for a given month as paid.
+ */
+export const markPayoutPaid = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can update payouts.");
+  }
+
+  const { monthKey, marketerUid } = request.data as { monthKey?: string; marketerUid?: string };
+  if (!monthKey || !marketerUid) {
+    throw new HttpsError("invalid-argument", "monthKey and marketerUid are required.");
+  }
+
+  await db.collection("payouts").doc(monthKey)
+    .collection("marketers").doc(marketerUid)
+    .update({ paid: true, paidAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  return { success: true };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
 export const sendNotification = onCall({ cors: true }, async (request) => {
