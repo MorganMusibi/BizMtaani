@@ -1277,3 +1277,8 @@ async function dismissSupportReport(reportId: string) {
               Payment history view coming soon.
             </div>
           )}
+        </main>
+      </div>
+    </div>
+  );
+  }
