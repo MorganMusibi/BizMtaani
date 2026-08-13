@@ -45,6 +45,9 @@ export interface ChatData {
 
   unreadCount?: Record<string, number>;
 
+  mutedFor?: string[];
+  deletedFor?: string[];
+
   createdAt?: Timestamp | null;
   updatedAt?: Timestamp | null;
 }
@@ -1305,4 +1308,96 @@ export async function reportMessage(
         serverTimestamp(),
     }
   );
+}
+
+/*
+|--------------------------------------------------------------------------
+| DELETE CHAT FOR ME
+|--------------------------------------------------------------------------
+*/
+
+export async function deleteChatForMe(
+  chatId: string,
+  userId: string
+): Promise<void> {
+
+  if (!chatId || !userId) {
+    throw new Error(
+      "Chat and user are required."
+    );
+  }
+
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const chatSnap =
+    await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    return;
+  }
+
+  const chat =
+    chatSnap.data() as ChatData;
+
+  const deletedFor =
+    chat.deletedFor || [];
+
+  if (deletedFor.includes(userId)) {
+    return;
+  }
+
+  await updateDoc(chatRef, {
+    deletedFor: [
+      ...deletedFor,
+      userId,
+    ],
+  });
+}
+
+/*
+|--------------------------------------------------------------------------
+| MUTE / UNMUTE CHAT
+|--------------------------------------------------------------------------
+*/
+
+export async function toggleMuteChat(
+  chatId: string,
+  userId: string,
+  mute: boolean
+): Promise<void> {
+
+  if (!chatId || !userId) {
+    throw new Error(
+      "Chat and user are required."
+    );
+  }
+
+  const chatRef =
+    doc(db, "chats", chatId);
+
+  const chatSnap =
+    await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    return;
+  }
+
+  const chat =
+    chatSnap.data() as ChatData;
+
+  const mutedFor =
+    chat.mutedFor || [];
+
+  const updated = mute
+    ? Array.from(
+        new Set([...mutedFor, userId])
+      )
+    : mutedFor.filter(
+        (uid) => uid !== userId
+      );
+
+  await updateDoc(chatRef, {
+    mutedFor: updated,
+  });
 }
