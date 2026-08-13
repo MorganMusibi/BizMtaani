@@ -211,20 +211,23 @@ await db.collection("products").doc(paymentData.productId).update({
     const commission = Math.round(amountPaid * COMMISSION_RATE);
 
     const now = new Date();
-    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-    const marketerRef = db.collection("marketers").doc(marketerUid);
+const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+const marketerRef = db.collection("marketers").doc(marketerUid);
 
-    await db.runTransaction(async (tx) => {
-      const marketerSnap = await tx.get(marketerRef);
-      const data = marketerSnap.data() ?? {};
-      const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
+await db.runTransaction(async (tx) => {
+  const marketerSnap = await tx.get(marketerRef);
+  const data = marketerSnap.data() ?? {};
+  const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
+  const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
 
-      tx.update(marketerRef, {
-        totalEarnedKES: admin.firestore.FieldValue.increment(commission),
-        signupsThisMonth: carriedCount + 1,
-        signupsMonthKey: monthKey,
-      });
-    });
+  tx.update(marketerRef, {
+    totalEarnedKES: admin.firestore.FieldValue.increment(commission),
+    signupsThisMonth: carriedCount + 1,
+    signupsMonthKey: monthKey,
+    earningsThisMonth: carriedEarnings + commission,
+    earningsMonthKey: monthKey,
+  });
+});
 
     await db.collection("referralCommissions").add({
       marketerUid,
