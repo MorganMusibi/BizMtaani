@@ -429,19 +429,18 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           </div>
 
           {isMarketer && (
-            <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
-              <div>
-                <p className="text-xs text-muted-foreground">Your sign-ups</p>
-                <p className="font-black text-lg text-primary">
-  {signupsThisMonth}
-</p>
-        
-              </div>
-              <p className="text-xs text-muted-foreground text-right max-w-[55%]">
-                Counts friends who registered and upgraded to premium this month
-              </p>
-            </div>
-          )}
+  <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
+    <div>
+      <p className="text-xs text-muted-foreground">Your earnings</p>
+      <p className="font-black text-lg text-primary">
+        KES {(marketerData?.totalEarnedKES ?? 0).toLocaleString()}
+      </p>
+    </div>
+    <p className="text-xs text-muted-foreground text-right max-w-[55%]">
+      You earn 14.2% every time someone you refer goes premium
+    </p>
+  </div>
+)}
 
           {userProfile?.myReferralCode && (
             <div className="space-y-2">
