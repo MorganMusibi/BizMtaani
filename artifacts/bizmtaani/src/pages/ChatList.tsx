@@ -18,6 +18,7 @@ import {
   Search,
   User,
   X,
+  BellOff,
 } from "lucide-react";
 
 import { BottomNav } from "@/components/BottomNav";
@@ -339,6 +340,8 @@ export default function ChatList() {
     useState("");
   const [selectedChat, setSelectedChat] =
     useState<ChatListItem | null>(null);
+  const [pendingAction, setPendingAction] =
+    useState<"mute" | "unmute" | "delete" | null>(null);
 
   const longPressTimerRef =
     useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -822,16 +825,26 @@ export default function ChatList() {
                       {otherUserName}
                     </p>
 
-                    <span
-                      className={`text-[11px] flex-shrink-0 ${
-                        unread > 0
-                          ? "text-primary font-bold"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {formatTime(
-                        chat.lastMessageAt
+                    <span className="flex items-center gap-1 flex-shrink-0">
+                      {chat.mutedFor?.includes(
+                        user.uid
+                      ) && (
+                        <BellOff
+                          size={12}
+                          className="text-muted-foreground"
+                        />
                       )}
+                      <span
+                        className={`text-[11px] ${
+                          unread > 0
+                            ? "text-primary font-bold"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {formatTime(
+                          chat.lastMessageAt
+                        )}
+                      </span>
                     </span>
                   </div>
 
@@ -907,18 +920,14 @@ export default function ChatList() {
             <button
               type="button"
               className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
-              onClick={async () => {
-                if (!user) return;
-
-                await toggleMuteChat(
-                  selectedChat.id,
-                  user.uid,
-                  !selectedChat.mutedFor?.includes(
-                    user.uid
+              onClick={() => {
+                setPendingAction(
+                  selectedChat.mutedFor?.includes(
+                    user?.uid || ""
                   )
+                    ? "unmute"
+                    : "mute"
                 );
-
-                setSelectedChat(null);
               }}
             >
               {selectedChat.mutedFor?.includes(
@@ -931,19 +940,13 @@ export default function ChatList() {
             <button
               type="button"
               className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
-              onClick={async () => {
-                if (!user) return;
-
-                await deleteChatForMe(
-                  selectedChat.id,
-                  user.uid
-                );
-
-                setSelectedChat(null);
-              }}
+              onClick={() =>
+                setPendingAction("delete")
+              }
             >
               🗑️ Delete conversation
             </button>
+              
 
             <button
               type="button"
@@ -954,6 +957,87 @@ export default function ChatList() {
             >
               Cancel
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* CONFIRM ACTION MODAL */}
+      {/* ================================================================ */}
+
+      {pendingAction && selectedChat && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() =>
+            setPendingAction(null)
+          }
+        >
+          <div
+            className="bg-card border border-border rounded-3xl max-w-sm w-full p-6 shadow-xl space-y-4"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg">
+                {pendingAction === "delete"
+                  ? "Delete this conversation?"
+                  : pendingAction === "mute"
+                  ? "Mute this conversation?"
+                  : "Unmute this conversation?"}
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                {pendingAction === "delete"
+                  ? "This will remove it from your list. The other person will still see it."
+                  : pendingAction === "mute"
+                  ? "You won't get notifications for new messages here."
+                  : "You'll start getting notifications for new messages again."}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                className="flex-1 h-11 rounded-2xl border-2 border-border font-bold"
+                onClick={() =>
+                  setPendingAction(null)
+                }
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                className={`flex-1 h-11 rounded-2xl font-bold text-white ${
+                  pendingAction === "delete"
+                    ? "bg-destructive"
+                    : "bg-primary"
+                }`}
+                onClick={async () => {
+                  if (!user) return;
+
+                  if (pendingAction === "delete") {
+                    await deleteChatForMe(
+                      selectedChat.id,
+                      user.uid
+                    );
+                  } else {
+                    await toggleMuteChat(
+                      selectedChat.id,
+                      user.uid,
+                      pendingAction === "mute"
+                    );
+                  }
+
+                  setPendingAction(null);
+                  setSelectedChat(null);
+                }}
+              >
+                {pendingAction === "delete"
+                  ? "Delete"
+                  : "Confirm"}
+              </button>
+            </div>
           </div>
         </div>
       )}
