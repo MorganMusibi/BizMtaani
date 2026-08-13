@@ -9,7 +9,7 @@ import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check, X } from "lucide-react";
 import { Link } from "wouter";
 import { BottomNav } from "@/components/BottomNav";
 import imageCompression from "browser-image-compression";
@@ -438,17 +438,19 @@ export default function Profile() {
             <p className="font-black text-sm">Referrals & Rewards</p>
           </div>
 
-          <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
-            <div>
-              <p className="text-xs text-muted-foreground">Your points</p>
-              <p className="font-black text-lg text-primary">
-                {userProfile?.points ?? 0}
+          {isMarketer && (
+            <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
+              <div>
+                <p className="text-xs text-muted-foreground">Recruits this month</p>
+                <p className="font-black text-lg text-primary">
+                  {userProfile?.monthlyRecruits ?? 0}
+                </p>
+              </div>
+              <p className="text-xs text-muted-foreground text-right max-w-[55%]">
+                Counts friends who registered and upgraded to premium this month
               </p>
             </div>
-            <p className="text-xs text-muted-foreground text-right max-w-[55%]">
-              Earn points when friends you refer post their first advert
-            </p>
-          </div>
+          )}
 
           {userProfile?.myReferralCode && (
             <div className="space-y-2">
@@ -619,11 +621,18 @@ export default function Profile() {
         <>
           <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowMarketerForm(false)} />
           <div
-            className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
-          >
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-            <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
+            <div
+  className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
+  style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+>
+  <button
+    onClick={() => setShowMarketerForm(false)}
+    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+  >
+    <X size={16} />
+  </button>
+  <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+  <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
 
             <div className="space-y-3">
               <div>
