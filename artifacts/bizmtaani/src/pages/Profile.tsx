@@ -29,13 +29,15 @@ export default function Profile() {
   const [submittingReferral, setSubmittingReferral] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [isMarketer, setIsMarketer] = useState(false);
-
+  const [marketerData, setMarketerData] = useState<any>(null);
+  
   useEffect(() => {
     if (!user) return;
     import("firebase/firestore").then(({ getDoc, doc: docRef }) => {
       getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
-        setIsMarketer(snap.exists());
-      });
+  setIsMarketer(snap.exists());
+  if (snap.exists()) setMarketerData(snap.data());
+});
       getDoc(docRef(db, "marketerApplications", user.uid)).then((snap) => {
         if (snap.exists() && snap.data()?.status === "pending") {
           setHasPendingApplication(true);
@@ -281,7 +283,14 @@ export default function Profile() {
     );
   }
 
-  const displayName = userProfile?.businessName || userProfile?.displayName || user.displayName || "Seller";
+  const now = new Date();
+const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+const signupsThisMonth =
+  marketerData?.signupsMonthKey === currentMonthKey
+    ? marketerData?.signupsThisMonth ?? 0
+    : 0;
+
+const displayName = userProfile?.businessName || userProfile?.displayName || user.displayName || "Seller";
   const isBusinessOwner = userProfile?.isBusinessOwner ?? false;
 
   const initials = displayName
@@ -443,8 +452,9 @@ export default function Profile() {
               <div>
                 <p className="text-xs text-muted-foreground">Your sign-ups</p>
                 <p className="font-black text-lg text-primary">
-                  {userProfile?.monthlyRecruits ?? 0}
-                </p>
+  {signupsThisMonth}
+</p>
+        
               </div>
               <p className="text-xs text-muted-foreground text-right max-w-[55%]">
                 Counts friends who registered and upgraded to premium this month
