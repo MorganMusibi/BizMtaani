@@ -460,8 +460,12 @@ async function runCleanup() {
 
   // Orphaned chats — the product or job they reference no longer
   // exists (e.g. deleted outside the normal deleteAdvert/deleteJob
-  // path). Bounded scan so this stays cheap.
+  // path). Ordered by createdAt with an age filter so each run
+  // advances through the collection instead of re-scanning the
+  // same first page forever.
   const orphanCandidates = await db.collection("chats")
+    .where("createdAt", "<", oneHourAgo)
+    .orderBy("createdAt")
     .limit(CLEANUP_LIMIT)
     .get();
 
