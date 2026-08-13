@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import {
   collection,
@@ -25,6 +25,8 @@ import { BottomNav } from "@/components/BottomNav";
 import {
   getParticipantName,
   getParticipantPhoto,
+  deleteChatForMe,
+  toggleMuteChat,
   type ChatData,
 } from "@/lib/chatService";
 
@@ -335,6 +337,33 @@ export default function ChatList() {
 
   const [searchQuery, setSearchQuery] =
     useState("");
+  const [selectedChat, setSelectedChat] =
+    useState<ChatListItem | null>(null);
+
+  const longPressTimerRef =
+    useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const suppressClickRef =
+    useRef(false);
+
+  function handleChatPressStart(
+    chat: ChatListItem
+  ) {
+    longPressTimerRef.current =
+      setTimeout(() => {
+        suppressClickRef.current = true;
+        setSelectedChat(chat);
+      }, 600);
+  }
+
+  function handleChatPressEnd() {
+    if (longPressTimerRef.current) {
+      clearTimeout(
+        longPressTimerRef.current
+      );
+      longPressTimerRef.current = null;
+    }
+  }
 
   /*
   |--------------------------------------------------------------------------
@@ -365,18 +394,21 @@ export default function ChatList() {
       )
     );
 
-    const unsubscribe =
-      onSnapshot(
-        chatsQuery,
-        (snap) => {
-          const loadedChats =
-            snap.docs.map(
-              (chatDoc) =>
-                ({
-                  id: chatDoc.id,
-                  ...chatDoc.data(),
-                } as ChatListItem)
-            );
+    const loadedChats =
+            snap.docs
+              .map(
+                (chatDoc) =>
+                  ({
+                    id: chatDoc.id,
+                    ...chatDoc.data(),
+                  } as ChatListItem)
+              )
+              .filter(
+                (chat) =>
+                  !chat.deletedFor?.includes(
+                    user.uid
+                  )
+              );
 
           setChats(loadedChats);
           setLoading(false);
@@ -724,7 +756,31 @@ export default function ChatList() {
                 key={chat.id}
                 href={`/chat/${chat.id}`}
                 data-testid={`chat-item-${chat.id}`}
-                className={`group flex items-center gap-3 px-4 py-3.5 min-h-[76px] active:bg-muted/70 hover:bg-muted/40 transition-colors ${
+                onClick={(event) => {
+                  if (suppressClickRef.current) {
+                    event.preventDefault();
+                    suppressClickRef.current = false;
+                  }
+                }}
+                onContextMenu={(event) =>
+                  event.preventDefault()
+                }
+                onTouchStart={() =>
+                  handleChatPressStart(chat)
+                }
+                onTouchEnd={handleChatPressEnd}
+                onTouchCancel={handleChatPressEnd}
+                onMouseDown={() =>
+                  handleChatPressStart(chat)
+                }
+                onMouseUp={handleChatPressEnd}
+                onMouseLeave={handleChatPressEnd}
+                style={{
+                  WebkitUserSelect: "none",
+                  userSelect: "none",
+                  WebkitTouchCallout: "none",
+                }}
+                className={`group flex items-center gap-3 px-4 py-3.5 min-h-[76px] active:bg-muted/70 hover:bg-muted/40 transition-colors select-none ${
                   unread > 0
                     ? "bg-primary/[0.04]"
                     : ""
@@ -824,6 +880,77 @@ export default function ChatList() {
               </Link>
             );
           })}
+        </div>
+      )}
+
+      {/* ================================================================ */}
+      {/* CHAT ACTION MENU */}
+      {/* ================================================================ */}
+
+      {selectedChat && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/40"
+          onClick={() =>
+            setSelectedChat(null)
+          }
+        >
+          <div
+            className="w-full max-w-md bg-card rounded-t-2xl p-2 shadow-xl"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
+              onClick={async () => {
+                if (!user) return;
+
+                await toggleMuteChat(
+                  selectedChat.id,
+                  user.uid,
+                  !selectedChat.mutedFor?.includes(
+                    user.uid
+                  )
+                );
+
+                setSelectedChat(null);
+              }}
+            >
+              {selectedChat.mutedFor?.includes(
+                user?.uid || ""
+              )
+                ? "🔔 Unmute"
+                : "🔕 Mute"}
+            </button>
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors text-destructive"
+              onClick={async () => {
+                if (!user) return;
+
+                await deleteChatForMe(
+                  selectedChat.id,
+                  user.uid
+                );
+
+                setSelectedChat(null);
+              }}
+            >
+              🗑️ Delete conversation
+            </button>
+
+            <button
+              type="button"
+              className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors font-medium"
+              onClick={() =>
+                setSelectedChat(null)
+              }
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
 
