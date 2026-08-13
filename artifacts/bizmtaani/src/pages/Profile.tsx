@@ -374,6 +374,18 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
               style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
             >
+              <div
+  className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
+  style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+>
+  <button
+    onClick={() => setShowAvatarMenu(false)}
+    className="absolute top-4 right-4 w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+  >
+    <X size={16} />
+  </button>
+  <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+  <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
               <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
 
