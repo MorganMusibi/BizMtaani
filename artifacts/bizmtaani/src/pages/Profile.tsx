@@ -258,6 +258,12 @@ export default function Profile() {
     );
   }
 
+const now = new Date();
+const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+const earningsThisMonth =
+  marketerData?.earningsMonthKey === currentMonthKey
+    ? marketerData?.earningsThisMonth ?? 0
+    : 0;
 
 const displayName = userProfile?.businessName || userProfile?.displayName || user.displayName || "Seller";
   const isBusinessOwner = userProfile?.isBusinessOwner ?? false;
@@ -425,9 +431,9 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           {isMarketer && (
   <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
     <div>
-      <p className="text-xs text-muted-foreground">Your earnings</p>
+      <p className="text-xs text-muted-foreground">Your earnings this month</p>
       <p className="font-black text-lg text-primary">
-        KES {(marketerData?.totalEarnedKES ?? 0).toLocaleString()}
+        KES {earningsThisMonth.toLocaleString()}
       </p>
     </div>
     <p className="text-xs text-muted-foreground text-right max-w-[55%]">
