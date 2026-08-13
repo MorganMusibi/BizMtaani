@@ -12,6 +12,9 @@ interface MarketerData {
   status: "active" | "suspended";
   totalEarnedKES: number;
   totalWithdrawnKES: number;
+  fullName?: string;
+  idNumber?: string;
+  mpesaNumber?: string;
 }
 
 interface Commission {
@@ -183,8 +186,30 @@ export default function MarketerDashboard() {
             Share your code
           </Button>
           <p className="text-xs text-muted-foreground">
-            Earn KES 10 when someone you refer takes Weekly Premium, or KES 35 for Monthly Premium — on their first payment only.
+            Earn KES 14 when someone you refer takes Weekly Premium, or KES 50 for Monthly Premium — on their first payment only.
           </p>
+        </div>
+
+        {/* Payout details on file */}
+        <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+          <p className="font-black text-sm">Payout Details on File</p>
+          <p className="text-xs text-muted-foreground -mt-2">
+            This is what we use to pay you. Contact BizMtaani if anything needs correcting.
+          </p>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Name</span>
+              <span className="font-semibold">{marketer.fullName || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">ID Number</span>
+              <span className="font-semibold">{marketer.idNumber || "—"}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">M-Pesa Number</span>
+              <span className="font-semibold">{marketer.mpesaNumber || "—"}</span>
+            </div>
+          </div>
         </div>
 
         {/* Recent commissions */}
