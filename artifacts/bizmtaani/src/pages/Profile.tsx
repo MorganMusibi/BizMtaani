@@ -36,8 +36,47 @@ export default function Profile() {
       getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
         setIsMarketer(snap.exists());
       });
+      getDoc(docRef(db, "marketerApplications", user.uid)).then((snap) => {
+        if (snap.exists() && snap.data()?.status === "pending") {
+          setHasPendingApplication(true);
+        }
+      });
     });
   }, [user]);
+
+  const [showMarketerForm, setShowMarketerForm] = useState(false);
+  const [hasPendingApplication, setHasPendingApplication] = useState(false);
+  const [marketerPhone, setMarketerPhone] = useState("");
+  const [marketerReason, setMarketerReason] = useState("");
+  const [submittingApplication, setSubmittingApplication] = useState(false);
+
+  async function handleApplyForMarketer() {
+    if (!marketerPhone.trim()) {
+      toast({ title: "Enter a contact phone number", variant: "destructive" });
+      return;
+    }
+
+    setSubmittingApplication(true);
+
+    try {
+      const applyForMarketer = httpsCallable(functions, "applyForMarketer");
+      await applyForMarketer({ phone: marketerPhone.trim(), reason: marketerReason.trim() });
+
+      toast({ title: "Application submitted!", description: "We'll review it and get back to you." });
+      setShowMarketerForm(false);
+      setHasPendingApplication(true);
+      setMarketerPhone("");
+      setMarketerReason("");
+    } catch (error: any) {
+      toast({
+        title: "Could not submit application",
+        description: error?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSubmittingApplication(false);
+    }
+  }
 
   async function handleSubmitReferralCode() {
     if (!referralInput.trim()) return;
@@ -454,7 +493,7 @@ export default function Profile() {
             </div>
           )}
 
-          {isMarketer && (
+          {isMarketer ? (
           <button
             onClick={() => setLocation("/marketer")}
             className="w-full flex items-center gap-4 px-4 py-4 bg-gradient-to-r from-[#00A651]/10 to-emerald-50 border-2 border-[#00A651]/30 rounded-2xl hover:border-[#00A651] transition-all text-left active:scale-[0.98]"
@@ -466,6 +505,34 @@ export default function Profile() {
               <p className="font-black text-sm">Marketer Dashboard</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 View earnings & your referral code
+              </p>
+            </div>
+            <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+          </button>
+        ) : hasPendingApplication ? (
+          <div className="w-full flex items-center gap-4 px-4 py-4 bg-muted/40 border border-border rounded-2xl">
+            <div className="w-11 h-11 rounded-xl bg-muted flex items-center justify-center flex-shrink-0">
+              <Gift size={22} className="text-muted-foreground" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">Marketer Application Pending</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                We're reviewing your application
+              </p>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowMarketerForm(true)}
+            className="w-full flex items-center gap-4 px-4 py-4 bg-card border border-border rounded-2xl hover:border-primary/40 transition-all text-left active:scale-[0.98]"
+          >
+            <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <Gift size={22} className="text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-black text-sm">Become a Marketer</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Earn cash by referring premium users
               </p>
             </div>
             <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
@@ -548,6 +615,60 @@ export default function Profile() {
           </button>
         </div>
       )}
+      {showMarketerForm && (
+        <>
+          <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowMarketerForm(false)} />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+          >
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+            <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">Contact Phone *</label>
+                <input
+                  type="tel"
+                  placeholder="e.g. 0712345678"
+                  value={marketerPhone}
+                  onChange={(e) => setMarketerPhone(e.target.value)}
+                  className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-muted-foreground">
+                  Why do you want to be a marketer? (Optional)
+                </label>
+                <textarea
+                  placeholder="Tell us a bit about yourself..."
+                  value={marketerReason}
+                  onChange={(e) => setMarketerReason(e.target.value)}
+                  maxLength={300}
+                  className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[80px]"
+                />
+              </div>
+
+              <Button
+                onClick={handleApplyForMarketer}
+                disabled={submittingApplication}
+                className="w-full gap-2"
+              >
+                {submittingApplication ? <Loader2 size={16} className="animate-spin" /> : "Submit Application"}
+              </Button>
+
+              <button
+                onClick={() => setShowMarketerForm(false)}
+                className="w-full flex items-center justify-center px-4 py-2.5 text-sm text-muted-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
       <BottomNav />
     </div>
   );
