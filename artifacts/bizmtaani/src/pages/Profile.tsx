@@ -621,7 +621,6 @@ export default function Profile() {
         <>
           <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowMarketerForm(false)} />
           <div
-            <div
   className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
   style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
 >
