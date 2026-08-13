@@ -8,7 +8,8 @@ import {
   GoogleAuthProvider,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth, db, functions } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { getWardInfo } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
@@ -108,6 +109,24 @@ premiumEndsAt: null,
   });
 }
 
+/**
+ * Applies a referral code after account creation, if one was entered.
+ * Deliberately non-blocking and silent on failure — an invalid or
+ * already-used code should never prevent someone from signing up.
+ */
+async function applyReferralCodeIfPresent(code: string) {
+  const trimmed = code.trim();
+  if (!trimmed) return;
+
+  try {
+    const submitReferralCode = httpsCallable(functions, "submitReferralCode");
+    await submitReferralCode({ code: trimmed });
+  } catch (error) {
+    console.warn("Referral code could not be applied:", error);
+  }
+}
+
+
 
 
 export default function Register() {
@@ -122,6 +141,7 @@ export default function Register() {
   const [area, setArea] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
 
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -165,6 +185,9 @@ export default function Register() {
         businessName: isBusinessOwner ? name.trim() : undefined,
         homeLocation,
       });
+
+      // Apply referral code if one was entered — non-blocking
+      applyReferralCodeIfPresent(referralCode);
 
       // Send email verification — non-blocking (don't fail if this errors)
       sendEmailVerification(cred.user).catch(() => {});
@@ -224,6 +247,10 @@ if (!existingProfile.exists()) {
       : undefined,
     homeLocation,
   });
+
+  // Apply referral code if one was entered — non-blocking, and only
+  // for genuinely new accounts, not existing users signing in again.
+  applyReferralCodeIfPresent(referralCode);
 } else {
   // Update only the location.
   // Do not overwrite subscription or existing profile data.
@@ -375,6 +402,20 @@ if (!existingProfile.exists()) {
               <p className="text-[11px] text-muted-foreground mt-1.5">
                 Helps buyers find your ads and shows you nearby listings.
               </p>
+            </div>
+
+            <div className="mb-5">
+              <Label htmlFor="referralCode" className="text-xs font-bold text-foreground">
+                Referral code (optional)
+              </Label>
+              <Input
+                id="referralCode"
+                data-testid="input-referral-code"
+                placeholder="e.g. JANE7K2"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                className="h-11 mt-1.5"
+              />
             </div>
 
             <Button
