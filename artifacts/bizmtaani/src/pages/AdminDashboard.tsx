@@ -635,6 +635,14 @@ async function dismissSupportReport(reportId: string) {
     return null;
   }
 
+  const stats = [
+    { title: "Total Users", value: totalUsers, icon: Users },
+    { title: "Active Adverts", value: activeAdverts, icon: Package },
+    { title: "Jobs", value: totalJobs, icon: Briefcase },
+    { title: "Payments", value: successfulPayments, icon: CreditCard },
+    { title: "Support Reports", value: pendingSupportCount, icon: Flag },
+  ];
+
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
@@ -998,7 +1006,8 @@ async function dismissSupportReport(reportId: string) {
                         <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
                       </tr>
                     </thead>
-                    <tbody>
+                      
+                        <tbody>
                       {users.map((u) => {
                         const reportCount = reportCountsBySeller[u.id] ?? 0;
                         return (
@@ -1015,6 +1024,28 @@ async function dismissSupportReport(reportId: string) {
                                   </span>
                                 )}
                               </div>
+                            </td>
+                            <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
+                            <td className="px-4 py-2.5">
+                              {u.role === "admin" ? (
+                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                                  <Shield className="h-3 w-3" /> Admin
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">User</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-2.5">
+                              {u.blocked ? (
+                                <span
+                                  title={u.blockReason || "Blocked"}
+                                  className="text-xs font-semibold text-destructive"
+                                >
+                                  Blocked
+                                </span>
+                              ) : (
+                                <span className="text-xs text-muted-foreground">Active</span>
+                              )}
                             </td>
                             <td className="px-4 py-2.5 text-right">
                               <div className="flex items-center justify-end gap-3">
@@ -1046,40 +1077,11 @@ async function dismissSupportReport(reportId: string) {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2.5">
-                              {u.blocked ? (
-                                <span
-                                  title={u.blockReason || "Blocked"}
-                                  className="text-xs font-semibold text-destructive"
-                                >
-                                  Blocked
-                                </span>
-                              ) : (
-                                <span className="text-xs text-muted-foreground">Active</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5 text-right">
-                              {u.role !== "admin" && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleUserBlock(u)}
-                                  disabled={processingUserId === u.id}
-                                  className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
-                                    u.blocked ? "text-primary" : "text-destructive"
-                                  }`}
-                                >
-                                  {processingUserId === u.id
-                                    ? "..."
-                                    : u.blocked
-                                    ? "Unblock"
-                                    : "Block"}
-                                </button>
-                              )}
-                            </td>
                           </tr>
                         );
                       })}
                     </tbody>
+                                
                   </table>
                 </div>
               )}
