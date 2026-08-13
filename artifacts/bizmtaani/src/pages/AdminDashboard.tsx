@@ -1338,10 +1338,6 @@ async function dismissSupportReport(reportId: string) {
             <>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold">Marketers</h2>
-          {activeTab === "marketers" && (
-            <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">Marketers</h2>
                 <p className="mt-1 text-muted-foreground">
                   Approved marketers and their commission earnings. To approve a new marketer, use "Make Marketer" on the Users tab.
                 </p>
