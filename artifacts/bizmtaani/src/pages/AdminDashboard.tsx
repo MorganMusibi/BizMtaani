@@ -35,6 +35,10 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
+const getMonthlyPayouts = httpsCallable(functions, "getMonthlyPayouts");
+const result = await getMonthlyPayouts({ monthKey: "2026-07" });
+// result.data.payouts → array of { id, marketerUid, referralCode, earningsKES, signups, paid, ... }
+
 type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications";
 interface ProductReport {
   id: string;
