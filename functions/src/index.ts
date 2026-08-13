@@ -202,32 +202,44 @@ await db.collection("products").doc(paymentData.productId).update({
         // Pay marketer commission, once per referred user, on their
         // first successful premium payment only.
         try {
-          const referralSnap = await db.collection("referrals").doc(paymentData.buyerId).get();
+  const referralSnap = await db.collection("referrals").doc(paymentData.buyerId).get();
 
-          if (referralSnap.exists && !referralSnap.data()?.commissionPaidOut) {
-            const { marketerUid } = referralSnap.data()!;
-            const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
-            const commission = Math.round(amountPaid * COMMISSION_RATE);
+  if (referralSnap.exists && !referralSnap.data()?.commissionPaidOut) {
+    const { marketerUid } = referralSnap.data()!;
+    const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
+    const commission = Math.round(amountPaid * COMMISSION_RATE);
 
-            await db.collection("marketers").doc(marketerUid).update({
-              totalEarnedKES: admin.firestore.FieldValue.increment(commission),
-            });
+    const now = new Date();
+    const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const marketerRef = db.collection("marketers").doc(marketerUid);
 
-            await db.collection("referralCommissions").add({
-              marketerUid,
-              referredUserUid: paymentData.buyerId,
-              paymentId: callback.CheckoutRequestID,
-              amountPaidKES: amountPaid,
-              commissionKES: commission,
-              type: "first_premium_payment",
-              createdAt: admin.firestore.FieldValue.serverTimestamp(),
-            });
+    await db.runTransaction(async (tx) => {
+      const marketerSnap = await tx.get(marketerRef);
+      const data = marketerSnap.data() ?? {};
+      const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
 
-            await referralSnap.ref.update({ commissionPaidOut: true });
-          }
-        } catch (error) {
-          console.error("Failed to process referral commission:", error);
-        }
+      tx.update(marketerRef, {
+        totalEarnedKES: admin.firestore.FieldValue.increment(commission),
+        signupsThisMonth: carriedCount + 1,
+        signupsMonthKey: monthKey,
+      });
+    });
+
+    await db.collection("referralCommissions").add({
+      marketerUid,
+      referredUserUid: paymentData.buyerId,
+      paymentId: callback.CheckoutRequestID,
+      amountPaidKES: amountPaid,
+      commissionKES: commission,
+      type: "first_premium_payment",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    await referralSnap.ref.update({ commissionPaidOut: true });
+  }
+} catch (error) {
+  console.error("Failed to process referral commission:", error);
+}
 
         // Extend existing premium subscription instead of resetting it
 const userRef = db.collection("users").doc(paymentData.buyerId);
