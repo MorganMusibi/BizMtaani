@@ -1109,10 +1109,17 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
   const { uid } = request.data as { uid?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
 
+  // Pull payout details from their application, if one exists — this is
+  // now the source of truth for name/ID/M-Pesa number used for payouts.
+  const applicationSnap = await db.collection("marketerApplications").doc(uid).get();
+  const applicationData = applicationSnap.exists ? applicationSnap.data() : null;
+
   const marketerUserSnap = await db.collection("users").doc(uid).get();
-  const marketerName = marketerUserSnap.exists
+  const fallbackName = marketerUserSnap.exists
     ? (marketerUserSnap.data()?.displayName as string | undefined) ?? ""
     : "";
+
+  const marketerName = applicationData?.fullName || fallbackName;
 
   const code = generateReferralCode(marketerName, uid);
 
@@ -1121,8 +1128,17 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     status: "active",
     totalEarnedKES: 0,
     totalWithdrawnKES: 0,
+    fullName: applicationData?.fullName ?? fallbackName,
+    idNumber: applicationData?.idNumber ?? "",
+    mpesaNumber: applicationData?.mpesaNumber ?? "",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+
+  // Mark the application as approved, if it exists, so it doesn't
+  // show up as pending anywhere and its data stays as a record.
+  if (applicationSnap.exists) {
+    await applicationSnap.ref.update({ status: "approved" });
+  }
 
   return { success: true, referralCode: code };
 });
