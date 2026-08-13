@@ -35,11 +35,8 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-const getMonthlyPayouts = httpsCallable(functions, "getMonthlyPayouts");
-const result = await getMonthlyPayouts({ monthKey: "2026-07" });
-// result.data.payouts → array of { id, marketerUid, referralCode, earningsKES, signups, paid, ... }
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts";
 interface ProductReport {
   id: string;
   productId: string;
@@ -81,6 +78,15 @@ interface Marketer {
   totalEarnedKES?: number;
   totalWithdrawnKES?: number;
   createdAt?: { seconds: number } | null;
+}
+
+interface Payout {
+  id: string;
+  marketerUid: string;
+  referralCode?: string | null;
+  earningsKES: number;
+  signups: number;
+  paid: boolean;
 }
 
 interface MarketerApplication {
@@ -191,6 +197,16 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [marketersLoaded, setMarketersLoaded] = useState(false);
   const [processingMarketerId, setProcessingMarketerId] = useState<string | null>(null);
 
+  // Payouts tab — lazily loaded per selected month
+  const [payoutMonth, setPayoutMonth] = useState(() => {
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+});
+const [payouts, setPayouts] = useState<Payout[]>([]);
+const [payoutsLoading, setPayoutsLoading] = useState(false);
+const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
+
   // Marketer applications tab — lazily loaded, bounded, matches the pattern used elsewhere
   const [applications, setApplications] = useState<MarketerApplication[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
@@ -251,6 +267,37 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
       setMarketersLoading(false);
     }
   }
+  async function loadPayouts(monthKey: string) {
+  setPayoutsLoading(true);
+  try {
+    const getMonthlyPayouts = httpsCallable(functions, "getMonthlyPayouts");
+    const result = await getMonthlyPayouts({ monthKey });
+    const data = result.data as { payouts: Payout[] };
+    setPayouts(data.payouts ?? []);
+  } catch (error) {
+    console.error("Failed to load payouts:", error);
+    alert("Failed to load payouts for this month.");
+  } finally {
+    setPayoutsLoading(false);
+  }
+}
+
+async function markPaid(payout: Payout) {
+  if (!confirm(`Mark ${payout.referralCode ?? payout.marketerUid} as paid for ${payoutMonth}?`)) return;
+  setProcessingPayoutId(payout.id);
+  try {
+    const markPayoutPaid = httpsCallable(functions, "markPayoutPaid");
+    await markPayoutPaid({ monthKey: payoutMonth, marketerUid: payout.marketerUid });
+    setPayouts((prev) =>
+      prev.map((p) => (p.id === payout.id ? { ...p, paid: true } : p))
+    );
+  } catch (error) {
+    console.error("Failed to mark payout paid:", error);
+    alert("Failed to update payout status.");
+  } finally {
+    setProcessingPayoutId(null);
+  }
+}
 
   async function makeMarketer(targetUser: AdminUser) {
     if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a marketer?`)) return;
@@ -595,13 +642,14 @@ useEffect(() => {
   }
 
   function selectTab(tab: Tab) {
-    setActiveTab(tab);
-    if (tab === "users") loadUsers();
-    if (tab === "adverts") loadAdverts();
-    if (tab === "jobs") loadJobs();
-    if (tab === "marketers") loadMarketers();
-    if (tab === "applications") loadApplications();
-  }
+  setActiveTab(tab);
+  if (tab === "users") loadUsers();
+  if (tab === "adverts") loadAdverts();
+  if (tab === "jobs") loadJobs();
+  if (tab === "marketers") loadMarketers();
+  if (tab === "applications") loadApplications();
+  if (tab === "payouts") loadPayouts(payoutMonth);
+}
 
   // -------------------------------------------------------
   // REPORT ACTIONS
@@ -731,6 +779,7 @@ async function dismissSupportReport(reportId: string) {
     { title: "Payments", icon: CreditCard, tab: "payments" },
     { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
+    { title: "Payouts", icon: CreditCard, tab: "payouts" },
   ];
 
   return (
@@ -1412,6 +1461,84 @@ async function dismissSupportReport(reportId: string) {
               )}
             </>
           )}
+
+          {activeTab === "payouts" && (
+  <>
+    <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h2 className="text-2xl font-bold">Marketer Payouts</h2>
+        <p className="mt-1 text-muted-foreground">Monthly commission owed to each marketer.</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="month"
+          value={payoutMonth}
+          onChange={(e) => setPayoutMonth(e.target.value)}
+          className="rounded-md border px-3 py-2 text-sm"
+        />
+        <button
+          type="button"
+          onClick={() => loadPayouts(payoutMonth)}
+          className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-muted"
+        >
+          Load
+        </button>
+      </div>
+    </div>
+
+    {payoutsLoading ? (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    ) : payouts.length === 0 ? (
+      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+        No payout data for {payoutMonth}. It may not have closed yet, or no marketers earned commissions.
+      </div>
+    ) : (
+      <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Sign-ups</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earned</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
+              <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payouts.map((p) => (
+              <tr key={p.id} className="border-t border-border">
+                <td className="px-4 py-2.5 font-mono font-semibold">{p.referralCode ?? p.marketerUid}</td>
+                <td className="px-4 py-2.5">{p.signups}</td>
+                <td className="px-4 py-2.5 font-semibold">KES {p.earningsKES.toLocaleString("en-GB")}</td>
+                <td className="px-4 py-2.5">
+                  {p.paid ? (
+                    <span className="text-xs font-semibold text-[#00A651]">Paid</span>
+                  ) : (
+                    <span className="text-xs font-semibold text-destructive">Unpaid</span>
+                  )}
+                </td>
+                <td className="px-4 py-2.5 text-right">
+                  {!p.paid && (
+                    <button
+                      type="button"
+                      onClick={() => markPaid(p)}
+                      disabled={processingPayoutId === p.id}
+                      className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                    >
+                      {processingPayoutId === p.id ? "..." : "Mark Paid"}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </>
+)}
            {activeTab === "payments" && (
             <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
               Payment history view coming soon.
