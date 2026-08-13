@@ -441,7 +441,7 @@ export default function Profile() {
           {isMarketer && (
             <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
               <div>
-                <p className="text-xs text-muted-foreground">Recruits this month</p>
+                <p className="text-xs text-muted-foreground">Your sign-ups</p>
                 <p className="font-black text-lg text-primary">
                   {userProfile?.monthlyRecruits ?? 0}
                 </p>
