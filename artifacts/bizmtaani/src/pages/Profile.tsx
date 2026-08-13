@@ -384,8 +384,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
   >
     <X size={16} />
   </button>
-  <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-  <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
+  
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
               <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
 
