@@ -999,4 +999,66 @@ export const submitReferralCode = onCall({ cors: true }, async (request) => {
 
   throw new HttpsError("not-found", "Invalid referral code.");
 });
-  
+  /**
+ * A user applies to become a marketer. Creates one small pending
+ * application doc — cheap, and prevents duplicate applications by
+ * using the user's own uid as the document ID (upsert, not append).
+ */
+export const applyForMarketer = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const uid = request.auth.uid;
+
+  // Already a marketer — no need to apply again.
+  const existingMarketer = await db.collection("marketers").doc(uid).get();
+  if (existingMarketer.exists) {
+    throw new HttpsError("failed-precondition", "You are already an approved marketer.");
+  }
+
+  // Already has a pending application — avoid duplicate spam.
+  const existingApplication = await db.collection("marketerApplications").doc(uid).get();
+  if (existingApplication.exists && existingApplication.data()?.status === "pending") {
+    throw new HttpsError("failed-precondition", "You already have a pending application.");
+  }
+
+  const { phone, reason } = request.data as { phone?: string; reason?: string };
+
+  if (typeof phone !== "string" || !phone.trim()) {
+    throw new HttpsError("invalid-argument", "A contact phone number is required.");
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+  const userData = userSnap.exists ? userSnap.data() : {};
+
+  await db.collection("marketerApplications").doc(uid).set({
+    uid,
+    displayName: userData?.displayName ?? "",
+    phone: phone.trim(),
+    reason: typeof reason === "string" ? reason.trim().slice(0, 300) : "",
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+/**
+ * Admin-only: reject a pending marketer application.
+ */
+export const rejectMarketerApplication = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can manage marketer applications.");
+  }
+
+  const { uid } = request.data as { uid?: string };
+  if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
+
+  await db.collection("marketerApplications").doc(uid).update({
+    status: "rejected",
+  });
+
+  return { success: true };
+});
