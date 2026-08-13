@@ -296,6 +296,8 @@ export async function startProductChat(params: {
 
   if (existingChat.exists()) {
     await updateDoc(chatRef, {
+      type: "product",
+      productId,
       participantNames: participantNames(users),
       participantPhotos: participantPhotos(users),
       productTitle,
