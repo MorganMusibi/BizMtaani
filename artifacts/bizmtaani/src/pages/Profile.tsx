@@ -258,12 +258,6 @@ export default function Profile() {
     );
   }
 
-  const now = new Date();
-const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-const signupsThisMonth =
-  marketerData?.signupsMonthKey === currentMonthKey
-    ? marketerData?.signupsThisMonth ?? 0
-    : 0;
 
 const displayName = userProfile?.businessName || userProfile?.displayName || user.displayName || "Seller";
   const isBusinessOwner = userProfile?.isBusinessOwner ?? false;
