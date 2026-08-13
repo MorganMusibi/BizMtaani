@@ -1203,26 +1203,42 @@ export const applyForMarketer = onCall({ cors: true }, async (request) => {
     throw new HttpsError("failed-precondition", "You already have a pending application.");
   }
 
-  const { phone, reason } = request.data as { phone?: string; reason?: string };
+  const { fullName, idNumber, mpesaNumber, reason } = request.data as {
+    fullName?: string;
+    idNumber?: string;
+    mpesaNumber?: string;
+    reason?: string;
+  };
 
-  if (typeof phone !== "string" || !phone.trim()) {
-    throw new HttpsError("invalid-argument", "A contact phone number is required.");
+  if (typeof fullName !== "string" || !fullName.trim()) {
+    throw new HttpsError("invalid-argument", "Your full name is required.");
   }
 
-  const userSnap = await db.collection("users").doc(uid).get();
-  const userData = userSnap.exists ? userSnap.data() : {};
+  if (typeof idNumber !== "string" || !idNumber.trim()) {
+    throw new HttpsError("invalid-argument", "Your ID number is required.");
+  }
+
+  if (typeof mpesaNumber !== "string" || !mpesaNumber.trim()) {
+    throw new HttpsError("invalid-argument", "An M-Pesa number is required.");
+  }
+
+  if (typeof reason !== "string" || !reason.trim()) {
+    throw new HttpsError("invalid-argument", "Please tell us why you want to be a marketer.");
+  }
 
   await db.collection("marketerApplications").doc(uid).set({
     uid,
-    displayName: userData?.displayName ?? "",
-    phone: phone.trim(),
-    reason: typeof reason === "string" ? reason.trim().slice(0, 300) : "",
+    fullName: fullName.trim(),
+    idNumber: idNumber.trim(),
+    mpesaNumber: mpesaNumber.trim(),
+    reason: reason.trim().slice(0, 300),
     status: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true };
 });
+
 
 /**
  * Admin-only: reject a pending marketer application.
