@@ -394,7 +394,11 @@ export default function ChatList() {
       )
     );
 
-    const loadedChats =
+    const unsubscribe =
+      onSnapshot(
+        chatsQuery,
+        (snap) => {
+          const loadedChats =
             snap.docs
               .map(
                 (chatDoc) =>
