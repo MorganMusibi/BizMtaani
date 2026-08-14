@@ -53,6 +53,8 @@ const LISTING_DURATIONS: Record<string, number> = {
 };
 const CLEANUP_LIMIT = 150;
 const ARCHIVE_RETENTION_DAYS = 45;
+const MINIMUM_PAYOUT_KES = 100; // adjust to whatever makes sense for your M-Pesa costs
+
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
 }
@@ -240,6 +242,22 @@ await db.runTransaction(async (tx) => {
     });
 
     await referralSnap.ref.update({ commissionPaidOut: true });
+    try {
+  const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
+  const marketerToken = marketerTokenSnap.exists ? marketerTokenSnap.data()?.token : null;
+  if (marketerToken) {
+    await admin.messaging().send({
+      token: marketerToken,
+      notification: {
+        title: "You earned a commission! 🎉",
+        body: `Someone you referred went premium — KES ${commission} added to your earnings.`,
+      },
+      data: { type: "referral_commission" },
+    });
+  }
+} catch (notifyError) {
+  console.error("Failed to notify marketer of commission:", notifyError);
+    }
   }
 } catch (error) {
   console.error("Failed to process referral commission:", error);
@@ -610,9 +628,23 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
     throw new HttpsError("invalid-argument", "monthKey and marketerUid are required.");
   }
 
-  await db.collection("payouts").doc(monthKey)
-    .collection("marketers").doc(marketerUid)
-    .update({ paid: true, paidAt: admin.firestore.FieldValue.serverTimestamp() });
+  const payoutRef = db.collection("payouts").doc(monthKey)
+    .collection("marketers").doc(marketerUid);
+  const marketerRef = db.collection("marketers").doc(marketerUid);
+
+  await db.runTransaction(async (tx) => {
+    const payoutSnap = await tx.get(payoutRef);
+    if (!payoutSnap.exists) {
+      throw new HttpsError("not-found", "Payout record not found.");
+    }
+    const payoutData = payoutSnap.data()!;
+    if (payoutData.paid) return; // already processed — avoid double-counting
+
+    tx.update(payoutRef, { paid: true, paidAt: admin.firestore.FieldValue.serverTimestamp() });
+    tx.update(marketerRef, {
+      totalWithdrawnKES: admin.firestore.FieldValue.increment(payoutData.earningsKES ?? 0),
+    });
+  });
 
   return { success: true };
 });
@@ -1141,6 +1173,36 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
   }
 
   return { success: true, referralCode: code };
+});
+
+ export const getMyReferrals = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  const uid = request.auth.uid;
+
+  const referralsSnap = await db.collection("referrals")
+    .where("marketerUid", "==", uid)
+    .orderBy("createdAt", "desc")
+    .limit(50)
+    .get();
+
+  const referrals = await Promise.all(
+    referralsSnap.docs.map(async (docSnap) => {
+      const data = docSnap.data();
+      const userSnap = await db.collection("users").doc(docSnap.id).get();
+      const userData = userSnap.exists ? userSnap.data() : null;
+      const isPremium = !!(userData?.premiumEndsAt && userData.premiumEndsAt.toDate() > new Date());
+
+      return {
+        uid: docSnap.id,
+        displayName: userData?.displayName ?? "Unknown",
+        joinedAt: data.createdAt ?? null,
+        commissionPaidOut: data.commissionPaidOut ?? false,
+        isPremium,
+      };
+    })
+  );
+
+  return { referrals };
 });
 
 /**
