@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -23,6 +25,13 @@ interface Commission {
   commissionKES: number;
   createdAt?: { seconds: number } | null;
 }
+interface ReferredUser {
+  uid: string;
+  displayName: string;
+  joinedAt?: { seconds: number } | null;
+  commissionPaidOut: boolean;
+  isPremium: boolean;
+}
 
 function timeAgo(seconds: number): string {
   const d = Math.floor(Date.now() / 1000) - seconds;
@@ -41,10 +50,13 @@ export default function MarketerDashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
 
-  const [marketer, setMarketer] = useState<MarketerData | null>(null);
-  const [commissions, setCommissions] = useState<Commission[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [codeCopied, setCodeCopied] = useState(false);
+const [marketer, setMarketer] = useState<MarketerData | null>(null);
+const [commissions, setCommissions] = useState<Commission[]>([]);
+const [loading, setLoading] = useState(true);
+const [codeCopied, setCodeCopied] = useState(false);
+
+const [referrals, setReferrals] = useState<ReferredUser[]>([]);
+const [referralsLoading, setReferralsLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
@@ -99,6 +111,25 @@ export default function MarketerDashboard() {
 
     return () => { cancelled = true; };
   }, [user]);
+
+
+  useEffect(() => {
+    if (!user || !marketer) return;
+
+    (async () => {
+      try {
+        setReferralsLoading(true);
+        const getMyReferrals = httpsCallable(functions, "getMyReferrals");
+        const result = await getMyReferrals({});
+        const data = result.data as { referrals: ReferredUser[] };
+        setReferrals(data.referrals ?? []);
+      } catch (error) {
+        console.error("Failed to load referrals:", error);
+      } finally {
+        setReferralsLoading(false);
+      }
+    })();
+  }, [user, marketer]);
 
   function handleCopyCode() {
     if (!marketer) return;
@@ -245,6 +276,47 @@ export default function MarketerDashboard() {
                   </div>
                   <p className="font-black text-sm text-[#00A651]">
                     +KES {c.commissionKES.toLocaleString("en-GB")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* People referred */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={17} className="text-primary" />
+            <p className="font-black text-sm">People You've Referred</p>
+          </div>
+
+          {referralsLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 size={20} className="animate-spin text-primary" />
+            </div>
+          ) : referrals.length === 0 ? (
+            <div className="flex flex-col items-center py-12 gap-3 text-center border border-dashed border-border rounded-2xl">
+              <p className="text-sm text-muted-foreground px-6">
+                No one has used your code yet. Share it to get started.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {referrals.map((r) => (
+                <div
+                  key={r.uid}
+                  className="bg-card border border-border rounded-2xl p-3.5 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="font-bold text-sm">{r.displayName}</p>
+                    {r.joinedAt && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Joined {timeAgo(r.joinedAt.seconds)}
+                      </p>
+                    )}
+                  </div>
+                  <p className={`text-xs font-bold ${r.isPremium ? "text-[#00A651]" : "text-muted-foreground"}`}>
+                    {r.isPremium ? "Premium ✓" : "Not premium yet"}
                   </p>
                 </div>
               ))}
