@@ -622,19 +622,20 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
   <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
   <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
 
-            <div className="space-y-3">
-  <label className="text-xs font-semibold text-muted-foreground">Full Name *</label>
-  <input
-    type="text"
-    placeholder="e.g. Jane Wanjiru"
-    value={marketerFullName}
-    onChange={(e) => setMarketerFullName(e.target.value)}
-    className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
-  />
-</div>
+ <div className="space-y-3">
+  <div>
+    <label className="text-xs font-semibold text-muted-foreground">Full Name *</label>
+    <input
+      type="text"
+      placeholder="e.g. Jane Wanjiru"
+      value={marketerFullName}
+      onChange={(e) => setMarketerFullName(e.target.value)}
+      className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+    />
+  </div>
 
-<div>
-  <label className="text-xs font-semibold text-muted-foreground">ID Number *</label>
+  <div>
+    <label className="text-xs font-semibold text-muted-foreground">ID Number *</label>
   <input
     type="text"
     placeholder="National ID number"
