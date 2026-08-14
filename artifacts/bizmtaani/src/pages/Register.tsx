@@ -114,15 +114,24 @@ premiumEndsAt: null,
  * Deliberately non-blocking and silent on failure — an invalid or
  * already-used code should never prevent someone from signing up.
  */
-async function applyReferralCodeIfPresent(code: string) {
+async function applyReferralCodeIfPresent(code: string): Promise<boolean> {
   const trimmed = code.trim();
-  if (!trimmed) return;
+  if (!trimmed) return true;
+
+  // Matches generateReferralCode's format: 1–6 letters + a 3-char
+  // suffix. Skips the network call entirely for obvious typos.
+  if (!/^[A-Z]{1,6}[A-Z0-9]{3}$/.test(trimmed)) {
+    console.warn("Referral code format invalid, skipping submission:", trimmed);
+    return false;
+  }
 
   try {
     const submitReferralCode = httpsCallable(functions, "submitReferralCode");
     await submitReferralCode({ code: trimmed });
+    return true;
   } catch (error) {
     console.warn("Referral code could not be applied:", error);
+    return false;
   }
 }
 
