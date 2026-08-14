@@ -557,34 +557,47 @@ export const closeMonthlyEarnings = onSchedule(
     const batch = db.batch();
 
     marketersSnap.docs.forEach((doc) => {
-      const data = doc.data();
-      const earnedThatMonth = data.earningsMonthKey === closedMonthKey
-        ? (data.earningsThisMonth ?? 0)
-        : 0;
-      const signupsThatMonth = data.signupsMonthKey === closedMonthKey
-        ? (data.signupsThisMonth ?? 0)
-        : 0;
+  const data = doc.data();
+  const earnedThatMonth = data.earningsMonthKey === closedMonthKey
+    ? (data.earningsThisMonth ?? 0)
+    : 0;
+  const signupsThatMonth = data.signupsMonthKey === closedMonthKey
+    ? (data.signupsThisMonth ?? 0)
+    : 0;
 
-      const payoutRef = db.collection("payouts").doc(closedMonthKey)
-        .collection("marketers").doc(doc.id);
-
-      batch.set(payoutRef, {
-        marketerUid: doc.id,
-        referralCode: data.referralCode ?? null,
-        earningsKES: earnedThatMonth,
-        signups: signupsThatMonth,
-        monthKey: closedMonthKey,
-        paid: false,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-
-      batch.update(doc.ref, {
-        earningsThisMonth: 0,
-        earningsMonthKey: newMonthKey,
-        signupsThisMonth: 0,
-        signupsMonthKey: newMonthKey,
-      });
+  if (earnedThatMonth < MINIMUM_PAYOUT_KES) {
+    // Below threshold — carry the amount into the new month instead
+    // of creating a payable snapshot, so it accumulates until it's
+    // worth paying out.
+    batch.update(doc.ref, {
+      earningsThisMonth: earnedThatMonth,
+      earningsMonthKey: newMonthKey,
+      signupsThisMonth: 0,
+      signupsMonthKey: newMonthKey,
     });
+    return;
+  }
+
+  const payoutRef = db.collection("payouts").doc(closedMonthKey)
+    .collection("marketers").doc(doc.id);
+
+  batch.set(payoutRef, {
+    marketerUid: doc.id,
+    referralCode: data.referralCode ?? null,
+    earningsKES: earnedThatMonth,
+    signups: signupsThatMonth,
+    monthKey: closedMonthKey,
+    paid: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  batch.update(doc.ref, {
+    earningsThisMonth: 0,
+    earningsMonthKey: newMonthKey,
+    signupsThisMonth: 0,
+    signupsMonthKey: newMonthKey,
+  });
+});
 
     await batch.commit();
     console.log(`Closed earnings for ${closedMonthKey}: ${marketersSnap.size} marketers snapshotted.`);
@@ -647,6 +660,29 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
   });
 
   return { success: true };
+});
+
+   export const getTopMarketers = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can view the leaderboard.");
+  }
+
+  const snap = await db.collection("marketers")
+    .orderBy("earningsThisMonth", "desc")
+    .limit(10)
+    .get();
+
+  const leaderboard = snap.docs.map((d) => ({
+    id: d.id,
+    referralCode: d.data().referralCode ?? null,
+    earningsThisMonth: d.data().earningsThisMonth ?? 0,
+    signupsThisMonth: d.data().signupsThisMonth ?? 0,
+  }));
+
+  return { leaderboard };
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
