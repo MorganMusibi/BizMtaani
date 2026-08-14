@@ -16,6 +16,7 @@ import {
   X,
   Shield,
   Megaphone,
+  TrendingUp,
 } from "lucide-react";
 import {
   collection,
@@ -36,7 +37,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard";
 interface ProductReport {
   id: string;
   productId: string;
@@ -87,6 +88,13 @@ interface Payout {
   earningsKES: number;
   signups: number;
   paid: boolean;
+}
+
+interface LeaderboardEntry {
+  id: string;
+  referralCode: string | null;
+  earningsThisMonth: number;
+  signupsThisMonth: number;
 }
 
 interface MarketerApplication {
@@ -208,6 +216,11 @@ const [payouts, setPayouts] = useState<Payout[]>([]);
 const [payoutsLoading, setPayoutsLoading] = useState(false);
 const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
 
+  // Leaderboard tab — lazily loaded, matches the pattern used elsewhere
+const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
+
   // Marketer applications tab — lazily loaded, bounded, matches the pattern used elsewhere
   const [applications, setApplications] = useState<MarketerApplication[]>([]);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
@@ -282,6 +295,23 @@ const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null
     setPayoutsLoading(false);
   }
 }
+
+  async function loadLeaderboard() {
+  if (leaderboardLoaded) return;
+  setLeaderboardLoading(true);
+  try {
+    const getTopMarketers = httpsCallable(functions, "getTopMarketers");
+    const result = await getTopMarketers({});
+    const data = result.data as { leaderboard: LeaderboardEntry[] };
+    setLeaderboard(data.leaderboard ?? []);
+    setLeaderboardLoaded(true);
+  } catch (error) {
+    console.error("Failed to load leaderboard:", error);
+    alert("Failed to load the leaderboard.");
+  } finally {
+    setLeaderboardLoading(false);
+  }
+      }
 
 async function markPaid(payout: Payout) {
   if (!confirm(`Mark ${payout.referralCode ?? payout.marketerUid} as paid for ${payoutMonth}?`)) return;
@@ -650,6 +680,7 @@ useEffect(() => {
   if (tab === "marketers") loadMarketers();
   if (tab === "applications") loadApplications();
   if (tab === "payouts") loadPayouts(payoutMonth);
+  if (tab === "leaderboard") loadLeaderboard();
 }
 
   // -------------------------------------------------------
@@ -781,6 +812,7 @@ async function dismissSupportReport(reportId: string) {
     { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
     { title: "Payouts", icon: CreditCard, tab: "payouts" },
+    { title: "Leaderboard", icon: TrendingUp, tab: "leaderboard" },
   ];
 
   return (
@@ -1543,6 +1575,53 @@ async function dismissSupportReport(reportId: string) {
     )}
   </>
 )}
+
+          {activeTab === "leaderboard" && (
+  <>
+    <div className="mb-6">
+      <h2 className="text-2xl font-bold">Top Marketers</h2>
+      <p className="mt-1 text-muted-foreground">
+        Ranked by earnings this month.
+      </p>
+    </div>
+
+    {leaderboardLoading ? (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    ) : leaderboard.length === 0 ? (
+      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+        No marketer earnings recorded yet this month.
+      </div>
+    ) : (
+      <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-muted/50">
+            <tr>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Rank</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Sign-ups</th>
+              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earnings</th>
+            </tr>
+          </thead>
+          <tbody>
+            {leaderboard.map((entry, index) => (
+              <tr key={entry.id} className="border-t border-border">
+                <td className="px-4 py-2.5 font-semibold">#{index + 1}</td>
+                <td className="px-4 py-2.5 font-mono font-semibold">{entry.referralCode ?? entry.id}</td>
+                <td className="px-4 py-2.5">{entry.signupsThisMonth}</td>
+                <td className="px-4 py-2.5 font-semibold">
+                  KES {entry.earningsThisMonth.toLocaleString("en-GB")}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </>
+)}
+          
            {activeTab === "payments" && (
             <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
               Payment history view coming soon.
