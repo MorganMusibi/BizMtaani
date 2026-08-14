@@ -46,37 +46,58 @@ export default function Profile() {
 
   const [showMarketerForm, setShowMarketerForm] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
-  const [marketerPhone, setMarketerPhone] = useState("");
+  const [marketerFullName, setMarketerFullName] = useState("");
+  const [marketerIdNumber, setMarketerIdNumber] = useState("");
+  const [marketerMpesaNumber, setMarketerMpesaNumber] = useState("");
   const [marketerReason, setMarketerReason] = useState("");
   const [submittingApplication, setSubmittingApplication] = useState(false);
 
   async function handleApplyForMarketer() {
-    if (!marketerPhone.trim()) {
-      toast({ title: "Enter a contact phone number", variant: "destructive" });
-      return;
-    }
-
-    setSubmittingApplication(true);
-
-    try {
-      const applyForMarketer = httpsCallable(functions, "applyForMarketer");
-      await applyForMarketer({ phone: marketerPhone.trim(), reason: marketerReason.trim() });
-
-      toast({ title: "Application submitted!", description: "We'll review it and get back to you." });
-      setShowMarketerForm(false);
-      setHasPendingApplication(true);
-      setMarketerPhone("");
-      setMarketerReason("");
-    } catch (error: any) {
-      toast({
-        title: "Could not submit application",
-        description: error?.message ?? "Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setSubmittingApplication(false);
-    }
+  if (!marketerFullName.trim()) {
+    toast({ title: "Enter your full name", variant: "destructive" });
+    return;
   }
+  if (!marketerIdNumber.trim()) {
+    toast({ title: "Enter your ID number", variant: "destructive" });
+    return;
+  }
+  if (!marketerMpesaNumber.trim()) {
+    toast({ title: "Enter your M-Pesa number", variant: "destructive" });
+    return;
+  }
+  if (!marketerReason.trim()) {
+    toast({ title: "Tell us why you want to be a marketer", variant: "destructive" });
+    return;
+  }
+
+  setSubmittingApplication(true);
+
+  try {
+    const applyForMarketer = httpsCallable(functions, "applyForMarketer");
+    await applyForMarketer({
+      fullName: marketerFullName.trim(),
+      idNumber: marketerIdNumber.trim(),
+      mpesaNumber: marketerMpesaNumber.trim(),
+      reason: marketerReason.trim(),
+    });
+
+    toast({ title: "Application submitted!", description: "We'll review it and get back to you." });
+    setShowMarketerForm(false);
+    setHasPendingApplication(true);
+    setMarketerFullName("");
+    setMarketerIdNumber("");
+    setMarketerMpesaNumber("");
+    setMarketerReason("");
+  } catch (error: any) {
+    toast({
+      title: "Could not submit application",
+      description: error?.message ?? "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setSubmittingApplication(false);
+  }
+}
 
   function handleCopyReferralCode() {
     const code = userProfile?.myReferralCode;
@@ -602,29 +623,50 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
   <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
 
             <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">Contact Phone *</label>
-                <input
-                  type="tel"
-                  placeholder="e.g. 0712345678"
-                  value={marketerPhone}
-                  onChange={(e) => setMarketerPhone(e.target.value)}
-                  className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
-                />
-              </div>
+  <label className="text-xs font-semibold text-muted-foreground">Full Name *</label>
+  <input
+    type="text"
+    placeholder="e.g. Jane Wanjiru"
+    value={marketerFullName}
+    onChange={(e) => setMarketerFullName(e.target.value)}
+    className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+  />
+</div>
 
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground">
-                  Why do you want to be a marketer? (Optional)
-                </label>
-                <textarea
-                  placeholder="Tell us a bit about yourself..."
-                  value={marketerReason}
-                  onChange={(e) => setMarketerReason(e.target.value)}
-                  maxLength={300}
-                  className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[80px]"
-                />
-              </div>
+<div>
+  <label className="text-xs font-semibold text-muted-foreground">ID Number *</label>
+  <input
+    type="text"
+    placeholder="National ID number"
+    value={marketerIdNumber}
+    onChange={(e) => setMarketerIdNumber(e.target.value)}
+    className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+  />
+</div>
+
+<div>
+  <label className="text-xs font-semibold text-muted-foreground">M-Pesa Number *</label>
+  <input
+    type="tel"
+    placeholder="e.g. 0712345678"
+    value={marketerMpesaNumber}
+    onChange={(e) => setMarketerMpesaNumber(e.target.value)}
+    className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+  />
+</div>
+
+<div>
+  <label className="text-xs font-semibold text-muted-foreground">
+    Why do you want to be a marketer? *
+  </label>
+  <textarea
+    placeholder="Tell us a bit about yourself..."
+    value={marketerReason}
+    onChange={(e) => setMarketerReason(e.target.value)}
+    maxLength={300}
+    className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[80px]"
+  />
+</div>
 
               <Button
                 onClick={handleApplyForMarketer}
