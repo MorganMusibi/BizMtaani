@@ -51,6 +51,7 @@ export default function Profile() {
   const [marketerMpesaNumber, setMarketerMpesaNumber] = useState("");
   const [marketerReason, setMarketerReason] = useState("");
   const [submittingApplication, setSubmittingApplication] = useState(false);
+  const [showConfirmStep, setShowConfirmStep] = useState(false);
 
   async function handleApplyForMarketer() {
   if (!marketerFullName.trim()) {
@@ -668,15 +669,14 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
     className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[80px]"
   />
 </div>
-
-              <Button
-                onClick={handleApplyForMarketer}
+<Button
+                onClick={() => setShowConfirmStep(true)}
                 disabled={submittingApplication}
                 className="w-full gap-2"
               >
-                {submittingApplication ? <Loader2 size={16} className="animate-spin" /> : "Submit Application"}
+                Review & Submit
               </Button>
-
+              
               <button
                 onClick={() => setShowMarketerForm(false)}
                 className="w-full flex items-center justify-center px-4 py-2.5 text-sm text-muted-foreground"
@@ -684,6 +684,51 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
                 Cancel
               </button>
             </div>
+          </div>
+        </>
+      )}
+
+      {showConfirmStep && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowConfirmStep(false)} />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-card rounded-t-3xl border-t border-border px-4 pb-8 pt-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+          >
+            <p className="font-bold text-sm text-center mb-4">Confirm your details</p>
+            <div className="space-y-2 text-sm mb-4">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Name</span>
+                <span className="font-semibold">{marketerFullName}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">ID Number</span>
+                <span className="font-semibold">{marketerIdNumber}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">M-Pesa Number</span>
+                <span className="font-semibold">{marketerMpesaNumber}</span>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">
+              This is what we'll use to pay you — double check it's correct.
+            </p>
+            <Button
+              onClick={() => {
+                setShowConfirmStep(false);
+                handleApplyForMarketer();
+              }}
+              disabled={submittingApplication}
+              className="w-full mb-2"
+            >
+              {submittingApplication ? <Loader2 size={16} className="animate-spin" /> : "Confirm & Submit"}
+            </Button>
+            <button
+              onClick={() => setShowConfirmStep(false)}
+              className="w-full text-sm text-muted-foreground py-2"
+            >
+              Go back and edit
+            </button>
           </div>
         </>
       )}
