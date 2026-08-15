@@ -50,6 +50,11 @@ type Step = 1 | 2 | 3 | 4 | 5;
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium,
 } = useAuth();
+
+  // Shared across all photos uploaded during this posting session, so
+  // every image (and eventually the advert itself) claims the same
+  // draft record. Generated once, lazily, on first upload.
+  const draftIdRef = useRef<string | null>(null);
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [step, setStep] = useState<Step>(1);
@@ -1016,9 +1021,12 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     throw new Error("Invalid phone number");
   }
 
-  // 1. Upload images
+// 1. Upload images
+  if (!draftIdRef.current) {
+    draftIdRef.current = crypto.randomUUID();
+  }
   const uploadedImages = await Promise.all(
-    imageFiles.map((file) => uploadImage(file, "product"))
+    imageFiles.map((file) => uploadImage(file, "product", draftIdRef.current))
   );
 
   // 2. Prepare advert data
@@ -1096,6 +1104,7 @@ county: wardInfo?.county?.trim() || "",
 
     plan,
     phone: cleanedPhone,
+    draftId: draftIdRef.current,
     // Category-specific details
 jobDetails: isJobSeeking
   ? {
@@ -1232,8 +1241,11 @@ setPublishingFree(true);
 
   try {
     // Upload images
+    if (!draftIdRef.current) {
+      draftIdRef.current = crypto.randomUUID();
+    }
     const uploadedImages = await Promise.all(
-      imageFiles.map((file) => uploadImage(file, "product"))
+      imageFiles.map((file) => uploadImage(file, "product", draftIdRef.current))
     );
 
     // Prepare advert data
@@ -1300,6 +1312,7 @@ county: wardInfo?.county?.trim() || "",
             }))
           : null,
       plan: "free",
+      draftId: draftIdRef.current,
 
 phone: cleanedPhone,
 
