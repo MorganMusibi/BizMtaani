@@ -56,7 +56,8 @@ async function compressImageBeforeUpload(
  */
 export async function uploadImage(
   file: File,
-  type: ImageUploadType
+  type: ImageUploadType,
+  draftId?: string | null
 ): Promise<{
   url: string;
   public_id: string;
@@ -66,7 +67,7 @@ export async function uploadImage(
   const functions = getFunctions(app, "us-central1");
   const getSignature = httpsCallable<
     { uploadType: string },
-    CloudinarySignatureResult
+    CloudinarySignatureResult & { draftId: string }
   >(functions, "getCloudinarySignature");
 
   const { data: sig } = await getSignature({ uploadType: type });
@@ -94,8 +95,7 @@ export async function uploadImage(
       data?.error?.message ?? `Upload failed (HTTP ${res.status})`
     );
   }
-
-  const data = (await res.json()) as {
+const data = (await res.json()) as {
   secure_url: string;
   public_id: string;
 };
@@ -104,8 +104,19 @@ if (!data.secure_url || !data.public_id) {
   throw new Error("Cloudinary response missing image data");
 }
 
+// Report the uploaded image back to the draft record so it can be
+// cleaned up automatically if the advert is never published.
+const claimId = draftId ?? sig.draftId;
+if (claimId) {
+  const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
+  attachDraftUploadImage({ draftId: claimId, publicId: data.public_id }).catch((error) => {
+    console.warn("Failed to attach draft upload record:", error);
+  });
+}
+
 return {
   url: data.secure_url,
   public_id: data.public_id,
 };
 }
+  
