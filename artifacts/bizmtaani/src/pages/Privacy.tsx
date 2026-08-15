@@ -53,8 +53,7 @@ export default function Privacy() {
               Depending on how you use BizMtaani, we may collect or receive
               information such as:
             </p>
-
-            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+<ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
               <li>
                 Account information such as your name, email address, phone
                 number, and profile information.
@@ -77,10 +76,16 @@ export default function Privacy() {
                 or premium services.
               </li>
               <li>
+                If you apply to become a marketer, your full name, national ID
+                number, and M-Pesa number, collected solely to verify your
+                identity and process commission payouts.
+              </li>
+              <li>
                 Technical information required to operate, secure, and
                 troubleshoot the service.
               </li>
             </ul>
+
           </section>
 
           {/* 2 */}
@@ -169,7 +174,29 @@ export default function Privacy() {
           {/* 6 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              6. Sharing of Information
+              6. Marketer Program Data
+            </h2>
+
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              If you apply to become a marketer, we collect your full name,
+              national ID number, and M-Pesa number. This information is used
+              solely to verify your identity, calculate commissions, and
+              process payouts, and is retained for as long as your marketer
+              account remains active and as needed to meet our accounting and
+              legal obligations.
+            </p>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              This information is not displayed publicly and is not shared
+              with other users. It may be accessed by BizMtaani staff for the
+              purposes of reviewing applications and issuing payouts.
+            </p>
+          </section>
+
+          {/* 7 */}
+          <section className="mb-7">
+            <h2 className="text-base font-black mb-2">
+              7. Sharing of Information
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed mb-3">
@@ -194,10 +221,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 7 */}
+          {/* 8 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              7. Advert and User Safety
+              8. Advert and User Safety
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -207,10 +234,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 8 */}
+          {/* 9 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              8. Data Retention
+              9. Data Retention
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -228,10 +255,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 9 */}
+          {/* 10 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              9. Account and Data Requests
+              10. Account and Data Requests
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -246,10 +273,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 10 */}
+          {/* 11 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              10. Security
+              11. Security
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -260,10 +287,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 11 */}
+          {/* 12 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              11. Third-Party Services
+              12. Third-Party Services
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -275,10 +302,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 12 */}
+          {/* 13 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              12. Children's Privacy
+              13. Children's Privacy
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -288,10 +315,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 13 */}
+          {/* 14 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              13. Changes to This Privacy Policy
+              14. Changes to This Privacy Policy
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -301,10 +328,10 @@ export default function Privacy() {
             </p>
           </section>
 
-          {/* 14 */}
+          {/* 15 */}
           <section className="mb-8">
             <h2 className="text-base font-black mb-2">
-              14. Contact Us
+              15. Contact Us
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
