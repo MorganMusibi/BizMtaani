@@ -108,6 +108,32 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   return { signature, timestamp, folder, apiKey: cloudinaryApiKey.value(), cloudName: cloudinaryCloudName.value(), draftId };
 });
 
+/**
+ * Attaches an uploaded image's Cloudinary public_id to its draft
+ * record, so it can be deleted automatically if the advert it was
+ * meant for is never published.
+ */
+export const attachDraftUploadImage = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { draftId, publicId } = request.data as { draftId?: string; publicId?: string };
+  if (!draftId || !publicId) {
+    throw new HttpsError("invalid-argument", "draftId and publicId are required.");
+  }
+
+  const draftRef = db.collection("draftUploads").doc(draftId);
+  const draftSnap = await draftRef.get();
+  if (!draftSnap.exists || draftSnap.data()?.uid !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Invalid draft upload.");
+  }
+
+  await draftRef.update({
+    publicIds: admin.firestore.FieldValue.arrayUnion(publicId),
+  });
+
+  return { success: true };
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
@@ -465,9 +491,20 @@ async function runCleanup() {
     .limit(CLEANUP_LIMIT)
     .get();
 
-  staleDrafts.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
+  let purgedDraftImages = 0;
+  for (const draftDoc of staleDrafts.docs) {
+    const data = draftDoc.data();
+    const publicIds: string[] = Array.isArray(data.publicIds) ? data.publicIds : [];
+    for (const publicId of publicIds) {
+      try {
+        await deleteCloudinaryImage(publicId);
+        purgedDraftImages++;
+      } catch (error) {
+        console.error(`Cloudinary delete failed for orphaned draft image ${publicId}:`, error);
+      }
+    }
+    batch.delete(draftDoc.ref);
+  }
 
   // Permanently purge adverts archived past retention — delete their
   // Cloudinary images, their chats (and messages), then the advert itself
@@ -539,6 +576,7 @@ async function runCleanup() {
     purgedArchived: staleArchived.size,
     purgedChatsFromPurgedAds: purgedChats,
     orphanedChatsDeleted: orphanedChats,
+    purgedDraftImages,
   };
 }
 
@@ -555,7 +593,7 @@ export const scheduledCleanup = onSchedule(
     try {
       const result = await runCleanup();
        console.log(
-  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}, Purged old archived adverts: ${result.purgedArchived}, Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, Orphaned chats removed: ${result.orphanedChatsDeleted}`
+  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}, Purged old archived adverts: ${result.purgedArchived}, Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, Orphaned chats removed: ${result.orphanedChatsDeleted}, Purged orphaned draft images: ${result.purgedDraftImages}`
 );
     } catch (error) {
       console.error("Cleanup failed:", error);
