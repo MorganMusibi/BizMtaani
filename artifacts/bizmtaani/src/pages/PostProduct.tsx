@@ -1884,7 +1884,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         </div>
         
-{!isVehicleBicycle &&
+{!isVehicleBicycle && (
         <div className="grid grid-cols-2 gap-3">
 
           <div className="space-y-1.5">
