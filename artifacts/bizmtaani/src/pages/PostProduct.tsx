@@ -542,6 +542,49 @@ const isJobSeeking =
 
 
 // ============================================================
+// SERVICE SUBCATEGORIES LIVING INSIDE NON-SERVICES CATEGORIES
+// These are service-type listings that got placed under a product
+// category (Fashion, Electronics, Pets, Babies & Kids, Equipment)
+// instead of under "Services" — they still need the service form.
+// ============================================================
+
+const PRODUCT_CATEGORY_SERVICE_SUBCATEGORIES = [
+  // Fashion & Clothing
+  "Tailoring & Dressmaking",
+  "Clothing Alterations",
+  "Barbers & Hair Salons",
+  "Beauty Salons",
+  "Nail Services",
+  "Fashion Design",
+
+  // Electronics & Tech
+  "Phone Repairs",
+  "Computer Repairs",
+  "TV Repairs",
+  "Electronics Repairs",
+  "Software & IT Services",
+  "Cyber Services",
+  "Printing & Photocopying",
+  "Graphic Design",
+  "Internet Services",
+
+  // Animals & Pets
+  "Pet Services",
+
+  // Babies & Kids
+  "Daycare & Childcare",
+  "Babysitters & Nannies",
+
+  // Commercial Equipment & Tools — hire/rental, not a one-off sale
+  "Equipment for Hire",
+  "Equipment Rental",
+];
+
+const isProductCategoryService =
+  PRODUCT_CATEGORY_SERVICE_SUBCATEGORIES.includes(selectedSubcategory);
+
+
+// ============================================================
 // PROFESSIONAL / SERVICE PROVIDER CLASSIFICATION
 // ============================================================
 
@@ -556,7 +599,8 @@ const isProfessionalService =
   (selectedCategory === "Services" &&
     !NON_PROFESSIONAL_SERVICES_SUBCATEGORIES.includes(selectedSubcategory)) ||
   isVehicleService ||
-  isEventService;
+  isEventService ||
+  isProductCategoryService;
 
 
 // ============================================================
