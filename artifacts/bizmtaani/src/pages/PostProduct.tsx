@@ -416,6 +416,84 @@ const isCommercialPropertySale =
   COMMERCIAL_SALE_SUBCATEGORIES.includes(selectedSubcategory);
 
 // ============================================================
+// VEHICLE CLASSIFICATION
+// ============================================================
+
+const VEHICLE_FOR_SALE_SUBCATEGORIES = [
+  "Cars",
+  "Motorcycles",
+  "Tuk-tuks",
+  "Trucks & Lorries",
+  "Vans",
+];
+
+const VEHICLE_SERVICE_SUBCATEGORIES = [
+  "Car Hire",
+  "Vehicle Hire",
+  "Vehicle Repair & Maintenance",
+  "Car Wash",
+  "Auto Electrical Services",
+  "Other Vehicle Services",
+];
+// Note: "Vehicle Spare Parts", "Vehicle Accessories", "Tyres & Wheels" are
+// intentionally left unclassified here — they're plain products and fall
+// through to the normal advert form, which is correct for them.
+
+const isVehicleBicycle =
+  isVehicle && selectedSubcategory === "Bicycles";
+
+const isVehicleForSale =
+  (isVehicle && VEHICLE_FOR_SALE_SUBCATEGORIES.includes(selectedSubcategory)) ||
+  isVehicleBicycle ||
+  // Used Vehicles under Second-Hand should also get the vehicle form
+  (selectedCategory === "Second-Hand / Used Items" &&
+    selectedSubcategory === "Used Vehicles");
+
+const isVehicleService =
+  isVehicle && VEHICLE_SERVICE_SUBCATEGORIES.includes(selectedSubcategory);
+
+
+// ============================================================
+// EVENTS & ENTERTAINMENT CLASSIFICATION
+// ============================================================
+
+// Actual one-off events being advertised (has a date/venue/ticket)
+const EVENT_LISTING_SUBCATEGORIES = [
+  "Weddings",
+  "Birthdays & Parties",
+  "Corporate Events",
+  "Conferences",
+  "Concerts & Festivals",
+  "Graduations",
+  "Church & Religious Events",
+];
+
+// Providers/services within Entertainment & Events (DJs, planners, venues...)
+const EVENT_SERVICE_SUBCATEGORIES = [
+  "Event Venues",
+  "Wedding Venues",
+  "Conference Venues",
+  "Party Venues",
+  "DJs & Entertainment",
+  "Live Bands & Musicians",
+  "MCs & Hosts",
+  "Comedy & Performers",
+  "Event Planning",
+  "Event Decoration",
+  "Photography & Videography",
+  "Catering",
+  "Tents, Chairs & Tables",
+  "Sound & Lighting Equipment",
+  "Event Equipment Hire",
+];
+
+const isEventListing =
+  isEvent && EVENT_LISTING_SUBCATEGORIES.includes(selectedSubcategory);
+
+const isEventService =
+  isEvent && EVENT_SERVICE_SUBCATEGORIES.includes(selectedSubcategory);
+
+// ============================================================
 // FOOD / EATERY CLASSIFICATION
 // ============================================================
 
@@ -467,38 +545,18 @@ const isJobSeeking =
 // PROFESSIONAL / SERVICE PROVIDER CLASSIFICATION
 // ============================================================
 
-const PROFESSIONAL_SERVICE_SUBCATEGORIES = [
-  // Professional
-  "Accounting & Bookkeeping",
-  "Legal Services",
-  "Consulting",
-  "Marketing & Advertising",
-  "Real Estate Services",
-  "Insurance Services",
-
-  // Personal
-  "Beauty & Personal Care",
-  "Photography",
-  "Videography",
-  "Tutoring & Education",
-  "Fitness Training",
-
-  // Business & digital
-  "Business & Digital Services",
-  "Web & App Development",
-  "Graphic Design",
-  "Social Media Services",
-  "Printing Services",
-
-  // Jobs / freelance
-  "Freelance Services",
+// Subcategories under "Services" that get their OWN dedicated form/handling
+// instead of the generic professional-service form.
+const NON_PROFESSIONAL_SERVICES_SUBCATEGORIES = [
+  ...TRANSPORT_SUBCATEGORIES,   // Delivery/Courier/Transport/Moving — uses pricingBasis form
+  "Job Seeking & CVs",          // uses the job-seeker form
 ];
 
 const isProfessionalService =
-  selectedCategory === "Services" &&
-  PROFESSIONAL_SERVICE_SUBCATEGORIES.includes(
-    selectedSubcategory
-  );
+  (selectedCategory === "Services" &&
+    !NON_PROFESSIONAL_SERVICES_SUBCATEGORIES.includes(selectedSubcategory)) ||
+  isVehicleService ||
+  isEventService;
 
 
 // ============================================================
@@ -694,7 +752,7 @@ function handleImageFiles(files: FileList | null) {
       }
       
       // Vehicle validation
-      if (isVehicle) {
+      if (isVehicleForSale) {
         if (!title.trim()) {
           toast({
             title: "Enter an advert title",
@@ -703,7 +761,7 @@ function handleImageFiles(files: FileList | null) {
           return false;
         }
 
-        if (!vehicleMake.trim() || !vehicleModel.trim()) {
+        if (!isVehicleBicycle && (!vehicleMake.trim() || !vehicleModel.trim())) {
           toast({
             title: "Enter vehicle details",
             description: "Make and model are required.",
@@ -720,6 +778,35 @@ function handleImageFiles(files: FileList | null) {
           return false;
         }
 
+        return true;
+      }
+
+      // Event listing validation
+      if (isEventListing) {
+        if (!title.trim()) {
+          toast({ title: "Enter an event title", variant: "destructive" });
+          return false;
+        }
+        if (!eventDate) {
+          toast({ title: "Enter the event date", variant: "destructive" });
+          return false;
+        }
+        if (!eventVenue.trim()) {
+          toast({ title: "Enter the event venue", variant: "destructive" });
+          return false;
+        }
+        if (
+          priceDisplay !== "free" &&
+          priceDisplay !== "contact" &&
+          (!ticketPrice || parseFloat(ticketPrice) <= 0)
+        ) {
+          toast({
+            title: "Enter a ticket price",
+            description: "Or choose Free Entry / Contact for Price.",
+            variant: "destructive",
+          });
+          return false;
+        }
         return true;
       }
       
@@ -1680,7 +1767,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
       </div>
 
-    ) : isVehicle ? (
+    ) : isVehicleForSale ? (
 
       /* =========================================================
          VEHICLE FORM
@@ -1729,33 +1816,19 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold">Year</label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 2018"
-              value={vehicleYear}
-              onChange={(e) => setVehicleYear(e.target.value)}
-              className="h-12"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-sm font-bold">Mileage (KM)</label>
-            <Input
-              type="number"
-              inputMode="numeric"
-              placeholder="e.g. 85000"
-              value={vehicleMileage}
-              onChange={(e) => setVehicleMileage(e.target.value)}
-              className="h-12"
-            />
-          </div>
-
-        </div>
+        {!isVehicleBicycle && (
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Mileage (KM)</label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="e.g. 85000"
+                value={vehicleMileage}
+                onChange={(e) => setVehicleMileage(e.target.value)}
+                className="h-12"
+              />
+            </div>
+          )}
 
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Condition</label>
@@ -1776,7 +1849,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             ))}
           </div>
         </div>
-
+        
+{!isVehicleBicycle &&
         <div className="grid grid-cols-2 gap-3">
 
           <div className="space-y-1.5">
@@ -1808,6 +1882,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
 
         </div>
+  )}
 
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Description</label>
@@ -1977,6 +2052,10 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
       </div>
 
+    ) : isEventListing ? (
+      <div className="space-y-5">
+        {/* ... event form JSX from my previous message goes here ... */}
+      </div>
     ) : (
 
       /* =========================================================
