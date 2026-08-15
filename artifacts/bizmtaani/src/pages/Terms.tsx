@@ -187,7 +187,58 @@ export default function Terms() {
           {/* 7 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              7. User-to-User Transactions
+              7. Marketer Program
+            </h2>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+              BizMtaani offers an optional referral marketer program. Approval
+              to become a marketer is at BizMtaani's sole discretion and
+              requires submitting accurate identifying and payout information,
+              including your full name, national ID number, and M-Pesa number.
+            </p>
+
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+              <li>
+                Approved marketers receive a unique referral code to share
+                with prospective users.
+              </li>
+              <li>
+                A commission is earned only when a user who registered using
+                your referral code completes their first successful Premium
+                payment. Subsequent payments by the same referred user do not
+                generate additional commission.
+              </li>
+              <li>
+                Commission rates, minimum payout thresholds, and payout
+                timing are set by BizMtaani and may be updated from time to
+                time. Current terms are displayed within the app.
+              </li>
+              <li>
+                Payouts are made to the M-Pesa number on file for your
+                marketer account. You are responsible for keeping this
+                information accurate and up to date.
+              </li>
+              <li>
+                BizMtaani may withhold, delay, or deny commission payments
+                where there is a reasonable basis to suspect fraudulent
+                referrals, self-referral, fake accounts, or other abuse of
+                the program.
+              </li>
+              <li>
+                BizMtaani may suspend or terminate a marketer's participation
+                in the program, or the program itself, at any time.
+              </li>
+              <li>
+                Referral codes may only be used for new user sign-ups and
+                cannot be applied retroactively to existing accounts.
+              </li>
+            </ul>
+          </section>
+
+          {/* 8 */}
+          <section className="mb-7">
+            <h2 className="text-base font-black mb-2">
+              8. User-to-User Transactions
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -203,11 +254,11 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 8 */}
+          {/* 9 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              8. Safety
-            </h2>
+  9. Safety
+</h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed mb-3">
               For your safety, consider the following:
@@ -227,10 +278,10 @@ export default function Terms() {
             </ul>
           </section>
 
-          {/* 9 */}
+          {/* 10 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              9. Reporting and Moderation
+              10. Reporting and Moderation
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -246,10 +297,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 10 */}
+          {/* 11 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              10. User Content
+              11. User Content
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -260,10 +311,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 11 */}
+          {/* 12 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              11. Intellectual Property
+              12. Intellectual Property
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -275,10 +326,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 12 */}
+          {/* 13 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              12. Account Suspension or Removal
+              13. Account Suspension or Removal
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -289,10 +340,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 13 */}
+          {/* 14 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              13. Service Availability
+              14. Service Availability
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -304,10 +355,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 14 */}
+          {/* 15 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              14. Marketplace Disclaimer
+              15. Marketplace Disclaimer
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -323,10 +374,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 15 */}
+          {/* 16 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              15. Limitation of Liability
+              16. Limitation of Liability
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -338,10 +389,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 16 */}
+          {/* 17 */}
           <section className="mb-7">
             <h2 className="text-base font-black mb-2">
-              16. Changes to These Terms
+              17. Changes to These Terms
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -352,10 +403,10 @@ export default function Terms() {
             </p>
           </section>
 
-          {/* 17 */}
+          {/* 18 */}
           <section className="mb-8">
             <h2 className="text-base font-black mb-2">
-              17. Contact Us
+              18. Contact Us
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
