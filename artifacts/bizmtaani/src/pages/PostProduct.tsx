@@ -583,6 +583,12 @@ const PRODUCT_CATEGORY_SERVICE_SUBCATEGORIES = [
 const isProductCategoryService =
   PRODUCT_CATEGORY_SERVICE_SUBCATEGORIES.includes(selectedSubcategory);
 
+const isEquipmentForHire =
+  isEquipment && isProductCategoryService;
+
+const isEquipmentForSale =
+  isEquipment && !isEquipmentForHire;
+
 
 // ============================================================
 // PROFESSIONAL / SERVICE PROVIDER CLASSIFICATION
@@ -868,6 +874,15 @@ function handleImageFiles(files: FileList | null) {
         if (!title.trim()) {
           toast({
             title: "Enter a service title",
+            variant: "destructive",
+          });
+          return false;
+        }
+
+        if (isEquipmentForHire && !equipmentType.trim()) {
+          toast({
+            title: "Enter equipment type",
+            description: "Tell customers what equipment you're hiring out.",
             variant: "destructive",
           });
           return false;
@@ -1290,6 +1305,13 @@ eventDetails: isEventListing
     }
   : null,
 
+equipmentDetails: isEquipment
+  ? {
+      equipmentType: equipmentType.trim(),
+      condition: isEquipmentForSale ? equipmentCondition : "",
+    }
+  : null,
+
     accommodationDetails: isAccommodation
   ? {
       bedrooms:
@@ -1510,6 +1532,13 @@ eventDetails: isEventListing
       eventEndTime,
       eventVenue: eventVenue.trim(),
       eventOrganizer: eventOrganizer.trim(),
+    }
+  : null,
+
+equipmentDetails: isEquipment
+  ? {
+      equipmentType: equipmentType.trim(),
+      condition: isEquipmentForSale ? equipmentCondition : "",
     }
   : null,
     };
@@ -2043,8 +2072,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             className="h-12 text-base"
           />
         </div>
-
-        <div className="space-y-1.5">
+<div className="space-y-1.5">
           <label className="text-sm font-bold">Service Description</label>
           <Textarea
             placeholder="Describe your professional service, experience and what customers can expect..."
@@ -2055,8 +2083,21 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           />
         </div>
 
+        {isEquipmentForHire && (
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Equipment Type *</label>
+            <Input
+              placeholder="e.g. Concrete Mixer, Generator, Scaffolding"
+              value={equipmentType}
+              onChange={(e) => setEquipmentType(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+        )}
+
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Service Type</label>
+        
           <Input
             placeholder="e.g. Accounting, Legal, IT Support, Graphic Design"
             value={serviceType}
@@ -2301,6 +2342,40 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             {description.length}/1000
           </p>
         </div>
+
+        {isEquipmentForSale && (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Equipment Type</label>
+              <Input
+                placeholder="e.g. Concrete Mixer, Generator, Power Drill"
+                value={equipmentType}
+                onChange={(e) => setEquipmentType(e.target.value)}
+                className="h-12 text-base"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">Condition</label>
+              <div className="grid grid-cols-3 gap-2">
+                {["New", "Used", "Refurbished"].map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    onClick={() => setEquipmentCondition(option)}
+                    className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                      equipmentCondition === option
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         
                         {isAccommodation && !isAccommodationLand && (
           <div className="space-y-4">
