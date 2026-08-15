@@ -1215,7 +1215,7 @@ jobDetails: isJobSeeking
     }
   : null,
 
-vehicleDetails: isVehicle
+vehicleDetails: isVehicleForSale
   ? {
       make: vehicleMake.trim(),
       model: vehicleModel.trim(),
@@ -1438,7 +1438,7 @@ jobDetails: isJobSeeking
     }
   : null,
 
-vehicleDetails: isVehicle
+vehicleDetails: isVehicleForSale
   ? {
       make: vehicleMake.trim(),
       model: vehicleModel.trim(),
