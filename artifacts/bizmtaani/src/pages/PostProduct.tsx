@@ -614,6 +614,15 @@ const subcategories =
     ];
   }
 
+  if (isEventListing) {
+    return [
+      { value: "fixed", label: "Fixed Price" },
+      { value: "negotiable", label: "Negotiable" },
+      { value: "contact", label: "Contact for Price" },
+      { value: "free", label: "Free Entry" },
+    ];
+  }
+
   return [
     { value: "fixed", label: "Fixed Price" },
     { value: "negotiable", label: "Negotiable" },
@@ -1126,11 +1135,13 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
       ? extractPriceValue(rentPerMonth)
-      : isProfessionalService && servicePricingType === "quote_only"
-        ? 0
-        : isTransport && pricingBasis === "quote_only"
+      : isEventListing
+        ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
+        : isProfessionalService && servicePricingType === "quote_only"
           ? 0
-          : extractPriceValue(price),
+          : isTransport && pricingBasis === "quote_only"
+            ? 0
+            : extractPriceValue(price),
 
     priceRaw: price.trim(),
     rentPerMonthRaw: rentPerMonth.trim(),
@@ -1224,6 +1235,17 @@ serviceDetails: isProfessionalService
       pricingType: servicePricingType,
     }
   : null,
+
+eventDetails: isEventListing
+  ? {
+      eventDate,
+      eventStartTime,
+      eventEndTime,
+      eventVenue: eventVenue.trim(),
+      eventOrganizer: eventOrganizer.trim(),
+    }
+  : null,
+
     accommodationDetails: isAccommodation
   ? {
       bedrooms:
@@ -1344,11 +1366,13 @@ setPublishingFree(true);
     ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
       ? extractPriceValue(rentPerMonth)
-      : isProfessionalService && servicePricingType === "quote_only"
-        ? 0
-        : isTransport && pricingBasis === "quote_only"
+      : isEventListing
+        ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
+        : isProfessionalService && servicePricingType === "quote_only"
           ? 0
-          : extractPriceValue(price),
+          : isTransport && pricingBasis === "quote_only"
+            ? 0
+            : extractPriceValue(price),
 
       priceRaw: price.trim(),
       rentPerMonthRaw: rentPerMonth.trim(),
@@ -1432,6 +1456,16 @@ serviceDetails: isProfessionalService
       serviceType: serviceType.trim(),
       serviceArea: serviceArea.trim(),
       pricingType: servicePricingType,
+    }
+  : null,
+
+eventDetails: isEventListing
+  ? {
+      eventDate,
+      eventStartTime,
+      eventEndTime,
+      eventVenue: eventVenue.trim(),
+      eventOrganizer: eventOrganizer.trim(),
     }
   : null,
     };
@@ -2054,7 +2088,131 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
     ) : isEventListing ? (
       <div className="space-y-5">
-        {/* ... event form JSX from my previous message goes here ... */}
+
+        <div>
+          <h2 className="font-black text-lg">Event Details</h2>
+          <p className="text-sm text-muted-foreground mt-1">
+            Tell people what the event is, when, and where.
+          </p>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Event Title *</label>
+          <Input
+            placeholder="e.g. Amani's Wedding, Nairobi Tech Meetup"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={80}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Description</label>
+          <Textarea
+            placeholder="Describe the event..."
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={1000}
+            className="min-h-[100px] text-sm"
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Event Date *</label>
+            <Input
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Organizer</label>
+            <Input
+              placeholder="e.g. Your name or group"
+              value={eventOrganizer}
+              onChange={(e) => setEventOrganizer(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">Start Time</label>
+            <Input
+              type="time"
+              value={eventStartTime}
+              onChange={(e) => setEventStartTime(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-sm font-bold">End Time</label>
+            <Input
+              type="time"
+              value={eventEndTime}
+              onChange={(e) => setEventEndTime(e.target.value)}
+              className="h-12 text-base"
+            />
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Venue *</label>
+          <Input
+            placeholder="e.g. Uhuru Gardens, Nairobi"
+            value={eventVenue}
+            onChange={(e) => setEventVenue(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-3">
+          <label className="text-sm font-bold">Entry / Ticket Price</label>
+
+          {priceDisplay !== "free" && priceDisplay !== "contact" && (
+            <Input
+              type="text"
+              inputMode="text"
+              placeholder="e.g. 500"
+              value={ticketPrice}
+              onChange={(e) => setTicketPrice(e.target.value)}
+              className="h-12 text-base"
+            />
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            {getPriceOptions().map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+                className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
       </div>
     ) : (
 
@@ -3078,6 +3236,12 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       ? `KES ${price}${priceDisplay === "negotiable" ? " (Negotiable)" : ""}`
       : isAccommodation || isCommercialProperty
       ? `KES ${rentPerMonth}/mo`
+      : isEventListing
+      ? priceDisplay === "free"
+        ? "Free Entry"
+        : priceDisplay === "contact"
+        ? "Contact for Price"
+        : `KES ${ticketPrice}`
       : priceDisplay === "contact"
       ? "Contact for Price"
       : priceDisplay === "quote"
