@@ -96,7 +96,16 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
   const timestamp = Math.floor(Date.now() / 1000);
   const signature = crypto.createHash("sha1").update(`folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`).digest("hex");
-  return { signature, timestamp, folder, apiKey: cloudinaryApiKey.value(), cloudName: cloudinaryCloudName.value() };
+
+  const draftId = crypto.randomBytes(12).toString("hex");
+  await db.collection("draftUploads").doc(draftId).set({
+    uid: request.auth.uid,
+    folder,
+    claimed: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { signature, timestamp, folder, apiKey: cloudinaryApiKey.value(), cloudName: cloudinaryCloudName.value(), draftId };
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -445,6 +454,18 @@ async function runCleanup() {
 
   // Delete abandoned pending payment records
   expiredPayments.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+
+  // Clean up unclaimed draft uploads — images uploaded to Cloudinary
+  // but never turned into an advert (user abandoned the form).
+  const staleDrafts = await db.collection("draftUploads")
+    .where("claimed", "==", false)
+    .where("createdAt", "<", oneHourAgo)
+    .limit(CLEANUP_LIMIT)
+    .get();
+
+  staleDrafts.docs.forEach((doc) => {
     batch.delete(doc.ref);
   });
 
@@ -817,7 +838,7 @@ export const reverseGeocode = onCall(
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, title, price, imageUrls, ...otherData } = request.data;
+  const { plan, title, price, imageUrls, draftId, ...otherData } = request.data;
   const uid = request.auth.uid;
   
   // Check if the user has an active premium subscription
@@ -982,7 +1003,12 @@ try {
   );
 }
 
-  // 8. Return the generated productId
+// 8. Mark the draft upload as claimed, if one was tracked
+  if (typeof draftId === "string") {
+    await db.collection("draftUploads").doc(draftId).update({ claimed: true }).catch(() => {});
+  }
+
+  // 9. Return the generated productId
   return {
   success: true,
   productId: newProductRef.id,
@@ -991,6 +1017,7 @@ try {
   plan: effectivePlan,
 };
   });
+ 
 
 export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
   if (!request.auth) {
