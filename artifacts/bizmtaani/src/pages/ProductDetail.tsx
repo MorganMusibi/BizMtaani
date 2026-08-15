@@ -500,15 +500,18 @@ const handleReply = () => {
       setUserCoords(coords);
     },
     (error) => {
-      console.warn(
-        "Unable to get user location for product details:",
-        error
-      );
-
-      // Keep userCoords as null.
-      // The product's own location will be used
-      // as the recommendation fallback.
-    },
+  if (error.code === error.PERMISSION_DENIED) {
+    // Expected — user declined location access. Not an error
+    // worth logging; the product's own location is used as
+    // the recommendation fallback below.
+  } else {
+    console.warn(
+      "Unable to get user location for product details:",
+      error
+    );
+  }
+  // Keep userCoords as null either way.
+},
     {
       enableHighAccuracy: true,
       timeout: 15000,
@@ -665,16 +668,6 @@ useEffect(() => {
       photoURL:
         user.photoURL || "",
     };
-    
-    console.log("CHAT DEBUG", {
-  authenticatedUser: user.uid,
-  productId: product.id,
-  sellerId: product.sellerId,
-  participants: [
-    user.uid,
-    product.sellerId,
-  ],
-});
 
     const seller: ChatParticipant = {
       uid: product.sellerId,
