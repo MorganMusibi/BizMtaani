@@ -12,6 +12,8 @@ import {
   FileText,
   Lock,
   Flag,
+  Gift,
+  Megaphone,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -35,6 +37,11 @@ const HOW_IT_WORKS = [
     icon: ShieldCheck,
     title: "Premium listings",
     body: "Premium plans can provide wider visibility and longer listing periods, helping your advert reach more potential customers.",
+  },
+  {
+    icon: Gift,
+    title: "Refer friends and earn",
+    body: "Share your referral code with friends when they sign up. Become an approved marketer to earn a commission every time someone you referred upgrades to Premium.",
   },
 ];
 
@@ -63,8 +70,23 @@ const FAQ = [
     q: "Can I change my selected area?",
     a: "Yes. You can change your selected area whenever you want to browse adverts from a different location.",
   },
+  {
+    q: "How do I become a marketer?",
+    a: "Go to your Profile, tap \"Become a Marketer\", and submit your full name, ID number, M-Pesa number, and a short note on why you'd like to join. Our team reviews applications and approves marketers manually.",
+  },
+  {
+    q: "How does a marketer earn money?",
+    a: "Once approved, you get a unique referral code to share. You earn 14.2% commission whenever someone who signed up using your code makes their first Premium payment. Repeat payments from the same person don't earn additional commission.",
+  },
+  {
+    q: "When and how do I get paid?",
+    a: "Earnings are tracked monthly and reset at the start of each new month. If your earnings for the month meet the minimum payout threshold, they're queued for payout. Payments are sent to the M-Pesa number on file — contact BizMtaani to confirm your payout.",
+  },
+  {
+    q: "Where do I enter a referral code?",
+    a: "You'll be asked for a referral code during sign up. It only applies to new accounts — existing users can't retroactively add one.",
+  },
 ];
-
 export default function About() {
   const [, setLocation] = useLocation();
 
@@ -157,6 +179,36 @@ export default function About() {
                 </p>
               </details>
             ))}
+          </div>
+        </section>
+
+        {/* Marketer Program */}
+        <section className="mb-8">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground mb-3">
+            Marketer program
+          </h2>
+
+          <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-[#00A651]/10 flex items-center justify-center flex-shrink-0">
+                <Megaphone size={18} className="text-[#00A651]" />
+              </div>
+              <div>
+                <p className="font-bold text-sm">Earn by referring premium users</p>
+                <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+                  Approved marketers earn 14.2% commission every time someone they referred
+                  makes their first Premium payment. Track your monthly earnings and referrals
+                  from your Marketer Dashboard, accessible from your Profile.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setLocation("/profile")}
+              className="w-full flex items-center justify-center gap-2 bg-[#00A651]/10 text-[#00A651] font-bold text-sm rounded-xl py-3 active:scale-[0.98] transition-transform"
+            >
+              Apply to become a marketer
+            </button>
           </div>
         </section>
 
