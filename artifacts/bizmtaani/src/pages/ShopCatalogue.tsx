@@ -394,7 +394,7 @@ useEffect(() => {
           where("sellerId", "==", userId),
           where("status", "==", "active"),
           orderBy("createdAt", "desc"),
-          limit(60)
+          limit(15)
         );
 
         const [snapshot, profileSnap] = await Promise.all([
