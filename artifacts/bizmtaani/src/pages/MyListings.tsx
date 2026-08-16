@@ -162,7 +162,7 @@ export default function MyListings() {
             </div>
             <div className="text-center">
               <p className="font-bold text-lg">No listings yet</p>
-              <p className="text-muted-foreground text-sm mt-1">Pay KES 60 to post your first advert for 7 days</p>
+              <p className="text-muted-foreground text-sm mt-1">Post your first advert free — live for 7 days</p>
             </div>
             <Button data-testid="button-first-post" onClick={() => setLocation("/post")} className="gap-2">
               <Plus size={16} />Post a Product
@@ -214,7 +214,7 @@ export default function MyListings() {
                               Delete
                             </button>
                             {expiry && !expiry.isExpired && (
-                              <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium" ? "premium" : "basic") as PaidListingPlan); }}
+                              <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium_monthly" ? "premium_monthly" : "premium_weekly") as PaidListingPlan); }}
                                 className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
                                 <RefreshCw size={11} />Renew
                               </button>
@@ -259,7 +259,7 @@ export default function MyListings() {
                             {deleting === product.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
                             Delete
                           </button>
-                          <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium" ? "premium" : "basic") as PaidListingPlan); }}
+                          <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium_monthly" ? "premium_monthly" : "premium_weekly") as PaidListingPlan); }}
                             className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
                             <RefreshCw size={11} />Renew
                           </button>
@@ -283,14 +283,14 @@ export default function MyListings() {
             <p className="font-black text-base mb-1">Renew Listing</p>
             <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{renewProduct.title}</p>
             <div className="flex gap-3 mb-5">
-              {(["basic", "premium"] as PaidListingPlan[]).map((p) => (
+              {(["premium_weekly", "premium_monthly"] as PaidListingPlan[]).map((p) => (
                 <button key={p} onClick={() => setRenewPlan(p)}
                   className={`flex-1 py-3 rounded-2xl border-2 text-center transition-all ${
                     renewPlan === p ? "border-primary bg-primary/5" : "border-border"
                   }`}>
-                  <p className="font-black text-sm capitalize">{p}</p>
+                  <p className="font-black text-sm">{p === "premium_monthly" ? "Monthly" : "Weekly"}</p>
                   <p className="text-xs text-muted-foreground">
-  {MAX_PHOTO_LIMIT[p] === Infinity ? "Unlimited" : MAX_PHOTO_LIMIT[p]} photos · 7 days
+  {MAX_PHOTO_LIMIT[p]} photos · {LISTING_DURATION_DAYS[p]} days
 </p>
                   <p className="font-black text-primary mt-1">KES {PLAN_AMOUNTS[p]}</p>
                 </button>
@@ -318,9 +318,10 @@ export default function MyListings() {
         defaultPhone={user?.phoneNumber || ""}
         onInitiate={handleRenewInitiate}
         onSuccess={() => {
-          toast({ title: "Listing renewed!", description: "Your advert is live for another 7 days." });
+          toast({ title: "Listing renewed!", description: "Your advert is live again." });
           setRenewProduct(null);
           setShowRenewModal(false);
+          fetchProducts();
         }}
       />
 
