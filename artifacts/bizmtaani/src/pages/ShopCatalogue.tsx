@@ -92,7 +92,7 @@ priceList?: {
   } | null;
   timestamp: number;
 }
-const SHOP_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes — shop catalogues change infrequently
+const SHOP_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — shop catalogues change infrequently
 const SHOP_CACHE_PREFIX = "bizmtaani_shop_cache_";
 
 function readShopCache(userId: string): ShopCacheEntry | null {
