@@ -19,6 +19,15 @@ import {
 } from "lucide-react";
 
 const PAGE_SIZE = 15;
+
+function isValidKenyanPhone(value: string): boolean {
+  const cleaned = value.replace(/\s+/g, "").trim();
+  return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 const NAIROBI: [number, number] = [-1.286389, 36.817223];
 
 export const JOB_CATEGORIES = [
