@@ -139,7 +139,7 @@ function getDistanceKm(
 function getThumbnailUrl(url: string): string {
   if (!url) return "";
   if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
-    return url.replace("/upload/", "/upload/f_auto,q_auto,w_500,c_fill/");
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_300,c_fill/");
   }
   return url;
 }
@@ -147,7 +147,7 @@ function getThumbnailUrl(url: string): string {
 function getAvatarThumbnailUrl(url: string): string {
   if (!url) return "";
   if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
-    return url.replace("/upload/", "/upload/f_auto,q_auto,w_128,h_128,c_fill/");
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_96,h_96,c_fill/");
   }
   return url;
 }
@@ -368,7 +368,12 @@ useEffect(() => {
     }
 
     const cached = readShopCache(userId);
-    if (cached && Date.now() - cached.timestamp < SHOP_CACHE_TTL_MS) {
+    const viewingOwnShop = user?.uid === userId;
+    if (
+      cached &&
+      !viewingOwnShop &&
+      Date.now() - cached.timestamp < SHOP_CACHE_TTL_MS
+    ) {
       setProducts(cached.products);
       setSellerProfile(cached.sellerProfile);
       setLoading(false);
@@ -725,11 +730,19 @@ useEffect(() => {
           </div>
 
           <div className="flex-1 min-w-0">
-            <h1 className="font-black text-xl leading-tight truncate">
-              {isOwn
-                ? "My Shop"
-                : sellerName}
-            </h1>
+            <div className="flex items-center gap-2">
+              <h1 className="font-black text-xl leading-tight truncate">
+                {isOwn
+                  ? "My Shop"
+                  : sellerName}
+              </h1>
+
+              {sellerProfile?.isBusinessOwner && (
+                <span className="flex-shrink-0 rounded-full bg-primary/10 text-primary px-2 py-0.5 text-[10px] font-bold">
+                  Business
+                </span>
+              )}
+            </div>
 
             {(sellerWard ||
               sellerCounty) && (
@@ -986,6 +999,23 @@ useEffect(() => {
                                     }
                                     className="text-muted-foreground"
                                   />
+                                </div>
+                              )}
+
+                              {/* Premium / Verified badges */}
+
+                              {(product.isPremium || product.verified) && (
+                                <div className="absolute top-2 left-2 flex gap-1">
+                                  {product.isPremium && (
+                                    <span className="rounded-full bg-[#00A651] px-2 py-1 text-[10px] font-bold text-white">
+                                      Premium
+                                    </span>
+                                  )}
+                                  {product.verified && (
+                                    <span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-bold text-white">
+                                      Verified
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
