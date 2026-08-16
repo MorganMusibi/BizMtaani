@@ -1591,6 +1591,7 @@ const data = result.data as PublishAdvertResponse;
     description: "Your advert is now live.",
   });
 
+  invalidateOwnCaches();
   navigate(`/product/${data.productId}`);
  }
     else {
@@ -1637,6 +1638,7 @@ toast({
       description: "Published using your Premium subscription.",
     });
 
+    invalidateOwnCaches();
     navigate(`/product/${result.productId}`);
   } catch (error: unknown) {
   console.error("Publish premium advert failed:", error);
