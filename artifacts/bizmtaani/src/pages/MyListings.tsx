@@ -91,7 +91,7 @@ export default function MyListings() {
       collection(db, "products"),
       where("sellerId", "==", user.uid),
       orderBy("createdAt", "desc"),
-      limit(30)
+      limit(20)
     );
     const snap = await getDocs(q);
     setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product)));
