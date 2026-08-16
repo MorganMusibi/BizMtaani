@@ -82,7 +82,7 @@ export default function MyListings() {
 
   // Renewal state
   const [renewProduct, setRenewProduct] = useState<Product | null>(null);
-  const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("basic");
+  const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("premium_weekly");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
   async function fetchProducts() {
@@ -111,6 +111,7 @@ export default function MyListings() {
     try {
       await deleteDoc(doc(db, "products", product.id));
       toast({ title: "Listing deleted" });
+      await fetchProducts();
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
     } finally {
