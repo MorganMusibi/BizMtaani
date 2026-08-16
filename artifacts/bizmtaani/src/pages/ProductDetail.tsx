@@ -70,7 +70,12 @@ interface Product {
     accountNumber?: string;
     otherDescription?: string;
   };
-  priceList?: { name: string; price: number }[];
+  priceList?: {
+    name: string;
+    price: number;
+    priceType?: "fixed" | "contact" | "custom";
+    priceText?: string;
+  }[];
   createdAt: { seconds: number } | null;
 }
 
@@ -1488,7 +1493,11 @@ const itemDistance =
                 <div key={i} className="flex items-center px-4 py-3 gap-2">
                   <span className="flex-1 text-sm font-medium">{item.name}</span>
                   <span className="text-sm font-bold text-primary whitespace-nowrap">
-                    KES {item.price.toLocaleString()}
+                    {item.priceType === "contact"
+                      ? "Contact for Price"
+                      : item.priceType === "custom" && item.priceText
+                      ? item.priceText
+                      : `KES ${item.price.toLocaleString()}`}
                   </span>
                 </div>
               ))}
