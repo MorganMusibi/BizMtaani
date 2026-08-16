@@ -69,9 +69,12 @@ interface ShopProduct {
     | "free";
 
   priceType?: "fixed" | "negotiable";
-
-  priceList?: { name: string; price: number }[];
-
+priceList?: {
+    name: string;
+    price: number;
+    priceType?: "fixed" | "contact" | "custom";
+    priceText?: string;
+  }[];
   status?: string;
 
   lat?: number;
