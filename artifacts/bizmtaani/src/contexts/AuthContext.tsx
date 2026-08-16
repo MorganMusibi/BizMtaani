@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
+import { registerForNotifications } from "@/lib/notifications";
 
 export interface HomeLocation {
   lat: number;
@@ -185,6 +186,10 @@ export function AuthProvider({
             setAdminLoading(false);
             return;
           }
+
+          // Register for push notifications — fire and forget, never
+          // block auth state resolution on this.
+          registerForNotifications(currentUser.uid).catch(() => {});
 
           // --------------------------------------------------
           // ADMIN CLAIM CHECK
