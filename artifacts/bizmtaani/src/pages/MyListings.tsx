@@ -59,6 +59,32 @@ function PriceListPreview({ priceList }: { priceList: Product["priceList"] }) {
   );
 }
 
+interface ListingsCacheEntry {
+  products: Product[];
+  timestamp: number;
+}
+const LISTINGS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const LISTINGS_CACHE_PREFIX = "bizmtaani_my_listings_cache_";
+
+function readListingsCache(uid: string): ListingsCacheEntry | null {
+  try {
+    const raw = sessionStorage.getItem(LISTINGS_CACHE_PREFIX + uid);
+    if (!raw) return null;
+    return JSON.parse(raw) as ListingsCacheEntry;
+  } catch {
+    return null;
+  }
+}
+
+function writeListingsCache(uid: string, entry: ListingsCacheEntry): void {
+  try {
+    sessionStorage.setItem(LISTINGS_CACHE_PREFIX + uid, JSON.stringify(entry));
+  } catch {
+    // sessionStorage may be full or unavailable — cache is a performance optimization only
+  }
+}
+
+
 function getExpiryInfo(p: Product): { label: string; color: string; isExpired: boolean } | null {
   if (!p.expiresAt) return null;
   const nowSec = Date.now() / 1000;
@@ -85,8 +111,17 @@ export default function MyListings() {
   const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("premium_weekly");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
-  async function fetchProducts() {
+  async function fetchProducts(opts?: { skipCache?: boolean }) {
     if (!user) return;
+
+    if (!opts?.skipCache) {
+      const cached = readListingsCache(user.uid);
+      if (cached && Date.now() - cached.timestamp < LISTINGS_CACHE_TTL_MS) {
+        setProducts(cached.products);
+        return;
+      }
+    }
+
     const q = query(
       collection(db, "products"),
       where("sellerId", "==", user.uid),
@@ -94,7 +129,9 @@ export default function MyListings() {
       limit(20)
     );
     const snap = await getDocs(q);
-    setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product)));
+    const loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+    setProducts(loaded);
+    writeListingsCache(user.uid, { products: loaded, timestamp: Date.now() });
   }
 
   useEffect(() => {
@@ -111,7 +148,7 @@ export default function MyListings() {
     try {
       await deleteDoc(doc(db, "products", product.id));
       toast({ title: "Listing deleted" });
-      await fetchProducts();
+      await fetchProducts({ skipCache: true });
     } catch (err: unknown) {
       toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
     } finally {
@@ -321,7 +358,7 @@ export default function MyListings() {
           toast({ title: "Listing renewed!", description: "Your advert is live again." });
           setRenewProduct(null);
           setShowRenewModal(false);
-          fetchProducts();
+          fetchProducts({ skipCache: true });
         }}
       />
 
