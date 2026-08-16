@@ -30,15 +30,24 @@ const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
 const LOCATION_PROMPT_SHOWN_KEY = "bizmtaani_location_prompt_shown";
 
+const LOCATION_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
 function loadCachedLocationState() {
   try {
     const raw = localStorage.getItem(LOCATION_STATE_STORAGE_KEY);
-    return raw ? JSON.parse(raw) as {
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as {
       userCoords: [number, number] | null;
       gpsGranted: boolean;
       gpsReady: boolean;
       locationInfo: ResolvedLocation | null;
-    } : null;
+      timestamp?: number;
+    };
+    // Expired or missing a timestamp (old cache format) — treat as stale
+    if (!parsed.timestamp || Date.now() - parsed.timestamp > LOCATION_CACHE_TTL_MS) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -280,7 +289,7 @@ export default function Home() {
   // Keep the module-level cache in sync so a later remount can skip
   // GPS/geocoding entirely.
   useEffect(() => {
-    cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo };
+    cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo, timestamp: Date.now() };
     try {
       localStorage.setItem(LOCATION_STATE_STORAGE_KEY, JSON.stringify(cachedLocationState));
     } catch {
