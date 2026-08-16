@@ -87,6 +87,32 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
   return _darajaToken.token;
 }
 
+/**
+ * Shared push helper — looks up the user's saved FCM token and sends,
+ * silently no-op-ing if they have none registered. Never throws —
+ * a failed notification should never break the calling flow.
+ */
+async function sendPushToUid(
+  uid: string,
+  title: string,
+  body: string,
+  data: Record<string, string> = {}
+): Promise<void> {
+  try {
+    const tokenSnap = await db.collection("fcmTokens").doc(uid).get();
+    const token = tokenSnap.exists ? tokenSnap.data()?.token : null;
+    if (!token) return;
+
+    await admin.messaging().send({
+      token,
+      notification: { title, body },
+      data,
+    });
+  } catch (error) {
+    console.error(`Failed to send notification to ${uid}:`, error);
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. IMAGE UPLOADS
 // ═══════════════════════════════════════════════════════════════════════════
@@ -236,6 +262,13 @@ await db.collection("products").doc(paymentData.productId).update({
     new Date(Date.now() + durationDays * 86_400_000)
   )
 });
+
+await sendPushToUid(
+  paymentData.buyerId,
+  "Your advert is live! 🎉",
+  "Payment confirmed — your listing is now visible to buyers.",
+  { type: "advert_activated", productId: paymentData.productId }
+);
 
         // Pay marketer commission, once per referred user, on their
         // first successful premium payment only.
@@ -602,8 +635,47 @@ export const scheduledCleanup = onSchedule(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 3B. MONTHLY MARKETER PAYOUT SNAPSHOT
+// 3B. EXPIRING ADVERT REMINDERS
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Runs every 6 hours (aligned with scheduledCleanup). Notifies sellers
+ * whose active advert expires within the next 24 hours — once per
+ * advert, tracked via expiringNotified so it never repeats.
+ */
+export const notifyExpiringAdverts = onSchedule("every 6 hours", async () => {
+  const now = admin.firestore.Timestamp.now();
+  const in24h = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+
+  const expiringSoon = await db.collection("products")
+    .where("status", "==", "active")
+    .where("expiresAt", ">", now)
+    .where("expiresAt", "<=", in24h)
+    .where("expiringNotified", "==", false)
+    .limit(CLEANUP_LIMIT)
+    .get();
+
+  const batch = db.batch();
+  let notified = 0;
+
+  for (const doc of expiringSoon.docs) {
+    const data = doc.data();
+    if (!data.sellerId) continue;
+
+    await sendPushToUid(
+      data.sellerId,
+      "Your advert expires soon",
+      `"${data.title ?? "Your listing"}" expires within 24 hours. Renew it to keep it visible.`,
+      { type: "advert_expiring", productId: doc.id }
+    );
+
+    batch.update(doc.ref, { expiringNotified: true });
+    notified++;
+  }
+
+  if (notified > 0) await batch.commit();
+  console.log(`Expiring advert reminders sent: ${notified}`);
+});
 export const closeMonthlyEarnings = onSchedule(
   { schedule: "0 0 1 * *", timeZone: "Africa/Nairobi" }, // 00:00 on the 1st of each month
   async () => {
@@ -747,6 +819,42 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
 // ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Fires on every new chat message. Notifies the other participant,
+ * unless they've muted this specific chat.
+ */
+export const onNewChatMessage = onDocumentCreated(
+  "chats/{chatId}/messages/{messageId}",
+  async (event) => {
+    const message = event.data?.data();
+    if (!message) return;
+
+    const chatId = event.params.chatId;
+    const chatSnap = await db.collection("chats").doc(chatId).get();
+    if (!chatSnap.exists) return;
+
+    const chat = chatSnap.data()!;
+    const senderId = message.senderId as string | undefined;
+    if (!senderId) return;
+
+    const participants: string[] = Array.isArray(chat.participants) ? chat.participants : [];
+    const recipientId = participants.find((p) => p !== senderId);
+    if (!recipientId) return;
+
+    // Respect per-user chat mute.
+    const mutedBy: string[] = Array.isArray(chat.mutedBy) ? chat.mutedBy : [];
+    if (mutedBy.includes(recipientId)) return;
+
+    await sendPushToUid(
+      recipientId,
+      message.senderName ?? "New message",
+      typeof message.text === "string" ? message.text.slice(0, 100) : "Sent you a message",
+      { type: "chat_message", chatUrl: `/chat/${chatId}` }
+    );
+  }
+);
+
 export const sendNotification = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
@@ -1273,6 +1381,13 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     await applicationSnap.ref.update({ status: "approved" });
   }
 
+  await sendPushToUid(
+    uid,
+    "You're approved as a marketer! 🎉",
+    `Your referral code is ${code}. Start sharing it to earn commissions.`,
+    { type: "marketer_approved", referralCode: code }
+  );
+
   return { success: true, referralCode: code };
 });
 
@@ -1436,6 +1551,13 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
   await db.collection("marketerApplications").doc(uid).update({
     status: "rejected",
   });
+
+  await sendPushToUid(
+    uid,
+    "Marketer application update",
+    "Your marketer application wasn't approved this time. Contact support if you'd like to know more.",
+    { type: "marketer_rejected" }
+  );
 
   return { success: true };
 });
