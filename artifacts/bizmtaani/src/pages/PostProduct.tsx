@@ -1270,7 +1270,9 @@ county: wardInfo?.county?.trim() || "",
       priceListItems.length > 0
         ? priceListItems.map((item) => ({
             name: item.name,
-            price: parseFloat(item.price) || 0,
+            priceType: item.priceType,
+            price: item.priceType === "fixed" ? parseFloat(item.price) || 0 : 0,
+            priceText: item.priceType === "custom" ? item.priceText : "",
           }))
         : null,
 
@@ -1500,7 +1502,9 @@ county: wardInfo?.county?.trim() || "",
         priceListItems.length > 0
           ? priceListItems.map((item) => ({
               name: item.name,
-              price: parseFloat(item.price) || 0,
+              priceType: item.priceType,
+              price: item.priceType === "fixed" ? parseFloat(item.price) || 0 : 0,
+              priceText: item.priceType === "custom" ? item.priceText : "",
             }))
           : null,
       plan: "free",
@@ -3162,7 +3166,13 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   {priceListItems.map((item, i) => (
                     <div key={i} className="flex items-center px-4 py-2.5 gap-2">
                       <span className="flex-1 text-sm font-medium">{item.name}</span>
-                      <span className="text-sm font-bold text-primary">KES {item.price}</span>
+                      <span className="text-sm font-bold text-primary">
+                        {item.priceType === "contact"
+                          ? "Contact for Price"
+                          : item.priceType === "custom"
+                          ? item.priceText
+                          : `KES ${item.price}`}
+                      </span>
                       <button
                         type="button"
                         onClick={() => removePriceListItem(i)}
@@ -3175,32 +3185,82 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="space-y-2">
                 <Input
-                  placeholder="Item name"
+                  placeholder="Item name e.g. Bread, Haircut, T-shirt"
                   value={newPriceListItem.name}
                   onChange={(e) =>
                     setNewPriceListItem((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="flex-1 h-9 text-sm"
+                  className="h-9 text-sm"
                 />
-                <Input
-                  type="number"
-                  inputMode="numeric"
-                  placeholder="KES"
-                  value={newPriceListItem.price}
-                  onChange={(e) =>
-                    setNewPriceListItem((prev) => ({ ...prev, price: e.target.value }))
-                  }
-                  className="w-24 h-9 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={addPriceListItem}
-                  className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
-                >
-                  <Plus size={16} />
-                </button>
+
+                <div className="flex gap-2">
+                  {[
+                    { value: "fixed", label: "Fixed Price" },
+                    { value: "contact", label: "Contact for Price" },
+                    { value: "custom", label: "Custom label" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setNewPriceListItem((prev) => ({
+                          ...prev,
+                          priceType: option.value as "fixed" | "contact" | "custom",
+                        }))
+                      }
+                      className={`flex-1 py-2 px-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
+                        newPriceListItem.priceType === option.value
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  {newPriceListItem.priceType === "fixed" && (
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="KES"
+                      value={newPriceListItem.price}
+                      onChange={(e) =>
+                        setNewPriceListItem((prev) => ({ ...prev, price: e.target.value }))
+                      }
+                      className="flex-1 h-9 text-sm"
+                    />
+                  )}
+
+                  {newPriceListItem.priceType === "custom" && (
+                    <Input
+                      type="text"
+                      placeholder="e.g. 30 pekee, @20, 20/=, Mbao pekee"
+                      value={newPriceListItem.priceText}
+                      onChange={(e) =>
+                        setNewPriceListItem((prev) => ({ ...prev, priceText: e.target.value }))
+                      }
+                      className="flex-1 h-9 text-sm"
+                    />
+                  )}
+
+                  {newPriceListItem.priceType === "contact" && (
+                    <div className="flex-1 h-9 flex items-center px-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
+                      Buyers will be told to contact you for this item's price.
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={addPriceListItem}
+                    className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
               </div>
             </div>
 
