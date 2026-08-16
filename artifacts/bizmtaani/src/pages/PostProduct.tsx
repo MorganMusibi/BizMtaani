@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
+import { clearFeedCache } from "@/hooks/useHomeFeed";
 import { encodeGeohash } from "@/lib/geohash";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
@@ -50,6 +51,22 @@ type Step = 1 | 2 | 3 | 4 | 5;
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium,
 } = useAuth();
+
+  // Invalidate this seller's own cached advert lists (My Listings +
+  // Home feed) so they see their new advert immediately after posting,
+  // instead of waiting out the (now much longer) cache TTLs. This only
+  // affects the poster's own device/browser — other users' cached
+  // views elsewhere are unaffected and will pick up the new advert
+  // once their own cache naturally expires.
+  function invalidateOwnCaches() {
+    if (!user) return;
+    try {
+      sessionStorage.removeItem(`bizmtaani_my_listings_cache_${user.uid}`);
+    } catch {
+      // sessionStorage unavailable — nothing to clear, safe to ignore
+    }
+    clearFeedCache();
+  }
 
   // Shared across all photos uploaded during this posting session, so
   // every image (and eventually the advert itself) claims the same
