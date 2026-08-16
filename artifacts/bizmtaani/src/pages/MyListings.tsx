@@ -63,7 +63,7 @@ interface ListingsCacheEntry {
   products: Product[];
   timestamp: number;
 }
-const LISTINGS_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const LISTINGS_CACHE_TTL_MS = 5 * 60 * 1000; // 2 minutes
 const LISTINGS_CACHE_PREFIX = "bizmtaani_my_listings_cache_";
 
 function readListingsCache(uid: string): ListingsCacheEntry | null {
