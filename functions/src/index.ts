@@ -900,6 +900,34 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 
   return { success: true };
 });
+
+/**
+ * Admin-only: send a notification to any user by uid — for support
+ * replies, announcements, or manual follow-ups.
+ */
+export const adminSendNotification = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can send admin notifications.");
+  }
+
+  const { uid, title, body } = request.data as { uid?: string; title?: string; body?: string };
+
+  if (!uid) throw new HttpsError("invalid-argument", "A target user UID is required.");
+  if (typeof title !== "string" || !title.trim() || title.length > 100) {
+    throw new HttpsError("invalid-argument", "A valid title (max 100 characters) is required.");
+  }
+  if (typeof body !== "string" || !body.trim() || body.length > 500) {
+    throw new HttpsError("invalid-argument", "A valid message (max 500 characters) is required.");
+  }
+
+  await sendPushToUid(uid, title.trim(), body.trim(), { type: "admin_message" });
+
+  return { success: true };
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 4B. REVERSE GEOCODING (Nominatim proxy with cache + rate limiting)
 // ═══════════════════════════════════════════════════════════════════════════
