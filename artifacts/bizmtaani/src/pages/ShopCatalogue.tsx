@@ -658,11 +658,44 @@ useEffect(() => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2
-          size={28}
-          className="animate-spin text-primary"
-        />
+      <div className="min-h-screen bg-background pb-24 animate-pulse">
+        <div className="sticky top-0 z-40 bg-card border-b border-border flex items-center gap-3 px-4 h-14">
+          <div className="w-6 h-6 rounded-full bg-muted" />
+          <div className="h-4 w-32 rounded bg-muted" />
+        </div>
+
+        <div className="px-4 pt-5 pb-4 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted flex-shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-5 w-40 rounded bg-muted" />
+              <div className="h-3 w-24 rounded bg-muted" />
+              <div className="h-3 w-28 rounded bg-muted" />
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="h-10 rounded-xl bg-muted" />
+            <div className="h-10 rounded-xl bg-muted" />
+            <div className="h-10 rounded-xl bg-muted" />
+          </div>
+        </div>
+
+        <div className="h-2 bg-muted" />
+
+        <div className="px-4 pt-4 grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-2xl border border-border overflow-hidden"
+            >
+              <div className="aspect-square bg-muted" />
+              <div className="px-2.5 py-2.5 space-y-2">
+                <div className="h-3 w-full rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -682,11 +715,13 @@ useEffect(() => {
       <div className="sticky top-0 z-40 bg-card border-b border-border flex items-center gap-3 px-4 h-14">
         <button
           type="button"
-          onClick={() =>
-            navigate(
-              -1 as unknown as string
-            )
-          }
+          onClick={() => {
+            if (window.history.length > 1) {
+              window.history.back();
+            } else {
+              navigate("/");
+            }
+          }}
           className="p-1 text-muted-foreground hover:text-foreground"
           aria-label="Go back"
         >
