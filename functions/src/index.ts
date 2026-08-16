@@ -1156,6 +1156,7 @@ try {
     ownerId: uid,
     sellerId: uid,
     status,
+    expiringNotified: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
   });
