@@ -36,7 +36,7 @@ interface FeedCacheEntry {
   areaDone: boolean;
   timestamp: number;
 }
-const FEED_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const FEED_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
 function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   try {
     const raw = localStorage.getItem("bizmtaani_feed_cache");
@@ -66,6 +66,19 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
 }
 
 const feedCache = loadFeedCacheFromStorage();
+
+// Called after a successful advert post so the poster's own device
+// shows the new advert immediately instead of waiting out the TTL.
+// This only clears this browser's cache — it has no effect on other
+// users' devices, since there is no shared server-side cache here.
+export function clearFeedCache() {
+  feedCache.clear();
+  try {
+    localStorage.removeItem("bizmtaani_feed_cache");
+  } catch {
+    // localStorage unavailable — nothing to clear, safe to ignore
+  }
+}
 
 export interface Product {
   id: string;
