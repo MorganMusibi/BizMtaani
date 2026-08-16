@@ -297,7 +297,8 @@ export default function Jobs() {
     );
   }
 
-  const visible = sortJobs(applyLocalFilters(jobs), wardName, county);
+  const activeJobs = jobs.filter((j) => !isJobExpired(j.deadline));
+  const visible = sortJobs(applyLocalFilters(activeJobs), wardName, county);
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
