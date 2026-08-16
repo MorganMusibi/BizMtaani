@@ -285,7 +285,47 @@ export default function Home() {
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
+  const [refreshingLocation, setRefreshingLocation] = useState(false);
 
+  const refreshLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setRefreshingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setGpsGranted(true);
+        setLocationErrorMsg(null);
+        const resolved = await getWardInfo(lat, lng);
+        if (resolved) {
+          setLocationInfo(resolved);
+        }
+        setUserCoords([lat, lng]);
+        const choices = await getAreaChoices(lat, lng);
+        setAreaChoices(choices ?? []);
+        setRefreshingLocation(false);
+      },
+      (error) => {
+        console.warn("Manual location refresh failed:", error);
+        setRefreshingLocation(false);
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationErrorMsg(
+            "Location access is blocked for this site. Enable it in your browser's site settings, then try again."
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationErrorMsg(
+            "Your phone's location/GPS appears to be turned off. Turn it on in your device settings, then try again."
+          );
+        } else {
+          setLocationErrorMsg(
+            "We couldn't get your location right now. Please try again in a moment."
+          );
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, []);
   // Keep the module-level cache in sync so a later remount can skip
   // GPS/geocoding entirely.
   useEffect(() => {
@@ -740,6 +780,14 @@ const totalVisible = rankedProducts.length;
             <p className="text-xs text-muted-foreground flex-1 truncate">
               {bannerText()}
             </p>
+            <button
+              type="button"
+              onClick={refreshLocation}
+              disabled={refreshingLocation}
+              className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
+            >
+              {refreshingLocation ? "Updating..." : "Refresh"}
+            </button>
           </div>
         )}
                       {locationErrorMsg && (
@@ -757,38 +805,11 @@ const totalVisible = rankedProducts.length;
                 {/* Try Again Button */}
                 <button
                   type="button"
-                  onClick={() => {
-                    navigator.geolocation.getCurrentPosition(
-                      async (pos) => {
-                        const lat = pos.coords.latitude;
-                        const lng = pos.coords.longitude;
-                        setUserCoords((prev) => {
-  if (
-    prev &&
-    prev[0] === lat &&
-    prev[1] === lng
-  ) {
-    return prev;
-  }
-
-  return [lat, lng];
-});
-                        setGpsGranted(true);
-                        setLocationErrorMsg(null);
-                        const resolved = await getWardInfo(lat, lng);
-                        if (resolved) setLocationInfo(resolved);
-                        const choices = await getAreaChoices(lat, lng);
-                        setAreaChoices(choices ?? []);
-                      },
-                      (err) => {
-                        console.error("Retry error:", err);
-                      },
-                      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-                    );
-                  }}
-                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm"
+                  onClick={refreshLocation}
+                  disabled={refreshingLocation}
+                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
                 >
-                  Try Again
+                  {refreshingLocation ? "Retrying..." : "Try Again"}
                 </button>
 
                 {/* Open Permissions / Guide Button */}
