@@ -12,6 +12,14 @@ import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Loader2, Check, Briefcase } from "lucide-react";
 import { JOB_CATEGORIES, JOB_TYPES } from "./Jobs";
 
+function isValidKenyanPhone(value: string): boolean {
+  const cleaned = value.replace(/\s+/g, "").trim();
+  return /^(?:\+254|254|0)(?:7\d{8}|1\d{8})$/.test(cleaned);
+}
+
+function isValidEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
 const NAIROBI = { lat: -1.286389, lng: 36.817223 };
 const CONTACT_METHODS = [
   { value: "none", label: "BizMtaani Chat Only" },
@@ -85,6 +93,24 @@ export default function PostJob() {
   });
   return;
 }
+    if (
+      (contactMethod === "phone" || contactMethod === "whatsapp") &&
+      !isValidKenyanPhone(contact)
+    ) {
+      toast({
+        title: "Enter a valid Kenyan phone number",
+        description: "e.g. 0712345678",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (contactMethod === "email" && !isValidEmail(contact)) {
+      toast({
+        title: "Enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
     if (!user) return;
 
     setSubmitting(true);
@@ -103,7 +129,7 @@ export default function PostJob() {
         ward,
         county,
         posterId: user.uid,
-        posterName: userProfile?.businessName || user.displayName || "Recruiter",
+        posterName: userProfile?.businessName || userProfile?.displayName || user.displayName || "Recruiter",
         createdAt: serverTimestamp(),
       });
       toast({ title: "Job posted!", description: "Your job listing is now live." });
@@ -222,6 +248,7 @@ export default function PostJob() {
             value={requirements} onChange={(e) => setRequirements(e.target.value)}
             className="min-h-[80px]" maxLength={1000}
           />
+          <p className="text-xs text-right text-muted-foreground">{requirements.length}/1000</p>
         </div>
 
         {/* Additional Application Contact */}
