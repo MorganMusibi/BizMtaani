@@ -70,6 +70,8 @@ interface ShopProduct {
 
   priceType?: "fixed" | "negotiable";
 
+  priceList?: { name: string; price: number }[];
+
   status?: string;
 
   lat?: number;
@@ -1024,6 +1026,12 @@ useEffect(() => {
                                   {
                                     product.subcategory
                                   }
+                                </p>
+                              )}
+
+                              {product.priceList && product.priceList.length > 0 && (
+                                <p className="text-[11px] text-primary font-semibold mt-0.5">
+                                  +{product.priceList.length} other item{product.priceList.length > 1 ? "s" : ""}
                                 </p>
                               )}
 
