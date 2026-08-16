@@ -3716,6 +3716,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         onInitiate={handleInitiate}
         onSuccess={(pid) => {
           toast({ title: "Listing is live!", description: "Your advert is now visible in the marketplace." });
+          invalidateOwnCaches();
           navigate(`/product/${pid}`);
         }}
       />
