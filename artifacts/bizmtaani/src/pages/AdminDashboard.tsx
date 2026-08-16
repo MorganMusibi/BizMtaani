@@ -181,12 +181,18 @@ const [supportReports, setSupportReports] = useState<SupportReport[]>([]);
 const [supportReportsLoading, setSupportReportsLoading] = useState(true);
 const [processingSupportReportId, setProcessingSupportReportId] = useState<string | null>(null);
 
-  // Users tab
+// Users tab
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [reportCountsBySeller, setReportCountsBySeller] = useState<Record<string, number>>({});
+
+  // Message modal — sending a direct notification to a specific user
+  const [messageTarget, setMessageTarget] = useState<AdminUser | null>(null);
+  const [messageTitle, setMessageTitle] = useState("");
+  const [messageBody, setMessageBody] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   // Adverts tab
   const [adverts, setAdverts] = useState<AdminProduct[]>([]);
@@ -732,6 +738,7 @@ async function dismissSupportReport(reportId: string) {
       setProcessingReportId(null);
     }
   }
+  
   async function toggleUserBlock(targetUser: AdminUser) {
     const willBlock = !targetUser.blocked;
     const reason = willBlock ? prompt("Reason for blocking this user (optional):") ?? "" : "";
@@ -753,6 +760,28 @@ async function dismissSupportReport(reportId: string) {
       alert("Failed to update user status.");
     } finally {
       setProcessingUserId(null);
+    }
+  }
+
+  async function sendAdminMessage() {
+    if (!messageTarget || !messageTitle.trim() || !messageBody.trim()) return;
+    setSendingMessage(true);
+    try {
+      const adminSendNotification = httpsCallable(functions, "adminSendNotification");
+      await adminSendNotification({
+        uid: messageTarget.id,
+        title: messageTitle.trim(),
+        body: messageBody.trim(),
+      });
+      alert(`Message sent to ${messageTarget.displayName || messageTarget.id}.`);
+      setMessageTarget(null);
+      setMessageTitle("");
+      setMessageBody("");
+    } catch (error) {
+      console.error("Failed to send admin notification:", error);
+      alert("Failed to send message. The user may not have notifications enabled.");
+    } finally {
+      setSendingMessage(false);
     }
   }
 
@@ -1210,6 +1239,13 @@ async function dismissSupportReport(reportId: string) {
                             </td>
                             <td className="px-4 py-2.5 text-right">
                               <div className="flex items-center justify-end gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => setMessageTarget(u)}
+                                  className="text-xs font-semibold text-primary hover:underline"
+                                >
+                                  Message
+                                </button>
                                 {u.role !== "admin" && (
                                   <button
                                     type="button"
@@ -1629,6 +1665,65 @@ async function dismissSupportReport(reportId: string) {
           )}
         </main>
       </div>
+
+      {messageTarget && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4">
+            <div>
+              <h3 className="font-bold text-lg">Message {messageTarget.displayName || messageTarget.id}</h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                Sent as a push notification, if they have notifications enabled.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Title</label>
+              <input
+                type="text"
+                value={messageTitle}
+                onChange={(e) => setMessageTitle(e.target.value)}
+                maxLength={100}
+                placeholder="e.g. Regarding your advert"
+                className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Message</label>
+              <textarea
+                value={messageBody}
+                onChange={(e) => setMessageBody(e.target.value)}
+                maxLength={500}
+                placeholder="Type your message..."
+                className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-border bg-background text-sm"
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setMessageTarget(null);
+                  setMessageTitle("");
+                  setMessageBody("");
+                }}
+                disabled={sendingMessage}
+                className="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={sendAdminMessage}
+                disabled={sendingMessage || !messageTitle.trim() || !messageBody.trim()}
+                className="flex-1 rounded-lg bg-primary text-white px-3 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+              >
+                {sendingMessage ? "Sending..." : "Send"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   }
