@@ -26,6 +26,37 @@ interface Product {
   expiresAt?: { seconds: number } | null;
   status?: string;
   plan?: string;
+  priceList?: {
+    name: string;
+    price: number;
+    priceType?: "fixed" | "contact" | "custom";
+    priceText?: string;
+  }[];
+}
+
+function PriceListPreview({ priceList }: { priceList: Product["priceList"] }) {
+  if (!priceList || priceList.length === 0) return null;
+  return (
+    <div className="mt-1.5 rounded-lg bg-primary/5 px-2 py-1.5 space-y-0.5">
+      {priceList.slice(0, 2).map((item, i) => (
+        <div key={i} className="flex items-center justify-between gap-1 text-[10px]">
+          <span className="text-muted-foreground truncate">{item.name}</span>
+          <span className="font-bold text-primary flex-shrink-0">
+            {item.priceType === "contact"
+              ? "Contact"
+              : item.priceType === "custom" && item.priceText
+              ? item.priceText
+              : `KES ${item.price?.toLocaleString?.() ?? item.price}`}
+          </span>
+        </div>
+      ))}
+      {priceList.length > 2 && (
+        <p className="text-[10px] text-primary font-semibold">
+          +{priceList.length - 2} more item{priceList.length - 2 > 1 ? "s" : ""}
+        </p>
+      )}
+    </div>
+  );
 }
 
 function getExpiryInfo(p: Product): { label: string; color: string; isExpired: boolean } | null {
@@ -164,6 +195,7 @@ export default function MyListings() {
                               {expiry.label}
                             </div>
                           )}
+                          <PriceListPreview priceList={product.priceList} />
                           <div className="flex items-center justify-between mt-2">
                             <button data-testid={`button-delete-${product.id}`}
                               onClick={() => setConfirmProduct(product)} disabled={deleting === product.id}
