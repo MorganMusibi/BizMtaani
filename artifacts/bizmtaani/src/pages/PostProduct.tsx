@@ -114,8 +114,15 @@ const [priceDisplay, setPriceDisplay] =
     supper: { name: "", price: "" },
   });
   // Other products / services list (shown on Product Detail as "View List")
-  const [priceListItems, setPriceListItems] = useState<{ name: string; price: string }[]>([]);
-  const [newPriceListItem, setNewPriceListItem] = useState({ name: "", price: "" });
+  const [priceListItems, setPriceListItems] = useState<
+    { name: string; priceType: "fixed" | "contact" | "custom"; price: string; priceText: string }[]
+  >([]);
+  const [newPriceListItem, setNewPriceListItem] = useState<{
+    name: string;
+    priceType: "fixed" | "contact" | "custom";
+    price: string;
+    priceText: string;
+  }>({ name: "", priceType: "fixed", price: "", priceText: "" });
 
   // Step 3 — Images + location
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -742,12 +749,20 @@ function handleImageFiles(files: FileList | null) {
     }));
   }
   function addPriceListItem() {
-    if (!newPriceListItem.name.trim() || !newPriceListItem.price) return;
+    if (!newPriceListItem.name.trim()) return;
+    if (newPriceListItem.priceType === "fixed" && !newPriceListItem.price) return;
+    if (newPriceListItem.priceType === "custom" && !newPriceListItem.priceText.trim()) return;
+
     setPriceListItems((prev) => [
       ...prev,
-      { name: newPriceListItem.name.trim(), price: newPriceListItem.price },
+      {
+        name: newPriceListItem.name.trim(),
+        priceType: newPriceListItem.priceType,
+        price: newPriceListItem.price,
+        priceText: newPriceListItem.priceText.trim(),
+      },
     ]);
-    setNewPriceListItem({ name: "", price: "" });
+    setNewPriceListItem({ name: "", priceType: "fixed", price: "", priceText: "" });
   }
 
   function removePriceListItem(i: number) {
