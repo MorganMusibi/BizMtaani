@@ -13,12 +13,15 @@ export function getFirebaseErrorMessage(
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
 
+      if (message.includes("network")) {
+        return "Please check your internet connection and try again.";
+      }
+
       if (
-        message.includes("network") ||
         message.includes("failed to fetch") ||
         message.includes("fetch failed")
       ) {
-        return "Please check your internet connection and try again.";
+        return "The upload couldn't reach our servers. If you're using an ad blocker or privacy extension, try disabling it for this site and try again.";
       }
     }
 
