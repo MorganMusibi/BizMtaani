@@ -242,6 +242,7 @@ export default function MyListings() {
                       </div>
                       <div className="p-3">
                         <p className="font-bold text-sm line-clamp-1">{product.title}</p>
+                        <PriceListPreview priceList={product.priceList} />
                         <div className="flex items-center justify-between mt-2">
                           <button onClick={() => setConfirmProduct(product)} disabled={deleting === product.id}
                             className="flex items-center gap-1 text-destructive text-xs font-medium hover:opacity-70 transition-opacity">
