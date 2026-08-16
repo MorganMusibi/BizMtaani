@@ -137,7 +137,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Sportswear",
       "Underwear & Lingerie",
 
-      "Shoes",
+      "Other Shoes",
       "Men's Shoes",
       "Women's Shoes",
       "Kids' Shoes",
@@ -152,7 +152,7 @@ export const CATEGORY_DEFS: CategoryDef[] = [
       "Sunglasses",
 
       "Watches",
-      "Jewelry",
+      "Other Jewelry",
       "Gold & Precious Jewelry",
       "Fashion Jewelry",
 
@@ -186,49 +186,43 @@ export const CATEGORY_DEFS: CategoryDef[] = [
     tagline:
       "Phones, computers, TVs, electronics, accessories, repairs and digital services",
     subcategories: [
-      "Phones",
+      "Other Phones",
       "Smartphones",
       "Basic Phones",
       "Tablets",
 
-      "Laptops & Computers",
       "Desktop Computers",
       "Laptops",
       "Monitors",
       "Computer Accessories",
 
-      "TVs & Home Entertainment",
       "Televisions",
       "Speakers & Sound Systems",
       "Home Theatre Systems",
       "Gaming Consoles",
       "Video Games",
 
-      "Cameras & Photography Equipment",
       "Cameras",
       "Camera Lenses",
       "Photography Accessories",
 
-      "Accessories",
+      "Other Accessories",
       "Phone Accessories",
       "Chargers & Cables",
       "Power Banks",
       "Headphones & Earphones",
       "Smart Watches",
 
-      "Networking",
       "WiFi Routers",
       "Modems",
       "Networking Equipment",
 
-      "Repairs & Tech Services",
       "Phone Repairs",
       "Computer Repairs",
       "TV Repairs",
       "Electronics Repairs",
       "Software & IT Services",
 
-      "Cyber / Printing Services",
       "Cyber Services",
       "Printing & Photocopying",
       "Graphic Design",
