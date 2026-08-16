@@ -1572,7 +1572,7 @@ const data = result.data as PublishAdvertResponse;
       errorMessage.toLowerCase().includes("archived")
     ) {
       setLimitModalMessage(
-        "You have reached your maximum limit of 5 active free adverts, or have 5 archived items. Please upgrade your plan or delete/manage existing listings to post a new one."
+        "You have reached your maximum limit of 3 active free adverts, or have 3 archived items. Please upgrade your plan or delete/manage existing listings to post a new one."
       );
     } else {
       const message = getFirebaseErrorMessage(
@@ -3258,13 +3258,12 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <h2 className="font-black text-lg">Choose Your Plan</h2>
       <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
     </div>
-
-    {/* Free plan */}
+{/* Free plan */}
     <button onClick={() => setPlan("free")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Free</span>
-          <p className="text-sm text-muted-foreground">7 days · 1 photo · 3 max active adverts</p>
+          <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
         </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
@@ -3275,7 +3274,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Weekly Premium</span>
-          <p className="text-sm text-muted-foreground">7 days · Up to 3 photos · Up to 8 active adverts</p>
+          <p className="text-sm text-muted-foreground">Up to 8 adverts at a time · 3 photos each · Live for 7 days</p>
         </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
@@ -3286,7 +3285,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Monthly Premium</span>
-          <p className="text-sm text-muted-foreground">30 days · Up to 3 photos · Up to 10 active adverts</p>
+          <p className="text-sm text-muted-foreground">Up to 10 adverts at a time · 3 photos each · Live for 30 days</p>
         </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
