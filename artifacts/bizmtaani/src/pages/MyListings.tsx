@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
-  collection, query, where, orderBy, onSnapshot, deleteDoc, doc,
+  collection, query, where, orderBy, limit, getDocs, deleteDoc, doc,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,7 +14,7 @@ import {
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS } from "@/lib/mpesa";
+import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
 interface Product {
   id: string;
   title: string;
@@ -85,13 +85,22 @@ export default function MyListings() {
   const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("basic");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
+  async function fetchProducts() {
+    if (!user) return;
+    const q = query(
+      collection(db, "products"),
+      where("sellerId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(30)
+    );
+    const snap = await getDocs(q);
+    setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product)));
+  }
+
   useEffect(() => {
     if (!user) { setLocation("/login"); return; }
-    const q = query(collection(db, "products"), where("sellerId", "==", user.uid), orderBy("createdAt", "desc"));
-    return onSnapshot(q, (snap) => {
-      setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product)));
-      setLoading(false);
-    });
+    setLoading(true);
+    fetchProducts().finally(() => setLoading(false));
   }, [user, setLocation]);
 
   async function confirmDelete() {
