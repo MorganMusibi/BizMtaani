@@ -1098,9 +1098,25 @@ useEffect(() => {
                               )}
 
                               {product.priceList && product.priceList.length > 0 && (
-                                <p className="text-[11px] text-primary font-semibold mt-0.5">
-                                  +{product.priceList.length} other item{product.priceList.length > 1 ? "s" : ""}
-                                </p>
+                                <div className="mt-1.5 rounded-lg bg-primary/5 px-2 py-1.5 space-y-0.5">
+                                  {product.priceList.slice(0, 2).map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between gap-1 text-[10px]">
+                                      <span className="text-muted-foreground truncate">{item.name}</span>
+                                      <span className="font-bold text-primary flex-shrink-0">
+                                        {item.priceType === "contact"
+                                          ? "Contact"
+                                          : item.priceType === "custom" && item.priceText
+                                          ? item.priceText
+                                          : `KES ${item.price?.toLocaleString?.() ?? item.price}`}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  {product.priceList.length > 2 && (
+                                    <p className="text-[10px] text-primary font-semibold">
+                                      +{product.priceList.length - 2} more item{product.priceList.length - 2 > 1 ? "s" : ""}
+                                    </p>
+                                  )}
+                                </div>
                               )}
 
                               {product.ward && (
