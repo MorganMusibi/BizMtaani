@@ -826,9 +826,9 @@ export default function ChatList() {
                     </p>
 
                     <span className="flex items-center gap-1 flex-shrink-0">
-                      {chat.mutedFor?.includes(
+                      {chat.mutedBy?.includes(
                         user.uid
-                      ) && (
+                        ) && (
                         <BellOff
                           size={12}
                           className="text-muted-foreground"
