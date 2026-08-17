@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -78,6 +78,24 @@ export function clearFeedCache() {
   } catch {
     // localStorage unavailable — nothing to clear, safe to ignore
   }
+}
+
+function computeFeedCacheKey(
+  wardName: string | undefined,
+  userCoords: [number, number]
+): string {
+  return `${wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
+}
+
+// Reads a still-fresh cache entry synchronously, for seeding a hook's
+// initial state before first render — avoids the empty-then-refill
+// flash on remount when nothing has actually changed.
+function getFreshFeedCacheEntry(key: string): FeedCacheEntry | null {
+  const cached = feedCache.get(key);
+  if (cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
+    return cached;
+  }
+  return null;
 }
 
 export interface Product {
@@ -482,12 +500,24 @@ export function useHomeFeeds({
 } | null;
 }) {
 
-const [wardProducts, setWardProducts] = useState<Product[]>([]);
-  const [wardCursor, setWardCursor] = useState<Cursor | null>(null);
-  const [wardDone, setWardDone] = useState(false);
+// Synchronous cache read at hook-init time — if this exact ward/coords
+// combo is already cached and fresh, seed state with it directly so
+// the first render after remounting doesn't show empty + spinner
+// before the effect below gets a chance to run.
+const initialCacheKey = !isSearchMode && gpsReady && userCoords
+  ? computeFeedCacheKey(locationInfo?.wardName, userCoords)
+  : null;
+const initialCached = initialCacheKey ? getFreshFeedCacheEntry(initialCacheKey) : null;
+// Consumed once by the effect below, then cleared — only the very
+// first matching run should skip its reset-and-refetch.
+const skipNextResetRef = useRef(initialCached ? initialCacheKey : null);
+
+const [wardProducts, setWardProducts] = useState<Product[]>(initialCached?.wardProducts ?? []);
+  const [wardCursor, setWardCursor] = useState<Cursor | null>(initialCached?.wardCursor ?? null);
+  const [wardDone, setWardDone] = useState(initialCached?.wardDone ?? false);
   const [wardLoading, setWardLoading] = useState(false);
 
-const [areaProducts, setAreaProducts] = useState<Product[]>([]);
+const [areaProducts, setAreaProducts] = useState<Product[]>(initialCached?.areaProducts ?? []);
   // Current geographic discovery stage.
 //
 // 0 = 2.5 km
@@ -502,19 +532,29 @@ const [areaRadiusStage, setAreaRadiusStage] = useState(0);
 
 // Products fetched from Firestore but not yet displayed.
 // These act as the nearby pagination buffer.
-const [areaBuffer, setAreaBuffer] = useState<Product[]>([]);
+const [areaBuffer, setAreaBuffer] = useState<Product[]>(initialCached?.areaBuffer ?? []);
 
-const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>({});
-const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>({});
-const [areaDone, setAreaDone] = useState(false);
+const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>(initialCached?.areaCursors ?? {});
+const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>(initialCached?.areaDonePrefixes ?? {});
+const [areaDone, setAreaDone] = useState(initialCached?.areaDone ?? false);
 const [areaLoading, setAreaLoading] = useState(false);
 const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
-const [initialLoading, setInitialLoading] = useState(true);
+const [initialLoading, setInitialLoading] = useState(!initialCached);
 
 useEffect(() => {
   if (!gpsReady || !userCoords) return;
+
+  const cacheKeyForThisRun = computeFeedCacheKey(locationInfo?.wardName, userCoords);
+
+  // State was already seeded from this exact cache entry when the hook
+  // first mounted — skip the reset-and-refetch for this one run only.
+  if (!isSearchMode && skipNextResetRef.current === cacheKeyForThisRun) {
+    skipNextResetRef.current = null;
+    return;
+  }
+  skipNextResetRef.current = null;
 
 setInitialLoading(true);
 
