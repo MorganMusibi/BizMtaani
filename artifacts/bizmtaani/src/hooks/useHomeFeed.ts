@@ -315,26 +315,16 @@ export function dedupe(existing: Product[], incoming: Product[]): Product[] {
   const ids = new Set(existing.map((p) => p.id));
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
+
 function sortNearbyProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
   return [...products].sort((a, b) => {
-    const distanceA = getDistanceKm(
-      userCoords[0],
-      userCoords[1],
-      a.lat,
-      a.lng
-    );
+    const distanceA = getEffectiveSortDistanceKm(userCoords, a);
+    const distanceB = getEffectiveSortDistanceKm(userCoords, b);
 
-    const distanceB = getDistanceKm(
-      userCoords[0],
-      userCoords[1],
-      b.lat,
-      b.lng
-    );
-
-    // Distance remains the primary ordering factor.
+    // Distance (discounted for premium) remains the primary ordering factor.
     if (distanceA !== distanceB) {
       return distanceA - distanceB;
     }
@@ -360,25 +350,16 @@ export function rankProducts(
   userCoords: [number, number]
 ): Product[] {
   return [...products].sort((a, b) => {
-    const distanceA = getDistanceKm(
-      userCoords[0],
-      userCoords[1],
-      a.lat,
-      a.lng
-    );
-
-    const distanceB = getDistanceKm(
-      userCoords[0],
-      userCoords[1],
-      b.lat,
-      b.lng
-    );
+    const distanceA = getEffectiveSortDistanceKm(userCoords, a);
+    const distanceB = getEffectiveSortDistanceKm(userCoords, b);
 
     // ============================================================
     // PRIMARY FACTOR — DISTANCE
     //
     // The home feed always prefers adverts that are physically
-    // closer to the user.
+    // closer to the user. Premium adverts get a sort-only distance
+    // discount (PREMIUM_SORT_DISTANCE_DISCOUNT) so they climb the
+    // list without fully overriding genuine proximity.
     // ============================================================
 
     if (distanceA !== distanceB) {
