@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Loader2, Check, Briefcase } from "lucide-react";
-import { JOB_CATEGORIES, JOB_TYPES } from "./Jobs";
+import { JOB_CATEGORIES, JOB_TYPES, clearJobsCache } from "./Jobs";
 
 function isValidKenyanPhone(value: string): boolean {
   const cleaned = value.replace(/\s+/g, "").trim();
@@ -134,6 +134,7 @@ export default function PostJob() {
         posterName: userProfile?.businessName || userProfile?.displayName || user.displayName || "Recruiter",
         createdAt: serverTimestamp(),
       });
+      clearJobsCache();
       toast({ title: "Job posted!", description: "Your job listing is now live." });
       navigate("/jobs");
     } catch (error: any) {
