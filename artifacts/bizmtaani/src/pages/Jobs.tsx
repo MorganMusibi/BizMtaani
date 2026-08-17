@@ -21,8 +21,6 @@ import {
 const PAGE_SIZE = 15;
 
 
-const NAIROBI: [number, number] = [-1.286389, 36.817223];
-
 export const JOB_CATEGORIES = [
   "All",
   "Domestic Work",
@@ -201,11 +199,12 @@ export default function Jobs() {
         setAreaName(info.wardName || info.county || null);
         setLocationReady(true);
       },
-      async () => {
-        const info = await getWardInfo(NAIROBI[0], NAIROBI[1]);
-        setWardName(info.wardName);
-        setCounty(info.county);
-        setAreaName(null); // GPS denied — show all jobs
+      () => {
+        // GPS denied or failed — don't guess a location. Show all jobs,
+        // unbiased by proximity, rather than silently assuming Nairobi.
+        setWardName(null);
+        setCounty(null);
+        setAreaName(null);
         setLocationReady(true);
       },
       { timeout: 8000, maximumAge: 60000 }
