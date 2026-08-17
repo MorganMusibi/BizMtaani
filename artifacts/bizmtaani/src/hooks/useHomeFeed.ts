@@ -34,6 +34,8 @@ interface FeedCacheEntry {
   areaCursors: Record<string, Cursor | null>;
   areaDonePrefixes: Record<string, boolean>;
   areaDone: boolean;
+  nationwideCursor: Cursor | null;
+  nationwideDone: boolean;
   timestamp: number;
 }
 const FEED_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
@@ -160,6 +162,20 @@ function isPremiumProduct(product: Product) {
     product.plan === "premium_monthly" ||
     product.isPremium === true
   );
+}
+
+// Premium ads sort as if they were closer than they really are — a
+// ranking nudge, not a visibility rule. isProductVisibleToUser() and
+// isProductEligibleForFeedStage() are untouched and still use real
+// distance, so this only affects order within an already-eligible set.
+const PREMIUM_SORT_DISTANCE_DISCOUNT = 0.5;
+
+function getEffectiveSortDistanceKm(
+  userCoords: [number, number],
+  product: Product
+): number {
+  const distance = getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng);
+  return isPremiumProduct(product) ? distance * PREMIUM_SORT_DISTANCE_DISCOUNT : distance;
 }
 
 function getProductVisibilityScope(product: Product) {
@@ -482,6 +498,35 @@ function areaQueries(
     .filter(
       (q): q is ReturnType<typeof query> => q !== null
     );
+}
+
+// Unbounded by geohash — used only once the normal 2.5→50km discovery
+// stages are exhausted, to surface premium adverts from anywhere in
+// Kenya. Only matches adverts with an explicit visibilityScope of
+// "county" or "all_areas" — legacy premium adverts without that field
+// set are still found via the normal radius stages (isPremiumProduct
+// still makes them eligible there), just not by this nationwide stage.
+function nationwidePremiumQuery(cursor?: Cursor) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      where("status", "==", "active"),
+      where("visibilityScope", "in", ["county", "all_areas"]),
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(AREA_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    where("status", "==", "active"),
+    where("visibilityScope", "in", ["county", "all_areas"]),
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
 }
 
 export function useHomeFeeds({
