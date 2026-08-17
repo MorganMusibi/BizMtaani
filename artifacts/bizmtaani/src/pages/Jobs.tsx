@@ -17,9 +17,94 @@ import {
   Briefcase, Plus, Loader2, MapPin, Clock, Search, X,
   Building2, Banknote, ChevronRight,
 } from "lucide-react";
-
 const PAGE_SIZE = 15;
 
+const JOBS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const JOBS_LOCATION_TTL_MS = 15 * 60 * 1000;
+const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
+const JOBS_LOCATION_STORAGE_KEY = "bizmtaani_jobs_location_state";
+
+interface JobsCacheEntry {
+  jobs: JobPostShape[];
+  cursor: Cursor | null;
+  done: boolean;
+  timestamp: number;
+}
+
+function loadJobsCacheFromStorage(): Map<string, JobsCacheEntry> {
+  try {
+    const raw = localStorage.getItem(JOBS_CACHE_STORAGE_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, Omit<JobsCacheEntry, "cursor"> & { cursor: null }>;
+    const map = new Map<string, JobsCacheEntry>();
+    Object.entries(parsed).forEach(([key, entry]) => {
+      map.set(key, { ...entry, cursor: null });
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveJobsCacheToStorage(cache: Map<string, JobsCacheEntry>) {
+  try {
+    const serializable: Record<string, unknown> = {};
+    cache.forEach((entry, key) => {
+      const { cursor, ...rest } = entry;
+      serializable[key] = rest;
+    });
+    localStorage.setItem(JOBS_CACHE_STORAGE_KEY, JSON.stringify(serializable));
+  } catch {
+    // localStorage full or unavailable — cache just won't persist across reload
+  }
+}
+
+const jobsCache = loadJobsCacheFromStorage();
+
+// Called after a successful job post so the poster's own device shows
+// the new listing immediately instead of waiting out the TTL. Only
+// clears this browser's cache — same caveat as clearFeedCache().
+export function clearJobsCache() {
+  jobsCache.clear();
+  try {
+    localStorage.removeItem(JOBS_CACHE_STORAGE_KEY);
+  } catch {
+    // safe to ignore
+  }
+}
+
+function computeJobsCacheKey(category: string, type: string): string {
+  return `${category}_${type}`;
+}
+
+function getFreshJobsCacheEntry(key: string): JobsCacheEntry | null {
+  const cached = jobsCache.get(key);
+  if (cached && Date.now() - cached.timestamp < JOBS_CACHE_TTL_MS) {
+    return cached;
+  }
+  return null;
+}
+
+interface CachedJobsLocation {
+  wardName: string | null;
+  county: string | null;
+  areaName: string | null;
+  timestamp: number;
+}
+
+function loadCachedJobsLocation(): CachedJobsLocation | null {
+  try {
+    const raw = localStorage.getItem(JOBS_LOCATION_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CachedJobsLocation;
+    if (!parsed.timestamp || Date.now() - parsed.timestamp > JOBS_LOCATION_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+let cachedJobsLocation = loadCachedJobsLocation();
 
 export const JOB_CATEGORIES = [
   "All",
@@ -50,6 +135,11 @@ export const JOB_CATEGORIES = [
 ];
 
 export const JOB_TYPES = ["All Types", "Full-time", "Part-time", "Contract", "Remote", "Internship"];
+
+type JobPostShape = {
+  id: string;
+  [key: string]: unknown;
+};
 
 export interface JobPost {
   id: string;
@@ -170,10 +260,10 @@ export default function Jobs() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
 
-  const [areaName, setAreaName] = useState<string | null>(null);
-  const [wardName, setWardName] = useState<string | null>(null);
-  const [county, setCounty] = useState<string | null>(null);
-  const [locationReady, setLocationReady] = useState(false);
+  const [areaName, setAreaName] = useState<string | null>(cachedJobsLocation?.areaName ?? null);
+  const [wardName, setWardName] = useState<string | null>(cachedJobsLocation?.wardName ?? null);
+  const [county, setCounty] = useState<string | null>(cachedJobsLocation?.county ?? null);
+  const [locationReady, setLocationReady] = useState(!!cachedJobsLocation);
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeType, setActiveType] = useState("All Types");
@@ -181,35 +271,88 @@ export default function Jobs() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
 
-  const [jobs, setJobs] = useState<JobPost[]>([]);
-  const [cursor, setCursor] = useState<Cursor | null>(null);
-  const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const initialJobsCacheKey = computeJobsCacheKey(activeCategory, activeType);
+  const initialJobsCached = getFreshJobsCacheEntry(initialJobsCacheKey);
+  // Consumed once by the fetch effect, then cleared — only the very
+  // first matching run should skip its reset-and-refetch.
+  const skipNextJobsResetRef = useRef(initialJobsCached ? initialJobsCacheKey : null);
+
+  const [jobs, setJobs] = useState<JobPost[]>((initialJobsCached?.jobs as JobPost[]) ?? []);
+  const [cursor, setCursor] = useState<Cursor | null>(initialJobsCached?.cursor ?? null);
+  const [done, setDone] = useState(initialJobsCached?.done ?? false);
+  const [loading, setLoading] = useState(!initialJobsCached);
   const [loadingMore, setLoadingMore] = useState(false);
 
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  // Detect location
+  // Detect location — skipped entirely if a fresh location was already
+  // cached from a previous mount (e.g. navigating back from a job).
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
-        setWardName(info.wardName);
-        setCounty(info.county);
-        setAreaName(info.wardName || info.county || null);
-        setLocationReady(true);
-      },
-      () => {
-        // GPS denied or failed — don't guess a location. Show all jobs,
-        // unbiased by proximity, rather than silently assuming Nairobi.
-        setWardName(null);
-        setCounty(null);
-        setAreaName(null);
-        setLocationReady(true);
-      },
-      { timeout: 8000, maximumAge: 60000 }
-    );
-  }, []);
+    if (!locationReady) return;
+
+    const cacheKeyForThisRun = computeJobsCacheKey(activeCategory, activeType);
+
+    // State was already seeded from this exact cache entry when the
+    // component first mounted — skip the reset-and-refetch this once.
+    if (skipNextJobsResetRef.current === cacheKeyForThisRun) {
+      skipNextJobsResetRef.current = null;
+      return;
+    }
+    skipNextJobsResetRef.current = null;
+
+    const cached = getFreshJobsCacheEntry(cacheKeyForThisRun);
+    if (cached) {
+      setJobs(cached.jobs as JobPost[]);
+      setCursor(cached.cursor);
+      setDone(cached.done);
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setJobs([]);
+    setCursor(null);
+    setDone(false);
+
+    getDocs(buildQuery())
+      .then((snap) => {
+
+        console.log("Jobs found: " + snap.docs.length);
+
+        const fetchedJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost));
+        const fetchedCursor = snap.docs[snap.docs.length - 1] ?? null;
+        const fetchedDone = snap.docs.length < PAGE_SIZE;
+
+        setJobs(fetchedJobs);
+        setCursor(fetchedCursor);
+        setDone(fetchedDone);
+        setLoading(false);
+
+        jobsCache.set(cacheKeyForThisRun, {
+          jobs: fetchedJobs,
+          cursor: fetchedCursor,
+          done: fetchedDone,
+          timestamp: Date.now(),
+        });
+        saveJobsCacheToStorage(jobsCache);
+      })
+    .catch((error) => {
+  console.error("Failed to load jobs:", error);
+  setLoading(false);
+});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locationReady, activeCategory, activeType, searchQuery]);
+
+  // Keep the module-level location cache in sync for later remounts.
+  useEffect(() => {
+    if (!locationReady) return;
+    cachedJobsLocation = { wardName, county, areaName, timestamp: Date.now() };
+    try {
+      localStorage.setItem(JOBS_LOCATION_STORAGE_KEY, JSON.stringify(cachedJobsLocation));
+    } catch {
+      // localStorage full or unavailable — in-memory cache still works for same-session nav
+    }
+  }, [locationReady, wardName, county, areaName]);
 
   function buildQuery(cur?: Cursor) {
     const coll = collection(db, "jobs");
