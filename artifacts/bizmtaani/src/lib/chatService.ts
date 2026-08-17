@@ -1400,3 +1400,4 @@ export async function toggleMuteChat(
   await updateDoc(chatRef, {
     mutedBy: updated,
   });
+}
