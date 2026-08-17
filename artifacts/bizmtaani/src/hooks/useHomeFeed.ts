@@ -43,10 +43,10 @@ function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   try {
     const raw = localStorage.getItem("bizmtaani_feed_cache");
     if (!raw) return new Map();
-    const parsed = JSON.parse(raw) as Record<string, Omit<FeedCacheEntry, "wardCursor" | "areaCursors"> & { wardCursor: null; areaCursors: Record<string, null> }>;
+    const parsed = JSON.parse(raw) as Record<string, Omit<FeedCacheEntry, "wardCursor" | "areaCursors" | "nationwideCursor"> & { wardCursor: null; areaCursors: Record<string, null>; nationwideCursor: null }>;
     const map = new Map<string, FeedCacheEntry>();
     Object.entries(parsed).forEach(([key, entry]) => {
-      map.set(key, { ...entry, wardCursor: null, areaCursors: {} });
+      map.set(key, { ...entry, wardCursor: null, areaCursors: {}, nationwideCursor: null });
     });
     return map;
   } catch {
@@ -58,7 +58,7 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
   try {
     const serializable: Record<string, unknown> = {};
     cache.forEach((entry, key) => {
-      const { wardCursor, areaCursors, ...rest } = entry;
+      const { wardCursor, areaCursors, nationwideCursor, ...rest } = entry;
       serializable[key] = rest;
     });
     localStorage.setItem("bizmtaani_feed_cache", JSON.stringify(serializable));
@@ -583,6 +583,12 @@ const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>(in
 const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>(initialCached?.areaDonePrefixes ?? {});
 const [areaDone, setAreaDone] = useState(initialCached?.areaDone ?? false);
 const [areaLoading, setAreaLoading] = useState(false);
+
+// Nationwide premium discovery — only used once the geohash radius
+// stages (2.5→50km) are exhausted. Tracked separately since it isn't
+// geohash-keyed like areaCursors/areaDonePrefixes.
+const [nationwideCursor, setNationwideCursor] = useState<Cursor | null>(initialCached?.nationwideCursor ?? null);
+const [nationwideDone, setNationwideDone] = useState(initialCached?.nationwideDone ?? false);
 const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
@@ -613,6 +619,8 @@ setAreaCursors({});
 setAreaDone(false);
 setAreaDonePrefixes({});   
 setAreaRadiusStage(0);
+setNationwideCursor(null);
+setNationwideDone(false);
 
 setSearchCursor(null);
 setSearchDone(false);
@@ -944,6 +952,8 @@ const sortedBuffer = sortNearbyProducts(
     areaCursors: currentCursors,
     areaDonePrefixes: currentDonePrefixes,
     areaDone: localAreaDone,
+    nationwideCursor: null,
+    nationwideDone: false,
     timestamp: Date.now(),
   });
   saveFeedCacheToStorage(feedCache);
@@ -1079,6 +1089,42 @@ if (!areaDone && !areaLoading) {
       setAreaBuffer(
         remainingBuffer
       );
+
+      return;
+    }
+
+    // ==========================================================
+    // STEP 1B — NATIONWIDE PREMIUM STAGE
+    //
+    // Reached only after every geohash radius stage (2.5→50km) is
+    // exhausted. Fetches premium adverts from anywhere in Kenya,
+    // nearest-first within this page via sortNearbyProducts — so a
+    // closer premium advert still outranks a farther one even here.
+    // ==========================================================
+
+    if (areaRadiusStage >= HOME_FEED_RADIUS_STEPS.length) {
+      if (nationwideDone) {
+        setAreaDone(true);
+        return;
+      }
+
+      const snap = await getDocs(
+        nationwidePremiumQuery(nationwideCursor ?? undefined)
+      );
+
+      const fetchedProducts = toProducts(snap.docs);
+      const sortedFetched = sortNearbyProducts(fetchedProducts, userCoords);
+
+      setAreaProducts((prev) =>
+        sortNearbyProducts(dedupe(prev, sortedFetched), userCoords)
+      );
+
+      const newCursor = snap.docs[snap.docs.length - 1] ?? null;
+      const isDone = snap.docs.length < AREA_PAGE;
+
+      setNationwideCursor(newCursor);
+      setNationwideDone(isDone);
+      setAreaDone(isDone);
 
       return;
     }
