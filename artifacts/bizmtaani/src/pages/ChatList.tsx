@@ -922,7 +922,7 @@ export default function ChatList() {
               className="w-full text-left px-4 py-3 rounded-xl hover:bg-muted transition-colors"
               onClick={() => {
                 setPendingAction(
-                  selectedChat.mutedFor?.includes(
+                 selectedChat.mutedBy?.includes(
                     user?.uid || ""
                   )
                     ? "unmute"
@@ -930,7 +930,7 @@ export default function ChatList() {
                 );
               }}
             >
-              {selectedChat.mutedFor?.includes(
+    {selectedChat.mutedBy?.include (
                 user?.uid || ""
               )
                 ? "🔔 Unmute"
