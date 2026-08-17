@@ -45,7 +45,7 @@ export interface ChatData {
 
   unreadCount?: Record<string, number>;
 
-  mutedFor?: string[];
+  mutedBy?: string[];
   deletedFor?: string[];
 
   createdAt?: Timestamp | null;
@@ -1386,18 +1386,17 @@ export async function toggleMuteChat(
   const chat =
     chatSnap.data() as ChatData;
 
-  const mutedFor =
-    chat.mutedFor || [];
+  const mutedBy =
+    chat.mutedBy || [];
 
   const updated = mute
     ? Array.from(
-        new Set([...mutedFor, userId])
+        new Set([...mutedBy, userId])
       )
-    : mutedFor.filter(
+    : mutedBy.filter(
         (uid) => uid !== userId
       );
 
   await updateDoc(chatRef, {
-    mutedFor: updated,
+    mutedBy: updated,
   });
-}
