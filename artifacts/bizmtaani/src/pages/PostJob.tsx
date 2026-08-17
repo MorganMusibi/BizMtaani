@@ -20,7 +20,7 @@ function isValidKenyanPhone(value: string): boolean {
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
-const NAIROBI = { lat: -1.286389, lng: 36.817223 };
+
 const CONTACT_METHODS = [
   { value: "none", label: "BizMtaani Chat Only" },
   { value: "whatsapp", label: "WhatsApp" },
@@ -47,6 +47,7 @@ export default function PostJob() {
 >("none");
   const [ward, setWard] = useState("");
   const [county, setCounty] = useState("");
+  const [locationFailed, setLocationFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -58,17 +59,18 @@ export default function PostJob() {
     setWard(userProfile.homeLocation.areaName);
     setCounty(userProfile.homeLocation.county);
   } else {
-    // Fallback: GPS/GeoJSON logic if profile location is missing
+    // Fallback: try GPS. If it fails or is denied, leave ward/county
+    // empty rather than guessing a city — an inaccurate location on a
+    // job posting is worse than none, since it's shown to applicants
+    // and never re-detected after posting.
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
         setWard(info.wardName);
         setCounty(info.county);
       },
-      async () => {
-        const info = await getWardInfo(NAIROBI.lat, NAIROBI.lng);
-        setWard(info.wardName);
-        setCounty(info.county);
+      () => {
+        setLocationFailed(true);
       },
       { timeout: 8000, maximumAge: 0 }
     );
@@ -323,6 +325,16 @@ export default function PostJob() {
     <span>
       Your job is visible to all job seekers, and will show first to those around and near{" "}
       <strong>{ward ? `${ward} area` : county}</strong>
+    </span>
+  </div>
+)}
+        {!ward && !county && locationFailed && (
+  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 px-4 py-3 rounded-xl">
+    <span>📍</span>
+    <span>
+      We couldn't detect your location, so this job will be shown to job seekers
+      everywhere in Kenya with no area preference. Enable location access and
+      repost if you'd like it to show first to applicants nearby.
     </span>
   </div>
 )}
