@@ -1465,8 +1465,13 @@ if (!areaDone && !areaLoading) {
         setAreaDonePrefixes({});
 
         setAreaDone(false);
+      } else if (!nationwideDone) {
+        // All geohash radius stages (up to 50km) are exhausted —
+        // move into the nationwide premium stage instead of ending.
+        setAreaRadiusStage(nextStage);
+        setAreaDone(false);
       } else {
-        // All geographic stages have been exhausted.
+        // Nationwide stage also exhausted — nothing left to load.
         setAreaDone(true);
       }
     } else {
@@ -1495,6 +1500,8 @@ if (!areaDone && !areaLoading) {
   areaRadiusStage,
   areaCursors,
   areaDonePrefixes,
+  nationwideCursor,
+  nationwideDone,
 ]);
 return {
   wardProducts,
