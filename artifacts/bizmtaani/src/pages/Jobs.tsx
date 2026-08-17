@@ -288,6 +288,68 @@ export default function Jobs() {
   // Detect location — skipped entirely if a fresh location was already
   // cached from a previous mount (e.g. navigating back from a job).
   useEffect(() => {
+    if (locationReady) return;
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
+        setWardName(info.wardName);
+        setCounty(info.county);
+        setAreaName(info.wardName || info.county || null);
+        setLocationReady(true);
+      },
+      () => {
+        // GPS denied or failed — don't guess a location. Show all jobs,
+        // unbiased by proximity, rather than silently assuming Nairobi.
+        setWardName(null);
+        setCounty(null);
+        setAreaName(null);
+        setLocationReady(true);
+      },
+      { timeout: 8000, maximumAge: 60000 }
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep the module-level location cache in sync for later remounts.
+  useEffect(() => {
+    if (!locationReady) return;
+    cachedJobsLocation = { wardName, county, areaName, timestamp: Date.now() };
+    try {
+      localStorage.setItem(JOBS_LOCATION_STORAGE_KEY, JSON.stringify(cachedJobsLocation));
+    } catch {
+      // localStorage full or unavailable — in-memory cache still works for same-session nav
+    }
+  }, [locationReady, wardName, county, areaName]);
+
+  function buildQuery(cur?: Cursor) {
+    const coll = collection(db, "jobs");
+    const constraints = [
+        orderBy("createdAt", "desc"),
+        limit(PAGE_SIZE),
+    ] as Parameters<typeof query>[1][];
+
+    // No ward filter here by design — all jobs are visible everywhere.
+    // Proximity is applied client-side via sortJobs() instead.
+
+    if (activeCategory !== "All") {
+        constraints.unshift(where("category", "==", activeCategory));
+    }
+
+    if (activeType !== "All Types") {
+        constraints.unshift(where("jobType", "==", activeType));
+    }
+
+    if (cur) {
+        constraints.push(startAfter(cur));
+    }
+
+    return query(coll, ...constraints);
+                 }
+
+  // Fetch jobs (or serve from cache) whenever location resolves or
+  // filters change.
+  useEffect(() => {
     if (!locationReady) return;
 
     const cacheKeyForThisRun = computeJobsCacheKey(activeCategory, activeType);
@@ -335,66 +397,6 @@ export default function Jobs() {
           timestamp: Date.now(),
         });
         saveJobsCacheToStorage(jobsCache);
-      })
-    .catch((error) => {
-  console.error("Failed to load jobs:", error);
-  setLoading(false);
-});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationReady, activeCategory, activeType, searchQuery]);
-
-  // Keep the module-level location cache in sync for later remounts.
-  useEffect(() => {
-    if (!locationReady) return;
-    cachedJobsLocation = { wardName, county, areaName, timestamp: Date.now() };
-    try {
-      localStorage.setItem(JOBS_LOCATION_STORAGE_KEY, JSON.stringify(cachedJobsLocation));
-    } catch {
-      // localStorage full or unavailable — in-memory cache still works for same-session nav
-    }
-  }, [locationReady, wardName, county, areaName]);
-
-  function buildQuery(cur?: Cursor) {
-    const coll = collection(db, "jobs");
-    const constraints = [
-        orderBy("createdAt", "desc"),
-        limit(PAGE_SIZE),
-    ] as Parameters<typeof query>[1][];
-
-    // No ward filter here by design — all jobs are visible everywhere.
-    // Proximity is applied client-side via sortJobs() instead.
-
-    if (activeCategory !== "All") {
-        constraints.unshift(where("category", "==", activeCategory));
-    }
-
-    if (activeType !== "All Types") {
-        constraints.unshift(where("jobType", "==", activeType));
-    }
-
-    if (cur) {
-        constraints.push(startAfter(cur));
-    }
-
-    return query(coll, ...constraints);
-                 }
-
-  useEffect(() => {
-    if (!locationReady) return;
-    setLoading(true);
-    setJobs([]);
-    setCursor(null);
-    setDone(false);
-
-    getDocs(buildQuery())
-      .then((snap) => {
-
-        console.log("Jobs found: " + snap.docs.length);
-
-        setJobs(snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost)));
-        setCursor(snap.docs[snap.docs.length - 1] ?? null);
-        setDone(snap.docs.length < PAGE_SIZE);
-        setLoading(false);
       })
     .catch((error) => {
   console.error("Failed to load jobs:", error);
