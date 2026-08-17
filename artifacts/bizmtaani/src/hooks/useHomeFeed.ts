@@ -712,6 +712,7 @@ try {
   let collectedProducts: Product[] = [];
   let iterations = 0;
   const MAX_ITERATIONS = 3;
+  let allPrefixesDone = false;
 
   const currentRadius = HOME_FEED_RADIUS_STEPS[0];
 
