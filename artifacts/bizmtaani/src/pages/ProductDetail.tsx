@@ -823,6 +823,12 @@ async function saveMenuChanges() {
       const deleteAdvert = httpsCallable(functions, "deleteAdvert");
       await deleteAdvert({ productId: product.id });
 
+      const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      await deleteAdvert({ productId: product.id });
+
+      productDetailCache.delete(product.id);
+      clearFeedCache();
+
       toast({ 
         title: "Advert deleted", 
         description: "Your advert has been removed." 
