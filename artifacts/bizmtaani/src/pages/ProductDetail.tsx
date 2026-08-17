@@ -15,7 +15,7 @@ import {
   startProductChat,
   ChatParticipant,
 } from "@/lib/chatService";
-import { isProductVisibleToUser, } from "@/hooks/useHomeFeed";
+import { isProductVisibleToUser, clearFeedCache } from "@/hooks/useHomeFeed";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -473,11 +473,21 @@ const handleReply = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronous cache read at mount time — avoids the empty-then-refill
+  // spinner flash when navigating back to a product viewed within the
+  // cache TTL. The effect below still runs and re-confirms this, but
+  // the first paint is now already correct instead of showing a spinner.
+  const initialProductCached = id ? productDetailCache.get(id) : undefined;
+  const initialProductCachedFresh =
+    initialProductCached && Date.now() - initialProductCached.timestamp < PRODUCT_DETAIL_CACHE_TTL_MS
+      ? initialProductCached
+      : undefined;
+
+  const [product, setProduct] = useState<Product | null>(initialProductCachedFresh?.product ?? null);
+  const [loading, setLoading] = useState(!initialProductCachedFresh);
   const [chatLoading, setChatLoading] = useState(false);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(cachedUserCoords);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [relatedProducts, setRelatedProducts] = useState<Product[]>(initialProductCachedFresh?.relatedProducts ?? []);
     useEffect(() => {
   if (cachedUserCoords) {
     // Already resolved earlier this session — skip re-requesting GPS.
