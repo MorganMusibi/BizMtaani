@@ -17,7 +17,7 @@ import {
   startJobApplicationChat,
   type ChatParticipant,
 } from "@/lib/chatService";
-import type { JobPost } from "./Jobs";
+import { clearJobsCache, type JobPost } from "./Jobs";
 
 // Helper function needed for your component
 function timeAgo(seconds: number): string {
@@ -65,6 +65,7 @@ export default function JobDetail() {
   try {
     const deleteJob = httpsCallable(functions, "deleteJob");
     await deleteJob({ jobId: job.id });
+    clearJobsCache();
     toast({ title: "Job deleted" });
     navigate("/jobs");
   } catch (e) {
