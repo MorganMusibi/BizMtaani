@@ -2,6 +2,7 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "firebase/storage
 import { db, storage, functions } from "@/lib/firebase";
 import { doc, setDoc, updateDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 import { useRef, useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { signOut, updateProfile } from "firebase/auth";
@@ -74,12 +75,14 @@ export default function Profile() {
   setSubmittingApplication(true);
 
   try {
+    const recaptchaToken = await getRecaptchaToken("apply_marketer");
     const applyForMarketer = httpsCallable(functions, "applyForMarketer");
     await applyForMarketer({
       fullName: marketerFullName.trim(),
       idNumber: marketerIdNumber.trim(),
       mpesaNumber: marketerMpesaNumber.trim(),
       reason: marketerReason.trim(),
+      recaptchaToken,
     });
 
     toast({ title: "Application submitted!", description: "We'll review it and get back to you." });
