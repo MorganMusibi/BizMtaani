@@ -11,6 +11,7 @@ import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getWardInfo } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { Button } from "@/components/ui/button";
@@ -126,16 +127,14 @@ async function applyReferralCodeIfPresent(code: string): Promise<boolean> {
   }
 
   try {
+    const recaptchaToken = await getRecaptchaToken("submit_referral");
     const submitReferralCode = httpsCallable(functions, "submitReferralCode");
-    await submitReferralCode({ code: trimmed });
+    await submitReferralCode({ code: trimmed, recaptchaToken });
     return true;
   } catch (error) {
     console.warn("Referral code could not be applied:", error);
     return false;
   }
-}
-
-
 
 
 export default function Register() {
