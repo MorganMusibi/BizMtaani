@@ -135,6 +135,7 @@ async function applyReferralCodeIfPresent(code: string): Promise<boolean> {
     console.warn("Referral code could not be applied:", error);
     return false;
   }
+}
 
 
 export default function Register() {
