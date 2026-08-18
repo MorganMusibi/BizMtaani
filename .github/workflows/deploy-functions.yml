@@ -63,6 +63,7 @@ jobs:
           set_secret MPESA_CONSUMER_KEY      "${{ secrets.MPESA_CONSUMER_KEY }}"
           set_secret MPESA_CONSUMER_SECRET   "${{ secrets.MPESA_CONSUMER_SECRET }}"
           set_secret MPESA_PASSKEY           "${{ secrets.MPESA_PASSKEY }}"
+          set_secret RECAPTCHA_SECRET_KEY    "${{ secrets.RECAPTCHA_SECRET_KEY }}"
 
       - name: Deploy Firebase Functions
         env:
