@@ -19,7 +19,7 @@ const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
 const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
-
+const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
 // ─── Constants ──────────────────────────────────────────────────────────────
 const FOLDER_MAP: Record<string, string> = {
   avatar: "bizmtaani/avatars",
@@ -74,6 +74,24 @@ function normalizePhone(raw: string): string {
   if ((p.startsWith("07") || p.startsWith("01")) && p.length === 10) return "254" + p.slice(1);
   if (p.startsWith("7") && p.length === 9) return "254" + p;
   throw new Error(`Invalid Kenyan number: ${raw}`);
+}
+
+async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<void> {
+  if (typeof token !== "string" || !token.trim()) {
+    throw new HttpsError("invalid-argument", "Missing reCAPTCHA token.");
+  }
+  const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: `secret=${recaptchaSecretKey.value()}&response=${token}`,
+  });
+  if (!res.ok) {
+    throw new HttpsError("internal", "reCAPTCHA verification service unavailable.");
+  }
+  const data = (await res.json()) as { success: boolean; score?: number; action?: string };
+  if (!data.success || data.action !== expectedAction || (data.score ?? 0) < 0.5) {
+    throw new HttpsError("permission-denied", "reCAPTCHA verification failed.");
+  }
 }
 
 let _darajaToken: { token: string; expiresAt: number } | null = null;
