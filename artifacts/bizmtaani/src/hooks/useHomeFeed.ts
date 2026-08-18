@@ -170,6 +170,58 @@ function isPremiumProduct(product: Product) {
 // distance, so this only affects order within an already-eligible set.
 const PREMIUM_SORT_DISTANCE_DISCOUNT = 0.5;
 
+// Products whose effective (discounted) distance falls in the same
+// bucket are treated as "the same area" — competing for view priority
+// via weighted randomness instead of raw distance. Tune to make "same
+// area" wider or narrower.
+const SAME_AREA_BUCKET_KM = 1;
+
+// How much more likely a premium ad is to win the weighted draw within
+// a same-area bucket, versus a free ad. 3 means premium is roughly 3x
+// as likely to land first in a head-to-head same-area tie — a real,
+// statistically higher chance of being seen, not a guarantee.
+const PREMIUM_VIEW_WEIGHT = 3;
+const FREE_VIEW_WEIGHT = 1;
+
+// Deterministic string hash → [0,1). Not cryptographic, just needs to
+// be stable for a given (seed, productId) pair so ordering doesn't
+// flicker on re-render, while varying across sessions.
+function seededRandom01(key: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    h ^= key.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return ((h >>> 0) % 1_000_000) / 1_000_000;
+}
+
+// One seed per browser tab/session — stable across re-renders and
+// pagination within a visit, but different on a fresh session, so the
+// weighted "who wins the same-area tie" outcome varies across visits
+// rather than always favoring the same product forever.
+function getViewSessionSeed(): string {
+  try {
+    let seed = sessionStorage.getItem("bizmtaani_view_seed");
+    if (!seed) {
+      seed = Math.random().toString(36).slice(2);
+      sessionStorage.setItem("bizmtaani_view_seed", seed);
+    }
+    return seed;
+  } catch {
+    return "static-seed";
+  }
+}
+
+// Efraimidis-Spirakis weighted random key: U^(1/weight), U uniform in
+// (0,1]. Sorting descending by this key gives each item a probability
+// of ranking first proportional to its weight — premium wins more
+// often, but never deterministically.
+function getViewPriorityKey(product: Product, sessionSeed: string): number {
+  const weight = isPremiumProduct(product) ? PREMIUM_VIEW_WEIGHT : FREE_VIEW_WEIGHT;
+  const u = Math.max(seededRandom01(`${sessionSeed}_${product.id}`), 0.0001);
+  return Math.pow(u, 1 / weight);
+}
+
 function getEffectiveSortDistanceKm(
   userCoords: [number, number],
   product: Product
@@ -320,27 +372,33 @@ function sortNearbyProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
+  const sessionSeed = getViewSessionSeed();
+
   return [...products].sort((a, b) => {
     const distanceA = getEffectiveSortDistanceKm(userCoords, a);
     const distanceB = getEffectiveSortDistanceKm(userCoords, b);
 
-    // Distance (discounted for premium) remains the primary ordering factor.
-    if (distanceA !== distanceB) {
-      return distanceA - distanceB;
+    const bucketA = Math.floor(distanceA / SAME_AREA_BUCKET_KM);
+    const bucketB = Math.floor(distanceB / SAME_AREA_BUCKET_KM);
+
+    // Different areas — real (discounted) distance still decides.
+    if (bucketA !== bucketB) {
+      return bucketA - bucketB;
     }
 
-    // Premium wins only when distance is effectively tied.
-    const premiumA = isPremiumProduct(a);
-    const premiumB = isPremiumProduct(b);
-
-    if (premiumA !== premiumB) {
-      return premiumA ? -1 : 1;
+    // Same area — compete via weighted randomness instead of exact
+    // distance, so premium has a statistically higher chance of
+    // landing first without always winning outright.
+    const keyA = getViewPriorityKey(a, sessionSeed);
+    const keyB = getViewPriorityKey(b, sessionSeed);
+    if (keyA !== keyB) {
+      return keyB - keyA;
     }
 
-    // Newer adverts first when distance and premium status tie.
+    // Exact tie (rare) — fall back to raw distance, then newest.
+    if (distanceA !== distanceB) return distanceA - distanceB;
     const createdA = a.createdAt?.seconds ?? 0;
     const createdB = b.createdAt?.seconds ?? 0;
-
     return createdB - createdA;
   });
 }
@@ -349,39 +407,48 @@ export function rankProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
+  const sessionSeed = getViewSessionSeed();
+
   return [...products].sort((a, b) => {
     const distanceA = getEffectiveSortDistanceKm(userCoords, a);
     const distanceB = getEffectiveSortDistanceKm(userCoords, b);
 
     // ============================================================
-    // PRIMARY FACTOR — DISTANCE
+    // PRIMARY FACTOR — DISTANCE (bucketed)
     //
     // The home feed always prefers adverts that are physically
     // closer to the user. Premium adverts get a sort-only distance
     // discount (PREMIUM_SORT_DISTANCE_DISCOUNT) so they climb the
-    // list without fully overriding genuine proximity.
+    // list without fully overriding genuine proximity. Distances are
+    // compared by bucket (SAME_AREA_BUCKET_KM) rather than exactly,
+    // so near-equal distances count as "the same area."
     // ============================================================
 
-    if (distanceA !== distanceB) {
-      return distanceA - distanceB;
+    const bucketA = Math.floor(distanceA / SAME_AREA_BUCKET_KM);
+    const bucketB = Math.floor(distanceB / SAME_AREA_BUCKET_KM);
+
+    if (bucketA !== bucketB) {
+      return bucketA - bucketB;
     }
 
     // ============================================================
-    // SECONDARY FACTOR — PREMIUM
+    // SECONDARY FACTOR — WEIGHTED VIEW PRIORITY
     //
-    // Premium gets a boost when adverts are at approximately
-    // the same distance.
+    // Within the same area, premium ads get a statistically higher
+    // chance (PREMIUM_VIEW_WEIGHT) of landing in an earlier, more
+    // frequently viewed position — not a guaranteed win, so a free
+    // ad can still occasionally out-rank a premium one nearby, but
+    // premium wins the contest more often over many page loads.
     // ============================================================
 
-    const premiumA = isPremiumProduct(a);
-    const premiumB = isPremiumProduct(b);
-
-    if (premiumA !== premiumB) {
-      return premiumA ? -1 : 1;
+    const keyA = getViewPriorityKey(a, sessionSeed);
+    const keyB = getViewPriorityKey(b, sessionSeed);
+    if (keyA !== keyB) {
+      return keyB - keyA;
     }
 
     // ============================================================
-    // TERTIARY FACTOR — NEWER ADVERTS
+    // TERTIARY FACTOR — NEWER ADVERTS (rare exact-key tie)
     // ============================================================
 
     const createdA = a.createdAt?.seconds ?? 0;
