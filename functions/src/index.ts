@@ -1090,6 +1090,13 @@ if (activeCountSnap.data().count >= activeAdLimit) {
     ? "active"
     : "pending_payment";
 
+  // Visibility scope is derived server-side from the verified plan —
+  // never trusted from the client — so a free-tier client can't spoof
+  // nationwide reach. Free stays local-radius; any premium tier gets
+  // all_areas, discoverable via the nationwide feed stage once the
+  // normal geohash radius (up to 50km) is exhausted.
+  const visibilityScope = effectivePlan === "free" ? "local" : "all_areas";
+
   // 6. Logic: Dynamic Expiry (Only if active immediately)
   // Hotel menu adverts follow the seller's subscription instead of a fixed
   // listing duration — archived (never deleted) when premium lapses,
@@ -1153,6 +1160,7 @@ try {
     commercialPropertyDetails: otherData.commercialPropertyDetails ?? null,
 
     plan: effectivePlan,
+    visibilityScope,
     ownerId: uid,
     sellerId: uid,
     status,
