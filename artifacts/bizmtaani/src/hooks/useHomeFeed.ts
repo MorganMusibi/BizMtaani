@@ -368,38 +368,53 @@ export function dedupe(existing: Product[], incoming: Product[]): Product[] {
   return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
 }
 
+// Precomputes each product's sort-relevant values exactly once, so a
+// sort of n products does O(n) distance/hash work instead of
+// O(n log n) — the comparator below only does cheap lookups.
+function buildSortKeys(
+  products: Product[],
+  userCoords: [number, number],
+  sessionSeed: string
+): Map<string, { bucket: number; distance: number; viewKey: number; created: number }> {
+  const keys = new Map<string, { bucket: number; distance: number; viewKey: number; created: number }>();
+  for (const product of products) {
+    const distance = getEffectiveSortDistanceKm(userCoords, product);
+    keys.set(product.id, {
+      distance,
+      bucket: Math.floor(distance / SAME_AREA_BUCKET_KM),
+      viewKey: getViewPriorityKey(product, sessionSeed),
+      created: product.createdAt?.seconds ?? 0,
+    });
+  }
+  return keys;
+}
+
 function sortNearbyProducts(
   products: Product[],
   userCoords: [number, number]
 ): Product[] {
   const sessionSeed = getViewSessionSeed();
+  const keys = buildSortKeys(products, userCoords, sessionSeed);
 
   return [...products].sort((a, b) => {
-    const distanceA = getEffectiveSortDistanceKm(userCoords, a);
-    const distanceB = getEffectiveSortDistanceKm(userCoords, b);
-
-    const bucketA = Math.floor(distanceA / SAME_AREA_BUCKET_KM);
-    const bucketB = Math.floor(distanceB / SAME_AREA_BUCKET_KM);
+    const ka = keys.get(a.id)!;
+    const kb = keys.get(b.id)!;
 
     // Different areas — real (discounted) distance still decides.
-    if (bucketA !== bucketB) {
-      return bucketA - bucketB;
+    if (ka.bucket !== kb.bucket) {
+      return ka.bucket - kb.bucket;
     }
 
     // Same area — compete via weighted randomness instead of exact
     // distance, so premium has a statistically higher chance of
     // landing first without always winning outright.
-    const keyA = getViewPriorityKey(a, sessionSeed);
-    const keyB = getViewPriorityKey(b, sessionSeed);
-    if (keyA !== keyB) {
-      return keyB - keyA;
+    if (ka.viewKey !== kb.viewKey) {
+      return kb.viewKey - ka.viewKey;
     }
 
     // Exact tie (rare) — fall back to raw distance, then newest.
-    if (distanceA !== distanceB) return distanceA - distanceB;
-    const createdA = a.createdAt?.seconds ?? 0;
-    const createdB = b.createdAt?.seconds ?? 0;
-    return createdB - createdA;
+    if (ka.distance !== kb.distance) return ka.distance - kb.distance;
+    return kb.created - ka.created;
   });
 }
 
@@ -408,55 +423,33 @@ export function rankProducts(
   userCoords: [number, number]
 ): Product[] {
   const sessionSeed = getViewSessionSeed();
+  const keys = buildSortKeys(products, userCoords, sessionSeed);
 
   return [...products].sort((a, b) => {
-    const distanceA = getEffectiveSortDistanceKm(userCoords, a);
-    const distanceB = getEffectiveSortDistanceKm(userCoords, b);
+    const ka = keys.get(a.id)!;
+    const kb = keys.get(b.id)!;
 
     // ============================================================
     // PRIMARY FACTOR — DISTANCE (bucketed)
-    //
-    // The home feed always prefers adverts that are physically
-    // closer to the user. Premium adverts get a sort-only distance
-    // discount (PREMIUM_SORT_DISTANCE_DISCOUNT) so they climb the
-    // list without fully overriding genuine proximity. Distances are
-    // compared by bucket (SAME_AREA_BUCKET_KM) rather than exactly,
-    // so near-equal distances count as "the same area."
     // ============================================================
-
-    const bucketA = Math.floor(distanceA / SAME_AREA_BUCKET_KM);
-    const bucketB = Math.floor(distanceB / SAME_AREA_BUCKET_KM);
-
-    if (bucketA !== bucketB) {
-      return bucketA - bucketB;
+    if (ka.bucket !== kb.bucket) {
+      return ka.bucket - kb.bucket;
     }
 
     // ============================================================
     // SECONDARY FACTOR — WEIGHTED VIEW PRIORITY
-    //
-    // Within the same area, premium ads get a statistically higher
-    // chance (PREMIUM_VIEW_WEIGHT) of landing in an earlier, more
-    // frequently viewed position — not a guaranteed win, so a free
-    // ad can still occasionally out-rank a premium one nearby, but
-    // premium wins the contest more often over many page loads.
     // ============================================================
-
-    const keyA = getViewPriorityKey(a, sessionSeed);
-    const keyB = getViewPriorityKey(b, sessionSeed);
-    if (keyA !== keyB) {
-      return keyB - keyA;
+    if (ka.viewKey !== kb.viewKey) {
+      return kb.viewKey - ka.viewKey;
     }
 
     // ============================================================
     // TERTIARY FACTOR — NEWER ADVERTS (rare exact-key tie)
     // ============================================================
-
-    const createdA = a.createdAt?.seconds ?? 0;
-    const createdB = b.createdAt?.seconds ?? 0;
-
-    return createdB - createdA;
+    return kb.created - ka.created;
   });
 }
+
 function wardQuery(
   wardName: string,
   cursor?: Cursor
