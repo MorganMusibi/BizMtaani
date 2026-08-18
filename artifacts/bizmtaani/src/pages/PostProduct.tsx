@@ -17,6 +17,7 @@ import { encodeGeohash } from "@/lib/geohash";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
 interface MenuItem { name: string; price: number; }
@@ -1394,12 +1395,14 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
+  const recaptchaToken = await getRecaptchaToken("publish_advert");
+
   const publishAdvert = httpsCallable<
-    typeof docData,
+    typeof docData & { recaptchaToken: string },
     PublishAdvertResponse
   >(functions, "publishAdvert");
 
-  const result = await publishAdvert(docData);
+  const result = await publishAdvert({ ...docData, recaptchaToken });
   const data = result.data;
 
   // 4. Backend says advert is already active
@@ -1580,11 +1583,11 @@ equipmentDetails: isEquipment
     };
 
     // Publish advert through Cloud Function
+     const recaptchaToken = await getRecaptchaToken("publish_advert");
      const publishAdvert = httpsCallable(functions, "publishAdvert");
-const result = await publishAdvert(docData);
+const result = await publishAdvert({ ...docData, recaptchaToken });
 
 const data = result.data as PublishAdvertResponse;
-
  if (data.success) {
   toast({
     title: "Advert published!",
