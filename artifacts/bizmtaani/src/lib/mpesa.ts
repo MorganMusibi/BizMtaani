@@ -13,6 +13,7 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 
 // ============================================================
 // TYPES
@@ -76,6 +77,7 @@ export interface StkPushParams {
   phone: string;
   plan: PaidListingPlan;
   productId: string;
+  recaptchaToken?: string;
 }
 
 export interface StkPushResult {
@@ -128,6 +130,7 @@ export async function initiateStkPush(
   const functions = getFunctions(app);
 
   const normalizedPhone = normalizePhone(params.phone);
+  const recaptchaToken = await getRecaptchaToken("initiate_payment");
 
   const initiate = httpsCallable<
     StkPushParams,
@@ -141,6 +144,7 @@ export async function initiateStkPush(
     const { data } = await initiate({
       ...params,
       phone: normalizedPhone,
+      recaptchaToken,
     });
 
     return data;
