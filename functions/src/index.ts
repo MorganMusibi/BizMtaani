@@ -181,10 +181,10 @@ export const attachDraftUploadImage = onCall({ cors: true }, async (request) => 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
-export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true }, async (request) => {
+export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, recaptchaSecretKey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
-  const { phone, plan, productId } = request.data as { phone: string; plan: string; productId: string };
-
+  const { phone, plan, productId, recaptchaToken } = request.data as { phone: string; plan: string; productId: string; recaptchaToken?: string };
+  await verifyRecaptcha(recaptchaToken, "initiate_payment");
   if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
     throw new HttpsError("invalid-argument", "Invalid plan selected.");
   }
@@ -1027,10 +1027,11 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ cors: true }, async (request) => {
+export const publishAdvert = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, title, price, imageUrls, draftId, ...otherData } = request.data;
+  const { plan, title, price, imageUrls, draftId, recaptchaToken, ...otherData } = request.data;
+  await verifyRecaptcha(recaptchaToken, "publish_advert");
   const uid = request.auth.uid;
   
   // Check if the user has an active premium subscription
