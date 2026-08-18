@@ -1482,10 +1482,11 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
  * Determines whether it's a marketer code or another user's own code,
  * and records the relationship. A user can only be referred once, ever.
  */
-export const submitReferralCode = onCall({ cors: true }, async (request) => {
+export const submitReferralCode = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { code } = request.data as { code?: string };
+  const { code, recaptchaToken } = request.data as { code?: string; recaptchaToken?: string };
+  await verifyRecaptcha(recaptchaToken, "submit_referral");
   if (!code || typeof code !== "string") {
     throw new HttpsError("invalid-argument", "A referral code is required.");
   }
@@ -1536,10 +1537,11 @@ export const submitReferralCode = onCall({ cors: true }, async (request) => {
  * application doc — cheap, and prevents duplicate applications by
  * using the user's own uid as the document ID (upsert, not append).
  */
-export const applyForMarketer = onCall({ cors: true }, async (request) => {
+export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const uid = request.auth.uid;
+  await verifyRecaptcha((request.data as { recaptchaToken?: string })?.recaptchaToken, "apply_marketer");
 
   // Already a marketer — no need to apply again.
   const existingMarketer = await db.collection("marketers").doc(uid).get();
