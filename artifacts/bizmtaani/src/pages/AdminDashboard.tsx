@@ -355,6 +355,24 @@ async function markPaid(payout: Payout) {
     }
   }
 
+  async function revokeAdmin(targetUser: AdminUser) {
+    if (!confirm(`Revoke admin access for "${targetUser.displayName || targetUser.id}"?`)) return;
+    setProcessingUserId(targetUser.id);
+    try {
+      const revokeAdminRole = httpsCallable(functions, "revokeAdminRole");
+      await revokeAdminRole({ uid: targetUser.id });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === targetUser.id ? { ...u, role: "user" } : u))
+      );
+      alert("Admin access revoked.");
+    } catch (error: any) {
+      console.error("Failed to revoke admin:", error);
+      alert(error?.message ?? "Failed to revoke admin access.");
+    } finally {
+      setProcessingUserId(null);
+    }
+  }
+
   async function toggleMarketerStatus(marketer: Marketer) {
     const willSuspend = marketer.status !== "suspended";
     setProcessingMarketerId(marketer.id);
@@ -1272,8 +1290,19 @@ async function dismissSupportReport(reportId: string) {
                                       : "Block"}
                                   </button>
                                 )}
+                                {u.role === "admin" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => revokeAdmin(u)}
+                                    disabled={processingUserId === u.id}
+                                    className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                                  >
+                                    {processingUserId === u.id ? "..." : "Revoke Admin"}
+                                  </button>
+                                )}
                               </div>
                             </td>
+                                  
                           </tr>
                         );
                       })}
