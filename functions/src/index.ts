@@ -110,6 +110,28 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
 }
 
 /**
+ * Records an admin action to a permanent, unmodifiable audit log.
+ * Never throws — a logging failure should never block the actual
+ * admin action from completing.
+ */
+async function logAdminAction(
+  adminUid: string,
+  action: string,
+  details: Record<string, unknown> = {}
+): Promise<void> {
+  try {
+    await db.collection("adminAuditLog").add({
+      adminUid,
+      action,
+      ...details,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (error) {
+    console.error(`Failed to log admin action "${action}":`, error);
+  }
+}
+
+/**
  * Shared push helper — looks up the user's saved FCM token and sends,
  * silently no-op-ing if they have none registered. Never throws —
  * a failed notification should never break the calling flow.
@@ -1367,11 +1389,14 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
       { merge: true }
     );
 
+    await logAdminAction(request.auth.uid, "grant_admin", { targetUid: uid });
+
     return {
       success: true,
       message: "Admin role granted successfully.",
       uid,
     };
+
   } catch (error) {
     console.error("Failed to set admin role:", error);
 
@@ -1381,6 +1406,71 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
     );
   }
 });
+
+/**
+ * Owner-only: revoke a user's admin access. The owner account itself
+ * can never be revoked — every admin check in this file keys off
+ * OWNER_UID directly, not the "admin" custom claim, so attempting to
+ * revoke the owner is rejected outright rather than silently no-op'ing.
+ */
+export const revokeAdminRole = onCall({ cors: true }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "You must be signed in.");
+  }
+
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only the BizMtaani owner can manage administrator access."
+    );
+  }
+
+  const { uid } = request.data as { uid?: string };
+
+  if (!uid) {
+    throw new HttpsError("invalid-argument", "A user UID is required.");
+  }
+
+  if (uid === OWNER_UID) {
+    throw new HttpsError(
+      "invalid-argument",
+      "The owner account cannot be revoked."
+    );
+  }
+
+  try {
+    const targetUser = await admin.auth().getUser(uid);
+
+    await admin.auth().setCustomUserClaims(uid, {
+      ...(targetUser.customClaims || {}),
+      admin: false,
+    });
+
+    await db.collection("users").doc(uid).set(
+      {
+        role: "user",
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    await logAdminAction(request.auth.uid, "revoke_admin", { targetUid: uid });
+
+    return {
+      success: true,
+      message: "Admin role revoked successfully.",
+      uid,
+    };
+  } catch (error) {
+    console.error("Failed to revoke admin role:", error);
+
+    throw new HttpsError(
+      "internal",
+      "Failed to revoke administrator access."
+    );
+  }
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 7. REFERRALS — MARKETER COMMISSIONS + USER POINTS
 // ═══════════════════════════════════════════════════════════════════════════
