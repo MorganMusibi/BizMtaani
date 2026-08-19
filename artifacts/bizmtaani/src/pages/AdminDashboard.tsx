@@ -202,7 +202,10 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [usersLoaded, setUsersLoaded] = useState(false);
   const [processingUserId, setProcessingUserId] = useState<string | null>(null);
   const [reportCountsBySeller, setReportCountsBySeller] = useState<Record<string, number>>({});
-
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [userSearchResults, setUserSearchResults] = useState<AdminUser[] | null>(null);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
+  
   // Message modal — sending a direct notification to a specific user
   const [messageTarget, setMessageTarget] = useState<AdminUser | null>(null);
   const [messageTitle, setMessageTitle] = useState("");
@@ -764,6 +767,35 @@ useEffect(() => {
     }
   }
 
+  // Prefix search on displayName. Firestore range query: matches any
+  // name starting with the typed text (case-sensitive — matches how
+  // displayName is actually stored). Bounded to 20 results.
+  async function searchUsers(rawQuery: string) {
+    const q = rawQuery.trim();
+    if (!q) {
+      setUserSearchResults(null);
+      return;
+    }
+    setUserSearchLoading(true);
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "users"),
+          orderBy("displayName"),
+          where("displayName", ">=", q),
+          where("displayName", "<=", q + "\uf8ff"),
+          limit(20)
+        )
+      );
+      setUserSearchResults(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminUser)));
+    } catch (error) {
+      console.error("Failed to search users:", error);
+      setUserSearchResults([]);
+    } finally {
+      setUserSearchLoading(false);
+    }
+  }
+
   // -------------------------------------------------------
   // ADVERTS — loaded lazily when tab is opened
   // -------------------------------------------------------
@@ -1294,10 +1326,41 @@ async function dismissSupportReport(reportId: string) {
             <>
               <div className="mb-6">
                 <h2 className="text-2xl font-bold">Users</h2>
-                <p className="mt-1 text-muted-foreground">Most recent 50 users.</p>
+                <p className="mt-1 text-muted-foreground">
+                  {userSearchResults !== null
+                    ? `${userSearchResults.length} result${userSearchResults.length === 1 ? "" : "s"} for "${userSearchQuery}"`
+                    : "Most recent 50 users."}
+                </p>
               </div>
 
-              {usersLoading ? (
+              <div className="mb-4 flex gap-2">
+                <input
+                  type="text"
+                  value={userSearchQuery}
+                  onChange={(e) => setUserSearchQuery(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") searchUsers(userSearchQuery); }}
+                  placeholder="Search by name (case-sensitive, matches start of name)…"
+                  className="flex-1 h-10 px-3 rounded-md border text-sm bg-background"
+                />
+                <button
+                  type="button"
+                  onClick={() => searchUsers(userSearchQuery)}
+                  className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
+                >
+                  Search
+                </button>
+                {userSearchResults !== null && (
+                  <button
+                    type="button"
+                    onClick={() => { setUserSearchQuery(""); setUserSearchResults(null); }}
+                    className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+
+              {usersLoading || userSearchLoading ? (
                 <div className="flex justify-center py-16">
                   <Loader2 className="h-6 w-6 animate-spin text-primary" />
                 </div>
@@ -1315,13 +1378,18 @@ async function dismissSupportReport(reportId: string) {
                     </thead>
                       
                         <tbody>
-                      {users.map((u) => {
+                      {(userSearchResults ?? users).map((u) => {
                         const reportCount = reportCountsBySeller[u.id] ?? 0;
                         return (
                           <tr key={u.id} className="border-t border-border">
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                {u.displayName || "—"}
+                                <div>
+                                  <p>{u.displayName || "—"}</p>
+                                  {(u as any).email && (
+                                    <p className="text-xs text-muted-foreground">{(u as any).email}</p>
+                                  )}
+                                </div>
                                 {reportCount > 0 && (
                                   <span
                                     title={`${reportCount} pending report(s)`}
@@ -1387,6 +1455,16 @@ async function dismissSupportReport(reportId: string) {
                                       : u.blocked
                                       ? "Unblock"
                                       : "Block"}
+                                  </button>
+                                )}
+                                {u.role !== "admin" && isOwner && (
+                                  <button
+                                    type="button"
+                                    onClick={() => grantAdmin(u)}
+                                    disabled={processingUserId === u.id}
+                                    className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                                  >
+                                    {processingUserId === u.id ? "..." : "Grant Admin"}
                                   </button>
                                 )}
                                 {u.role === "admin" && isOwner && u.id !== user?.uid && (
