@@ -1522,6 +1522,9 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
   const fallbackName = marketerUserSnap.exists
     ? (marketerUserSnap.data()?.displayName as string | undefined) ?? ""
     : "";
+  const fallbackEmail = marketerUserSnap.exists
+    ? (marketerUserSnap.data()?.email as string | undefined) ?? ""
+    : "";
 
   const marketerName = applicationData?.fullName || fallbackName;
 
@@ -1533,6 +1536,7 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     totalEarnedKES: 0,
     totalWithdrawnKES: 0,
     fullName: applicationData?.fullName ?? fallbackName,
+    email: applicationData?.email ?? fallbackEmail,
     idNumber: applicationData?.idNumber ?? "",
     mpesaNumber: applicationData?.mpesaNumber ?? "",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -1687,9 +1691,16 @@ export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKe
     throw new HttpsError("invalid-argument", "Please tell us why you want to be a marketer.");
   }
 
+  // Pull email from the user's own account/profile — never trust a
+  // client-supplied email field, since request.auth.token.email is
+  // verified by Firebase Auth itself.
+  const userSnap = await db.collection("users").doc(uid).get();
+  const email = request.auth.token.email ?? userSnap.data()?.email ?? "";
+
   await db.collection("marketerApplications").doc(uid).set({
     uid,
     fullName: fullName.trim(),
+    email,
     idNumber: idNumber.trim(),
     mpesaNumber: mpesaNumber.trim(),
     reason: reason.trim().slice(0, 300),
