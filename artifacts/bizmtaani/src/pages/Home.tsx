@@ -681,8 +681,7 @@ const totalVisible = rankedProducts.length;
     if (isSearchMode) return "Searching across Kenya";
     if (!locationInfo) return "Finding your area...";
     const area = locationInfo.wardName;
-    if (area && gpsGranted) return area;
-    if (area) return `${area} (from your saved location)`;
+    if (area) return `${area} area`;
     return "Finding nearby adverts...";
   }
 
