@@ -960,15 +960,16 @@ async function throttleNominatim() {
   }
   lastNominatimCallAt = Date.now();
 }
-
 export const reverseGeocode = onCall(
   {
     cors: true,
     maxInstances: 1, // forces all calls through one instance, serializing requests
     concurrency: 1,  // ensures that one instance only processes one call at a time
+    secrets: [recaptchaSecretKey],
   },
   async (request) => {
-    const { lat, lng } = request.data as { lat?: number; lng?: number };
+    const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
+    await verifyRecaptcha(recaptchaToken, "reverse_geocode");
 
     if (typeof lat !== "number" || typeof lng !== "number") {
       throw new HttpsError("invalid-argument", "lat and lng are required numbers.");
