@@ -376,7 +376,8 @@ async function markPaid(payout: Payout) {
     }
   }
 
-  async function revokeAdmin(targetUser: AdminUser) {
+  
+async function revokeAdmin(targetUser: AdminUser) {
     if (!confirm(`Revoke admin access for "${targetUser.displayName || targetUser.id}"?`)) return;
     setProcessingUserId(targetUser.id);
     try {
@@ -394,6 +395,24 @@ async function markPaid(payout: Payout) {
     }
   }
 
+  async function grantAdmin(targetUser: AdminUser) {
+    if (!confirm(`Grant admin access to "${targetUser.displayName || targetUser.id}"? They will be able to manage users, adverts, payouts, and more.`)) return;
+    setProcessingUserId(targetUser.id);
+    try {
+      const setAdminRole = httpsCallable(functions, "setAdminRole");
+      await setAdminRole({ uid: targetUser.id });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === targetUser.id ? { ...u, role: "admin" } : u))
+      );
+      alert("Admin access granted.");
+    } catch (error: any) {
+      console.error("Failed to grant admin:", error);
+      alert(error?.message ?? "Failed to grant admin access.");
+    } finally {
+      setProcessingUserId(null);
+    }
+  }
+  
   async function toggleMarketerStatus(marketer: Marketer) {
     const willSuspend = marketer.status !== "suspended";
     setProcessingMarketerId(marketer.id);
