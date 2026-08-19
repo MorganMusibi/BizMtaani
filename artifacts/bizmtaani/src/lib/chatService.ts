@@ -2,9 +2,9 @@ import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, server
   query,
   where,
 } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 
-import { db, auth } from "@/lib/firebase";
-
+import { db, auth, functions } from "@/lib/firebase";
 /*
 |--------------------------------------------------------------------------
 | TYPES
@@ -1274,40 +1274,14 @@ export async function reportMessage(
   const message =
     messageSnap.data() as ChatMessage;
 
-  const reportRef =
-    doc(
-      collection(
-        db,
-        "messageReports"
-      )
-    );
-
-  await setDoc(
-    reportRef,
-    {
-      chatId,
-
-      messageId,
-
-      reporterId,
-
-      reportedUserId:
-        message.senderId,
-
-      messageText:
-        message.text,
-
-      reason:
-        reason.trim() ||
-        "No reason provided",
-
-      status:
-        "pending",
-
-      createdAt:
-        serverTimestamp(),
-    }
-  );
+  const submitMessageReport = httpsCallable(functions, "submitMessageReport");
+  await submitMessageReport({
+    chatId,
+    messageId,
+    reportedUserId: message.senderId,
+    messageText: message.text,
+    reason: reason.trim() || "No reason provided",
+  });
 }
 
 /*
