@@ -1185,6 +1185,7 @@ try {
     description: typeof otherData.description === "string" ? otherData.description : "",
     price,
     priceRaw: typeof otherData.priceRaw === "string" ? otherData.priceRaw : "",
+    priceText: typeof otherData.priceText === "string" ? otherData.priceText : "",
     rentPerMonthRaw: typeof otherData.rentPerMonthRaw === "string" ? otherData.rentPerMonthRaw : "",
 
     category: typeof otherData.category === "string" ? otherData.category : "",
