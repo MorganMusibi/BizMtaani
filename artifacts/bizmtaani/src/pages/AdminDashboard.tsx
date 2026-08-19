@@ -154,6 +154,11 @@ export default function AdminDashboard() {
   const { user, isAdmin, adminLoading } = useAuth();
   const [, navigate] = useLocation();
 
+  // Matches OWNER_UID in functions/index.ts — only the owner sees
+  // admin-revocation controls, even though other admins can use
+  // the rest of this dashboard.
+  const isOwner = user?.uid === "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+
   const [activeTab, setActiveTab] = useState<Tab>("overview");
 
   // Overview stats
@@ -1290,7 +1295,7 @@ async function dismissSupportReport(reportId: string) {
                                       : "Block"}
                                   </button>
                                 )}
-                                {u.role === "admin" && (
+                                {u.role === "admin" && isOwner && u.id !== user?.uid && (
                                   <button
                                     type="button"
                                     onClick={() => revokeAdmin(u)}
