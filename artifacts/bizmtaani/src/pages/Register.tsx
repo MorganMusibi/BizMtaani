@@ -90,6 +90,7 @@ async function saveUserProfile(
   uid: string,
   opts: {
     displayName: string;
+    email?: string;
     isBusinessOwner: boolean;
     businessName?: string;
     homeLocation?: HomeLocation;
@@ -97,6 +98,7 @@ async function saveUserProfile(
 ) {
   await setDoc(doc(db, "users", uid), {
     displayName: opts.displayName,
+    email: opts.email ?? "",
     isBusinessOwner: opts.isBusinessOwner,
     
     subscriptionPlan: "free",
@@ -190,6 +192,7 @@ export default function Register() {
       await updateProfile(cred.user, { displayName: name.trim() });
       await saveUserProfile(cred.user.uid, {
         displayName: name.trim(),
+        email: email.trim(),
         isBusinessOwner: isBusinessOwner ?? false,
         businessName: isBusinessOwner ? name.trim() : undefined,
         homeLocation,
@@ -250,6 +253,7 @@ if (!existingProfile.exists()) {
   await saveUserProfile(result.user.uid, {
     displayName:
       result.user.displayName ?? "BizMtaani User",
+    email: result.user.email ?? "",
     isBusinessOwner: isBusinessOwner ?? false,
     businessName: isBusinessOwner
       ? (result.user.displayName ?? undefined)
