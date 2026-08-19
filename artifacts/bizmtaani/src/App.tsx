@@ -9,6 +9,7 @@ import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { SplashScreen } from "@/components/SplashScreen";
+import { RecaptchaDisclosure } from "@/components/RecaptchaDisclosure";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
@@ -108,6 +109,7 @@ function App() {
           </WouterRouter>
           <ProfileSetupGate />
           <InstallPrompt />
+          <RecaptchaDisclosure />
           <Toaster />
           {showSplash && <SplashScreen onDone={handleSplashDone} />}
         </AuthProvider>
