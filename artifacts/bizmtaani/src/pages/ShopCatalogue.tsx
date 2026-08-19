@@ -66,7 +66,10 @@ interface ShopProduct {
     | "negotiable"
     | "contact"
     | "quote"
-    | "free";
+    | "free"
+    | "custom";
+
+  priceText?: string;
 
   priceType?: "fixed" | "negotiable";
 priceList?: {
@@ -198,6 +201,12 @@ function priceDisplay(product: ShopProduct): string {
     product.priceDisplay === "free"
   ) {
     return "Free";
+  }
+
+  if (
+    product.priceDisplay === "custom"
+  ) {
+    return product.priceText || "Contact for Price";
   }
 
   if (
