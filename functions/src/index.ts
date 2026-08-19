@@ -1397,6 +1397,123 @@ export const submitProductReport = onCall({ cors: true }, async (request) => {
   return { success: true };
 });
 
+                                          /**
+ * Creates a support report on the user's behalf, with the same
+ * per-user cooldown pattern as submitProductReport.
+ */
+export const submitSupportReport = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { type, advertId, description, contact, priority } = request.data as {
+    type?: string;
+    advertId?: string | null;
+    description?: string;
+    contact?: string | null;
+    priority?: string;
+  };
+
+  if (typeof type !== "string" || !type.trim()) {
+    throw new HttpsError("invalid-argument", "A report type is required.");
+  }
+  if (typeof description !== "string" || description.trim().length < 10 || description.trim().length > 3000) {
+    throw new HttpsError("invalid-argument", "Description must be between 10 and 3000 characters.");
+  }
+
+  const cooldownRef = db.collection("reportCooldowns").doc(request.auth.uid);
+  const cooldownSnap = await cooldownRef.get();
+  const lastReportedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastReportedAt?.toMillis() : null;
+
+  if (lastReportedAt && Date.now() - lastReportedAt < REPORT_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a moment before submitting another report."
+    );
+  }
+
+  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  await db.collection("supportReports").add({
+    userId: request.auth.uid,
+    userEmail: request.auth.token.email ?? null,
+    type: type.trim(),
+    advertId: typeof advertId === "string" && advertId.trim() ? advertId.trim() : null,
+    description: description.trim(),
+    contact: typeof contact === "string" && contact.trim() ? contact.trim() : null,
+    priority: priority === "high" ? "high" : "normal",
+    status: "open",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+/**
+ * Creates a message report on the user's behalf. Verifies the
+ * reporter is actually a participant in the chat the message belongs
+ * to (a direct client write could not check this), and shares the
+ * same per-user cooldown as the other report types.
+ */
+export const submitMessageReport = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { chatId, messageId, reportedUserId, messageText, reason } = request.data as {
+    chatId?: string;
+    messageId?: string;
+    reportedUserId?: string;
+    messageText?: string;
+    reason?: string;
+  };
+
+  if (
+    typeof chatId !== "string" || !chatId.trim() ||
+    typeof messageId !== "string" || !messageId.trim() ||
+    typeof reportedUserId !== "string" || !reportedUserId.trim() ||
+    typeof messageText !== "string" ||
+    typeof reason !== "string" || !reason.trim()
+  ) {
+    throw new HttpsError("invalid-argument", "Missing or invalid report details.");
+  }
+
+  // Verify the reporter is actually a participant in this chat —
+  // a direct client write couldn't enforce this.
+  const chatSnap = await db.collection("chats").doc(chatId).get();
+  if (!chatSnap.exists) {
+    throw new HttpsError("not-found", "Chat not found.");
+  }
+  const participants: string[] = Array.isArray(chatSnap.data()?.participants)
+    ? chatSnap.data()!.participants
+    : [];
+  if (!participants.includes(request.auth.uid)) {
+    throw new HttpsError("permission-denied", "You are not a participant in this chat.");
+  }
+
+  const cooldownRef = db.collection("reportCooldowns").doc(request.auth.uid);
+  const cooldownSnap = await cooldownRef.get();
+  const lastReportedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastReportedAt?.toMillis() : null;
+
+  if (lastReportedAt && Date.now() - lastReportedAt < REPORT_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a moment before submitting another report."
+    );
+  }
+
+  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  await db.collection("messageReports").add({
+    reporterId: request.auth.uid,
+    chatId: chatId.trim(),
+    messageId: messageId.trim(),
+    reportedUserId: reportedUserId.trim(),
+    messageText: messageText.slice(0, 1000),
+    reason: reason.trim().slice(0, 300),
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 6. ADMIN MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
