@@ -19,9 +19,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import {
-  collection,
-  getCountFromServer,
-  query,
+  collection, getCountFromServer, query,
   where,
   orderBy,
   limit,
@@ -30,6 +28,8 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  addDoc,
+  serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -390,6 +390,15 @@ async function markPaid(payout: Payout) {
           m.id === marketer.id ? { ...m, status: willSuspend ? "suspended" : "active" } : m
         )
       );
+
+      if (user) {
+        addDoc(collection(db, "adminAuditLog"), {
+          adminUid: user.uid,
+          action: willSuspend ? "suspend_marketer" : "reactivate_marketer",
+          targetUid: marketer.id,
+          createdAt: serverTimestamp(),
+        }).catch((err) => console.error("Failed to write audit log:", err));
+      }
     } catch (error) {
       console.error("Failed to update marketer status:", error);
       alert("Failed to update marketer status.");
@@ -778,6 +787,16 @@ async function dismissSupportReport(reportId: string) {
           u.id === targetUser.id ? { ...u, blocked: willBlock, blockReason: reason } : u
         )
       );
+
+      if (user) {
+        addDoc(collection(db, "adminAuditLog"), {
+          adminUid: user.uid,
+          action: willBlock ? "block_user" : "unblock_user",
+          targetUid: targetUser.id,
+          reason: willBlock ? reason : "",
+          createdAt: serverTimestamp(),
+        }).catch((err) => console.error("Failed to write audit log:", err));
+      }
     } catch (error) {
       console.error("Failed to update block status:", error);
       alert("Failed to update user status.");
