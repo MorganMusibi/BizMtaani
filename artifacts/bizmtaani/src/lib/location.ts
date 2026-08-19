@@ -9,6 +9,7 @@ import {
 } from "@/lib/locationHierarchy";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -137,11 +138,12 @@ function findNearbyWardNames(lat: number, lng: number, features: WardFeature[]):
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
     const functions = getFunctions(app, "us-central1");
-    const reverseGeocode = httpsCallable<{ lat: number; lng: number }, Record<string, string | null>>(
-      functions,
-      "reverseGeocode"
-    );
-    const { data: addr } = await reverseGeocode({ lat, lng });
+    const recaptchaToken = await getRecaptchaToken("reverse_geocode");
+    const reverseGeocode = httpsCallable<
+      { lat: number; lng: number; recaptchaToken: string },
+      Record<string, string | null>
+    >(functions, "reverseGeocode");
+    const { data: addr } = await reverseGeocode({ lat, lng, recaptchaToken });
 
     // Priority order for Kenya ward names:
     // suburb / neighbourhood / quarter  → ward-level (most accurate)
