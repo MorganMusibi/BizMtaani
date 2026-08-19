@@ -1002,10 +1002,18 @@ if (isTransport) {
   return true;
 }
 
+const requiresPrice =
+  !isAccommodation &&
+  !isCommercialProperty &&
+  !isEatery &&
+  (priceDisplay === "fixed" ||
+    priceDisplay === "negotiable");
+
 if (
   requiresPrice &&
   (!price || parseFloat(price) <= 0)
 ) {
+
   toast({
     title: "Enter a valid price",
     description:
