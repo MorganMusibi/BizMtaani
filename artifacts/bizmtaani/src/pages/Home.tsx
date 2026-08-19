@@ -316,8 +316,15 @@ export default function Home() {
           // coords in case the caller relies on a fresher fix, but
           // don't touch locationInfo (avoids flashing "Unknown ward").
           setUserCoords([lat, lng]);
+        } else {
+          // Same ward as before — nothing to update, no refetch. Let
+          // the user know the refresh actually ran, since otherwise a
+          // no-op refresh looks identical to a silently failed one.
+          toast({
+            title: "Still in the same area",
+            description: resolved.wardName ? `${resolved.wardName} area` : undefined,
+          });
         }
-        // else: same ward as before — nothing to update, no refetch.
 
         setRefreshingLocation(false);
       },
