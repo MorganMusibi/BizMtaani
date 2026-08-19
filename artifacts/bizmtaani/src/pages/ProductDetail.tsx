@@ -59,7 +59,8 @@ interface Product {
   sellerName: string;
   sellerAvatar: string;
   phone?: string;
-  priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free";
+  priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free" | "custom";
+  priceText?: string;
   ward?: string;
   county?: string;
   pricingBasis?: string;
@@ -968,6 +969,11 @@ async function saveMenuChanges() {
       Free
     </h2>
 
+  ) : product.priceDisplay === "custom" ? (
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+      {product.priceText || "Contact for Price"}
+    </h2>
+
     ) : (
     <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
       KES {product.priceRaw || product.price.toLocaleString()}
@@ -1161,6 +1167,10 @@ const itemDistance =
           item.priceDisplay === "free"
         ) {
           itemPriceLabel = "Free";
+        } else if (
+          item.priceDisplay === "custom"
+        ) {
+          itemPriceLabel = item.priceText || "Contact for Price";
         } else {
           itemPriceLabel = `KES ${item.priceRaw || item.price.toLocaleString()}`;
         }
