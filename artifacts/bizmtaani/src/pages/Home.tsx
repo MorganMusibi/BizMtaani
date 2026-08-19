@@ -297,12 +297,28 @@ export default function Home() {
         setGpsGranted(true);
         setLocationErrorMsg(null);
         const resolved = await getWardInfo(lat, lng);
-        if (resolved) {
+
+        // Only update state (and therefore trigger a Home feed refetch)
+        // if the resolved area is genuinely different from what's
+        // already showing. Prevents a Refresh tap from re-querying
+        // Firestore when the user hasn't actually moved to a new area.
+        const wardChanged = resolved?.wardName
+          ? resolved.wardName !== locationInfo?.wardName
+          : false;
+
+        if (resolved && wardChanged) {
           setLocationInfo(resolved);
+          setUserCoords([lat, lng]);
+          const choices = await getAreaChoices(lat, lng);
+          setAreaChoices(choices ?? []);
+        } else if (!resolved) {
+          // Couldn't resolve a ward this time — still worth updating
+          // coords in case the caller relies on a fresher fix, but
+          // don't touch locationInfo (avoids flashing "Unknown ward").
+          setUserCoords([lat, lng]);
         }
-        setUserCoords([lat, lng]);
-        const choices = await getAreaChoices(lat, lng);
-        setAreaChoices(choices ?? []);
+        // else: same ward as before — nothing to update, no refetch.
+
         setRefreshingLocation(false);
       },
       (error) => {
@@ -325,9 +341,8 @@ export default function Home() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, []);
+  }, [locationInfo?.wardName]);
   // Keep the module-level cache in sync so a later remount can skip
-  // GPS/geocoding entirely.
   useEffect(() => {
     cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo, timestamp: Date.now() };
     try {
