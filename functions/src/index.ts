@@ -945,7 +945,6 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const adminSendNotification = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can send admin notifications.");
   }
