@@ -1689,7 +1689,6 @@ async function dismissSupportReport(reportId: string) {
               ) : (
                 <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
                   <table className="w-full text-sm">
-                  <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
