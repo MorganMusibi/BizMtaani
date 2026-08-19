@@ -692,12 +692,26 @@ const subcategories =
     ];
   }
 
-  if (isEventListing) {
+if (isEventListing) {
     return [
       { value: "fixed", label: "Fixed Price" },
       { value: "negotiable", label: "Negotiable" },
       { value: "contact", label: "Contact for Price" },
       { value: "free", label: "Free Entry" },
+    ];
+  }
+
+  // Normal product categories (Fashion, Electronics, General Products,
+  // Second-Hand, Babies & Kids, Animals & Pets, Leisure, Other) get the
+  // same pricing flexibility as the "Other Products/Services" list —
+  // Contact for Price and a free-text Custom label, alongside the
+  // existing Fixed/Negotiable options.
+  if (isNormalAdvertCategory) {
+    return [
+      { value: "fixed", label: "Fixed Price" },
+      { value: "negotiable", label: "Negotiable" },
+      { value: "contact", label: "Contact for Price" },
+      { value: "custom", label: "Custom label" },
     ];
   }
 
