@@ -1550,6 +1550,8 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     { type: "marketer_approved", referralCode: code }
   );
 
+  await logAdminAction(request.auth.uid, "approve_marketer", { targetUid: uid, referralCode: code });
+
   return { success: true, referralCode: code };
 });
 
@@ -1721,6 +1723,8 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
     "Your marketer application wasn't approved this time. Contact support if you'd like to know more.",
     { type: "marketer_rejected" }
   );
+
+  await logAdminAction(request.auth.uid, "reject_marketer_application", { targetUid: uid });
 
   return { success: true };
 });
