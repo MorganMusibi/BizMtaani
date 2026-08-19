@@ -314,3 +314,7 @@ input, textarea, [contenteditable="true"] {
   user-select: text;
 }
 
+/* Hide reCAPTCHA v3 badge — disclosure text shown instead (see Footer/Register) */
+.grecaptcha-badge {
+  visibility: hidden;
+}
