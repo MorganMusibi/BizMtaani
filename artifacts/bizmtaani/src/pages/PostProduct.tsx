@@ -87,12 +87,15 @@ export default function PostProduct() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [rentPerMonth, setRentPerMonth] = useState("");
+  const [priceText, setPriceText] = useState("");
+
   type PriceDisplay =
   | "fixed"
   | "negotiable"
   | "contact"
   | "quote"
-  | "free";
+  | "free"
+  | "custom";
   // Job seeker details
 const [jobTitle, setJobTitle] = useState("");
 const [jobSkills, setJobSkills] = useState("");
