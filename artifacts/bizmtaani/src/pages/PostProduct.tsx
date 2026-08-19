@@ -2903,7 +2903,25 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               </div>
             )}
 
-            <div className="flex gap-2">
+            {priceDisplay === "custom" && (
+              <div className="space-y-1.5">
+
+                <label className="text-sm font-bold">
+                  Price Label
+                </label>
+
+                <Input
+                  type="text"
+                  placeholder="e.g. 30 pekee, @20, Ksh 500 non-negotiable"
+                  value={priceText}
+                  onChange={(e) => setPriceText(e.target.value)}
+                  className="h-12 text-base"
+                />
+
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
               {getPriceOptions().map((option) => (
                 <button
                   key={option.value}
@@ -2911,7 +2929,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   onClick={() =>
                     setPriceDisplay(option.value as PriceDisplay)
                   }
-                  className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                  className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
                     priceDisplay === option.value
                       ? "border-primary bg-primary/5 text-primary"
                       : "border-border text-muted-foreground"
