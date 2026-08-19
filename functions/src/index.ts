@@ -20,6 +20,10 @@ const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
 const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
+
+// Single source of truth for the owner UID — referenced by every
+// admin-only function instead of repeating the literal string.
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
 // ─── Constants ──────────────────────────────────────────────────────────────
 const FOLDER_MAP: Record<string, string> = {
   avatar: "bizmtaani/avatars",
@@ -181,10 +185,28 @@ export const attachDraftUploadImage = onCall({ cors: true }, async (request) => 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
+const MPESA_INITIATION_COOLDOWN_MS = 30_000;
+
 export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, recaptchaSecretKey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, plan, productId, recaptchaToken } = request.data as { phone: string; plan: string; productId: string; recaptchaToken?: string };
   await verifyRecaptcha(recaptchaToken, "initiate_payment");
+
+  // Cooldown guard — stops repeated STK push spam (accidental double-taps
+  // or a script) from hammering Daraja and annoying the buyer's phone
+  // with duplicate prompts.
+  const cooldownRef = db.collection("paymentCooldowns").doc(request.auth.uid);
+  const cooldownSnap = await cooldownRef.get();
+  const lastInitiatedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastInitiatedAt?.toMillis() : null;
+
+  if (lastInitiatedAt && Date.now() - lastInitiatedAt < MPESA_INITIATION_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a moment before trying to pay again."
+    );
+  }
+
+  await cooldownRef.set({ lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp() });
   if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
     throw new HttpsError("invalid-argument", "Invalid plan selected.");
   }
@@ -759,7 +781,6 @@ export const closeMonthlyEarnings = onSchedule(
 export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can view payouts.");
   }
@@ -780,7 +801,6 @@ export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
 export const markPayoutPaid = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can update payouts.");
   }
@@ -814,7 +834,6 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
    export const getTopMarketers = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can view the leaderboard.");
   }
@@ -1312,9 +1331,7 @@ export const setAdminRole = onCall({ cors: true }, async (request) => {
   }
 
   // Only the initial owner account is allowed to grant admin access.
-  // IMPORTANT: Replace this with YOUR Firebase Auth UID.
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
-
+  // (OWNER_UID is defined once near the top of this file.)
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError(
       "permission-denied",
@@ -1399,7 +1416,6 @@ function generateReferralCode(name: string, uid: string): string {
 export const approveMarketer = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can approve marketers.");
   }
@@ -1599,7 +1615,6 @@ export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKe
 export const rejectMarketerApplication = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can manage marketer applications.");
   }
