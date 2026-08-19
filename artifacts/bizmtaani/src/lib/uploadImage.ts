@@ -10,6 +10,8 @@ interface CloudinarySignatureResult {
   folder: string;
   apiKey: string;
   cloudName: string;
+  allowedFormats: string;
+  bytesLimit: number;
 }
 /**
  * Compress an image client-side before it ever reaches Cloudinary.
@@ -74,13 +76,17 @@ export async function uploadImage(
 
   // Only send the params that are covered by the signature.
   // Adding extra params here would cause Cloudinary to reject with
-  // "Invalid Signature".
+  // "Invalid Signature" — allowed_formats and bytes_limit are now
+  // part of the signed payload, so they must be included exactly
+  // as the backend signed them.
   const form = new FormData();
   form.append("file", compressedFile);
   form.append("api_key", sig.apiKey);
   form.append("timestamp", String(sig.timestamp));
   form.append("signature", sig.signature);
   form.append("folder", sig.folder);
+  form.append("allowed_formats", sig.allowedFormats);
+  form.append("bytes_limit", String(sig.bytesLimit));
 
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
