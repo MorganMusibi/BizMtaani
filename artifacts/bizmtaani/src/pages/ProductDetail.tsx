@@ -791,6 +791,7 @@ async function saveMenuChanges() {
     setSavingMenu(false);
   }
       }
+
   async function submitReport() {
   if (!product || !reportReason.trim()) {
     toast({ title: "Please select or describe a reason", variant: "destructive" });
@@ -798,25 +799,28 @@ async function saveMenuChanges() {
   }
   setSubmittingReport(true);
   try {
-    await addDoc(collection(db, "reports"), {
+    const submitProductReport = httpsCallable(functions, "submitProductReport");
+    await submitProductReport({
       productId: product.id,
       productTitle: product.title,
       sellerId: product.sellerId,
-      reporterId: user?.uid ?? null,
       reason: reportReason.trim(),
-      createdAt: serverTimestamp(),
-      status: "pending",
     });
     toast({ title: "Report submitted", description: "Thank you — our team will review this advert." });
     setShowReportModal(false);
     setReportReason("");
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to submit report:", error);
-    toast({ title: "Failed to submit report", variant: "destructive" });
+    toast({
+      title: "Failed to submit report",
+      description: error?.message ?? "Please try again.",
+      variant: "destructive",
+    });
   } finally {
     setSubmittingReport(false);
   }
-      }
+  }
+  
         async function handleDeleteProduct() {
     if (!product || !user) return;
 
