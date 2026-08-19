@@ -75,6 +75,8 @@ interface AdminUser {
 interface Marketer {
   id: string;
   referralCode?: string;
+  fullName?: string;
+  email?: string;
   status?: "active" | "suspended";
   totalEarnedKES?: number;
   totalWithdrawnKES?: number;
@@ -110,6 +112,7 @@ interface AuditLogEntry {
 interface MarketerApplication {
   id: string;
   fullName?: string;
+  email?: string;
   idNumber?: string;
   mpesaNumber?: string;
   reason?: string;
@@ -1625,6 +1628,7 @@ async function dismissSupportReport(reportId: string) {
                       <div>
                         <p className="font-semibold text-sm">{a.fullName || "Unnamed applicant"}</p>
                         <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                          <span>Email: {a.email || "—"}</span>
                           <span>ID: {a.idNumber || "—"}</span>
                           <span>M-Pesa: {a.mpesaNumber || "—"}</span>
                         </div>
@@ -1685,9 +1689,11 @@ async function dismissSupportReport(reportId: string) {
               ) : (
                 <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
                   <table className="w-full text-sm">
+                  <table className="w-full text-sm">
                     <thead className="bg-muted/50">
                       <tr>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Name / Email</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earned</th>
                         <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Paid Out</th>
@@ -1702,6 +1708,10 @@ async function dismissSupportReport(reportId: string) {
                         return (
                           <tr key={m.id} className="border-t border-border">
                             <td className="px-4 py-2.5 font-mono font-semibold">{m.referralCode ?? "—"}</td>
+                            <td className="px-4 py-2.5">
+                              <p>{m.fullName || "—"}</p>
+                              <p className="text-xs text-muted-foreground">{m.email || "—"}</p>
+                            </td>
                             <td className="px-4 py-2.5">
                               {m.status === "suspended" ? (
                                 <span className="text-xs font-semibold text-destructive">Suspended</span>
