@@ -334,18 +334,15 @@ export default function Home() {
 
         if (error.code === error.PERMISSION_DENIED) {
           setLocationErrorMsg(
-            "Umeblock location kwa hii site. Enda kwa browser settings uruhusu, kisha ujaribu tena."
+            "Location yako iko off. Enda  browser settings uka i turn ON, kisha ujaribu tena."
           );
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           setLocationErrorMsg(
-            "GPS yako iko off. eka your thumb hapo front Camera scroll hadi chini then tap <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="#ffffff">
-  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
-</svg>, 
- alafu u try again."
+            "GPS yako iko off msee. Iwashe kwa phone settings, kisha ujaribu tena."
           );
         } else {
           setLocationErrorMsg(
-            "Haikuweza kupata location yako sasa hivi. Jaribu tena baadaye kidogo."
+            "location yako haipatikani sahii. Jaribu tena in a fewww!."
           );
         }
       },
@@ -819,7 +816,7 @@ const totalVisible = rankedProducts.length;
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                GPS Permission Required
+                Tunahitaji Location Yako 📍
               </p>
               <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
                 {locationErrorMsg}
@@ -841,7 +838,7 @@ const totalVisible = rankedProducts.length;
                   type="button"
                   onClick={() => {
                     alert(
-                      "To enable location permissions:\n\n1. Tap the lock (🔒) or settings icon in your browser's address bar.\n2. Look for 'Permissions' or 'Location'.\n3. Change it to 'Allow'.\n4. Refresh the page or tap 'Re-detect GPS'."
+                      "Jinsi ya kuwasha location:\n\n1. Bonyeza lock (🔒) au settings icon kwa address bar.\n2. Tafuta 'Permissions' au 'Location'.\n3. Badilisha iwe 'Allow'.\n4. Refresh page au bonyeza 'Try Again'."
                     );
                   }}
                   className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] font-bold rounded-lg transition-colors border border-amber-500/30"
