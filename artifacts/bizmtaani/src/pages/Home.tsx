@@ -334,15 +334,18 @@ export default function Home() {
 
         if (error.code === error.PERMISSION_DENIED) {
           setLocationErrorMsg(
-            "Location access is blocked for this site. Enable it in your browser's site settings, then try again."
+            "Umeblock location kwa hii site. Enda kwa browser settings uruhusu, kisha ujaribu tena."
           );
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           setLocationErrorMsg(
-            "Your phone's location/GPS appears to be turned off. Turn it on in your device settings, then try again."
+            "GPS yako iko off. eka your thumb hapo front Camera scroll hadi chini then tap <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="#ffffff">
+  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+</svg>, 
+ alafu u try again."
           );
         } else {
           setLocationErrorMsg(
-            "We couldn't get your location right now. Please try again in a moment."
+            "Haikuweza kupata location yako sasa hivi. Jaribu tena baadaye kidogo."
           );
         }
       },
