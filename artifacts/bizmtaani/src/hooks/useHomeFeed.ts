@@ -945,32 +945,14 @@ const queries = areaQueries(
     }
   }
 
-  const radiusFilteredProducts =
-  collectedProducts.filter((product) => {
-    const distance = getDistanceKm(
-      userCoords[0],
-      userCoords[1],
-      product.lat,
-      product.lng
-    );
-
-    return (
-      isProductVisibleToUser(
-        product,
-        userCoords
-      ) &&
-      isProductEligibleForFeedStage(
-        product,
-        distance,
-        0
-      )
-    );
-  });
-
-const sortedBuffer = sortNearbyProducts(
-  radiusFilteredProducts,
-  userCoords
-);
+  // collectedProducts was already filtered by isProductVisibleToUser +
+  // isProductEligibleForFeedStage inside the pageProducts step above —
+  // re-filtering here was redundant (same checks, same data, always
+  // true) and recomputed every product's distance a second time.
+  const sortedBuffer = sortNearbyProducts(
+    collectedProducts,
+    userCoords
+  );
 
   // First 20 products become visible.
   // Everything else stays in the buffer.
@@ -1395,39 +1377,17 @@ if (!areaDone && !areaLoading) {
         allPrefixesDone = true;
       }
     }
-
     // ==========================================================
-    // STEP 4 — FILTER TO CURRENT GEOGRAPHIC STAGE
+    // STEP 4 — collectedProducts is already filtered to the current
+    // geographic stage (same isProductVisibleToUser +
+    // isProductEligibleForFeedStage checks applied inside the
+    // pageProducts step above) — re-filtering here was redundant and
+    // recomputed every product's distance a second time.
     // ==========================================================
-
-    const radiusFilteredProducts =
-  collectedProducts.filter(
-    (product) => {
-      const distance =
-        getDistanceKm(
-          userCoords[0],
-          userCoords[1],
-          product.lat,
-          product.lng
-        );
-
-      return (
-        isProductVisibleToUser(
-          product,
-          userCoords
-        ) &&
-        isProductEligibleForFeedStage(
-          product,
-          distance,
-          areaRadiusStage
-        )
-      );
-    }
-  );
 
     const sortedProducts =
       sortNearbyProducts(
-        radiusFilteredProducts,
+        collectedProducts,
         userCoords
       );
 
