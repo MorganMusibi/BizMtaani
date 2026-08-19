@@ -160,12 +160,27 @@ async function sendPushToUid(
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. IMAGE UPLOADS
 // ═══════════════════════════════════════════════════════════════════════════
+// 8 MB covers your app's existing 4-5MB client-side limits with
+// headroom, while still blocking anything wildly oversized.
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const ALLOWED_UPLOAD_FORMATS = "jpg,jpeg,png,webp";
+
 export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const uploadType = ((request.data as Record<string, unknown>).uploadType as string | undefined) ?? "product";
   const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
   const timestamp = Math.floor(Date.now() / 1000);
-  const signature = crypto.createHash("sha1").update(`folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`).digest("hex");
+
+  // Every parameter included in the signature is enforced by
+  // Cloudinary server-side — a client cannot alter these without
+  // invalidating the signature, so this closes the gap left by an
+  // unsigned preset (which your app doesn't use anyway).
+  const signature = crypto
+    .createHash("sha1")
+    .update(
+      `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&bytes_limit=${MAX_UPLOAD_BYTES}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+    )
+    .digest("hex");
 
   const draftId = crypto.randomBytes(12).toString("hex");
   await db.collection("draftUploads").doc(draftId).set({
@@ -175,7 +190,16 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  return { signature, timestamp, folder, apiKey: cloudinaryApiKey.value(), cloudName: cloudinaryCloudName.value(), draftId };
+  return {
+    signature,
+    timestamp,
+    folder,
+    apiKey: cloudinaryApiKey.value(),
+    cloudName: cloudinaryCloudName.value(),
+    draftId,
+    allowedFormats: ALLOWED_UPLOAD_FORMATS,
+    bytesLimit: MAX_UPLOAD_BYTES,
+  };
 });
 
 /**
