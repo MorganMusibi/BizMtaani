@@ -26,6 +26,8 @@ interface Product {
   expiresAt?: { seconds: number } | null;
   status?: string;
   plan?: string;
+  priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free" | "custom";
+  priceText?: string;
   priceList?: {
     name: string;
     price: number;
@@ -232,7 +234,9 @@ export default function MyListings() {
                         <div className="p-3">
                           <p data-testid={`text-title-${product.id}`} className="font-bold text-sm line-clamp-1">{product.title}</p>
                           <p data-testid={`text-price-${product.id}`} className="text-primary font-bold text-sm mt-0.5">
-                            {(product.rentPerMonth ?? product.price) > 0
+                            {product.priceDisplay === "custom"
+                              ? product.priceText || "Contact for Price"
+                              : (product.rentPerMonth ?? product.price) > 0
                               ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}`
                               : "Quote only"}
                           </p>
