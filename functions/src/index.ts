@@ -1340,6 +1340,64 @@ export const deleteJob = onCall({ cors: true }, async (request) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 5B. REPORT SUBMISSION (rate-limited)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const REPORT_COOLDOWN_MS = 60_000;
+
+/**
+ * Creates a product report on the user's behalf, with a per-user
+ * cooldown to stop repeated-click or scripted spam. Firestore rules
+ * for the `reports` collection can then deny direct client writes
+ * entirely, since this function is the only legitimate path.
+ */
+export const submitProductReport = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { productId, productTitle, sellerId, reason } = request.data as {
+    productId?: string;
+    productTitle?: string;
+    sellerId?: string;
+    reason?: string;
+  };
+
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "productId is required.");
+  }
+  if (typeof sellerId !== "string" || !sellerId.trim()) {
+    throw new HttpsError("invalid-argument", "sellerId is required.");
+  }
+  if (typeof reason !== "string" || !reason.trim()) {
+    throw new HttpsError("invalid-argument", "A reason is required.");
+  }
+
+  const cooldownRef = db.collection("reportCooldowns").doc(request.auth.uid);
+  const cooldownSnap = await cooldownRef.get();
+  const lastReportedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastReportedAt?.toMillis() : null;
+
+  if (lastReportedAt && Date.now() - lastReportedAt < REPORT_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a moment before submitting another report."
+    );
+  }
+
+  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+  await db.collection("reports").add({
+    productId: productId.trim(),
+    productTitle: typeof productTitle === "string" ? productTitle.trim() : "",
+    sellerId: sellerId.trim(),
+    reporterId: request.auth.uid,
+    reason: reason.trim().slice(0, 300),
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { success: true };
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 6. ADMIN MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
