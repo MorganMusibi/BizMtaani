@@ -114,33 +114,24 @@ if (!user) {
     try {
       setSubmitting(true);
 
-      await addDoc(collection(db, "supportReports"), {
-        userId: user.uid,
-        userEmail: user.email ?? null,
-
+      const submitSupportReport = httpsCallable(functions, "submitSupportReport");
+      await submitSupportReport({
         type: reportType,
-
         advertId: cleanAdvertId || null,
-
         description: cleanDescription,
-
         contact: cleanContact || null,
-
-        status: "open",
         priority: reportType === "fraud" ? "high" : "normal",
-
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
       });
 
       setSubmitted(true);
       setAdvertId("");
       setDescription("");
       setContact("");
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to submit report:", err);
 
       setError(
+        err?.message ??
         "We couldn't submit your report right now. Please check your connection and try again."
       );
     } finally {
