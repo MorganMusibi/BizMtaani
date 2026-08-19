@@ -1002,13 +1002,6 @@ if (isTransport) {
   return true;
 }
 
-const requiresPrice =
-  !isAccommodation &&
-  !isCommercialProperty &&
-  !isEatery &&
-  (priceDisplay === "fixed" ||
-    priceDisplay === "negotiable");
-
 if (
   requiresPrice &&
   (!price || parseFloat(price) <= 0)
@@ -1017,6 +1010,15 @@ if (
     title: "Enter a valid price",
     description:
       "Or choose 'Contact for Price' or 'Request Quote'.",
+    variant: "destructive",
+  });
+  return false;
+}
+
+if (priceDisplay === "custom" && !priceText.trim()) {
+  toast({
+    title: "Enter a price label",
+    description: "e.g. '30 pekee', '@20', 'Ksh 500 non-negotiable'",
     variant: "destructive",
   });
   return false;
@@ -1239,7 +1241,7 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     title: title.trim(),
     description: description.trim(),
 
-    price:
+price:
   isAccommodation && !isAccommodationSale && !isAccommodationLand
     ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
@@ -1250,9 +1252,12 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
           ? 0
           : isTransport && pricingBasis === "quote_only"
             ? 0
-            : extractPriceValue(price),
+            : priceDisplay === "custom"
+              ? 0
+              : extractPriceValue(price),
 
     priceRaw: price.trim(),
+    priceText: priceDisplay === "custom" ? priceText.trim() : "",
     rentPerMonthRaw: rentPerMonth.trim(),
 
     category: selectedCategory,
@@ -1481,7 +1486,7 @@ setPublishingFree(true);
     const docData: any = {
       title: title.trim(),
       description: description.trim(),
-      price:
+price:
   isAccommodation && !isAccommodationSale && !isAccommodationLand
     ? extractPriceValue(rentPerMonth)
     : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
@@ -1492,9 +1497,12 @@ setPublishingFree(true);
           ? 0
           : isTransport && pricingBasis === "quote_only"
             ? 0
-            : extractPriceValue(price),
+            : priceDisplay === "custom"
+              ? 0
+              : extractPriceValue(price),
 
       priceRaw: price.trim(),
+      priceText: priceDisplay === "custom" ? priceText.trim() : "",
       rentPerMonthRaw: rentPerMonth.trim(),
 
       category: selectedCategory,
