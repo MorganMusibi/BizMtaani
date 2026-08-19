@@ -37,7 +37,7 @@ import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog";
 interface ProductReport {
   id: string;
   productId: string;
@@ -95,6 +95,16 @@ interface LeaderboardEntry {
   referralCode: string | null;
   earningsThisMonth: number;
   signupsThisMonth: number;
+}
+
+interface AuditLogEntry {
+  id: string;
+  adminUid: string;
+  action: string;
+  targetUid?: string;
+  reason?: string;
+  referralCode?: string;
+  createdAt: { seconds: number } | null;
 }
 
 interface MarketerApplication {
@@ -237,6 +247,12 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsLoaded, setApplicationsLoaded] = useState(false);
   const [processingApplicationId, setProcessingApplicationId] = useState<string | null>(null);
+
+  // Audit log tab — owner-only, lazily loaded, bounded to 50 most recent
+  const [auditLog, setAuditLog] = useState<AuditLogEntry[]>([]);
+  const [auditLogLoading, setAuditLogLoading] = useState(false);
+  const [auditLogLoaded, setAuditLogLoaded] = useState(false);
+  const [adminNames, setAdminNames] = useState<Record<string, string>>({});
   
   async function loadJobs() {
     if (jobsLoaded) return;
@@ -462,6 +478,44 @@ async function markPaid(payout: Payout) {
       alert("Failed to reject this application.");
     } finally {
       setProcessingApplicationId(null);
+    }
+  }
+  // -------------------------------------------------------
+  // AUDIT LOG — owner-only, lazily loaded when tab is opened
+  // -------------------------------------------------------
+  async function loadAuditLog() {
+    if (auditLogLoaded) return;
+    setAuditLogLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "adminAuditLog"), orderBy("createdAt", "desc"), limit(50))
+      );
+      const entries = snap.docs.map((d) => ({ id: d.id, ...d.data() } as AuditLogEntry));
+      setAuditLog(entries);
+      setAuditLogLoaded(true);
+
+      // Resolve admin uids to display names for readability, skipping
+      // any already resolved. Best-effort — falls back to the raw uid.
+      const uidsToResolve = Array.from(new Set(entries.map((e) => e.adminUid))).filter(
+        (uid) => !adminNames[uid]
+      );
+      if (uidsToResolve.length > 0) {
+        const results = await Promise.all(
+          uidsToResolve.map(async (uid) => {
+            try {
+              const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid), limit(1)));
+              return [uid, snap.docs[0]?.data()?.displayName ?? uid] as const;
+            } catch {
+              return [uid, uid] as const;
+            }
+          })
+        );
+        setAdminNames((prev) => ({ ...prev, ...Object.fromEntries(results) }));
+      }
+    } catch (error) {
+      console.error("Failed to load audit log:", error);
+    } finally {
+      setAuditLogLoading(false);
     }
   }
   // -------------------------------------------------------
@@ -719,6 +773,7 @@ useEffect(() => {
   if (tab === "applications") loadApplications();
   if (tab === "payouts") loadPayouts(payoutMonth);
   if (tab === "leaderboard") loadLeaderboard();
+  if (tab === "auditlog") loadAuditLog();
 }
 
   // -------------------------------------------------------
@@ -884,6 +939,7 @@ async function dismissSupportReport(reportId: string) {
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
     { title: "Payouts", icon: CreditCard, tab: "payouts" },
     { title: "Leaderboard", icon: TrendingUp, tab: "leaderboard" },
+    ...(isOwner ? [{ title: "Audit Log", icon: Shield, tab: "auditlog" as Tab }] : []),
   ];
 
   return (
@@ -1715,6 +1771,58 @@ async function dismissSupportReport(reportId: string) {
             <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
               Payment history view coming soon.
             </div>
+          )}
+
+          {activeTab === "auditlog" && isOwner && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold">Audit Log</h2>
+                <p className="mt-1 text-muted-foreground">
+                  Most recent 50 admin actions. Permanent — cannot be edited or deleted.
+                </p>
+              </div>
+
+              {auditLogLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : auditLog.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No admin actions recorded yet.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {auditLog.map((entry) => (
+                    <div key={entry.id} className="rounded-xl border bg-card p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm capitalize">
+                            {entry.action.replace(/_/g, " ")}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            By {adminNames[entry.adminUid] ?? entry.adminUid}
+                            {entry.targetUid && <> · Target: {entry.targetUid}</>}
+                          </p>
+                          {entry.reason && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Reason: {entry.reason}
+                            </p>
+                          )}
+                          {entry.referralCode && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Code: <span className="font-mono">{entry.referralCode}</span>
+                            </p>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground flex-shrink-0">
+                          {timeAgo(entry.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </main>
       </div>
