@@ -1,4 +1,4 @@
-.import { getFunctions, httpsCallable } from "firebase/functions";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import imageCompression from "browser-image-compression";
 
