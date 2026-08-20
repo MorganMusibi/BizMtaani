@@ -167,7 +167,8 @@ const ALLOWED_UPLOAD_FORMATS = "jpg,jpeg,png,webp";
 
 export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
-  const uploadType = ((request.data as Record<string, unknown>).uploadType as string | undefined) ?? "product";
+  const reqData = request.data as Record<string, unknown>;
+  const uploadType = (reqData.uploadType as string | undefined) ?? "product";
   const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
   const timestamp = Math.floor(Date.now() / 1000);
 
@@ -185,14 +186,18 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   )
   .digest("hex");
 
-  const draftId = crypto.randomBytes(12).toString("hex");
+  // Use the client-supplied draftId if given, so every photo in this
+  // posting session attaches to the SAME draft record. Fall back to
+  // generating one only if the client didn't send one.
+  const clientDraftId = reqData.draftId as string | undefined;
+  const draftId = clientDraftId && clientDraftId.trim() ? clientDraftId : crypto.randomBytes(12).toString("hex");
+
   await db.collection("draftUploads").doc(draftId).set({
     uid: request.auth.uid,
     folder,
     claimed: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
+  }, { merge: true });
   return {
     signature,
     timestamp,
