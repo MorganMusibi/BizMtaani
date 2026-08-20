@@ -119,18 +119,19 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          "react-vendor": ["react", "react-dom"],
-          "radix-ui": [
-            "@radix-ui/react-dialog",
-            "@radix-ui/react-dropdown-menu",
-            "@radix-ui/react-select",
-            "@radix-ui/react-popover",
-            "@radix-ui/react-tabs",
-            "@radix-ui/react-accordion",
-          ],
-          "leaflet-vendor": ["leaflet", "react-leaflet"],
-          "charts-vendor": ["recharts"],
-        },
+  "react-vendor": ["react", "react-dom"],
+  "firebase-vendor": ["firebase/app", "firebase/auth", "firebase/firestore", "firebase/functions", "firebase/messaging"],
+  "radix-ui": [
+    "@radix-ui/react-dialog",
+    "@radix-ui/react-dropdown-menu",
+    "@radix-ui/react-select",
+    "@radix-ui/react-popover",
+    "@radix-ui/react-tabs",
+    "@radix-ui/react-accordion",
+  ],
+  "leaflet-vendor": ["leaflet", "react-leaflet"],
+  "charts-vendor": ["recharts"],
+},
       },
     },
     chunkSizeWarningLimit: 1000,
