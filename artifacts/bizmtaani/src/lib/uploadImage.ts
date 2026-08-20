@@ -1,6 +1,5 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
-import imageCompression from "browser-image-compression";
 
 export type ImageUploadType = "avatar" | "product" | "community";
 
@@ -36,6 +35,7 @@ async function compressImageBeforeUpload(
       : { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker: true };
 
   try {
+    const { default: imageCompression } = await import("browser-image-compression");
     const compressed = await imageCompression(file, options);
     return compressed;
   } catch (error) {
