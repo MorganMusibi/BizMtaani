@@ -1,6 +1,6 @@
 // Tracks which lazy chunks we've already started fetching this
-// session, so hovering the same link twice doesn't re-trigger a
-// network request.
+// session, so hovering/touching the same link twice doesn't
+// re-trigger a network request.
 const prefetched = new Set<string>();
 
 export function prefetchRoute(key: string, importFn: () => Promise<unknown>) {
