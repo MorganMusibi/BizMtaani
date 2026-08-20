@@ -68,12 +68,14 @@ export async function uploadImage(
 
   const functions = getFunctions(app, "us-central1");
   const getSignature = httpsCallable<
-    { uploadType: string },
+    { uploadType: string; draftId?: string },
     CloudinarySignatureResult & { draftId: string }
   >(functions, "getCloudinarySignature");
 
-  const { data: sig } = await getSignature({ uploadType: type });
-
+  const { data: sig } = await getSignature({
+    uploadType: type,
+    draftId: draftId ?? undefined,
+  });
   // Only send the params that are covered by the signature.
   // Adding extra params here would cause Cloudinary to reject with
   // "Invalid Signature" — allowed_formats and bytes_limit are now
