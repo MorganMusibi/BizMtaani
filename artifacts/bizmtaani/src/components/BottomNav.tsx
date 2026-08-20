@@ -4,6 +4,7 @@ import { LayoutGrid, Package, MessageCircle, User, Briefcase, Info } from "lucid
 import { useAuth } from "@/contexts/AuthContext";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { prefetchRoute } from "@/lib/prefetch";
 
 interface Chat {
   lastSenderId?: string;
@@ -33,6 +34,16 @@ export function BottomNav() {
     return unsub;
   }, [user]);
 
+  // "/" is Home — already loaded on first paint, so it's excluded.
+  // Every other nav destination gets its chunk warmed on hover/touch.
+  const prefetchMap: Record<string, () => Promise<unknown>> = {
+    "/jobs": () => import("@/pages/Jobs"),
+    "/my-listings": () => import("@/pages/MyListings"),
+    "/chats": () => import("@/pages/ChatList"),
+    "/about": () => import("@/pages/About"),
+    "/profile": () => import("@/pages/Profile"),
+  };
+
   const navItems = [
     { path: "/", label: "Discover", icon: LayoutGrid, badge: false },
     { path: "/jobs", label: "Jobs", icon: Briefcase, badge: false },
@@ -57,6 +68,14 @@ export function BottomNav() {
               key={path}
               href={path}
               data-testid={`nav-${label.toLowerCase()}`}
+              onMouseEnter={() => {
+                const load = prefetchMap[path];
+                if (load) prefetchRoute(path, load);
+              }}
+              onTouchStart={() => {
+                const load = prefetchMap[path];
+                if (load) prefetchRoute(path, load);
+              }}
               className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
                 isActive
                   ? "text-primary"
