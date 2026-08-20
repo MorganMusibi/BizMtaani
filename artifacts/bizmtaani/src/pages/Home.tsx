@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
+import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
@@ -58,21 +59,7 @@ const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
-function getThumbnailUrl(url: string): string {
-  if (!url) return "";
 
-  // Cloudinary images:
-  // Optimize format, quality, width, and crop for feed cards.
-  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
-    return url.replace(
-      "/upload/",
-      "/upload/f_auto,q_auto,w_500,c_fill/"
-    );
-  }
-
-  // Non-Cloudinary images are returned unchanged.
-  return url;
-}
 function getCanonicalProductLocation(product: Product): {
   ward: string;
   constituency: string;
