@@ -179,11 +179,11 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   // bytes_limit (which isn't a recognized upload parameter and
   // gets silently dropped from Cloudinary's own signature check).
   const signature = crypto
-    .createHash("sha1")
-    .update(
-      `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
-    )
-    .digest("hex");
+  .createHash("sha1")
+  .update(
+    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+  )
+  .digest("hex");
 
   const draftId = crypto.randomBytes(12).toString("hex");
   await db.collection("draftUploads").doc(draftId).set({
