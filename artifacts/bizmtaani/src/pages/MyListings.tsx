@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
+import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
 interface Product {
@@ -224,8 +225,8 @@ export default function MyListings() {
                         className="bg-card rounded-2xl border border-border overflow-hidden">
                         <Link href={`/product/${product.id}`}>
                           {product.imageUrl ? (
-                            <img src={product.imageUrl} alt={product.title} className="w-full aspect-square object-cover" />
-                          ) : (
+                          <img src={getThumbnailUrl(product.imageUrl, 300)} alt={product.title} className="w-full aspect-square object-cover" />
+                           ) : (
                             <div className="w-full aspect-square bg-muted flex items-center justify-center">
                               <Package size={28} className="text-muted-foreground" />
                             </div>
@@ -281,8 +282,8 @@ export default function MyListings() {
                     <div key={product.id} className="bg-card rounded-2xl border border-destructive/20 overflow-hidden opacity-70">
                       <div className="relative">
                         {product.imageUrl ? (
-                          <img src={product.imageUrl} alt={product.title} className="w-full aspect-square object-cover grayscale" />
-                        ) : (
+                          <img src={getThumbnailUrl(product.imageUrl, 300)} alt={product.title} className="w-full aspect-square object-cover grayscale" />
+                           ) : (
                           <div className="w-full aspect-square bg-muted flex items-center justify-center">
                             <Package size={28} className="text-muted-foreground" />
                           </div>
