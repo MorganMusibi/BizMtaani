@@ -175,10 +175,13 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   // Cloudinary server-side — a client cannot alter these without
   // invalidating the signature, so this closes the gap left by an
   // unsigned preset (which your app doesn't use anyway).
+  // NOTE: Cloudinary's real parameter name is max_file_size, not
+  // bytes_limit (which isn't a recognized upload parameter and
+  // gets silently dropped from Cloudinary's own signature check).
   const signature = crypto
     .createHash("sha1")
     .update(
-      `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&bytes_limit=${MAX_UPLOAD_BYTES}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+      `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
     )
     .digest("hex");
 
@@ -198,7 +201,7 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
     cloudName: cloudinaryCloudName.value(),
     draftId,
     allowedFormats: ALLOWED_UPLOAD_FORMATS,
-    bytesLimit: MAX_UPLOAD_BYTES,
+    maxFileSize: MAX_UPLOAD_BYTES,
   };
 });
 
