@@ -13,6 +13,7 @@ import { RecaptchaDisclosure } from "@/components/RecaptchaDisclosure";
 import NotFound from "@/pages/not-found";
 import { lazy, Suspense } from "react";
 import Home from "@/pages/Home";
+import { BottomNav } from "@/components/BottomNav";
 
 const NotFound = lazy(() => import("@/pages/not-found"));
 const Login = lazy(() => import("@/pages/Login"));
@@ -110,8 +111,9 @@ function App() {
           <NotificationSetup />
           <EmailVerificationBanner />
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-            <Router />
+          <Router />
           </WouterRouter>
+          <BottomNav />
           <ProfileSetupGate />
           <InstallPrompt />
           <RecaptchaDisclosure />
