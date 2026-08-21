@@ -90,7 +90,7 @@ function getCanonicalProductLocation(product: Product): {
   };
 }
 
-const ProductCard = React.memo(function ProductCard({
+const ProductCard = memo(function ProductCard({
   product,
   userCoords,
   onClick,
