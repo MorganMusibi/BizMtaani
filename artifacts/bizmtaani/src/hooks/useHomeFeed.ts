@@ -666,7 +666,7 @@ setNationwideDone(false);
 setSearchCursor(null);
 setSearchDone(false);
   const run = async () => {
-    console.log("[FEED] run() start", { isSearchMode, wardName: locationInfo?.wardName, userCoords });
+    
 
     const cacheKey = `${locationInfo?.wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
 
@@ -742,7 +742,6 @@ setAreaDone(true);
   }
 
   setInitialLoading(false);
-  console.log("[FEED] run() end (search mode), initialLoading set false");
   return;
 }
     // ============================================================
@@ -998,7 +997,6 @@ const queries = areaQueries(
     
 
     setInitialLoading(false);
-    console.log("[FEED] run() end, initialLoading set false");
   };
 
     run();
