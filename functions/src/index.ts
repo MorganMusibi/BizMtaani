@@ -1545,8 +1545,6 @@ await cooldownRef.set({
 });
 
   await db.collection("messageReports").add({
-
-  await db.collection("messageReports").add({
     reporterId: request.auth.uid,
     chatId: chatId.trim(),
     messageId: messageId.trim(),
