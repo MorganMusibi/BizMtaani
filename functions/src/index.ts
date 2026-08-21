@@ -24,8 +24,9 @@ const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
 const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+
 function requireAdmin(
-  request: { auth: { uid: string; token: Record<string, unknown> } | null }
+  request: { auth?: { uid: string; token: Record<string, unknown> } | null }
 ): asserts request is { auth: { uid: string; token: Record<string, unknown> } } {
   if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
   if (request.auth.token.admin !== true) {
