@@ -31,15 +31,47 @@ export default function Profile() {
   
   useEffect(() => {
     if (!user) return;
+
+    const cacheKey = `bizmtaani_marketer_status_${user.uid}`;
+
+    try {
+      const cached = sessionStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        setIsMarketer(parsed.isMarketer);
+        setMarketerData(parsed.marketerData);
+        setHasPendingApplication(parsed.hasPendingApplication);
+        return; // Already know the answer this session — skip the reads.
+      }
+    } catch {
+      // Corrupt or unavailable cache — fall through and fetch normally.
+    }
+
     import("firebase/firestore").then(({ getDoc, doc: docRef }) => {
       getDoc(docRef(db, "marketers", user.uid)).then((snap) => {
-  setIsMarketer(snap.exists());
-  if (snap.exists()) setMarketerData(snap.data());
-});
-      getDoc(docRef(db, "marketerApplications", user.uid)).then((snap) => {
-        if (snap.exists() && snap.data()?.status === "pending") {
-          setHasPendingApplication(true);
-        }
+        const isMkt = snap.exists();
+        const data = snap.exists() ? snap.data() : null;
+        setIsMarketer(isMkt);
+        setMarketerData(data);
+
+        getDoc(docRef(db, "marketerApplications", user.uid)).then((appSnap) => {
+          const pending = appSnap.exists() && appSnap.data()?.status === "pending";
+          setHasPendingApplication(pending);
+
+          try {
+            sessionStorage.setItem(
+              cacheKey,
+              JSON.stringify({
+                isMarketer: isMkt,
+                marketerData: data,
+                hasPendingApplication: pending,
+              })
+            );
+          } catch {
+            // sessionStorage full or unavailable — caching is a
+            // performance optimization only, safe to skip.
+          }
+        });
       });
     });
   }, [user]);
@@ -87,6 +119,7 @@ export default function Profile() {
     toast({ title: "Application submitted!", description: "We'll review it and get back to you." });
     setShowMarketerForm(false);
     setHasPendingApplication(true);
+    if (user) sessionStorage.removeItem(`bizmtaani_marketer_status_${user.uid}`);
     setMarketerFullName("");
     setMarketerIdNumber("");
     setMarketerMpesaNumber("");
