@@ -839,7 +839,7 @@ export const closeMonthlyEarnings = onSchedule(
  * Admin-only: fetch the payout list for a given month (e.g. "2026-07").
  */
 export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  requireAdmin(request);
 
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can view payouts.");
@@ -1711,7 +1711,7 @@ function generateReferralCode(name: string, uid: string): string {
  * Admin-only: approve a marketer and issue their referral code.
  */
 export const approveMarketer = onCall({ cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  requireAdmin(request);
 
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can approve marketers.");
@@ -1774,7 +1774,7 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
  * earnings history.
  */
 export const setMarketerStatus = onCall({ cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  requireAdmin(request);
 
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can manage marketer status.");
@@ -1959,7 +1959,7 @@ export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKe
  * Admin-only: reject a pending marketer application.
  */
 export const rejectMarketerApplication = onCall({ cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  requireAdmin(request);
 
   if (request.auth.uid !== OWNER_UID) {
     throw new HttpsError("permission-denied", "Only the owner can manage marketer applications.");
