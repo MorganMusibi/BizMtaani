@@ -6,7 +6,7 @@ import {
   ChevronDown,
   CheckCircle2,
 } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
+
 import { useAuth } from "@/contexts/AuthContext";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
@@ -375,7 +375,6 @@ if (!user) {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
                               }
