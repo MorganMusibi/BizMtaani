@@ -6,7 +6,7 @@ import {
   dedupe,
   rankProducts,
 } from "@/hooks/useHomeFeed";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -23,7 +23,6 @@ import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
@@ -91,7 +90,7 @@ function getCanonicalProductLocation(product: Product): {
   };
 }
 
-function ProductCard({
+const ProductCard = React.memo(function ProductCard({
   product,
   userCoords,
   onClick,
@@ -257,7 +256,7 @@ const displayCounty =
       </div>
     </div>
   );
-}
+});
 
 export default function Home() {
   const [, setLocation] = useLocation();
@@ -958,7 +957,6 @@ const totalVisible = rankedProducts.length;
         />
       )}
 
-      <BottomNav />
     </div>
   );
     }
