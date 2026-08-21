@@ -307,7 +307,7 @@ export default function Home() {
           // the user know the refresh actually ran, since otherwise a
           // no-op refresh looks identical to a silently failed one.
           toast({
-            title: "TULIAAA! 😂 Uko",
+            title: "TULIAA! 😂 Uko",
             description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
           });
         }
@@ -411,18 +411,18 @@ export default function Home() {
     useEffect(() => {
     let cancelled = false;
 const applyResolvedLocation = async (location: ResolvedLocation) => {
-  console.log("[LOC] applyResolvedLocation start", location);
+
   if (cancelled) return;
 
   let final = location;
   if (location.wardName) {
-    console.log("[LOC] calling resolveCanonicalLocation");
+    
     const canonical = await resolveCanonicalLocation(
       location.wardName,
       location.constituency,
       location.county
     );
-    console.log("[LOC] resolveCanonicalLocation done", canonical);
+    
     if (canonical) {
       final = {
         ...location,
@@ -503,7 +503,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
 };
 
     const requestGps = async () => {
-  console.log("[LOC] requestGps start, geolocation available:", !!navigator.geolocation);
+  
   if (!navigator.geolocation) {
     if (await useSavedProfileLocation()) return;
     if (await usePreviouslySelectedArea()) return;
