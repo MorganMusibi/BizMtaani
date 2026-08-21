@@ -8,7 +8,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
 import {
@@ -1336,7 +1335,7 @@ const itemDistance =
   )}
 </div>
 
-      <BottomNav />
+      
     {/* --- REPORT MODAL --- */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
