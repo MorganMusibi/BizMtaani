@@ -423,7 +423,9 @@ async function revokeAdmin(targetUser: AdminUser) {
     const willSuspend = marketer.status !== "suspended";
     setProcessingMarketerId(marketer.id);
     try {
-      await updateDoc(doc(db, "marketers", marketer.id), {
+      const setMarketerStatus = httpsCallable(functions, "setMarketerStatus");
+      await setMarketerStatus({
+        uid: marketer.id,
         status: willSuspend ? "suspended" : "active",
       });
       setMarketers((prev) =>
@@ -431,15 +433,8 @@ async function revokeAdmin(targetUser: AdminUser) {
           m.id === marketer.id ? { ...m, status: willSuspend ? "suspended" : "active" } : m
         )
       );
-
-      if (user) {
-        addDoc(collection(db, "adminAuditLog"), {
-          adminUid: user.uid,
-          action: willSuspend ? "suspend_marketer" : "reactivate_marketer",
-          targetUid: marketer.id,
-          createdAt: serverTimestamp(),
-        }).catch((err) => console.error("Failed to write audit log:", err));
-      }
+      // Audit logging now happens server-side inside the Cloud
+      // Function, so no direct client write is needed here.
     } catch (error) {
       console.error("Failed to update marketer status:", error);
       alert("Failed to update marketer status.");
