@@ -805,7 +805,10 @@ try {
 
   let collectedProducts: Product[] = [];
   let iterations = 0;
-  const MAX_ITERATIONS = 3;
+  // Not a visibility limit — purely a runaway-loop safety net.
+  // Real exhaustion is decided by allPrefixesDone below; this should
+  // never realistically be reached.
+  const MAX_ITERATIONS = 10000;
   let allPrefixesDone = false;
 
   const currentRadius = HOME_FEED_RADIUS_STEPS[0];
@@ -1176,11 +1179,6 @@ if (!areaDone && !areaLoading) {
       ...areaDonePrefixes,
     };
 
-    let collectedProducts: Product[] = [];
-
-    let allPrefixesDone = false;
-    let iterations = 0;
-    const MAX_ITERATIONS = 6;
 
     // ==========================================================
     // STEP 3 — FETCH ENOUGH PRODUCTS FOR THE BUFFER
