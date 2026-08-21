@@ -11,7 +11,6 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getWardInfo } from "@/lib/location";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 import {
   Briefcase, Plus, Loader2, MapPin, Clock, Search, X,
@@ -594,7 +593,6 @@ export default function Jobs() {
         </div>
       )}
 
-      <BottomNav />
     </div>
   );
 }
