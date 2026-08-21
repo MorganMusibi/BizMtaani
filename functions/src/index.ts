@@ -548,6 +548,18 @@ async function deleteCloudinaryImage(publicId: string) {
   );
 }
 
+async function deleteCloudinaryImagesBatched(publicIds: string[], batchSize = 10) {
+  for (let i = 0; i < publicIds.length; i += batchSize) {
+    await Promise.all(
+      publicIds.slice(i, i + batchSize).map((id) =>
+        deleteCloudinaryImage(id).catch((error) =>
+          console.error(`Cloudinary delete failed for ${id}:`, error)
+        )
+      )
+    );
+  }
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CLEANUP
 // ═══════════════════════════════════════════════════════════════════════════
@@ -606,16 +618,10 @@ async function runCleanup() {
     const data = doc.data();
 
     if (Array.isArray(data.imageUrls)) {
-      for (const img of data.imageUrls) {
-        const publicId = typeof img === "string" ? null : img.public_id;
-        if (publicId) {
-          try {
-            await deleteCloudinaryImage(publicId);
-          } catch (error) {
-            console.error(`Cloudinary delete failed for ${publicId}:`, error);
-          }
-        }
-      }
+      const publicIds = data.imageUrls
+        .map((img: any) => (typeof img === "string" ? null : img.public_id))
+        .filter((id: any): id is string => !!id);
+      await deleteCloudinaryImagesBatched(publicIds);
     }
 
     batch.delete(doc.ref);
@@ -638,14 +644,8 @@ async function runCleanup() {
   for (const draftDoc of staleDrafts.docs) {
     const data = draftDoc.data();
     const publicIds: string[] = Array.isArray(data.publicIds) ? data.publicIds : [];
-    for (const publicId of publicIds) {
-      try {
-        await deleteCloudinaryImage(publicId);
-        purgedDraftImages++;
-      } catch (error) {
-        console.error(`Cloudinary delete failed for orphaned draft image ${publicId}:`, error);
-      }
-    }
+    await deleteCloudinaryImagesBatched(publicIds);
+    purgedDraftImages += publicIds.length;
     batch.delete(draftDoc.ref);
   }
 
@@ -656,16 +656,10 @@ async function runCleanup() {
     const data = doc.data();
 
     if (Array.isArray(data.imageUrls)) {
-      for (const img of data.imageUrls) {
-        const publicId = typeof img === "string" ? null : img.public_id;
-        if (publicId) {
-          try {
-            await deleteCloudinaryImage(publicId);
-          } catch (error) {
-            console.error(`Cloudinary delete failed for ${publicId}:`, error);
-          }
-        }
-      }
+      const publicIds = data.imageUrls
+        .map((img: any) => (typeof img === "string" ? null : img.public_id))
+        .filter((id: any): id is string => !!id);
+      await deleteCloudinaryImagesBatched(publicIds);
     }
 
     const relatedChats = await db.collection("chats")
