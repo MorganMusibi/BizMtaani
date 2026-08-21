@@ -15,8 +15,6 @@ import {
   Gift,
   Megaphone,
 } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
-
 const HOW_IT_WORKS = [
   {
     icon: Search,
@@ -361,7 +359,6 @@ export default function About() {
         </section>
       </div>
 
-      <BottomNav />
     </div>
   );
 }
