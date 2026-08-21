@@ -12,7 +12,6 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check, X } from "lucide-react";
 import { Link } from "wouter";
-import { BottomNav } from "@/components/BottomNav";
 import imageCompression from "browser-image-compression";
 
 export default function Profile() {
@@ -736,7 +735,6 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
         </>
       )}
 
-      <BottomNav />
     </div>
   );
 }
