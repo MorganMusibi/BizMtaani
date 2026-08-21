@@ -6,7 +6,6 @@ import { doc, getDoc, collection, query, where, orderBy, limit, getDocs } from "
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { ChevronLeft, Loader2, Wallet, Copy, Check, Share2, TrendingUp } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { Button } from "@/components/ui/button";
 
 interface MarketerData {
@@ -324,8 +323,6 @@ const [referralsLoading, setReferralsLoading] = useState(true);
           )}
         </div>
       </div>
-
-      <BottomNav />
     </div>
   );
           }
