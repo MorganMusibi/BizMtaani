@@ -24,7 +24,9 @@ const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
 const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
-function requireAdmin(request: { auth: { uid: string; token: Record<string, unknown> } | null }) {
+function requireAdmin(
+  request: { auth: { uid: string; token: Record<string, unknown> } | null }
+): asserts request is { auth: { uid: string; token: Record<string, unknown> } } {
   if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
   if (request.auth.token.admin !== true) {
     throw new HttpsError("permission-denied", "Admin access required.");
@@ -841,9 +843,6 @@ export const closeMonthlyEarnings = onSchedule(
 export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can view payouts.");
-  }
 
   const { monthKey } = request.data as { monthKey?: string };
   if (!monthKey) throw new HttpsError("invalid-argument", "monthKey is required, e.g. '2026-07'.");
@@ -1713,9 +1712,6 @@ function generateReferralCode(name: string, uid: string): string {
 export const approveMarketer = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can approve marketers.");
-  }
 
   const { uid } = request.data as { uid?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
@@ -1775,10 +1771,6 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
  */
 export const setMarketerStatus = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
-
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can manage marketer status.");
-  }
 
   const { uid, status } = request.data as { uid?: string; status?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A marketer UID is required.");
@@ -1961,9 +1953,6 @@ export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKe
 export const rejectMarketerApplication = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can manage marketer applications.");
-  }
 
   const { uid } = request.data as { uid?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
