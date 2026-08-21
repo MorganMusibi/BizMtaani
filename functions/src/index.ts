@@ -269,7 +269,10 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
     );
   }
 
-  await cooldownRef.set({ lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp() });
+  await cooldownRef.set({
+  lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+});
   if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
     throw new HttpsError("invalid-argument", "Invalid plan selected.");
   }
