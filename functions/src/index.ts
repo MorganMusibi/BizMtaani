@@ -1767,6 +1767,42 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
   return { success: true, referralCode: code };
 });
 
+      /**
+ * Admin-only: suspend or reactivate a marketer. Suspending stops
+ * their referral code from being usable (submitReferralCode only
+ * matches marketers with status == "active") without deleting their
+ * earnings history.
+ */
+export const setMarketerStatus = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  if (request.auth.uid !== OWNER_UID) {
+    throw new HttpsError("permission-denied", "Only the owner can manage marketer status.");
+  }
+
+  const { uid, status } = request.data as { uid?: string; status?: string };
+  if (!uid) throw new HttpsError("invalid-argument", "A marketer UID is required.");
+  if (status !== "active" && status !== "suspended") {
+    throw new HttpsError("invalid-argument", "status must be 'active' or 'suspended'.");
+  }
+
+  const marketerRef = db.collection("marketers").doc(uid);
+  const marketerSnap = await marketerRef.get();
+  if (!marketerSnap.exists) {
+    throw new HttpsError("not-found", "Marketer not found.");
+  }
+
+  await marketerRef.update({ status });
+
+  await logAdminAction(
+    request.auth.uid,
+    status === "suspended" ? "suspend_marketer" : "reactivate_marketer",
+    { targetUid: uid }
+  );
+
+  return { success: true, status };
+});
+
  export const getMyReferrals = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const uid = request.auth.uid;
