@@ -67,7 +67,6 @@ if (!user) {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 }
@@ -192,7 +191,6 @@ if (!user) {
           </div>
         </main>
 
-        <BottomNav />
       </div>
     );
   }
