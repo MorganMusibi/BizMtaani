@@ -6,7 +6,6 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { ChevronLeft, Loader2, Package, MapPin } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { getCategoryDef, getCategoryBadgeColor } from "@/lib/categories";
 import type { Product } from "@/hooks/useHomeFeed";
 
@@ -202,7 +201,6 @@ export default function CategoryAds() {
         )}
       </div>
 
-      <BottomNav />
     </div>
   );
     }
