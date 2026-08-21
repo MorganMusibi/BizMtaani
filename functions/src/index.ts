@@ -1543,8 +1543,8 @@ await cooldownRef.set({
   lastReportedAt: admin.firestore.FieldValue.serverTimestamp(),
   expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
 });
-  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
-});
+
+  await db.collection("messageReports").add({
 
   await db.collection("messageReports").add({
     reporterId: request.auth.uid,
