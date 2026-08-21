@@ -277,7 +277,6 @@ export default function Profile() {
         <Button data-testid="button-signin" onClick={() => setLocation("/login")} className="w-full max-w-xs">
           Sign In
         </Button>
-        <BottomNav />
       </div>
     );
   }
