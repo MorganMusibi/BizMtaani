@@ -13,7 +13,6 @@ import {
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { BottomNav } from "@/components/BottomNav";
 import {
   ChevronLeft,
   Phone,
@@ -1172,8 +1171,6 @@ useEffect(() => {
           )}
         </div>
       )}
-
-      <BottomNav />
     </div>
   );
 }
