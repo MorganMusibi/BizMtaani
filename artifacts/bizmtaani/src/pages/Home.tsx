@@ -462,7 +462,7 @@ const applyResolvedLocation = async (location: ResolvedLocation) => {
 });
   }
   setGpsReady(true);
-  console.log("[LOC] applyResolvedLocation done, gpsReady set true");
+  
 };
 
     const useSavedProfileLocation = async (): Promise<boolean> => {
@@ -482,19 +482,19 @@ const applyResolvedLocation = async (location: ResolvedLocation) => {
 };
 
 const usePreviouslySelectedArea = async (): Promise<boolean> => {
-  console.log("[LOC] usePreviouslySelectedArea start");
+  
   try {
     const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
-    console.log("[LOC] stored value:", stored);
+    
     if (!stored) return false;
     const parsed = JSON.parse(stored) as ResolvedLocation;
-    console.log("[LOC] parsed:", parsed);
+    
     if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") {
-      console.log("[LOC] invalid lat/lng, bailing");
+      
       return false;
     }
     await applyResolvedLocation(parsed);
-    console.log("[LOC] usePreviouslySelectedArea done");
+    
     return true;
   } catch (error) {
     console.error("[LOC] Failed to load saved area:", error);
