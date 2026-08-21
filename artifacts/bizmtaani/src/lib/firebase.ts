@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported } from "firebase/messaging";
 import { getFunctions } from "firebase/functions"; // Added this
@@ -20,7 +20,18 @@ export const auth = getAuth(app);
 // Keep users signed in across browser restarts
 setPersistence(auth, browserLocalPersistence).catch(() => {});
 
-export const db = getFirestore(app);
+// Persistent local cache: Firestore reads/writes are cached in
+// IndexedDB, so revisiting the same data (e.g. reopening a product,
+// or navigating back to Home) can be served from local cache instead
+// of a fresh network read — cuts both load time and Firestore read
+// costs. persistentMultipleTabManager lets it work correctly if the
+// user has BizMtaani open in more than one browser tab at once.
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
+
 export const storage = getStorage(app);
 export const functions = getFunctions(app, "us-central1"); // Added this
 
