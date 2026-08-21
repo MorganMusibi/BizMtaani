@@ -1,7 +1,6 @@
 import { useParams, useLocation, Link } from "wouter";
 import { ChevronLeft } from "lucide-react";
 import { getCategoryDef } from "@/lib/categories";
-import { BottomNav } from "@/components/BottomNav";
 
 export default function CategorySubcategories() {
   const { categoryKey } = useParams<{ categoryKey: string }>();
@@ -48,7 +47,6 @@ export default function CategorySubcategories() {
         </div>
       </div>
 
-      <BottomNav />
     </div>
   );
 }
