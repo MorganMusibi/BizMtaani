@@ -12,7 +12,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
-import { BottomNav } from "@/components/BottomNav";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
@@ -381,7 +380,6 @@ export default function MyListings() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <BottomNav />
     </div>
   );
 }
