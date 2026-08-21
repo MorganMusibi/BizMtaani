@@ -1177,6 +1177,13 @@ if (!areaDone && !areaLoading) {
       ...areaDonePrefixes,
     };
 
+    let collectedProducts: Product[] = [];
+    let allPrefixesDone = false;
+    let iterations = 0;
+    // Not a visibility limit — purely a runaway-loop safety net.
+    // Real exhaustion is decided by allPrefixesDone below; this should
+    // never realistically be reached.
+    const MAX_ITERATIONS = 10000;
 
     // ==========================================================
     // STEP 3 — FETCH ENOUGH PRODUCTS FOR THE BUFFER
