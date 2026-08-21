@@ -630,12 +630,12 @@ async function revokeAdmin(targetUser: AdminUser) {
         );
         setTodayActiveAdverts(activeTodaySnap.data().count);
 
-        // New users today — adjust field/format if your users store createdAt differently
+        // New users today
         try {
           const newUsersSnap = await getCountFromServer(
             query(
               collection(db, "users"),
-              where("createdAt", ">=", startOfToday.toISOString())
+              where("createdAt", ">=", startOfTodayTs)
             )
           );
           setTodayNewUsers(newUsersSnap.data().count);
