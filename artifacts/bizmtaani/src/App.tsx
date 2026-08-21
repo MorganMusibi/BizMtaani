@@ -10,8 +10,8 @@ import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { SplashScreen } from "@/components/SplashScreen";
 import { RecaptchaDisclosure } from "@/components/RecaptchaDisclosure";
-import NotFound from "@/pages/not-found";
 import { lazy, Suspense } from "react";
+import { useLocation } from "wouter";
 import Home from "@/pages/Home";
 import { BottomNav } from "@/components/BottomNav";
 
@@ -63,6 +63,15 @@ function ProfileSetupGate() {
   return <ProfileSetupModal />;
 }
 
+// BottomNav is hidden on full-screen flows where it would get in
+// the way: auth screens and the chat thread itself.
+const HIDDEN_BOTTOM_NAV_PREFIXES = ["/login", "/register", "/reset-password", "/chat/"];
+
+function useShouldShowBottomNav(): boolean {
+  const [location] = useLocation();
+  return !HIDDEN_BOTTOM_NAV_PREFIXES.some((prefix) => location.startsWith(prefix));
+}
+
 function Router() {
   return (
     <Suspense fallback={<div className="min-h-screen" />}>
@@ -98,6 +107,7 @@ function Router() {
 
 function App() {
   const [showSplash, setShowSplash] = useState(!splashAlreadyShown);
+  const showBottomNav = useShouldShowBottomNav();
 
   const handleSplashDone = useCallback(() => {
     sessionStorage.setItem("bm_splash", "1");
@@ -113,7 +123,7 @@ function App() {
           <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
           <Router />
           </WouterRouter>
-          <BottomNav />
+          {showBottomNav && <BottomNav />}
           <ProfileSetupGate />
           <InstallPrompt />
           <RecaptchaDisclosure />
