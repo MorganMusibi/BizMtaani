@@ -202,11 +202,12 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   const draftId = clientDraftId && clientDraftId.trim() ? clientDraftId : crypto.randomBytes(12).toString("hex");
 
   await db.collection("draftUploads").doc(draftId).set({
-    uid: request.auth.uid,
-    folder,
-    claimed: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  }, { merge: true });
+  uid: request.auth.uid,
+  folder,
+  claimed: false,
+  createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
+}, { merge: true });
   return {
     signature,
     timestamp,
@@ -1418,8 +1419,10 @@ export const submitProductReport = onCall({ cors: true }, async (request) => {
     );
   }
 
-  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
-
+  await cooldownRef.set({
+  lastReportedAt: admin.firestore.FieldValue.serverTimestamp(),
+  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+});
   await db.collection("reports").add({
     productId: productId.trim(),
     productTitle: typeof productTitle === "string" ? productTitle.trim() : "",
@@ -1466,7 +1469,10 @@ export const submitSupportReport = onCall({ cors: true }, async (request) => {
     );
   }
 
-  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
+  await cooldownRef.set({
+  lastReportedAt: admin.firestore.FieldValue.serverTimestamp(),
+  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+});
 
   await db.collection("supportReports").add({
     userId: request.auth.uid,
@@ -1533,8 +1539,10 @@ export const submitMessageReport = onCall({ cors: true }, async (request) => {
       "Please wait a moment before submitting another report."
     );
   }
-
-  await cooldownRef.set({ lastReportedAt: admin.firestore.FieldValue.serverTimestamp() });
+await cooldownRef.set({
+  lastReportedAt: admin.firestore.FieldValue.serverTimestamp(),
+  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+});
 
   await db.collection("messageReports").add({
     reporterId: request.auth.uid,
