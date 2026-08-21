@@ -376,31 +376,39 @@ await sendPushToUid(
         // Pay marketer commission, once per referred user, on their
         // first successful premium payment only.
         try {
-  const referralSnap = await db.collection("referrals").doc(paymentData.buyerId).get();
+  const referralRef = db.collection("referrals").doc(paymentData.buyerId);
+  const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
+  const commission = Math.round(amountPaid * COMMISSION_RATE);
+  const now = new Date();
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-  if (referralSnap.exists && !referralSnap.data()?.commissionPaidOut) {
+  let commissionJustPaid: { marketerUid: string } | null = null;
+
+  await db.runTransaction(async (tx) => {
+    const referralSnap = await tx.get(referralRef);
+    if (!referralSnap.exists || referralSnap.data()?.commissionPaidOut) return;
+
     const { marketerUid } = referralSnap.data()!;
-    const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
-    const commission = Math.round(amountPaid * COMMISSION_RATE);
+    const marketerRef = db.collection("marketers").doc(marketerUid);
+    const marketerSnap = await tx.get(marketerRef);
+    const data = marketerSnap.data() ?? {};
+    const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
+    const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
 
-    const now = new Date();
-const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-const marketerRef = db.collection("marketers").doc(marketerUid);
+    tx.update(marketerRef, {
+      totalEarnedKES: admin.firestore.FieldValue.increment(commission),
+      signupsThisMonth: carriedCount + 1,
+      signupsMonthKey: monthKey,
+      earningsThisMonth: carriedEarnings + commission,
+      earningsMonthKey: monthKey,
+    });
+    tx.update(referralRef, { commissionPaidOut: true });
 
-await db.runTransaction(async (tx) => {
-  const marketerSnap = await tx.get(marketerRef);
-  const data = marketerSnap.data() ?? {};
-  const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
-  const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
-
-  tx.update(marketerRef, {
-    totalEarnedKES: admin.firestore.FieldValue.increment(commission),
-    signupsThisMonth: carriedCount + 1,
-    signupsMonthKey: monthKey,
-    earningsThisMonth: carriedEarnings + commission,
-    earningsMonthKey: monthKey,
+    commissionJustPaid = { marketerUid };
   });
-});
+
+  if (commissionJustPaid) {
+    const { marketerUid } = commissionJustPaid;
 
     await db.collection("referralCommissions").add({
       marketerUid,
@@ -412,22 +420,21 @@ await db.runTransaction(async (tx) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    await referralSnap.ref.update({ commissionPaidOut: true });
     try {
-  const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
-  const marketerToken = marketerTokenSnap.exists ? marketerTokenSnap.data()?.token : null;
-  if (marketerToken) {
-    await admin.messaging().send({
-      token: marketerToken,
-      notification: {
-        title: "You earned a commission! 🎉",
-        body: `Someone you referred went premium — KES ${commission} added to your earnings.`,
-      },
-      data: { type: "referral_commission" },
-    });
-  }
-} catch (notifyError) {
-  console.error("Failed to notify marketer of commission:", notifyError);
+      const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
+      const marketerToken = marketerTokenSnap.exists ? marketerTokenSnap.data()?.token : null;
+      if (marketerToken) {
+        await admin.messaging().send({
+          token: marketerToken,
+          notification: {
+            title: "Congrats🥳 Umepata commission! 🎉",
+            body: `Someone you referred went premium — KES ${commission} added to your earnings.`,
+          },
+          data: { type: "referral_commission" },
+        });
+      }
+    } catch (notifyError) {
+      console.error("Failed to notify marketer of commission:", notifyError);
     }
   }
 } catch (error) {
@@ -1732,7 +1739,15 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
 
   const marketerName = applicationData?.fullName || fallbackName;
 
-  const code = generateReferralCode(marketerName, uid);
+  let code = generateReferralCode(marketerName, uid);
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const clash = await db.collection("marketers")
+      .where("referralCode", "==", code)
+      .limit(1)
+      .get();
+    if (clash.empty) break;
+    code = generateReferralCode(marketerName, uid);
+  }
 
   await db.collection("marketers").doc(uid).set({
     referralCode: code,
@@ -1806,22 +1821,32 @@ export const setMarketerStatus = onCall({ cors: true }, async (request) => {
     .limit(50)
     .get();
 
-  const referrals = await Promise.all(
-    referralsSnap.docs.map(async (docSnap) => {
-      const data = docSnap.data();
-      const userSnap = await db.collection("users").doc(docSnap.id).get();
-      const userData = userSnap.exists ? userSnap.data() : null;
-      const isPremium = !!(userData?.premiumEndsAt && userData.premiumEndsAt.toDate() > new Date());
+  const referralDocs = referralsSnap.docs;
+  const referredUids = referralDocs.map((d) => d.id);
+  const userDataMap = new Map<string, FirebaseFirestore.DocumentData>();
 
-      return {
-        uid: docSnap.id,
-        displayName: userData?.displayName ?? "Unknown",
-        joinedAt: data.createdAt ?? null,
-        commissionPaidOut: data.commissionPaidOut ?? false,
-        isPremium,
-      };
-    })
-  );
+  for (let i = 0; i < referredUids.length; i += 30) {
+    const chunk = referredUids.slice(i, i + 30);
+    if (chunk.length === 0) continue;
+    const chunkSnap = await db.collection("users")
+      .where(admin.firestore.FieldPath.documentId(), "in", chunk)
+      .get();
+    chunkSnap.docs.forEach((d) => userDataMap.set(d.id, d.data()));
+  }
+
+  const referrals = referralDocs.map((docSnap) => {
+    const data = docSnap.data();
+    const userData = userDataMap.get(docSnap.id) ?? null;
+    const isPremium = !!(userData?.premiumEndsAt && userData.premiumEndsAt.toDate() > new Date());
+
+    return {
+      uid: docSnap.id,
+      displayName: userData?.displayName ?? "Unknown",
+      joinedAt: data.createdAt ?? null,
+      commissionPaidOut: data.commissionPaidOut ?? false,
+      isPremium,
+    };
+  });
 
   return { referrals };
 });
