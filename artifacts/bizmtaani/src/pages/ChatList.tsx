@@ -577,7 +577,6 @@ export default function ChatList() {
           </button>
         </div>
 
-        <BottomNav />
       </div>
     );
   }
