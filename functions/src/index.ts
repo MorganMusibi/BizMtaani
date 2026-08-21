@@ -24,6 +24,12 @@ const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
 const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+function requireAdmin(request: { auth: { uid: string; token: Record<string, unknown> } | null }) {
+  if (!request.auth) throw new HttpsError("unauthenticated", "You must be signed in.");
+  if (request.auth.token.admin !== true) {
+    throw new HttpsError("permission-denied", "Admin access required.");
+  }
+}
 // ─── Constants ──────────────────────────────────────────────────────────────
 const FOLDER_MAP: Record<string, string> = {
   avatar: "bizmtaani/avatars",
@@ -855,9 +861,7 @@ export const getMonthlyPayouts = onCall({ cors: true }, async (request) => {
 export const markPayoutPaid = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can update payouts.");
-  }
+  requireAdmin(request);
 
   const { monthKey, marketerUid } = request.data as { monthKey?: string; marketerUid?: string };
   if (!monthKey || !marketerUid) {
@@ -888,9 +892,7 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
    export const getTopMarketers = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can view the leaderboard.");
-  }
+  requireAdmin(request);
 
   const snap = await db.collection("marketers")
     .orderBy("earningsThisMonth", "desc")
@@ -999,9 +1001,7 @@ export const sendNotification = onCall({ cors: true }, async (request) => {
 export const adminSendNotification = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  if (request.auth.uid !== OWNER_UID) {
-    throw new HttpsError("permission-denied", "Only the owner can send admin notifications.");
-  }
+  requireAdmin(request);
 
   const { uid, title, body } = request.data as { uid?: string; title?: string; body?: string };
 
