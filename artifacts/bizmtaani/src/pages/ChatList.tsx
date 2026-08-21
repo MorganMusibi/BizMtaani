@@ -21,8 +21,6 @@ import {
   BellOff,
 } from "lucide-react";
 
-import { BottomNav } from "@/components/BottomNav";
-
 import {
   getParticipantName,
   getParticipantPhoto,
@@ -1044,7 +1042,7 @@ export default function ChatList() {
       {/* BOTTOM NAV */}
       {/* ================================================================ */}
 
-      <BottomNav />
+    
     </div>
   );
 }
