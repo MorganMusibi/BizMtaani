@@ -54,8 +54,27 @@ function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   }
 }
 
+// Caps how many area/ward combos are kept in localStorage at once.
+// Without this, a session that browses many different areas would
+// grow the cache — and the JSON.stringify cost on every save —
+// without bound.
+const MAX_CACHED_AREAS = 6;
+
 function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
   try {
+    // Keep only the most recently updated entries, evicting the
+    // oldest first once over the cap. This also trims the in-memory
+    // map itself, not just what gets written to localStorage.
+    if (cache.size > MAX_CACHED_AREAS) {
+      const sortedByAge = [...cache.entries()].sort(
+        (a, b) => a[1].timestamp - b[1].timestamp
+      );
+      const toEvict = sortedByAge.slice(0, cache.size - MAX_CACHED_AREAS);
+      for (const [key] of toEvict) {
+        cache.delete(key);
+      }
+    }
+
     const serializable: Record<string, unknown> = {};
     cache.forEach((entry, key) => {
       const { wardCursor, areaCursors, nationwideCursor, ...rest } = entry;
