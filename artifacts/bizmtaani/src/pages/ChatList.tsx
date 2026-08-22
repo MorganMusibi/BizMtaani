@@ -598,14 +598,6 @@ export default function ChatList() {
             <h1 className="font-black text-lg">
               Messages
             </h1>
-
-            {totalUnread > 0 && (
-              <span className="min-w-5 h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
-                {totalUnread > 99
-                  ? "99+"
-                  : totalUnread}
-              </span>
-            )}
           </div>
         </div>
 
