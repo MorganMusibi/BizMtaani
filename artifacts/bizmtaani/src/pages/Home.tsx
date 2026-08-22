@@ -613,6 +613,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     areaDone,
     initialLoading,
     loadMore,
+    previewProducts,
   } = useHomeFeeds({
     gpsReady,
     userCoords,
@@ -866,7 +867,30 @@ const totalVisible = rankedProducts.length;
           </div>
         )}
 
-        {initialLoading ? (
+        {initialLoading && previewProducts.length > 0 ? (
+          <div className="px-3 pt-3 pb-24">
+            <div className="mx-3 mb-3 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
+              <Loader2 size={14} className="animate-spin text-primary flex-shrink-0" />
+              <p className="text-xs text-muted-foreground">
+                Finding your area — showing recent listings across Kenya for now
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {previewProducts.map((p) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  userCoords={userCoords}
+                  hierarchyReady={hierarchyReady}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLocation(`/product/${p.id}`);
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+        ) : initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Finding nearby adverts...</p>
