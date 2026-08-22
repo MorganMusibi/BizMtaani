@@ -3,6 +3,8 @@ import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDoc
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNearbyGeohashPrefixes } from "@/lib/geohash";
+import { getNearbyGeohashPrefixes, radiusKmToGeohashPrecision } from "@/lib/geohash";
+
 interface ProductImage { url: string; public_id?: string;
 }
 const WARD_PAGE = 20;
@@ -519,10 +521,10 @@ function areaQueries(
   donePrefixes: Record<string, boolean> = {}
 ) {
   const prefixes = getNearbyGeohashPrefixes(
-    coords[0],
-    coords[1],
-    radiusKm
-  );
+  coords[0],
+  coords[1],
+  radiusKmToGeohashPrecision(radiusKm)
+);
   const coll = collection(db, "products");
 
   return prefixes
@@ -879,7 +881,7 @@ try {
   const prefixes = getNearbyGeohashPrefixes(
   userCoords[0],
   userCoords[1],
-  currentRadius
+  radiusKmToGeohashPrecision(currentRadius)
 );
 
 const queries = areaQueries(
