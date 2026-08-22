@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, } from "react";
-import { collection, doc, onSnapshot, orderBy, query, where, } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, where, limitToLast, getDocs, limit, } from "firebase/firestore";
 import { useLocation, useParams, Link, useSearch, } from "wouter";
 import { ChevronLeft, Send, Loader2, MessageCircle, Briefcase, User,
 } from "lucide-react";
@@ -277,7 +277,8 @@ const [selectedMessage, setSelectedMessage] =
         orderBy(
           "createdAt",
           "asc"
-        )
+        ),
+        limitToLast(20)
       );
 
     const unsubscribeMessages =
@@ -341,16 +342,21 @@ createdAt:
       )
   )
 );
-          markChatAsRead(
-  chatId,
-  user.uid
-).catch((readError) => {
-  console.error(
-    "Unable to mark messages as read:",
-    readError
-  );
-});
-        },
+          // Skip the query entirely when there's nothing to mark —
+          // avoids an extra Firestore read on every message snapshot
+          // (including the read receipts' own writes bouncing back)
+          // when unreadCount already tells us the answer is zero.
+          if (chat?.unreadCount?.[user.uid]) {
+            markChatAsRead(
+              chatId,
+              user.uid
+            ).catch((readError) => {
+              console.error(
+                "Unable to mark messages as read:",
+                readError
+              );
+            });
+          }
 
         (firebaseError) => {
 
@@ -413,62 +419,69 @@ createdAt:
     return;
   }
 
+  let cancelled = false;
+
   const chatsQuery = query(
-  collection(
-    db,
-    "chats"
-  ),
-  where(
-    "participants",
-    "array-contains",
-    user.uid
-  )
-);
+    collection(
+      db,
+      "chats"
+    ),
+    where(
+      "participants",
+      "array-contains",
+      user.uid
+    ),
+    orderBy(
+      "lastMessageAt",
+      "desc"
+    ),
+    limit(50)
+  );
 
-  const unsubscribe =
-    onSnapshot(
-      chatsQuery,
-      (snapshot) => {
+  // One-time fetch, not a live listener — the forward picker is a
+  // brief interaction and doesn't need real-time updates while open.
+  getDocs(chatsQuery)
+    .then((snapshot) => {
+      if (cancelled) return;
 
-        const loadedChats =
-  snapshot.docs
-    .map(
-      (chatDoc) => ({
-        id: chatDoc.id,
-        ...chatDoc.data(),
-      } as ChatData & {
-        id: string;
-      })
-    )
-    .filter(
-      (chat) =>
-        chat.id !== chatId
-    );
+      const loadedChats =
+        snapshot.docs
+          .map(
+            (chatDoc) => ({
+              id: chatDoc.id,
+              ...chatDoc.data(),
+            } as ChatData & {
+              id: string;
+            })
+          )
+          .filter(
+            (chat) =>
+              chat.id !== chatId
+          );
 
-setForwardChats(
-  loadedChats
-);
-      },
-      (firebaseError) => {
+      setForwardChats(loadedChats);
+    })
+    .catch((firebaseError) => {
+      if (cancelled) return;
 
-        console.error(
-          "Unable to load chats for forwarding:",
-          firebaseError
-        );
+      console.error(
+        "Unable to load chats for forwarding:",
+        firebaseError
+      );
 
-        setSendError(
-          "Unable to load conversations."
-        );
-      }
-    );
+      setSendError(
+        "Unable to load conversations."
+      );
+    });
 
   return () => {
-    unsubscribe();
+    cancelled = true;
   };
 
 }, [
   forwardingMessage,
   user,
+  chatId,
 ]);
 
  /*
