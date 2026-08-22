@@ -42,7 +42,10 @@ function timeAgo(seconds: number): string {
 
 // Simple in-memory cache — avoids re-reading Firestore every time the
 // user navigates back to this page within the same app session.
-let cachedMarketerData: { marketer: MarketerData; commissions: Commission[]; timestamp: number } | null = null;
+// Keyed by uid (not a single shared slot) so a fast account switch
+// within the cache TTL can never show one user's referral code,
+// balance, ID number, or M-Pesa number to a different signed-in user.
+const cachedMarketerDataByUid = new Map<string, { marketer: MarketerData; commissions: Commission[]; timestamp: number }>();
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
 export default function MarketerDashboard() {
@@ -60,9 +63,10 @@ const [referralsLoading, setReferralsLoading] = useState(true);
   useEffect(() => {
     if (!user) return;
 
-    if (cachedMarketerData && Date.now() - cachedMarketerData.timestamp < CACHE_TTL_MS) {
-      setMarketer(cachedMarketerData.marketer);
-      setCommissions(cachedMarketerData.commissions);
+    const cached = cachedMarketerDataByUid.get(user.uid);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      setMarketer(cached.marketer);
+      setCommissions(cached.commissions);
       setLoading(false);
       return;
     }
@@ -99,7 +103,7 @@ const [referralsLoading, setReferralsLoading] = useState(true);
         if (!cancelled) {
           setMarketer(marketerData);
           setCommissions(commissionsData);
-          cachedMarketerData = { marketer: marketerData, commissions: commissionsData, timestamp: Date.now() };
+          cachedMarketerDataByUid.set(user.uid, { marketer: marketerData, commissions: commissionsData, timestamp: Date.now() });
         }
       } catch (error) {
         console.error("Failed to load marketer dashboard:", error);
