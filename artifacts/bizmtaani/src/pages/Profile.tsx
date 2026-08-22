@@ -617,11 +617,11 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           onClick={() => setShowPhotoViewer(false)}
         >
           <img
-            src={user.photoURL!}
-            alt={displayName}
-            className="max-w-full max-h-full object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
+  src={getFullSizeUrl(user.photoURL!)}
+  alt={displayName}
+  className="max-w-full max-h-full object-contain"
+  onClick={(e) => e.stopPropagation()}
+/>
 
           <button
             className="absolute top-5 right-5 text-white text-4xl"
