@@ -325,19 +325,28 @@ export const mpesaCallback = onRequest(async (req, res) => {
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
     
     const paymentRef = db.collection("payments").doc(callback.CheckoutRequestID);
-    const paymentSnap = await paymentRef.get();
-    
-    if (paymentSnap.exists && paymentSnap.data()?.callbackToken === req.query["cbtoken"]) {
-      const existingStatus = paymentSnap.data()?.status;
 
-      // Idempotency guard: Safaricom may deliver the same callback
-      // more than once. If we've already processed this payment,
-      // acknowledge and exit without repeating any updates.
-      if (existingStatus === "completed" || existingStatus === "failed") {
-        res.json({ ResultCode: 0, ResultDesc: "Already processed" });
-        return;
+    // Idempotency guard: Safaricom may deliver the same callback more
+    // than once. Claim the payment atomically — only one concurrent
+    // delivery can win the transaction and proceed past this point.
+    const claim = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(paymentRef);
+      if (!snap.exists || snap.data()?.callbackToken !== req.query["cbtoken"]) {
+        return { shouldProcess: false, paymentData: null };
       }
+      const existingStatus = snap.data()?.status;
+      if (existingStatus === "completed" || existingStatus === "failed") {
+        return { shouldProcess: false, paymentData: null };
+      }
+      // Claim it now, inside the transaction, before any other work runs.
+      tx.update(paymentRef, {
+        status: callback.ResultCode === 0 ? "completed" : "failed",
+      });
+      return { shouldProcess: true, paymentData: snap.data()! };
+    });
 
+    if (claim.shouldProcess) {
+      const paymentSnap = { data: () => claim.paymentData }; // keeps below code unchanged
       if (callback.ResultCode === 0) {
   const paymentData = paymentSnap.data()!;
 
@@ -355,9 +364,8 @@ export const mpesaCallback = onRequest(async (req, res) => {
         item.Name === "MpesaReceiptNumber"
     )?.Value ?? null;
 
-  // Mark payment as completed and save M-Pesa receipt
+  // Save M-Pesa receipt (status was already claimed atomically above)
   await paymentRef.update({
-    status: "completed",
     mpesaCode,
     completedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
@@ -516,14 +524,14 @@ await userRef
           await reactivateBatch.commit();
         }
       } else {
-        // Payment failed or was cancelled by the user
+        // Payment failed or was cancelled by the user (status already claimed above)
         await paymentRef.update({
-          status: "failed",
           failureReason: callback.ResultDesc ?? "Payment failed",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
     }
+  }
   } catch (err) { console.error(err); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
