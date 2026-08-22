@@ -1,6 +1,7 @@
 import {  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp, writeBatch, Timestamp,
   query,
   where,
+  limit,
 } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 
@@ -897,7 +898,10 @@ export async function markChatAsRead(
       chatId,
       "messages"
     );
-
+// Only fetch messages that are genuinely unread — filtering by
+  // readAt == null server-side means Firestore returns (and bills)
+  // only the handful of new messages since last read, not the
+  // entire conversation history every time this chat is opened.
   const messagesQuery =
     query(
       messagesRef,
@@ -905,7 +909,13 @@ export async function markChatAsRead(
         "senderId",
         "==",
         otherUserId
-      )
+      ),
+      where(
+        "readAt",
+        "==",
+        null
+      ),
+      limit(200)
     );
 
   const messagesSnap =
@@ -918,20 +928,13 @@ export async function markChatAsRead(
 
   messagesSnap.forEach(
     (messageDoc) => {
-      const message =
-        messageDoc.data();
-
-      if (
-        !message.readAt
-      ) {
-        batch.update(
-          messageDoc.ref,
-          {
-            readAt:
-              serverTimestamp(),
-          }
-        );
-      }
+      batch.update(
+        messageDoc.ref,
+        {
+          readAt:
+            serverTimestamp(),
+        }
+      );
     }
   );
 
