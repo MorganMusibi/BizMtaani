@@ -48,6 +48,12 @@ function timeAgo(seconds: number): string {
 const cachedMarketerDataByUid = new Map<string, { marketer: MarketerData; commissions: Commission[]; timestamp: number }>();
 const CACHE_TTL_MS = 2 * 60 * 1000;
 
+// Called on sign-out so a shared/kiosk device never keeps this data
+// around for longer than the session that fetched it.
+export function clearMarketerDashboardCache() {
+  cachedMarketerDataByUid.clear();
+}
+
 export default function MarketerDashboard() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
