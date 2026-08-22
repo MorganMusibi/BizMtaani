@@ -926,9 +926,9 @@ export default function ChatList() {
                 );
               }}
             >
-    {selectedChat.mutedBy?.include (
-                user?.uid || ""
-              )
+    {selectedChat.mutedBy?.includes(
+  user?.uid || ""
+)
                 ? "🔔 Unmute"
                 : "🔕 Mute"}
             </button>
