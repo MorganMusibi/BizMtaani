@@ -357,7 +357,7 @@ createdAt:
               );
             });
           }
-
+},
         (firebaseError) => {
 
           console.error(
