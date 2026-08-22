@@ -838,20 +838,59 @@ export async function forwardChatMessage(params: {
 |--------------------------------------------------------------------------
 */
 
+
 export async function markChatAsRead(
   chatId: string,
   userId: string
 ): Promise<void> {
-  if (!chatId || !userId) return;
 
-  const chatRef = doc(db, "chats", chatId);
+  if (!chatId || !userId) {
+    return;
+  }
 
-  await updateDoc(chatRef, {
-    [`unreadCount.${userId}`]: 0,
-    updatedAt: serverTimestamp(),
-  });
+  const chatRef =
+    doc(
+      db,
+      "chats",
+      chatId
+    );
+
+  const chatSnap =
+    await getDoc(chatRef);
+
+  if (!chatSnap.exists()) {
+    return;
+  }
+
+  const chat =
+    chatSnap.data() as ChatData;
+
+  if (
+    !chat.participants?.includes(
+      userId
+    )
+  ) {
+    throw new Error(
+      "You are not a participant in this conversation."
+    );
+  }
+
+  // Read receipts (per-message readAt) are no longer displayed in
+  // the UI, so there's no reason to query unread messages or write
+  // readAt on each one — that was pure cost with no visible effect.
+  // All that's still needed is clearing this user's unread badge.
+  await updateDoc(
+    chatRef,
+    {
+      unreadCount: {
+        ...(chat.unreadCount || {}),
+        [userId]: 0,
+      },
+      updatedAt:
+        serverTimestamp(),
+    }
+  );
 }
-
 
 /*
 |--------------------------------------------------------------------------
