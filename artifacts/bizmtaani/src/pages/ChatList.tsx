@@ -6,6 +6,7 @@ import {
   orderBy,
   query,
   where,
+  limit,
 } from "firebase/firestore";
 
 import { db } from "@/lib/firebase";
@@ -392,7 +393,8 @@ export default function ChatList() {
       orderBy(
         "lastMessageAt",
         "desc"
-      )
+      ),
+      limit(20)
     );
 
     const unsubscribe =
