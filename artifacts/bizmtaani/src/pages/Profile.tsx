@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check, X } from "lucide-react";
 import { Link } from "wouter";
 import imageCompression from "browser-image-compression";
+import { getFullSizeUrl } from "@/lib/cloudinaryUrl";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
