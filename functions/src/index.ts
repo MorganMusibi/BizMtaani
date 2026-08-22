@@ -746,6 +746,15 @@ export const scheduledCleanup = onSchedule(
     } catch (error) {
       console.error("Cleanup failed:", error);
     }
+
+    // Merged from the former separate notifyExpiringAdverts scheduled
+    // function — same 6-hour cadence, now sharing one invocation
+    // instead of two, to cut scheduled Cloud Function invocation cost.
+    try {
+      await runExpiringAdvertReminders();
+    } catch (error) {
+      console.error("Expiring advert reminders failed:", error);
+    }
   }
 );
 
@@ -758,7 +767,7 @@ export const scheduledCleanup = onSchedule(
  * whose active advert expires within the next 24 hours — once per
  * advert, tracked via expiringNotified so it never repeats.
  */
-export const notifyExpiringAdverts = onSchedule("every 6 hours", async () => {
+async function runExpiringAdvertReminders() {
   const now = admin.firestore.Timestamp.now();
   const in24h = admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
 
@@ -790,7 +799,8 @@ export const notifyExpiringAdverts = onSchedule("every 6 hours", async () => {
 
   if (notified > 0) await batch.commit();
   console.log(`Expiring advert reminders sent: ${notified}`);
-});
+}
+
 export const closeMonthlyEarnings = onSchedule(
   { schedule: "0 0 1 * *", timeZone: "Africa/Nairobi" }, // 00:00 on the 1st of each month
   async () => {
