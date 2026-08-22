@@ -553,7 +553,14 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     },
     {
       enableHighAccuracy: true,
-      timeout: 15000,
+      // Cut from 15s to 6s. A user who hesitates on the browser's
+      // "Allow location?" prompt was previously burning that
+      // hesitation time against a single long timeout, leaving the
+      // homepage blank the whole while. A shorter timeout gets a
+      // declining/hesitant user to the fallback chain (saved
+      // location → previously chosen area → manual area picker)
+      // much sooner.
+      timeout: 6000,
       maximumAge: 0
     }
   );
@@ -564,9 +571,14 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
       return;
     }
 
-    if (user && !userProfile) {
-      return;
-    }
+    // Previously this waited for userProfile (a Firestore read) to
+    // finish before even requesting GPS — for a brand-new signup that
+    // adds a full extra round-trip of blank-screen time before the
+    // location prompt even appears. GPS/geolocation itself doesn't
+    // need the profile; only the useSavedProfileLocation() fallback
+    // path does, and that function already handles a not-yet-loaded
+    // profile gracefully (returns false and moves to the next
+    // fallback), so we no longer block on it here.
     requestGps();
 
     return () => {
