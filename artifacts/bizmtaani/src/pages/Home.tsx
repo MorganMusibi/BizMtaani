@@ -503,9 +503,20 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
 };
 
     const requestGps = async () => {
-  
+
+  // If the user already has a home area on file (typed at signup),
+  // show it immediately rather than waiting on the GPS prompt/timeout
+  // first. GPS is more precise once it resolves, so applyResolvedLocation
+  // is still allowed to overwrite this with a GPS fix moments later —
+  // this just means the homepage never sits blank for a user who
+  // already gave us an area name.
+  const hadSavedLocation = await useSavedProfileLocation();
+  if (hadSavedLocation) {
+    setGpsReady(true);
+  }
+
   if (!navigator.geolocation) {
-    if (await useSavedProfileLocation()) return;
+    if (hadSavedLocation) return;
     if (await usePreviouslySelectedArea()) return;
     setGpsReady(true);
     if (!hasPromptedArea.current) {
