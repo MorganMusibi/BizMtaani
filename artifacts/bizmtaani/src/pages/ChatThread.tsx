@@ -797,28 +797,7 @@ setShowProductAttachment(false);
     }
   );
   }
-  function getMessageStatus(
-  message: Message
-) {
-  if (message.readAt) {
-    return {
-      icon: "✓✓",
-      className: "text-blue-400",
-    };
-  }
-
-  if (message.deliveredAt) {
-    return {
-      icon: "✓✓",
-      className: "text-white/60",
-    };
-  }
-
-  return {
-    icon: "✓",
-    className: "text-white/60",
-  };
-  }
+  
   function handleMessagePressStart(
   message: Message
 ) {
@@ -1246,8 +1225,6 @@ async function handleForwardMessage(
 
               const isMine =
                 message.senderId === user.uid;
-              const messageStatus =
-  getMessageStatus(message);
 
               const currentDate =
                 formatMessageDate(
@@ -1396,26 +1373,7 @@ async function handleForwardMessage(
                           )}
                         </p>
 
-                        {isMine && (
-                          <span
-  className={`text-[11px] font-semibold ${
-    messageStatus.className
-  }`}
-                            aria-label={
-                              message.readAt
-                                ? "Read"
-                                : message.deliveredAt
-                                ? "Delivered"
-                                : "Sent"
-                            }
-                          >
-                            {
-  messageStatus.icon
-}
-                          </span>
-                        )}
-
-                      </div>
+                        </div>
   )}
 
                     </div>
