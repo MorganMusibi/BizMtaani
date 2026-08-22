@@ -262,3 +262,15 @@ export function nearbyAreaPrefix(
     5
   );
     }
+/**
+ * Maps a search radius (km) to a sane geohash precision. Precision
+ * must stay a small integer (4-6 typically) — cell size should get
+ * coarser as the search radius grows, not finer. Passing radiusKm
+ * itself as precision (the previous bug here) produced 10-50
+ * character "geohashes" that never matched any real stored value.
+ */
+export function radiusKmToGeohashPrecision(radiusKm: number): number {
+  if (radiusKm <= 5) return 5;   // ~4.9km cells
+  if (radiusKm <= 20) return 4;  // ~40km × 20km cells
+  return 3;                      // ~156km cells — covers up to 50km+ in one or two cells
+}
