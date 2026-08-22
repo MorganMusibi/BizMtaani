@@ -531,7 +531,6 @@ await userRef
         });
       }
     }
-  }
   } catch (err) { console.error(err); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
