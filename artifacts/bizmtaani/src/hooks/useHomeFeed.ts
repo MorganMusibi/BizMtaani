@@ -804,6 +804,43 @@ setWardDone(localWardDone);
     } else {
       setWardDone(true);
     }
+
+    // The ward query already returned a full page — the stage-0
+    // (2.5km) geohash fan-out below would very likely re-fetch (and
+    // re-bill for) mostly the same nearby documents under a different
+    // index. Skip it and start any later "load more" scrolling at
+    // stage 1 (5km) instead, so we only pay for genuinely new ground.
+    const wardAlreadyFull = localWardProducts.length >= AREA_PAGE;
+
+    if (wardAlreadyFull) {
+      setAreaProducts([]);
+      setAreaBuffer([]);
+      setAreaCursors({});
+      setAreaDonePrefixes({});
+      setAreaDone(false);
+      setAreaRadiusStage(1);
+
+      feedCache.set(cacheKey, {
+        wardProducts: localWardProducts,
+        wardCursor: localWardCursor,
+        wardDone: localWardDone,
+        areaProducts: [],
+        areaBuffer: [],
+        areaCursors: {},
+        areaDonePrefixes: {},
+        areaDone: false,
+        nationwideCursor: null,
+        nationwideDone: false,
+        timestamp: Date.now(),
+      });
+      saveFeedCacheToStorage(feedCache);
+
+      setInitialLoading(false);
+      return;
+    }
+    } else {
+      setWardDone(true);
+    }
 // ============================================================
 // INITIAL NEARBY AREA LOAD — BUFFERED
 //
