@@ -589,6 +589,8 @@ export async function sendChatMessage(params: {
     lastSenderId:
       senderId,
 
+   deletedFor: [],
+
     unreadCount: {
       ...unread,
 
