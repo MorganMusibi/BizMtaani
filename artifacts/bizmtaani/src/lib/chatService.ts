@@ -1025,7 +1025,8 @@ export async function markMessagesAsDelivered(
         "deliveredAt",
         "==",
         null
-      )
+      ),
+      limit(200)
     );
 
   const messagesSnap =
