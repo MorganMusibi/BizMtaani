@@ -81,9 +81,7 @@ export interface ChatMessage {
 
   createdAt?: Timestamp | null;
 
-  deliveredAt?: Timestamp | null;
 
-  readAt?: Timestamp | null;
   deletedFor?: string[];
   deletedForEveryone?: boolean;
   forwarded?: boolean;
@@ -575,8 +573,6 @@ export async function sendChatMessage(params: {
     replyTo: replyTo || null,
     productContext: productContext || null,
     createdAt: serverTimestamp(),
-    deliveredAt: null,
-    readAt: null,
   });
   
   batch.update(chatRef, {
@@ -797,11 +793,6 @@ export async function forwardChatMessage(params: {
       createdAt:
         serverTimestamp(),
 
-      deliveredAt:
-        null,
-
-      readAt:
-        null,
 
       replyTo:
         null,
@@ -851,223 +842,16 @@ export async function markChatAsRead(
   chatId: string,
   userId: string
 ): Promise<void> {
+  if (!chatId || !userId) return;
 
-  if (!chatId || !userId) {
-    return;
-  }
+  const chatRef = doc(db, "chats", chatId);
 
-  const chatRef =
-    doc(
-      db,
-      "chats",
-      chatId
-    );
-
-  const chatSnap =
-    await getDoc(chatRef);
-
-  if (!chatSnap.exists()) {
-    return;
-  }
-
-  const chat =
-    chatSnap.data() as ChatData;
-
-  if (
-    !chat.participants?.includes(
-      userId
-    )
-  ) {
-    throw new Error(
-      "You are not a participant in this conversation."
-    );
-  }
-
-  const otherUserId =
-    chat.participants.find(
-      (uid) =>
-        uid !== userId
-    );
-
-  if (!otherUserId) {
-    return;
-  }
-
-  const messagesRef =
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    );
-// Only fetch messages that are genuinely unread — filtering by
-  // readAt == null server-side means Firestore returns (and bills)
-  // only the handful of new messages since last read, not the
-  // entire conversation history every time this chat is opened.
-  const messagesQuery =
-    query(
-      messagesRef,
-      where(
-        "senderId",
-        "==",
-        otherUserId
-      ),
-      where(
-        "readAt",
-        "==",
-        null
-      ),
-      limit(200)
-    );
-
-  const messagesSnap =
-    await getDocs(
-      messagesQuery
-    );
-
-  const batch =
-    writeBatch(db);
-
-  messagesSnap.forEach(
-    (messageDoc) => {
-      batch.update(
-        messageDoc.ref,
-        {
-          readAt:
-            serverTimestamp(),
-        }
-      );
-    }
-  );
-
-  batch.update(
-    chatRef,
-    {
-      unreadCount: {
-        ...(chat.unreadCount || {}),
-        [userId]: 0,
-      },
-      updatedAt:
-        serverTimestamp(),
-    }
-  );
-
-  await batch.commit();
+  await updateDoc(chatRef, {
+    [`unreadCount.${userId}`]: 0,
+    updatedAt: serverTimestamp(),
+  });
 }
 
-/*
-|--------------------------------------------------------------------------
-| MARK MESSAGES AS DELIVERED
-|--------------------------------------------------------------------------
-*/
-
-export async function markMessagesAsDelivered(
-  chatId: string,
-  userId: string
-): Promise<void> {
-
-  if (!chatId || !userId) {
-    return;
-  }
-
-  const chatRef =
-    doc(
-      db,
-      "chats",
-      chatId
-    );
-
-  const chatSnap =
-    await getDoc(chatRef);
-
-  if (!chatSnap.exists()) {
-    return;
-  }
-
-  const chat =
-    chatSnap.data() as ChatData;
-
-  if (
-    !chat.participants?.includes(
-      userId
-    )
-  ) {
-    throw new Error(
-      "You are not a participant in this conversation."
-    );
-  }
-
-  const otherUserId =
-    chat.participants.find(
-      (uid) =>
-        uid !== userId
-    );
-
-  if (!otherUserId) {
-    return;
-  }
-
-  const messagesRef =
-    collection(
-      db,
-      "chats",
-      chatId,
-      "messages"
-    );
-
-  const messagesQuery =
-    query(
-      messagesRef,
-      where(
-        "senderId",
-        "==",
-        otherUserId
-      ),
-      where(
-        "deliveredAt",
-        "==",
-        null
-      ),
-      limit(200)
-    );
-
-  const messagesSnap =
-    await getDocs(
-      messagesQuery
-    );
-
-  const batch =
-    writeBatch(db);
-
-  let hasUpdates =
-    false;
-
-  messagesSnap.forEach(
-    (messageDoc) => {
-      const message =
-        messageDoc.data();
-
-      if (
-        !message.deliveredAt
-      ) {
-        batch.update(
-          messageDoc.ref,
-          {
-            deliveredAt:
-              serverTimestamp(),
-          }
-        );
-
-        hasUpdates =
-          true;
-      }
-    }
-  );
-
-  if (hasUpdates) {
-    await batch.commit();
-  }
-}
 
 /*
 |--------------------------------------------------------------------------
