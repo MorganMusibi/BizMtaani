@@ -7,17 +7,17 @@ import { db } from "@/lib/firebase";
 import { prefetchRoute } from "@/lib/prefetch";
 
 interface Chat {
-  lastSenderId?: string;
+  unreadCount?: Record<string, number>;
 }
 
 export function BottomNav() {
   const [location] = useLocation();
   const { user } = useAuth();
-  const [hasUnread, setHasUnread] = useState(false);
+  const [unreadTotal, setUnreadTotal] = useState(0);
 
   useEffect(() => {
     if (!user) {
-      setHasUnread(false);
+      setUnreadTotal(0);
       return;
     }
     const q = query(
@@ -25,11 +25,11 @@ export function BottomNav() {
       where("participants", "array-contains", user.uid)
     );
     const unsub = onSnapshot(q, (snap) => {
-      const unread = snap.docs.some((d) => {
+      const total = snap.docs.reduce((sum, d) => {
         const data = d.data() as Chat;
-        return data.lastSenderId && data.lastSenderId !== user.uid;
-      });
-      setHasUnread(unread);
+        return sum + (data.unreadCount?.[user.uid] ?? 0);
+      }, 0);
+      setUnreadTotal(total);
     });
     return unsub;
   }, [user]);
@@ -45,12 +45,12 @@ export function BottomNav() {
   };
 
   const navItems = [
-    { path: "/", label: "Discover", icon: LayoutGrid, badge: false },
-    { path: "/jobs", label: "Jobs", icon: Briefcase, badge: false },
-    { path: "/my-listings", label: "Listings", icon: Package, badge: false },
-    { path: "/chats", label: "Chats", icon: MessageCircle, badge: hasUnread },
-    { path: "/about", label: "About", icon: Info, badge: false },
-    { path: "/profile", label: "Profile", icon: User, badge: false },
+    { path: "/", label: "Discover", icon: LayoutGrid, badge: 0 },
+    { path: "/jobs", label: "Jobs", icon: Briefcase, badge: 0 },
+    { path: "/my-listings", label: "Listings", icon: Package, badge: 0 },
+    { path: "/chats", label: "Chats", icon: MessageCircle, badge: unreadTotal },
+    { path: "/about", label: "About", icon: Info, badge: 0 },
+    { path: "/profile", label: "Profile", icon: User, badge: 0 },
   ];
 
   return (
@@ -84,8 +84,10 @@ export function BottomNav() {
             >
               <div className="relative">
                 <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
-                {badge && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-destructive border-2 border-card" />
+                {badge > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 rounded-full bg-destructive border-2 border-card flex items-center justify-center text-[9px] font-bold text-white leading-none">
+                    {badge > 99 ? "99+" : badge}
+                  </span>
                 )}
               </div>
               <span
