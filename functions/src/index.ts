@@ -911,10 +911,15 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
   return { success: true };
 });
 
-   export const getTopMarketers = onCall({ cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+   let _leaderboardCache: { leaderboard: any[]; timestamp: number } | null = null;
+const LEADERBOARD_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes — leaderboard doesn't need to be real-time
 
+export const getTopMarketers = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
+
+  if (_leaderboardCache && Date.now() - _leaderboardCache.timestamp < LEADERBOARD_CACHE_TTL_MS) {
+    return { leaderboard: _leaderboardCache.leaderboard };
+  }
 
   const snap = await db.collection("marketers")
     .orderBy("earningsThisMonth", "desc")
@@ -927,6 +932,8 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
     earningsThisMonth: d.data().earningsThisMonth ?? 0,
     signupsThisMonth: d.data().signupsThisMonth ?? 0,
   }));
+
+  _leaderboardCache = { leaderboard, timestamp: Date.now() };
 
   return { leaderboard };
 });
