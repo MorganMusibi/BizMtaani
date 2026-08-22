@@ -597,6 +597,30 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     };
   }, [user, userProfile]);
 
+  // Hard ceiling on the whole location-resolution flow (GPS prompt +
+  // reverse geocode + any fallback lookups). Without this, a slow or
+  // stalled step anywhere in that chain (e.g. a hung geocoding call)
+  // could leave "Finding your area..." spinning forever with no way
+  // out except reloading the page. If it hasn't resolved within the
+  // window below, we stop waiting, surface the manual area picker,
+  // and let the user retry via the Refresh button instead.
+  useEffect(() => {
+    if (gpsReady) return;
+
+    const timeoutId = setTimeout(() => {
+      setGpsReady(true);
+      if (!hasPromptedArea.current) {
+        hasPromptedArea.current = true;
+        setShowAreaPicker(true);
+      }
+      setLocationErrorMsg(
+        "Kupata mtaa wako ina take long. Chagua eneo lako, au bonyeza Refresh baadaye."
+      );
+    }, 15000);
+
+    return () => clearTimeout(timeoutId);
+  }, [gpsReady]);
+
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
