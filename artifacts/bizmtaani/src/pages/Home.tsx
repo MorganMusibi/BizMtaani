@@ -307,7 +307,7 @@ export default function Home() {
           // the user know the refresh actually ran, since otherwise a
           // no-op refresh looks identical to a silently failed one.
           toast({
-            title: "TULIAA! 😂 Uko",
+            title: "TULIAA! Uko",
             description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
           });
         }
