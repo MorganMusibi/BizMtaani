@@ -342,21 +342,15 @@ createdAt:
       )
   )
 );
-          // Skip the query entirely when there's nothing to mark —
-          // avoids an extra Firestore read on every message snapshot
-          // (including the read receipts' own writes bouncing back)
-          // when unreadCount already tells us the answer is zero.
-          if (chat?.unreadCount?.[user.uid]) {
-            markChatAsRead(
-              chatId,
-              user.uid
-            ).catch((readError) => {
-              console.error(
-                "Unable to mark messages as read:",
-                readError
-              );
-            });
-          }
+          markChatAsRead(
+            chatId,
+            user.uid
+          ).catch((readError) => {
+            console.error(
+              "Unable to mark messages as read:",
+              readError
+            );
+          });
 },
         (firebaseError) => {
 
