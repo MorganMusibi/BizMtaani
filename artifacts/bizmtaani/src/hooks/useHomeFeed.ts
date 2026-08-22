@@ -805,14 +805,19 @@ setWardDone(localWardDone);
       setWardDone(true);
     }
 
-    // The ward query already returned a full page — the stage-0
-    // (2.5km) geohash fan-out below would very likely re-fetch (and
-    // re-bill for) mostly the same nearby documents under a different
-    // index. Skip it and start any later "load more" scrolling at
-    // stage 1 (5km) instead, so we only pay for genuinely new ground.
-    const wardAlreadyFull = localWardProducts.length >= AREA_PAGE;
+    // The ward query already covers this user's most-local candidates
+    // (a product in their ward is almost always also within 2.5km of
+    // them). The stage-0 geohash fan-out below targets that exact
+    // same 2.5km radius, so running it whenever the ward query found
+    // anything at all would re-fetch — and re-bill for — mostly the
+    // same documents under a different index. Skip stage 0 entirely
+    // whenever the ward query returned any results, and start any
+    // "load more" scrolling at stage 1 (5km) instead, so we only pay
+    // for genuinely new ground beyond what the ward query already
+    // covered.
+    const wardHadResults = localWardProducts.length > 0;
 
-    if (wardAlreadyFull) {
+    if (wardHadResults) {
       setAreaProducts([]);
       setAreaBuffer([]);
       setAreaCursors({});
