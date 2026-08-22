@@ -14,6 +14,7 @@ import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, Chev
 import { Link } from "wouter";
 import imageCompression from "browser-image-compression";
 import { getFullSizeUrl } from "@/lib/cloudinaryUrl";
+import { clearMarketerDashboardCache } from "@/pages/MarketerDashboard";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
@@ -296,6 +297,14 @@ export default function Profile() {
   }
 
   async function handleSignOut() {
+    clearMarketerDashboardCache();
+    if (user) {
+      try {
+        sessionStorage.removeItem(`bizmtaani_marketer_status_${user.uid}`);
+      } catch {
+        // sessionStorage unavailable — nothing to clear, safe to ignore
+      }
+    }
     await signOut(auth);
     toast({ title: "Signed out" });
     setLocation("/");
