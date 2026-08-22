@@ -838,11 +838,8 @@ setWardDone(localWardDone);
       setInitialLoading(false);
       return;
     }
-    } else {
-      setWardDone(true);
-    }
 // ============================================================
-// INITIAL NEARBY AREA LOAD — BUFFERED
+// INITIAL NEARBY AREA LOAD — BUFFERED  
 //
 // Fetch a larger nearby buffer from Firestore.
 // Only 20 products are displayed at a time.
