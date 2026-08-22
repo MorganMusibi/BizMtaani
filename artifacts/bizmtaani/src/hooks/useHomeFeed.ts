@@ -90,6 +90,14 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
 
 const feedCache = loadFeedCacheFromStorage();
 
+// Lightweight, nationwide "recent listings" used only as placeholder
+// content while the real location-based feed is still resolving (GPS
+// permission prompt, reverse geocode, ward/area queries). Cached
+// briefly at module level so re-mounting Home within the TTL doesn't
+// re-fetch it.
+const PREVIEW_CACHE_TTL_MS = 5 * 60 * 1000;
+let previewCache: { products: Product[]; timestamp: number } | null = null;
+
 // Called after a successful advert post so the poster's own device
 // shows the new advert immediately instead of waiting out the TTL.
 // This only clears this browser's cache — it has no effect on other
@@ -655,6 +663,39 @@ const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
 const [initialLoading, setInitialLoading] = useState(!initialCached);
+
+// Independent of GPS/location — fetches immediately on mount so the
+// homepage always has something to show within a moment, regardless
+// of how long location resolution takes.
+const [previewProducts, setPreviewProducts] = useState<Product[]>(previewCache?.products ?? []);
+const [previewLoading, setPreviewLoading] = useState(!previewCache);
+
+useEffect(() => {
+  if (previewCache && Date.now() - previewCache.timestamp < PREVIEW_CACHE_TTL_MS) {
+    setPreviewProducts(previewCache.products);
+    setPreviewLoading(false);
+    return;
+  }
+
+  let cancelled = false;
+
+  (async () => {
+    try {
+      const snap = await getDocs(searchQueryAllProducts());
+      const products = toProducts(snap.docs);
+      if (!cancelled) {
+        setPreviewProducts(products);
+        previewCache = { products, timestamp: Date.now() };
+      }
+    } catch (error) {
+      console.error("Failed to load preview listings:", error);
+    } finally {
+      if (!cancelled) setPreviewLoading(false);
+    }
+  })();
+
+  return () => { cancelled = true; };
+}, []);
 
 useEffect(() => {
   if (!gpsReady || !userCoords) return;
@@ -1576,5 +1617,7 @@ return {
   areaDone,
   initialLoading,
   loadMore,
+  previewProducts,
+  previewLoading,
 };
 }
