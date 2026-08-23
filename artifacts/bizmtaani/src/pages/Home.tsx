@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
+import { useToast } from "@/hooks/use-toast";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
@@ -1078,8 +1079,14 @@ const totalVisible = rankedProducts.length;
         <AreaPickerSheet
           choices={areaChoices}
           onSelect={handleAreaSelect}
+          onSearchSelect={handleAreaSearchSelect}
+          resolving={resolvingAreaSearch}
           onDismiss={() => {
-            handleAreaSelect(areaChoices[0]);
+            if (areaChoices.length > 0) {
+              handleAreaSelect(areaChoices[0]);
+            } else {
+              setShowAreaPicker(false);
+            }
           }}
         />
       )}
