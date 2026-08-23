@@ -724,59 +724,42 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
       setResolvingAreaSearch(true);
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-        const resp = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-            `${ward.wardName}, ${ward.constituencyName}, Kenya`
-          )}&limit=1`,
-          { signal: controller.signal }
+        const coords = await getWardCoordinates(
+          ward.wardName,
+          ward.constituencyName,
+          ward.countyName
         );
-        clearTimeout(timeoutId);
 
-        const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
+        if (!coords) {
+          toast({
+            title: "Couldn't find that area on the map",
+            description: "Try a nearby, larger area name instead.",
+          });
+          return;
+        }
 
-        const handleAreaSearchSelect = useCallback(
-  async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
-    setResolvingAreaSearch(true);
-    try {
-      const coords = await getWardCoordinates(
-        ward.wardName,
-        ward.constituencyName,
-        ward.countyName
-      );
+        const resolved: ResolvedLocation = {
+          lat: coords.lat,
+          lng: coords.lng,
+          wardName: ward.wardName,
+          constituency: ward.constituencyName,
+          county: ward.countyName,
+          displayName: `${ward.wardName}, ${ward.constituencyName}`,
+        } as ResolvedLocation;
 
-      if (!coords) {
+        handleAreaSelect(resolved);
+      } catch (error) {
+        console.warn("Failed to resolve selected area:", error);
         toast({
-          title: "Couldn't find that area on the map",
-          description: "Try a nearby, larger area name instead.",
+          title: "Something went wrong",
+          description: "Please try again or pick a different area.",
         });
-        return;
+      } finally {
+        setResolvingAreaSearch(false);
       }
-
-      const resolved: ResolvedLocation = {
-        lat: coords.lat,
-        lng: coords.lng,
-        wardName: ward.wardName,
-        constituency: ward.constituencyName,
-        county: ward.countyName,
-        displayName: `${ward.wardName}, ${ward.constituencyName}`,
-      } as ResolvedLocation;
-
-      handleAreaSelect(resolved);
-    } catch (error) {
-      console.warn("Failed to resolve selected area:", error);
-      toast({
-        title: "Something went wrong",
-        description: "Please try again or pick a different area.",
-      });
-    } finally {
-      setResolvingAreaSearch(false);
-    }
-  },
-  [handleAreaSelect, toast]
-);
+    },
+    [handleAreaSelect, toast]
+  );
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
