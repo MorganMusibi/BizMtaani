@@ -29,6 +29,7 @@ type Step =
 
 export function AreaPickerSheet({ onSearchSelect, onDismiss, resolving = false }: Props) {
   const [searchText, setSearchText] = useState("");
+  const [resolvingKey, setResolvingKey] = useState<string | null>(null);
   const [wardResults, setWardResults] = useState<WardMatch[]>([]);
   const [constituencyResults, setConstituencyResults] = useState<
     { countyName: string; constituencyName: string; wards: string[] }[]
@@ -178,20 +179,27 @@ export function AreaPickerSheet({ onSearchSelect, onDismiss, resolving = false }
                 <div>
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Wards</p>
                   <div className="space-y-2">
-                    {wardResults.map((w) => (
-                      <button
-                        key={`${w.wardName}-${w.constituencyName}`}
-                        onClick={() => onSearchSelect(w)}
-                        disabled={resolving}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
-                      >
-                        <div className="flex-1">
-                          <p className="font-bold text-sm">{w.wardName} area</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">{w.constituencyName}, {w.countyName}</p>
-                        </div>
-                        {resolving && <Loader2 size={16} className="animate-spin text-primary flex-shrink-0" />}
-                      </button>
-                    ))}
+                    {wardResults.map((w) => {
+  const key = `${w.wardName}-${w.constituencyName}`;
+  const isThisResolving = resolving && resolvingKey === key;
+  return (
+    <button
+      key={key}
+      onClick={() => {
+        setResolvingKey(key);
+        onSearchSelect(w);
+      }}
+      disabled={resolving}
+      className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98] disabled:opacity-50"
+    >
+      <div className="flex-1">
+        <p className="font-bold text-sm">{w.wardName} area</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{w.constituencyName}, {w.countyName}</p>
+      </div>
+      {isThisResolving && <Loader2 size={16} className="animate-spin text-primary flex-shrink-0" />}
+    </button>
+  );
+})}
                   </div>
                 </div>
               )}
