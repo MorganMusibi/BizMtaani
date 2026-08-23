@@ -65,8 +65,8 @@ const LISTING_DURATIONS: Record<string, number> = {
   premium_monthly: 30,
 };
 const CLEANUP_LIMIT = 150;
-const ARCHIVE_RETENTION_DAYS = 45;
-const MINIMUM_PAYOUT_KES = 100; // adjust to whatever makes sense for your M-Pesa costs
+const ARCHIVE_RETENTION_HOURS = 48;
+const MINIMUM_PAYOUT_KES = 350; // adjust to whatever makes sense for your M-Pesa costs
 
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
