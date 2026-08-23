@@ -721,8 +721,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
   );
 
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
-
-  const handleAreaSearchSelect = useCallback(
+const handleAreaSearchSelect = useCallback(
     async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
       setResolvingAreaSearch(true);
       try {
@@ -739,42 +738,6 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
           });
           return;
         }
-
-        const handleFreeTextAreaSearch = useCallback(
-  async (text: string) => {
-    setFreeTextSearching(true);
-    try {
-      const coords = await forwardGeocodePlace(text);
-
-      if (!coords) {
-        toast({
-          title: "Couldn't find that place",
-          description: "Try a nearby ward or estate name instead.",
-        });
-        return;
-      }
-
-      const info = await getWardInfo(coords.lat, coords.lng);
-
-      const resolved: ResolvedLocation = {
-        ...info,
-        lat: coords.lat,
-        lng: coords.lng,
-      } as ResolvedLocation;
-
-      handleAreaSelect(resolved);
-    } catch (error) {
-      console.warn("Free-text area search failed:", error);
-      toast({
-        title: "Something went wrong",
-        description: "Please try again.",
-      });
-    } finally {
-      setFreeTextSearching(false);
-    }
-  },
-  [handleAreaSelect, toast]
-);
 
         const resolved: ResolvedLocation = {
           lat: coords.lat,
@@ -798,7 +761,42 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     },
     [handleAreaSelect, toast]
   );
-  
+
+  const handleFreeTextAreaSearch = useCallback(
+    async (text: string) => {
+      setFreeTextSearching(true);
+      try {
+        const coords = await forwardGeocodePlace(text);
+
+        if (!coords) {
+          toast({
+            title: "Couldn't find that place",
+            description: "Try a nearby ward or estate name instead.",
+          });
+          return;
+        }
+
+        const info = await getWardInfo(coords.lat, coords.lng);
+
+        const resolved: ResolvedLocation = {
+          ...info,
+          lat: coords.lat,
+          lng: coords.lng,
+        } as ResolvedLocation;
+
+        handleAreaSelect(resolved);
+      } catch (error) {
+        console.warn("Free-text area search failed:", error);
+        toast({
+          title: "Something went wrong",
+          description: "Please try again.",
+        });
+      } finally {
+        setFreeTextSearching(false);
+      }
+    },
+    [handleAreaSelect, toast]
+  );
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
