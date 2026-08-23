@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getWardInfo,
   getAreaChoices,
+  getWardCoordinates,
   type ResolvedLocation,
 } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
@@ -736,42 +737,46 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
 
         const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
 
-        const resolved: ResolvedLocation = results.length
-          ? {
-              lat: parseFloat(results[0].lat),
-              lng: parseFloat(results[0].lon),
-              wardName: ward.wardName,
-              constituency: ward.constituencyName,
-              county: ward.countyName,
-              displayName: `${ward.wardName}, ${ward.constituencyName}`,
-            }
-          : // Nominatim found nothing — fall back to 0,0 rejected downstream
-            // by useSavedProfileLocation-style checks isn't ideal, so instead
-            // we just proceed without lat/lng resolution and let the user
-            // know rather than silently writing bad coordinates.
-            null as any;
+        const handleAreaSearchSelect = useCallback(
+  async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+    setResolvingAreaSearch(true);
+    try {
+      const coords = await getWardCoordinates(
+        ward.wardName,
+        ward.constituencyName,
+        ward.countyName
+      );
 
-        if (!resolved) {
-          toast({
-            title: "Couldn't find that area on the map",
-            description: "Try a nearby, larger area name instead.",
-          });
-          return;
-        }
-
-        handleAreaSelect(resolved);
-      } catch (error) {
-        console.warn("Failed to geocode selected area:", error);
+      if (!coords) {
         toast({
-          title: "Something went wrong",
-          description: "Please try again or pick a different area.",
+          title: "Couldn't find that area on the map",
+          description: "Try a nearby, larger area name instead.",
         });
-      } finally {
-        setResolvingAreaSearch(false);
+        return;
       }
-    },
-    [handleAreaSelect, toast]
-  );
+
+      const resolved: ResolvedLocation = {
+        lat: coords.lat,
+        lng: coords.lng,
+        wardName: ward.wardName,
+        constituency: ward.constituencyName,
+        county: ward.countyName,
+        displayName: `${ward.wardName}, ${ward.constituencyName}`,
+      } as ResolvedLocation;
+
+      handleAreaSelect(resolved);
+    } catch (error) {
+      console.warn("Failed to resolve selected area:", error);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again or pick a different area.",
+      });
+    } finally {
+      setResolvingAreaSearch(false);
+    }
+  },
+  [handleAreaSelect, toast]
+);
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
