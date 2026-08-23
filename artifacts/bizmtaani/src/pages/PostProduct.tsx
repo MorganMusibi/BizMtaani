@@ -3438,9 +3438,10 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 >
       <div className="flex justify-between items-center">
         <div>
-          <span className="font-black text-base">Free</span>
-          <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
-        </div>
+  <span className="font-black text-base">Free</span>
+  <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
+  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to people within a short radius</p>
+</div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
     </button>
@@ -3449,9 +3450,10 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
     <button onClick={() => setPlan("premium_weekly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_weekly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
         <div>
-          <span className="font-black text-base">Weekly Premium</span>
-          <p className="text-sm text-muted-foreground">Up to 8 adverts at a time · 3 photos each · Live for 7 days</p>
-        </div>
+  <span className="font-black text-base">Weekly Premium</span>
+  <p className="text-sm text-muted-foreground">Up to 8 adverts at a time · 3 photos each · Live for 7 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to people up to 50km+ radius</p>
+</div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
     </button>
@@ -3460,9 +3462,10 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
     <button onClick={() => setPlan("premium_monthly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_monthly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
       <div className="flex justify-between items-center">
         <div>
-          <span className="font-black text-base">Monthly Premium</span>
-          <p className="text-sm text-muted-foreground">Up to 10 adverts at a time · 3 photos each · Live for 30 days</p>
-        </div>
+  <span className="font-black text-base">Monthly Premium</span>
+  <p className="text-sm text-muted-foreground">Up to 10 adverts at a time · 3 photos each · Live for 30 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Reaches people up to 50km away — and nationwide once nearby areas are covered</p>
+</div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
     </button>
