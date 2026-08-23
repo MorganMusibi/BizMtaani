@@ -1364,15 +1364,15 @@ export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, clo
     }
   }
 
-  // 2. NEW: Delete associated chats (Avoid ghost chats)
+  // 2. Delete associated chats and their messages (avoid ghost chats
+  // and orphaned message subcollections — recursiveDelete removes both).
   const chatQuery = await db.collection("chats").where("productId", "==", productId).get();
-  const batch = db.batch();
-  chatQuery.docs.forEach((doc) => batch.delete(doc.ref));
+  for (const chatDoc of chatQuery.docs) {
+    await db.recursiveDelete(chatDoc.ref);
+  }
 
   // 3. Delete the advert
-  batch.delete(productRef);
-  
-  await batch.commit();
+  await productRef.delete();
 
   return { success: true, message: "Advert and associated data removed." };
 });
@@ -1402,13 +1402,14 @@ export const deleteJob = onCall({ cors: true }, async (request) => {
     throw new HttpsError("permission-denied", "You can only delete your own job listings.");
   }
 
-  // Delete associated application chats (avoid ghost chats)
+  // Delete associated application chats and their messages (avoid ghost
+  // chats and orphaned message subcollections)
   const chatQuery = await db.collection("chats").where("jobId", "==", jobId).get();
-  const batch = db.batch();
-  chatQuery.docs.forEach((doc) => batch.delete(doc.ref));
+  for (const chatDoc of chatQuery.docs) {
+    await db.recursiveDelete(chatDoc.ref);
+  }
 
-  batch.delete(jobRef);
-  await batch.commit();
+  await jobRef.delete();
 
   return { success: true, message: "Job and associated chats removed." };
 });
