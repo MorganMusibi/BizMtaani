@@ -685,6 +685,62 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     []
   );
 
+  const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
+
+  const handleAreaSearchSelect = useCallback(
+    async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+      setResolvingAreaSearch(true);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const resp = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            `${ward.wardName}, ${ward.constituencyName}, Kenya`
+          )}&limit=1`,
+          { signal: controller.signal }
+        );
+        clearTimeout(timeoutId);
+
+        const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
+
+        const resolved: ResolvedLocation = results.length
+          ? {
+              lat: parseFloat(results[0].lat),
+              lng: parseFloat(results[0].lon),
+              wardName: ward.wardName,
+              constituency: ward.constituencyName,
+              county: ward.countyName,
+              displayName: `${ward.wardName}, ${ward.constituencyName}`,
+            }
+          : // Nominatim found nothing — fall back to 0,0 rejected downstream
+            // by useSavedProfileLocation-style checks isn't ideal, so instead
+            // we just proceed without lat/lng resolution and let the user
+            // know rather than silently writing bad coordinates.
+            null as any;
+
+        if (!resolved) {
+          toast({
+            title: "Couldn't find that area on the map",
+            description: "Try a nearby, larger area name instead.",
+          });
+          return;
+        }
+
+        handleAreaSelect(resolved);
+      } catch (error) {
+        console.warn("Failed to geocode selected area:", error);
+        toast({
+          title: "Something went wrong",
+          description: "Please try again or pick a different area.",
+        });
+      } finally {
+        setResolvingAreaSearch(false);
+      }
+    },
+    [handleAreaSelect, toast]
+  );
+
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
     return products.filter((p) => {
