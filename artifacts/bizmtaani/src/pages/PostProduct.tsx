@@ -1616,8 +1616,8 @@ const result = await publishAdvert({ ...docData, recaptchaToken });
 const data = result.data as PublishAdvertResponse;
  if (data.success) {
   toast({
-    title: "Advert published!",
-    description: "Your advert is now live.",
+    title: "SUCCESS",
+    description: "Advert yako iko live.",
   });
 
   invalidateOwnCaches();
