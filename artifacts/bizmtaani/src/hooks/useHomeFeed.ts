@@ -35,6 +35,7 @@ interface FeedCacheEntry {
   areaCursors: Record<string, Cursor | null>;
   areaDonePrefixes: Record<string, boolean>;
   areaDone: boolean;
+  areaRadiusStage: number;
   nationwideCursor: Cursor | null;
   nationwideDone: boolean;
   timestamp: number;
@@ -642,8 +643,7 @@ const [areaProducts, setAreaProducts] = useState<Product[]>(initialCached?.areaP
 //
 // This controls candidate discovery only.
 // It does NOT change advert visibility permissions.
-const [areaRadiusStage, setAreaRadiusStage] = useState(0);
-
+const [areaRadiusStage, setAreaRadiusStage] = useState(initialCached?.areaRadiusStage ?? 0);
 // Products fetched from Firestore but not yet displayed.
 // These act as the nearby pagination buffer.
 const [areaBuffer, setAreaBuffer] = useState<Product[]>(initialCached?.areaBuffer ?? []);
@@ -732,20 +732,23 @@ setSearchDone(false);
     const cacheKey = `${locationInfo?.wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
 
     if (!isSearchMode) {
-      const cached = feedCache.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
-        setWardProducts(cached.wardProducts);
-        setWardCursor(cached.wardCursor);
-        setWardDone(cached.wardDone);
-        setAreaProducts(cached.areaProducts);
-        setAreaBuffer(cached.areaBuffer);
-        setAreaCursors(cached.areaCursors);
-        setAreaDonePrefixes(cached.areaDonePrefixes);
-        setAreaDone(cached.areaDone);
-        setInitialLoading(false);
-        return;
-      }
-    }
+  const cached = feedCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
+    setWardProducts(cached.wardProducts);
+    setWardCursor(cached.wardCursor);
+    setWardDone(cached.wardDone);
+    setAreaProducts(cached.areaProducts);
+    setAreaBuffer(cached.areaBuffer);
+    setAreaCursors(cached.areaCursors);
+    setAreaDonePrefixes(cached.areaDonePrefixes);
+    setAreaDone(cached.areaDone);
+    setAreaRadiusStage(cached.areaRadiusStage ?? 0);
+    setNationwideCursor(cached.nationwideCursor);
+    setNationwideDone(cached.nationwideDone);
+    setInitialLoading(false);
+    return;
+  }
+}
 
     // ============================================================
     // SEARCH MODE
@@ -868,22 +871,23 @@ setWardDone(localWardDone);
       setAreaRadiusStage(1);
 
       feedCache.set(cacheKey, {
-        wardProducts: localWardProducts,
-        wardCursor: localWardCursor,
-        wardDone: localWardDone,
-        areaProducts: [],
-        areaBuffer: [],
-        areaCursors: {},
-        areaDonePrefixes: {},
-        areaDone: false,
-        nationwideCursor: null,
-        nationwideDone: false,
-        timestamp: Date.now(),
-      });
-      saveFeedCacheToStorage(feedCache);
+  wardProducts: localWardProducts,
+  wardCursor: localWardCursor,
+  wardDone: localWardDone,
+  areaProducts: [],
+  areaBuffer: [],
+  areaCursors: {},
+  areaDonePrefixes: {},
+  areaDone: false,
+  areaRadiusStage: 1,
+  nationwideCursor: null,
+  nationwideDone: false,
+  timestamp: Date.now(),
+});
+saveFeedCacheToStorage(feedCache);
 
-      setInitialLoading(false);
-      return;
+setInitialLoading(false);
+return;
     }
 // ============================================================
 // INITIAL NEARBY AREA LOAD — BUFFERED  
@@ -1069,19 +1073,20 @@ const queries = areaQueries(
   setAreaDone(localAreaDone);
 
   feedCache.set(cacheKey, {
-    wardProducts: localWardProducts,
-    wardCursor: localWardCursor,
-    wardDone: localWardDone,
-    areaProducts: localAreaProducts,
-    areaBuffer: localAreaBuffer,
-    areaCursors: currentCursors,
-    areaDonePrefixes: currentDonePrefixes,
-    areaDone: localAreaDone,
-    nationwideCursor: null,
-    nationwideDone: false,
-    timestamp: Date.now(),
-  });
-  saveFeedCacheToStorage(feedCache);
+  wardProducts: localWardProducts,
+  wardCursor: localWardCursor,
+  wardDone: localWardDone,
+  areaProducts: localAreaProducts,
+  areaBuffer: localAreaBuffer,
+  areaCursors: currentCursors,
+  areaDonePrefixes: currentDonePrefixes,
+  areaDone: localAreaDone,
+  areaRadiusStage: 0,
+  nationwideCursor: null,
+  nationwideDone: false,
+  timestamp: Date.now(),
+});
+saveFeedCacheToStorage(feedCache);
 
 } catch (error) {
   console.error(
