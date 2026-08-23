@@ -3225,6 +3225,18 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                       className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
                       <X size={12} />
                     </button>
+
+                    {i === 0 && imageFiles.length < photoLimit && (
+  <button
+    type="button"
+    onClick={() => setShowImageMenu(true)}
+    className="absolute top-1 left-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shadow-md"
+    aria-label="Add another photo"
+  >
+    <Plus size={14} />
+  </button>
+)}
+                    
                   </div>
                 ))}
                 {imageFiles.length < photoLimit && (
@@ -3760,7 +3772,17 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <div className="fixed bottom-0 left-0 right-0 z-50 bg-card rounded-t-3xl border-t border-border px-4 pt-4"
             style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}>
             <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-            <p className="font-bold text-sm text-center mb-4">Add a photo</p>
+            <div className="relative mb-4">
+  <p className="font-bold text-sm text-center">Add a photo</p>
+  <button
+    type="button"
+    onClick={() => setShowImageMenu(false)}
+    className="absolute right-0 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground"
+    aria-label="Close"
+  >
+    <X size={16} />
+  </button>
+</div>
             <div className="space-y-2">
               <button type="button" onClick={() => { setShowImageMenu(false); cameraRef.current?.click(); }}
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
