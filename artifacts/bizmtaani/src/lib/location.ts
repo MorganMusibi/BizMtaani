@@ -180,6 +180,32 @@ export async function nominatimFallback(lat: number, lng: number): Promise<Parti
   }
 }
 
+export async function getWardCoordinates(
+  wardName: string,
+  constituencyName: string,
+  countyName: string
+): Promise<{ lat: number; lng: number } | null> {
+  const features = await loadWards();
+  if (!features) return null;
+
+  const norm = (s: string) => s.trim().toLowerCase();
+
+  const feat = features.find(
+    (f) =>
+      norm(f.properties.ward) === norm(wardName) &&
+      norm(f.properties.constituency) === norm(constituencyName) &&
+      norm(f.properties.county) === norm(countyName)
+  );
+
+  if (!feat) return null;
+
+  const [minLng, minLat, maxLng, maxLat] = feat._bbox;
+  return {
+    lat: (minLat + maxLat) / 2,
+    lng: (minLng + maxLng) / 2,
+  };
+}
+
 export function preloadWards(): void {
   void loadWards();
 }
