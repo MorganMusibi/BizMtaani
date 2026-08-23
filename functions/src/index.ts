@@ -253,7 +253,7 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
 
 export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, recaptchaSecretKey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
-  const { phone, plan, productId, recaptchaToken } = request.data as { phone: string; plan: string; productId: string; recaptchaToken?: string };
+  const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
   await verifyRecaptcha(recaptchaToken, "initiate_payment");
 
   // Cooldown guard — stops repeated STK push spam (accidental double-taps
