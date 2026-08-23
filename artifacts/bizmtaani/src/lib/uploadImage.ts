@@ -78,9 +78,9 @@ export async function uploadImage(
   });
   // Only send the params that are covered by the signature.
   // Adding extra params here would cause Cloudinary to reject with
-  // "Invalid Signature" — allowed_formats and bytes_limit are now
-  // part of the signed payload, so they must be included exactly
-  // as the backend signed them.
+  // "Invalid Signature" — allowed_formats and max_file_size are
+  // signed on the backend (getCloudinarySignature), so both must be
+  // included here exactly as signed.
   const form = new FormData();
   form.append("file", compressedFile);
   form.append("api_key", sig.apiKey);
@@ -88,6 +88,7 @@ export async function uploadImage(
   form.append("signature", sig.signature);
   form.append("folder", sig.folder);
   form.append("allowed_formats", sig.allowedFormats);
+  form.append("max_file_size", String(sig.maxFileSize));
   
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
