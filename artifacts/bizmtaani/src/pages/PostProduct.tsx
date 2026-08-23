@@ -73,9 +73,10 @@ export default function PostProduct() {
   // every image (and eventually the advert itself) claims the same
   // draft record. Generated once, lazily, on first upload.
   const draftIdRef = useRef<string | null>(null);
-  const [, navigate] = useLocation();
-  const { toast } = useToast();
-  const [step, setStep] = useState<Step>(1);
+const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+const [, navigate] = useLocation();
+const { toast } = useToast();
+const [step, setStep] = useState<Step>(1);
 
   // Step 1 — Category
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "">("");
@@ -1742,10 +1743,23 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 return (
                   <div key={cat.key}>
                     <button
-                      onClick={() => {
+                      
+                        onClick={() => {
   setSelectedCategory(cat.key);
   setSelectedSubcategory("");
   setCustomSubcategory("");
+
+  if (cat.key !== "Services") {
+    setPricingBasis("per_trip");
+  }
+
+  requestAnimationFrame(() => {
+    categoryRefs.current[cat.key]?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  });
+}}
 
   // Reset pricing basis when leaving Services
   if (cat.key !== "Services") {
