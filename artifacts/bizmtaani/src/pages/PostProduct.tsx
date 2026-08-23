@@ -170,6 +170,11 @@ const [priceDisplay, setPriceDisplay] =
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const photoLimit = MAX_PHOTO_LIMIT[plan];
+  const maxPossiblePhotoLimit = Math.max(
+  MAX_PHOTO_LIMIT.free,
+  MAX_PHOTO_LIMIT.premium_weekly,
+  MAX_PHOTO_LIMIT.premium_monthly
+);
 // Property / rental
 const [bedrooms, setBedrooms] = useState("");
 const [bathrooms, setBathrooms] = useState("");
@@ -241,25 +246,7 @@ const [ticketPrice, setTicketPrice] = useState("");
     );
   }, [user, userProfile]);
 
-  // Auto-upgrade to premium if photos exceed basic limit
-
-useEffect(() => {
-  if (
-    imageFiles.length > MAX_PHOTO_LIMIT.free &&
-    plan === "free"
-  ) {
-    if (hasActivePremium) {
-      setPlan(subscriptionPlan);
-    } else {
-      setPlan("premium_weekly");
-    }
-  }
-}, [
-  imageFiles.length,
-  plan,
-  hasActivePremium,
-  subscriptionPlan,
-]);
+ 
   // Cleanup preview URLs when component unmounts
 useEffect(() => {
   return () => {
@@ -725,24 +712,15 @@ if (isEventListing) {
   
 function handleImageFiles(files: FileList | null) {
   if (!files) return;
-  
-  // Use the new MAX_PHOTO_LIMIT constant
-  const currentLimit = MAX_PHOTO_LIMIT[plan];
+
+  const currentLimit = maxPossiblePhotoLimit;
   const remaining = currentLimit - imageFiles.length;
-  
+
   if (remaining <= 0) {
-    if (plan === "free") {
-      toast({ 
-        title: "Free plan limit reached", 
-        description: "Upgrade to Weekly or Monthly Premium for more photos." 
-      });
-    } else {
-      // This covers both premium_weekly and premium_monthly
-      toast({ 
-        title: "Limit reached", 
-        description: "You have reached the photo limit for your current plan." 
-      });
-    }
+    toast({
+      title: "Maximum photos reached",
+      description: `You can add up to ${maxPossiblePhotoLimit} photos per advert.`,
+    });
     return;
   }
   
@@ -3191,9 +3169,9 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-bold">
-                  Photos (Optional • up to {MAX_PHOTO_LIMIT[plan]})
+                  Photos (Optional • up to {maxPossiblePhotoLimit[plan]})
                 </label>
-                <span className="text-xs text-muted-foreground">{imageFiles.length}/{MAX_PHOTO_LIMIT[plan]}</span>
+                <span className="text-xs text-muted-foreground">{imageFiles.length}/{maxPossiblePhotoLimit[plan]}</span>
               </div>
 
               {imageFiles.length === 0 && (
@@ -3226,7 +3204,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                       <X size={12} />
                     </button>
 
-                    {i === 0 && imageFiles.length < photoLimit && (
+                    {i === 0 && imageFiles.length < maxPossiblePhotoLimit && (
   <button
     type="button"
     onClick={() => setShowImageMenu(true)}
@@ -3239,8 +3217,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                     
                   </div>
                 ))}
-                {imageFiles.length < photoLimit && (
-                  <button onClick={() => setShowImageMenu(true)}
+                {imageFiles.length < maxPossiblePhotoLimit && (
+  <button onClick={() => setShowImageMenu(true)}
                     className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                     <Camera size={22} />
                     <span className="text-[10px] font-semibold">Add photo</span>
