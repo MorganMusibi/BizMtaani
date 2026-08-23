@@ -247,12 +247,18 @@ const [ticketPrice, setTicketPrice] = useState("");
   }, [user, userProfile]);
 
  
-  // Cleanup preview URLs when component unmounts
+  // Cleanup preview URLs only when the component actually unmounts —
+// not on every add/remove, which would revoke URLs still in use.
+const imagePreviewsRef = useRef<string[]>([]);
+useEffect(() => {
+  imagePreviewsRef.current = imagePreviews;
+}, [imagePreviews]);
+
 useEffect(() => {
   return () => {
-    imagePreviews.forEach((url) => URL.revokeObjectURL(url));
+    imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
   };
-}, [imagePreviews]);
+}, []);
 
   const catDef = selectedCategory
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
