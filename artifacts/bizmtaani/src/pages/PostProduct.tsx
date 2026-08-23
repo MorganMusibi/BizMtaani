@@ -1444,6 +1444,15 @@ equipmentDetails: isEquipment
  * Corrected handlePublishFree
  */
 async function handlePublishFree() {
+  if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+    toast({
+      title: "Too many photos for Free plan",
+      description: "Please upgrade your plan or remove extra photos before publishing.",
+      variant: "destructive",
+    });
+    return;
+  }
+
   const cleanedPhone = phone.replace(/\s+/g, "").trim();
 
   if (!isValidKenyanPhone(cleanedPhone)) {
@@ -3413,7 +3422,20 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
     </div>
 {/* Free plan */}
-    <button onClick={() => setPlan("free")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}>
+    <button
+  onClick={() => {
+    if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+      toast({
+        title: "Free plan allows only 1 photo",
+        description: "Remove extra photos, or choose Weekly or Monthly Premium instead.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPlan("free");
+  }}
+  className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}
+>
       <div className="flex justify-between items-center">
         <div>
           <span className="font-black text-base">Free</span>
