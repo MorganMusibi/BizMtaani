@@ -13,6 +13,7 @@ import {
   getWardInfo,
   getAreaChoices,
   getWardCoordinates,
+  forwardGeocodePlace,
   type ResolvedLocation,
 } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
@@ -273,7 +274,8 @@ export default function Home() {
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
-
+  const [freeTextSearching, setFreeTextSearching] = useState(false);
+  
   // Tracks recent GPS-refresh failures (permission denied or GPS
   // hardware off) so we can offer the manual area search after
   // repeated attempts, instead of leaving the user stuck retrying a
@@ -738,6 +740,42 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
           return;
         }
 
+        const handleFreeTextAreaSearch = useCallback(
+  async (text: string) => {
+    setFreeTextSearching(true);
+    try {
+      const coords = await forwardGeocodePlace(text);
+
+      if (!coords) {
+        toast({
+          title: "Couldn't find that place",
+          description: "Try a nearby ward or estate name instead.",
+        });
+        return;
+      }
+
+      const info = await getWardInfo(coords.lat, coords.lng);
+
+      const resolved: ResolvedLocation = {
+        ...info,
+        lat: coords.lat,
+        lng: coords.lng,
+      } as ResolvedLocation;
+
+      handleAreaSelect(resolved);
+    } catch (error) {
+      console.warn("Free-text area search failed:", error);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again.",
+      });
+    } finally {
+      setFreeTextSearching(false);
+    }
+  },
+  [handleAreaSelect, toast]
+);
+
         const resolved: ResolvedLocation = {
           lat: coords.lat,
           lng: coords.lng,
@@ -760,6 +798,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     },
     [handleAreaSelect, toast]
   );
+  
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
@@ -1094,12 +1133,14 @@ const totalVisible = rankedProducts.length;
         </div>
       )}
 {showAreaPicker && (
-        <AreaPickerSheet
-          onSearchSelect={handleAreaSearchSelect}
-          resolving={resolvingAreaSearch}
-          onDismiss={() => setShowAreaPicker(false)}
-        />
-      )}
+  <AreaPickerSheet
+    onSearchSelect={handleAreaSearchSelect}
+    onFreeTextSearch={handleFreeTextAreaSearch}
+    resolving={resolvingAreaSearch}
+    freeTextSearching={freeTextSearching}
+    onDismiss={() => setShowAreaPicker(false)}
+  />
+)}
       
 
     </div>
