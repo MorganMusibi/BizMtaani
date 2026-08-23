@@ -184,14 +184,15 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   // Every parameter included in the signature is enforced by
   // Cloudinary server-side — a client cannot alter these without
   // invalidating the signature, so this closes the gap left by an
-  // unsigned preset (which your app doesn't use anyway).
-  // NOTE: Cloudinary's real parameter name is max_file_size, not
-  // bytes_limit (which isn't a recognized upload parameter and
-  // gets silently dropped from Cloudinary's own signature check).
+  // unsigned preset (which your app doesn't use anyway). max_file_size
+  // must be included here AND sent as a form field in the actual
+  // upload request (see uploadImage in cloudinaryUpload.ts) — if either
+  // side is missing or mismatched, Cloudinary rejects with "Invalid
+  // Signature".
   const signature = crypto
   .createHash("sha1")
   .update(
-    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
   )
   .digest("hex");
 
@@ -616,8 +617,8 @@ async function runCleanup() {
 
   // Permanently delete adverts that have sat archived past retention
   const archiveCutoff = admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() - ARCHIVE_RETENTION_DAYS * 86_400_000)
-  );
+  new Date(Date.now() - ARCHIVE_RETENTION_HOURS * 60 * 60 * 1000)
+);
 
   const staleArchived = await db.collection("products")
     .where("status", "==", "archived")
