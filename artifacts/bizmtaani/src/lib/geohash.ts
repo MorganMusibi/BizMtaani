@@ -1,33 +1,5 @@
 const BASE32 = "0123456789bcdefghjkmnpqrstuvwxyz";
 
-const NEIGHBORS: Record<
-  "right" | "left",
-  Record<"even" | "odd", string>
-> = {
-  right: {
-    even: "bc01fg45238967deuvhjyznpkmstqrwx",
-    odd: "p0r21436x8zb9dcf5h7kjnmqesgutwvy",
-  },
-  left: {
-    even: "238967debc01fg45kmstqrwxuvhjyznp",
-    odd: "14365h7k9dcfesgujnmqp0r2twvyx8zb",
-  },
-};
-
-const BORDERS: Record<
-  "right" | "left",
-  Record<"even" | "odd", string>
-> = {
-  right: {
-    even: "bcfguvyz",
-    odd: "prxz",
-  },
-  left: {
-    even: "0145hjnp",
-    odd: "028b",
-  },
-};
-
 /**
  * Encode latitude / longitude into a geohash.
  *
@@ -88,85 +60,17 @@ export function encodeGeohash(
   return hash;
 }
 
-/**
- * Get a neighbouring geohash in a given direction.
- */
-function calculateAdjacent(
-  hash: string,
-  direction: "right" | "left"
-): string {
-  if (!hash) return "";
-
-  const lastChar = hash[hash.length - 1];
-
-  const parity = hash.length % 2 === 0
-    ? "even"
-    : "odd";
-
-  const border = BORDERS[direction][parity];
-
-  let parent = hash.slice(0, -1);
-
-  if (border.includes(lastChar) && parent) {
-    parent = calculateAdjacent(
-      parent,
-      direction
-    );
-  }
-
-  const neighborTable =
-    NEIGHBORS[direction][parity];
-
-  const index = neighborTable.indexOf(lastChar);
-
-  if (index === -1) {
-    return hash;
-  }
-
-  return (
-    parent +
-    BASE32[index]
-  );
-}
-
-/**
- * Get the geohash immediately north.
- */
-function north(hash: string): string {
-  return calculateAdjacent(
-    calculateAdjacent(hash, "right"),
-    "right"
-  );
-}
-
-/**
- * Get the geohash immediately south.
- */
-function south(hash: string): string {
-  return calculateAdjacent(
-    calculateAdjacent(hash, "left"),
-    "left"
-  );
-}
-
-/**
- * Get the geohash immediately east.
- */
-function east(hash: string): string {
-  return calculateAdjacent(
-    hash,
-    "right"
-  );
-}
-
-/**
- * Get the geohash immediately west.
- */
-function west(hash: string): string {
-  return calculateAdjacent(
-    hash,
-    "left"
-  );
+// Returns the lat/lng span (in degrees) covered by one geohash cell
+// at a given precision — used to step to neighboring cells without
+// relying on base32 neighbor/border lookup tables.
+function geohashCellSizeDeg(precision: number): { lngSpan: number; latSpan: number } {
+  const totalBits = precision * 5;
+  const lngBits = Math.ceil(totalBits / 2);
+  const latBits = Math.floor(totalBits / 2);
+  return {
+    lngSpan: 360 / Math.pow(2, lngBits),
+    latSpan: 180 / Math.pow(2, latBits),
+  };
 }
 
 /**
@@ -181,50 +85,28 @@ export function getNearbyGeohashPrefixes(
   lng: number,
   precision = 5
 ): string[] {
-  const center = encodeGeohash(
-    lat,
-    lng,
-    precision
-  );
+  const { lngSpan, latSpan } = geohashCellSizeDeg(precision);
 
-  const n = north(center);
-  const s = south(center);
-  const e = east(center);
-  const w = west(center);
-
-  const ne = east(n);
-  const nw = west(n);
-  const se = east(s);
-  const sw = west(s);
+  const points: [number, number][] = [
+    [lat, lng],
+    [lat + latSpan, lng],
+    [lat - latSpan, lng],
+    [lat, lng + lngSpan],
+    [lat, lng - lngSpan],
+    [lat + latSpan, lng + lngSpan],
+    [lat + latSpan, lng - lngSpan],
+    [lat - latSpan, lng + lngSpan],
+    [lat - latSpan, lng - lngSpan],
+  ];
 
   return Array.from(
-    new Set([
-      center,
-
-      // North
-      n,
-
-      // South
-      s,
-
-      // East
-      e,
-
-      // West
-      w,
-
-      // North-East
-      ne,
-
-      // North-West
-      nw,
-
-      // South-East
-      se,
-
-      // South-West
-      sw,
-    ])
+    new Set(
+      points.map(([la, lo]) => {
+        const clampedLat = Math.max(-90, Math.min(90, la));
+        const clampedLng = ((lo + 540) % 360) - 180;
+        return encodeGeohash(clampedLat, clampedLng, precision);
+      })
+    )
   );
 }
 
@@ -261,7 +143,8 @@ export function nearbyAreaPrefix(
     lng,
     5
   );
-    }
+}
+
 /**
  * Maps a search radius (km) to a sane geohash precision. Precision
  * must stay a small integer (4-6 typically) — cell size should get
