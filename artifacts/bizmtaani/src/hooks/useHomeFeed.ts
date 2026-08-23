@@ -1118,6 +1118,8 @@ saveFeedCacheToStorage(feedCache);
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
 
+  const cacheKey = computeFeedCacheKey(locationInfo?.wardName, userCoords);
+
   // ============================================================
   // SEARCH PAGINATION
   // Load 20 search results at a time.
@@ -1183,44 +1185,42 @@ const loadMore = useCallback(async () => {
 // ============================================================
 
 if (!areaDone && !areaLoading) {
-  setAreaLoading(true);
+if (areaBuffer.length > 0) {
+  const nextPage = areaBuffer.slice(
+    0,
+    AREA_PAGE
+  );
 
-  try {
-    // ==========================================================
-    // STEP 1 — CONSUME EXISTING BUFFER FIRST
-    //
-    // Never query Firestore if we already have products
-    // waiting in the local buffer.
-    // ==========================================================
+  const remainingBuffer = areaBuffer.slice(
+    AREA_PAGE
+  );
 
-    if (areaBuffer.length > 0) {
-      const nextPage = areaBuffer.slice(
-        0,
-        AREA_PAGE
-      );
+  const mergedAreaProducts = sortNearbyProducts(
+    dedupe(areaProducts, nextPage),
+    userCoords
+  );
 
-      const remainingBuffer = areaBuffer.slice(
-        AREA_PAGE
-      );
+  setAreaProducts(mergedAreaProducts);
+  setAreaBuffer(remainingBuffer);
 
-      setAreaProducts((prev) => {
-        const merged = dedupe(
-          prev,
-          nextPage
-        );
+  feedCache.set(cacheKey, {
+    wardProducts,
+    wardCursor,
+    wardDone,
+    areaProducts: mergedAreaProducts,
+    areaBuffer: remainingBuffer,
+    areaCursors,
+    areaDonePrefixes,
+    areaDone,
+    areaRadiusStage,
+    nationwideCursor,
+    nationwideDone,
+    timestamp: Date.now(),
+  });
+  saveFeedCacheToStorage(feedCache);
 
-        return sortNearbyProducts(
-          merged,
-          userCoords
-        );
-      });
-
-      setAreaBuffer(
-        remainingBuffer
-      );
-
-      return;
-    }
+  return;
+}
 
     // ==========================================================
     // STEP 1B — NATIONWIDE PREMIUM STAGE
@@ -1244,19 +1244,33 @@ if (!areaDone && !areaLoading) {
       const fetchedProducts = toProducts(snap.docs);
       const sortedFetched = sortNearbyProducts(fetchedProducts, userCoords);
 
-      setAreaProducts((prev) =>
-        sortNearbyProducts(dedupe(prev, sortedFetched), userCoords)
-      );
+      const mergedNationwide = sortNearbyProducts(dedupe(areaProducts, sortedFetched), userCoords);
+setAreaProducts(mergedNationwide);
 
-      const newCursor = snap.docs[snap.docs.length - 1] ?? null;
-      const isDone = snap.docs.length < AREA_PAGE;
+const newCursor = snap.docs[snap.docs.length - 1] ?? null;
+const isDone = snap.docs.length < AREA_PAGE;
 
-      setNationwideCursor(newCursor);
-      setNationwideDone(isDone);
-      setAreaDone(isDone);
+setNationwideCursor(newCursor);
+setNationwideDone(isDone);
+setAreaDone(isDone);
 
-      return;
-    }
+feedCache.set(cacheKey, {
+  wardProducts,
+  wardCursor,
+  wardDone,
+  areaProducts: mergedNationwide,
+  areaBuffer,
+  areaCursors,
+  areaDonePrefixes,
+  areaDone: isDone,
+  areaRadiusStage,
+  nationwideCursor: newCursor,
+  nationwideDone: isDone,
+  timestamp: Date.now(),
+});
+saveFeedCacheToStorage(feedCache);
+
+return;
 
     // ==========================================================
     // STEP 2 — GET CURRENT GEOGRAPHIC STAGE
@@ -1514,78 +1528,79 @@ if (!areaDone && !areaLoading) {
         AREA_PAGE
       );
 
-    setAreaProducts(
-      (prev) => {
-        const merged =
-          dedupe(
-            prev,
-            nextPage
-          );
+    const mergedStageProducts = sortNearbyProducts(
+  dedupe(areaProducts, nextPage),
+  userCoords
+);
 
-        return sortNearbyProducts(
-          merged,
-          userCoords
-        );
-      }
-    );
+setAreaProducts(mergedStageProducts);
+setAreaBuffer(remainingBuffer);
+setAreaCursors(currentCursors);
+setAreaDonePrefixes(currentDonePrefixes);
 
-    setAreaBuffer(
-      remainingBuffer
-    );
+// ==========================================================
+// STEP 6 — PROGRESSIVE RADIUS EXPANSION
+//
+// If the current radius is exhausted, move outward.
+// ==========================================================
 
-    setAreaCursors(
-      currentCursors
-    );
+let resolvedNextStage = areaRadiusStage;
+let resolvedAreaDone = false;
+let resolvedCursors = currentCursors;
+let resolvedDonePrefixes = currentDonePrefixes;
 
-    setAreaDonePrefixes(
-      currentDonePrefixes
-    );
+if (allPrefixesDone && remainingBuffer.length === 0) {
+  const nextStage = areaRadiusStage + 1;
 
-    // ==========================================================
-    // STEP 6 — PROGRESSIVE RADIUS EXPANSION
+  if (nextStage < HOME_FEED_RADIUS_STEPS.length) {
+    // Expand to the next radius.
     //
-    // If the current radius is exhausted, move outward.
-    // ==========================================================
+    // IMPORTANT:
+    // Reset geohash cursors because the larger radius
+    // introduces new geohash prefixes that have never
+    // been queried before.
+    setAreaRadiusStage(nextStage);
+    setAreaCursors({});
+    setAreaDonePrefixes({});
+    setAreaDone(false);
 
-    if (
-      allPrefixesDone &&
-      remainingBuffer.length === 0
-    ) {
-      const nextStage =
-        areaRadiusStage + 1;
+    resolvedNextStage = nextStage;
+    resolvedAreaDone = false;
+    resolvedCursors = {};
+    resolvedDonePrefixes = {};
+  } else if (!nationwideDone) {
+    // All geohash radius stages (up to 50km) are exhausted —
+    // move into the nationwide premium stage instead of ending.
+    setAreaRadiusStage(nextStage);
+    setAreaDone(false);
 
-      if (
-        nextStage <
-        HOME_FEED_RADIUS_STEPS.length
-      ) {
-        // Expand to the next radius.
-        //
-        // IMPORTANT:
-        // Reset geohash cursors because the larger radius
-        // introduces new geohash prefixes that have never
-        // been queried before.
+    resolvedNextStage = nextStage;
+    resolvedAreaDone = false;
+  } else {
+    // Nationwide stage also exhausted — nothing left to load.
+    setAreaDone(true);
+    resolvedAreaDone = true;
+  }
+} else {
+  setAreaDone(false);
+  resolvedAreaDone = false;
+}
 
-        setAreaRadiusStage(
-          nextStage
-        );
-
-        setAreaCursors({});
-
-        setAreaDonePrefixes({});
-
-        setAreaDone(false);
-      } else if (!nationwideDone) {
-        // All geohash radius stages (up to 50km) are exhausted —
-        // move into the nationwide premium stage instead of ending.
-        setAreaRadiusStage(nextStage);
-        setAreaDone(false);
-      } else {
-        // Nationwide stage also exhausted — nothing left to load.
-        setAreaDone(true);
-      }
-    } else {
-      setAreaDone(false);
-    }
+feedCache.set(cacheKey, {
+  wardProducts,
+  wardCursor,
+  wardDone,
+  areaProducts: mergedStageProducts,
+  areaBuffer: remainingBuffer,
+  areaCursors: resolvedCursors,
+  areaDonePrefixes: resolvedDonePrefixes,
+  areaDone: resolvedAreaDone,
+  areaRadiusStage: resolvedNextStage,
+  nationwideCursor,
+  nationwideDone,
+  timestamp: Date.now(),
+});
+saveFeedCacheToStorage(feedCache);
 
   } catch (error) {
     console.error(
@@ -1606,11 +1621,16 @@ if (!areaDone && !areaLoading) {
   areaDone,
   areaLoading,
   areaBuffer,
+  areaProducts,
   areaRadiusStage,
   areaCursors,
   areaDonePrefixes,
   nationwideCursor,
   nationwideDone,
+  locationInfo?.wardName,
+  wardProducts,
+  wardCursor,
+  wardDone,
 ]);
 return {
   wardProducts,
