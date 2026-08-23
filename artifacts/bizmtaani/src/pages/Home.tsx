@@ -761,42 +761,6 @@ const handleAreaSearchSelect = useCallback(
     [handleAreaSelect, toast]
   );
 
-  const handleFreeTextAreaSearch = useCallback(
-    async (text: string) => {
-      setFreeTextSearching(true);
-      try {
-        const coords = await forwardGeocodePlace(text);
-
-        if (!coords) {
-          toast({
-            title: "Couldn't find that place",
-            description: "Try a nearby ward or estate name instead.",
-          });
-          return;
-        }
-
-        const info = await getWardInfo(coords.lat, coords.lng);
-
-        const resolved: ResolvedLocation = {
-          ...info,
-          lat: coords.lat,
-          lng: coords.lng,
-        } as ResolvedLocation;
-
-        handleAreaSelect(resolved);
-      } catch (error) {
-        console.warn("Free-text area search failed:", error);
-        toast({
-          title: "Something went wrong",
-          description: "Please try again.",
-        });
-      } finally {
-        setFreeTextSearching(false);
-      }
-    },
-    [handleAreaSelect, toast]
-  );
-
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
     return products.filter((p) => {
@@ -942,14 +906,21 @@ const totalVisible = rankedProducts.length;
 
             <div className="flex-1 overflow-y-auto">
         {gpsReady && (
-          <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
-            <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
-            <p className="text-xs text-muted-foreground flex-1 truncate">
-              {bannerText()}
-            </p>
-            onClick={() => setShowRefreshOptions(true)}
-          </div>
-        )}
+  <div className="flex items-center gap-2 px-4 py-2 border-b border-border bg-muted/30">
+    <MapPin size={12} className={gpsGranted ? "text-secondary flex-shrink-0" : "text-amber-500 flex-shrink-0"} />
+    <p className="text-xs text-muted-foreground flex-1 truncate">
+      {bannerText()}
+    </p>
+    <button
+      type="button"
+      onClick={() => setShowRefreshOptions(true)}
+      disabled={refreshingLocation}
+      className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
+    >
+      {refreshingLocation ? "Updating..." : "Refresh"}
+    </button>
+  </div>
+)}
                       {locationErrorMsg && (
           <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
