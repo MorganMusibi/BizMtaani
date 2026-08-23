@@ -274,29 +274,41 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp(),
   expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
 });
-  if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
-    throw new HttpsError("invalid-argument", "Invalid plan selected.");
-  }
+  
+if (typeof productId !== "string" || !productId.trim()) {
+  throw new HttpsError("invalid-argument", "Product ID is required.");
+}
 
-  if (typeof productId !== "string" || !productId.trim()) {
-    throw new HttpsError("invalid-argument", "Product ID is required.");
-  }
+const productSnap = await db.collection("products").doc(productId).get();
 
-  const productSnap = await db.collection("products").doc(productId).get();
+if (!productSnap.exists) {
+  throw new HttpsError("not-found", "Advert not found.");
+}
 
-  if (!productSnap.exists) {
-    throw new HttpsError("not-found", "Advert not found.");
-  }
+const productData = productSnap.data()!;
 
-  const productData = productSnap.data()!;
+if (productData.sellerId !== request.auth.uid) {
+  throw new HttpsError(
+    "permission-denied",
+    "You can only initiate payment for your own adverts."
+  );
+}
 
-  if (productData.sellerId !== request.auth.uid) {
-    throw new HttpsError(
-      "permission-denied",
-      "You can only initiate payment for your own adverts."
-    );
-  }
+if (productData.status !== "pending_payment") {
+  throw new HttpsError(
+    "failed-precondition",
+    "This advert is not awaiting payment."
+  );
+}
 
+// Use the plan already verified and stored on the product at
+// publish time — never trust a plan value supplied by the client,
+// since that directly determines the amount charged.
+const plan = productData.plan;
+
+if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
+  throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
+}
   const formattedPhone = normalizePhone(phone);
   const token = await getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
   const ts = mpesaTimestamp();
