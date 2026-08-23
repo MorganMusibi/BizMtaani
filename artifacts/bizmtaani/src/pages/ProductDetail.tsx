@@ -609,9 +609,6 @@ if (relatedItems.length === 0 && currentProduct.category) {
     cancelled = true;
   };
 }, [id]);
-
-/
-
   
     const images = product 
     ? (Array.isArray(product.imageUrls) 
