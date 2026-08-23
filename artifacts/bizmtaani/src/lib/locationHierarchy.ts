@@ -565,3 +565,82 @@ export async function validateLocationHierarchy(
     countyCode: county.county_code,
   };
 }
+
+
+/**
+ * Search all wards by a typed, partial name — for a manual area-picker
+ * search box. Uses the same normalize() as the rest of this file, so
+ * results are consistent with resolveCanonicalLocation/findWardLocationSync
+ * (e.g. typing "babadogo" matches "Baba Dogo"). Unlike those functions,
+ * this does substring matching, not exact — appropriate for search-as-you-type.
+ */
+export async function searchWardsByName(
+  queryText: string,
+  limit = 15
+): Promise<
+  { countyCode: number; countyName: string; constituencyName: string; wardName: string }[]
+> {
+  const trimmed = queryText.trim();
+  if (!trimmed) return [];
+
+  const all = await getAllWards();
+  const normalizedQuery = normalize(trimmed);
+
+  return all
+    .filter((w) => normalize(w.wardName).includes(normalizedQuery))
+    .slice(0, limit);
+}
+
+/**
+ * Search constituencies by a typed, partial name. Selecting a result
+ * from this should show that constituency's ward list next (its
+ * wards are already included on the returned object, no extra
+ * lookup needed).
+ */
+export async function searchConstituenciesByName(
+  queryText: string,
+  limit = 15
+): Promise<{ countyCode: number; countyName: string; constituencyName: string; wards: string[] }[]> {
+  const trimmed = queryText.trim();
+  if (!trimmed) return [];
+
+  const counties = await getLocationHierarchy();
+  const normalizedQuery = normalize(trimmed);
+  const results: { countyCode: number; countyName: string; constituencyName: string; wards: string[] }[] = [];
+
+  for (const county of counties) {
+    for (const constituency of county.constituencies) {
+      if (normalize(constituency.constituency_name).includes(normalizedQuery)) {
+        results.push({
+          countyCode: county.county_code,
+          countyName: county.county_name,
+          constituencyName: constituency.constituency_name,
+          wards: constituency.wards,
+        });
+        if (results.length >= limit) return results;
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Search counties by a typed, partial name. Selecting a result from
+ * this should show that county's constituency list next.
+ */
+export async function searchCountiesByName(
+  queryText: string,
+  limit = 15
+): Promise<{ countyCode: number; countyName: string; constituencies: Constituency[] }[]> {
+  const trimmed = queryText.trim();
+  if (!trimmed) return [];
+
+  const counties = await getLocationHierarchy();
+  const normalizedQuery = normalize(trimmed);
+
+  return counties
+    .filter((c) => normalize(c.county_name).includes(normalizedQuery))
+    .map((c) => ({ countyCode: c.county_code, countyName: c.county_name, constituencies: c.constituencies }))
+    .slice(0, limit);
+      }
