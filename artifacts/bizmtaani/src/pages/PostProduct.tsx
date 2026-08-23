@@ -1741,33 +1741,31 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 const isSelected = selectedCategory === cat.key;
                 const subs = cat.subcategories ?? [];
                 return (
-                  <div key={cat.key}>
-                    <button
-                      
-                        onClick={() => {
-  setSelectedCategory(cat.key);
-  setSelectedSubcategory("");
-  setCustomSubcategory("");
+                  <div
+  key={cat.key}
+  ref={(el) => { categoryRefs.current[cat.key] = el; }}
+>
+  <button
+    onClick={() => {
+      setSelectedCategory(cat.key);
+      setSelectedSubcategory("");
+      setCustomSubcategory("");
 
-  if (cat.key !== "Services") {
-    setPricingBasis("per_trip");
-  }
+      if (cat.key !== "Services") {
+        setPricingBasis("per_trip");
+      }
 
-  requestAnimationFrame(() => {
-    categoryRefs.current[cat.key]?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  });
-}}
-
-  // Reset pricing basis when leaving Services
-  if (cat.key !== "Services") {
-    setPricingBasis("per_trip");
-  }
-}}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
-                        isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
+      requestAnimationFrame(() => {
+        categoryRefs.current[cat.key]?.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+        });
+      });
+    }}
+    className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all text-left ${
+      isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
+    }`}
+  >
                       }`}
                     >
                       <cat.icon size={22} className="flex-shrink-0 text-foreground" />
