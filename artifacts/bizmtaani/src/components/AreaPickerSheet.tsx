@@ -263,18 +263,9 @@ export function AreaPickerSheet({
               )}
 
               {showEmptyState && (
-  <div className="text-center py-6">
-    <p className="text-xs text-muted-foreground mb-3">
-      No matching ward, constituency, or county found for "{searchText.trim()}".
-    </p>
-    <button
-      onClick={() => onFreeTextSearch(searchText.trim())}
-      disabled={freeTextSearching}
-      className="text-xs font-semibold text-primary px-4 py-2 rounded-xl border border-primary/40 disabled:opacity-50"
-    >
-      {freeTextSearching ? "Searching..." : `Search "${searchText.trim()}" as a place`}
-    </button>
-  </div>
+  <p className="text-center text-xs text-muted-foreground py-6">
+    No matching ward, constituency, or county found. Try a different spelling.
+  </p>
 )}
             </>
           )}
