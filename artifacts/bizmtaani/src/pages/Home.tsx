@@ -326,6 +326,30 @@ export default function Home() {
         console.warn("Manual location refresh failed:", error);
         setRefreshingLocation(false);
 
+        const isGpsUnavailable =
+          error.code === error.PERMISSION_DENIED ||
+          error.code === error.POSITION_UNAVAILABLE;
+
+        if (isGpsUnavailable) {
+          const now = Date.now();
+          const recent = refreshFailureTimestampsRef.current.filter(
+            (t) => now - t < REFRESH_FAILURE_WINDOW_MS
+          );
+          recent.push(now);
+          refreshFailureTimestampsRef.current = recent;
+
+          if (recent.length >= REFRESH_FAILURE_THRESHOLD) {
+            // Repeated failed refreshes with GPS unavailable — stop
+            // asking them to keep retrying GPS and offer manual
+            // area search instead.
+            refreshFailureTimestampsRef.current = [];
+            setLocationErrorMsg(null);
+            setShowAreaPicker(true);
+            setRefreshingLocation(false);
+            return;
+          }
+        }
+
         if (error.code === error.PERMISSION_DENIED) {
           setLocationErrorMsg(
             "Location yako iko off. Enda  browser settings uka i turn ON, kisha ujaribu tena."
