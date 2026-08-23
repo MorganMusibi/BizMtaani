@@ -99,94 +99,54 @@ function isPremiumProduct(product: Product) {
     product.isPremium === true
   );
 }
+function getComparablePrice(p: Product): number {
+  return p.rentPerMonth ?? p.price ?? 0;
+}
+
+// Price is a soft nudge, not a filter — bucketed rather than exact,
+// so "relatively closer price" wins ties without excluding anything
+// that's simply not premium or not subcategory-matched.
+const PRICE_PROXIMITY_BUCKET = 0.5; // 50% bands: 0–50% off, 50–100% off, etc.
+
 function rankRelatedProducts(
   products: Product[],
   currentProduct: Product,
   userCoords: { lat: number; lng: number } | null
 ): Product[] {
+  const currentPrice = getComparablePrice(currentProduct);
+
   return [...products].sort((a, b) => {
-    // ============================================================
-    // PRIMARY FACTOR — SUBCATEGORY RELEVANCE
-    //
-    // Products in the exact same subcategory come first.
-    // ============================================================
+    // 1. SAME SUBCATEGORY — relevance still comes first
+    const aSameSubcategory = Boolean(currentProduct.subcategory && a.subcategory === currentProduct.subcategory);
+    const bSameSubcategory = Boolean(currentProduct.subcategory && b.subcategory === currentProduct.subcategory);
+    if (aSameSubcategory !== bSameSubcategory) return aSameSubcategory ? -1 : 1;
 
-    const aSameSubcategory =
-      Boolean(
-        currentProduct.subcategory &&
-        a.subcategory ===
-          currentProduct.subcategory
-      );
+    // 2. PREMIUM — now ranked ahead of distance/price, per your ask
+    const premiumA = isPremiumProduct(a);
+    const premiumB = isPremiumProduct(b);
+    if (premiumA !== premiumB) return premiumA ? -1 : 1;
 
-    const bSameSubcategory =
-      Boolean(
-        currentProduct.subcategory &&
-        b.subcategory ===
-          currentProduct.subcategory
-      );
+    // 3. PRICE PROXIMITY (soft, bucketed) — prefers similar price
+    // without requiring it; items far off in price still show,
+    // just lower within the same relevance/premium tier.
+    const priceA = getComparablePrice(a);
+    const priceB = getComparablePrice(b);
+    const diffA = currentPrice > 0 ? Math.abs(priceA - currentPrice) / currentPrice : 0;
+    const diffB = currentPrice > 0 ? Math.abs(priceB - currentPrice) / currentPrice : 0;
+    const bucketA = Math.floor(diffA / PRICE_PROXIMITY_BUCKET);
+    const bucketB = Math.floor(diffB / PRICE_PROXIMITY_BUCKET);
+    if (bucketA !== bucketB) return bucketA - bucketB;
 
-    if (
-      aSameSubcategory !==
-      bSameSubcategory
-    ) {
-      return aSameSubcategory ? -1 : 1;
-    }
-
-    // ============================================================
-    // SECONDARY FACTOR — DISTANCE
-    //
-    // Nearby adverts come before distant adverts.
-    // ============================================================
-
+    // 4. DISTANCE
     if (userCoords) {
-      const distanceA = getDistanceKm(
-        userCoords.lat,
-        userCoords.lng,
-        a.lat,
-        a.lng
-      );
-
-      const distanceB = getDistanceKm(
-        userCoords.lat,
-        userCoords.lng,
-        b.lat,
-        b.lng
-      );
-
-      if (distanceA !== distanceB) {
-        return distanceA - distanceB;
-      }
+      const distanceA = getDistanceKm(userCoords.lat, userCoords.lng, a.lat, a.lng);
+      const distanceB = getDistanceKm(userCoords.lat, userCoords.lng, b.lat, b.lng);
+      if (distanceA !== distanceB) return distanceA - distanceB;
     }
 
-    // ============================================================
-    // TERTIARY FACTOR — PREMIUM
-    //
-    // Premium adverts win when relevance and distance
-    // are otherwise comparable.
-    // ============================================================
-
-    const premiumA =
-      isPremiumProduct(a);
-
-    const premiumB =
-      isPremiumProduct(b);
-
-    if (
-      premiumA !== premiumB
-    ) {
-      return premiumA ? -1 : 1;
-    }
-
-    // ============================================================
-    // FINAL FACTOR — NEWEST
-    // ============================================================
-
-    const createdA =
-      a.createdAt?.seconds ?? 0;
-
-    const createdB =
-      b.createdAt?.seconds ?? 0;
-
+    // 5. NEWEST
+    const createdA = a.createdAt?.seconds ?? 0;
+    const createdB = b.createdAt?.seconds ?? 0;
     return createdB - createdA;
   });
 }
