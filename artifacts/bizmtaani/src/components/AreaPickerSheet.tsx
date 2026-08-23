@@ -15,10 +15,10 @@ interface WardMatch {
 
 interface Props {
   onSearchSelect: (ward: WardMatch) => void;
+  onFreeTextSearch: (text: string) => void;
   onDismiss: () => void;
-  // True while the caller is geocoding a picked ward — disables the
-  // list so the user can't double-tap while it resolves.
   resolving?: boolean;
+  freeTextSearching?: boolean;
 }
 
 // What's currently shown below the search box.
@@ -27,7 +27,13 @@ type Step =
   | { type: "wards"; countyName: string; constituencyName: string; wards: string[] }
   | { type: "constituencies"; countyName: string; constituencies: Constituency[] };
 
-export function AreaPickerSheet({ onSearchSelect, onDismiss, resolving = false }: Props) {
+export function AreaPickerSheet({
+  onSearchSelect,
+  onFreeTextSearch,
+  onDismiss,
+  resolving = false,
+  freeTextSearching = false,
+}: Props) {
   const [searchText, setSearchText] = useState("");
   const [resolvingKey, setResolvingKey] = useState<string | null>(null);
   const [wardResults, setWardResults] = useState<WardMatch[]>([]);
@@ -256,11 +262,20 @@ export function AreaPickerSheet({ onSearchSelect, onDismiss, resolving = false }
                 </p>
               )}
 
-              {!searchText.trim() && (
-                <p className="text-center text-xs text-muted-foreground py-6">
-                  Start typing to find your area.
-                </p>
-              )}
+              {showEmptyState && (
+  <div className="text-center py-6">
+    <p className="text-xs text-muted-foreground mb-3">
+      No matching ward, constituency, or county found for "{searchText.trim()}".
+    </p>
+    <button
+      onClick={() => onFreeTextSearch(searchText.trim())}
+      disabled={freeTextSearching}
+      className="text-xs font-semibold text-primary px-4 py-2 rounded-xl border border-primary/40 disabled:opacity-50"
+    >
+      {freeTextSearching ? "Searching..." : `Search "${searchText.trim()}" as a place`}
+    </button>
+  </div>
+)}
             </>
           )}
         </div>
