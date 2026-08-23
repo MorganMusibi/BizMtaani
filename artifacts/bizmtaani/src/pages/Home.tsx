@@ -746,21 +746,17 @@ const handleAreaSearchSelect = useCallback(
     });
   }
 
-  const wardIds = new Set(wardProducts.map((p) => p.id));
-  const allLoadedProducts = dedupe(
-    wardProducts,
-    areaProducts.filter((p) => !wardIds.has(p.id))
-  );
-
-  const filteredProducts = applyFilters(allLoadedProducts);
-  const rankedProducts = userCoords
-  ? rankProducts(
-      filteredProducts,
-      userCoords
-    )
-  : filteredProducts;
-
-const totalVisible = rankedProducts.length;
+  const { rankedProducts, totalVisible } = useMemo(() => {
+    const wardIds = new Set(wardProducts.map((p) => p.id));
+    const allLoadedProducts = dedupe(
+      wardProducts,
+      areaProducts.filter((p) => !wardIds.has(p.id))
+    );
+    const filtered = applyFilters(allLoadedProducts);
+    const ranked = userCoords ? rankProducts(filtered, userCoords) : filtered;
+    return { rankedProducts: ranked, totalVisible: ranked.length };
+  }, [wardProducts, areaProducts, activeKey, searchQuery, userCoords]);
+  
   const isLoadingMore = areaLoading;
   const allDone = areaDone;
 
