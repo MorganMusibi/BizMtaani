@@ -1766,8 +1766,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
     }`}
   >
-                      }`}
-                    >
+                      
+                  
                       <cat.icon size={22} className="flex-shrink-0 text-foreground" />
                       <div className="flex-1">
                         <p className="font-bold text-sm">{cat.displayShort}</p>
