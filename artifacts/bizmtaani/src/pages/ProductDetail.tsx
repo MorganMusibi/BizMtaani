@@ -553,7 +553,7 @@ useEffect(() => {
           collection(db, "products"),
           where("category", "==", currentProduct.category),
           where("status", "==", "active"),
-          limit(8)
+          limit(5)
         );
         const categorySnap = await getDocs(categoryQuery);
         relatedItems = categorySnap.docs
@@ -580,7 +580,7 @@ useEffect(() => {
       );
 
       if (!cancelled) {
-        const finalRelated = rankedRelatedProducts.slice(0, 6);
+        const finalRelated = rankedRelatedProducts.slice(0, 3);
         setRelatedProducts(finalRelated);
 
         productDetailCache.set(id, {
@@ -602,16 +602,8 @@ useEffect(() => {
   };
 }, [id]);
 
-// 2. Re-rank/filter related items separately if userCoords loads/updates later
-useEffect(() => {
-  if (!product || !userCoords) return;
+/
 
-  const recommendationCoords: [number, number] = [userCoords.lat, userCoords.lng];
-  
-  // Re-run visibility filter and ranking against already loaded product state
-  // (You can also extract the related fetching into a helper function, 
-  // but keeping it cleanly triggered prevents infinite fetch loops)
-}, [userCoords]);
   
     const images = product 
     ? (Array.isArray(product.imageUrls) 
