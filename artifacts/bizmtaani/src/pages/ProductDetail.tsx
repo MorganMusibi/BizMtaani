@@ -542,30 +542,32 @@ useEffect(() => {
       let relatedItems: Product[] = [];
 
       if (currentProduct.subcategory) {
-        const subcategoryQuery = query(
-          collection(db, "products"),
-          where("subcategory", "==", currentProduct.subcategory),
-          where("status", "==", "active"),
-          limit(8)
-        );
-        const subcategorySnap = await getDocs(subcategoryQuery);
-        relatedItems = subcategorySnap.docs
-          .filter((d) => d.id !== currentProduct.id)
-          .map((d) => ({ id: d.id, ...d.data() } as Product));
-      }
+  const subcategoryQuery = query(
+    collection(db, "products"),
+    where("subcategory", "==", currentProduct.subcategory),
+    where("status", "==", "active"),
+    limit(5)
+  );
+  const subcategorySnap = await getDocs(subcategoryQuery);
+  relatedItems = subcategorySnap.docs
+    .filter((d) => d.id !== currentProduct.id)
+    .map((d) => ({ id: d.id, ...d.data() } as Product))
+    .filter(isNotExpired);
+}
 
-      if (relatedItems.length === 0 && currentProduct.category) {
-        const categoryQuery = query(
-          collection(db, "products"),
-          where("category", "==", currentProduct.category),
-          where("status", "==", "active"),
-          limit(5)
-        );
-        const categorySnap = await getDocs(categoryQuery);
-        relatedItems = categorySnap.docs
-          .filter((d) => d.id !== currentProduct.id)
-          .map((d) => ({ id: d.id, ...d.data() } as Product));
-      }
+if (relatedItems.length === 0 && currentProduct.category) {
+  const categoryQuery = query(
+    collection(db, "products"),
+    where("category", "==", currentProduct.category),
+    where("status", "==", "active"),
+    limit(6)
+  );
+  const categorySnap = await getDocs(categoryQuery);
+  relatedItems = categorySnap.docs
+    .filter((d) => d.id !== currentProduct.id)
+    .map((d) => ({ id: d.id, ...d.data() } as Product))
+    .filter(isNotExpired);
+}
 
       // Store raw fetched items temporarily or compute with current fallback coords
       const recommendationCoords: [number, number] | null =
