@@ -412,13 +412,11 @@ export default function Home() {
 }, [toast]);
     useEffect(() => {
     let cancelled = false;
-const applyResolvedLocation = async (location: ResolvedLocation) => {
-
+const applyResolvedLocation = async (location: ResolvedLocation, opts?: { skipCanonical?: boolean }) => {
   if (cancelled) return;
 
   let final = location;
-  if (location.wardName) {
-    
+  if (location.wardName && !opts?.skipCanonical) {
     const canonical = await resolveCanonicalLocation(
       location.wardName,
       location.constituency,
@@ -537,11 +535,10 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
       const resolved = await getWardInfo(lat, lng);
 
       if (resolved) {
-        await applyResolvedLocation({ ...resolved, lat, lng });
-      } else {
-        // Couldn't resolve a ward for these coordinates — still use raw GPS coords
-        await applyResolvedLocation({ lat, lng } as ResolvedLocation);
-      }
+  await applyResolvedLocation({ ...resolved, lat, lng }, { skipCanonical: true });
+} else {
+  await applyResolvedLocation({ lat, lng } as ResolvedLocation, { skipCanonical: true });
+}
 
     },
     async () => {
