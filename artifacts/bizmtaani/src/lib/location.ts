@@ -457,3 +457,27 @@ for (const r of results) {
 function toTitleCase(str: string): string {
   return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
+
+/**
+ * Search all wards by a typed, partial name — for a manual area-picker
+ * search box. Uses the same normalize() as the rest of this file, so
+ * results are consistent with resolveCanonicalLocation/findWardLocationSync
+ * (e.g. typing "babadogo" matches "Baba Dogo"). Unlike those functions,
+ * this does substring matching, not exact — appropriate for search-as-you-type.
+ */
+export async function searchWardsByName(
+  queryText: string,
+  limit = 15
+): Promise<
+  { countyCode: number; countyName: string; constituencyName: string; wardName: string }[]
+> {
+  const trimmed = queryText.trim();
+  if (!trimmed) return [];
+
+  const all = await getAllWards();
+  const normalizedQuery = normalize(trimmed);
+
+  return all
+    .filter((w) => normalize(w.wardName).includes(normalizedQuery))
+    .slice(0, limit);
+}
