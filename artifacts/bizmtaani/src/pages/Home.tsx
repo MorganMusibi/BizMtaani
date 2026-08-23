@@ -6,7 +6,7 @@ import {
   dedupe,
   rankProducts,
 } from "@/hooks/useHomeFeed";
-import { useState, useEffect, useRef, useCallback, memo } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
