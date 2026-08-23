@@ -273,6 +273,14 @@ export default function Home() {
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
 
+  // Tracks recent GPS-refresh failures (permission denied or GPS
+  // hardware off) so we can offer the manual area search after
+  // repeated attempts, instead of leaving the user stuck retrying a
+  // GPS prompt that clearly isn't going to succeed.
+  const refreshFailureTimestampsRef = useRef<number[]>([]);
+  const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
+  const REFRESH_FAILURE_THRESHOLD = 3;
+
   const refreshLocation = useCallback(() => {
     if (!navigator.geolocation) return;
     setRefreshingLocation(true);
