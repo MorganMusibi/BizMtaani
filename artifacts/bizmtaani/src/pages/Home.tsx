@@ -273,7 +273,7 @@ export default function Home() {
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
-  
+  const [showRefreshOptions, setShowRefreshOptions] = useState(false);
   
   // Tracks recent GPS-refresh failures (permission denied or GPS
   // hardware off) so we can offer the manual area search after
@@ -947,14 +947,7 @@ const totalVisible = rankedProducts.length;
             <p className="text-xs text-muted-foreground flex-1 truncate">
               {bannerText()}
             </p>
-            <button
-              type="button"
-              onClick={refreshLocation}
-              disabled={refreshingLocation}
-              className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
-            >
-              {refreshingLocation ? "Updating..." : "Refresh"}
-            </button>
+            onClick={() => setShowRefreshOptions(true)}
           </div>
         )}
                       {locationErrorMsg && (
@@ -976,21 +969,9 @@ const totalVisible = rankedProducts.length;
                   disabled={refreshingLocation}
                   className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
                 >
-                  {refreshingLocation ? "Retrying..." : "Try Again"}
+                  {refreshingLocation ? "Retrying..." : "Jaribu tena"}
                 </button>
 
-                {/* Open Permissions / Guide Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    alert(
-                      "Jinsi ya kuwasha location:\n\n1. Bonyeza lock (🔒) au settings icon kwa address bar.\n2. Tafuta 'Permissions' au 'Location'.\n3. Badilisha iwe 'Allow'.\n4. Refresh page au bonyeza 'Try Again'."
-                    );
-                  }}
-                  className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] font-bold rounded-lg transition-colors border border-amber-500/30"
-                >
-                  Open Permissions Guide
-                </button>
               </div>
             </div>
             <button
@@ -1129,6 +1110,56 @@ const totalVisible = rankedProducts.length;
           </Button>
         </div>
       )}
+
+      {showRefreshOptions && (
+  <>
+    <div
+      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
+      onClick={() => setShowRefreshOptions(false)}
+    />
+    <div
+      className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl border-t border-border px-5 pt-5"
+      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+    >
+      <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+      <p className="font-black text-base mb-4">Update your area</p>
+      <div className="space-y-2">
+        <button
+          onClick={() => {
+            setShowRefreshOptions(false);
+            refreshLocation();
+          }}
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
+        >
+          <MapPin size={18} className="text-primary flex-shrink-0" />
+          <div>
+            <p className="font-bold text-sm">Use GPS</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Detect my current location</p>
+          </div>
+        </button>
+        <button
+          onClick={() => {
+            setShowRefreshOptions(false);
+            setShowAreaPicker(true);
+          }}
+          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-border bg-muted/40 text-left transition-all active:scale-[0.98]"
+        >
+          <Search size={18} className="text-muted-foreground flex-shrink-0" />
+          <div>
+            <p className="font-bold text-sm">Search manually</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Type jina la ward au Constituency enye uko </p>
+          </div>
+        </button>
+      </div>
+      <button
+        onClick={() => setShowRefreshOptions(false)}
+        className="w-full mt-3 py-3 text-sm font-semibold text-muted-foreground"
+      >
+        Cancel
+      </button>
+    </div>
+  </>
+)}
 {showAreaPicker && (
   <AreaPickerSheet
     onSearchSelect={handleAreaSearchSelect}
