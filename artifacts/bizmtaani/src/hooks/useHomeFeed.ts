@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { getNearbyGeohashPrefixes } from "@/lib/geohash";
 import { getNearbyGeohashPrefixes, radiusKmToGeohashPrecision } from "@/lib/geohash";
 
 interface ProductImage { url: string; public_id?: string;
@@ -1297,12 +1296,12 @@ if (!areaDone && !areaLoading) {
       iterations < MAX_ITERATIONS
     ) {
       iterations++;
-      const prefixes =
-        getNearbyGeohashPrefixes(
-          userCoords[0],
-          userCoords[1],
-          currentRadius
-        );
+     const prefixes =
+  getNearbyGeohashPrefixes(
+    userCoords[0],
+    userCoords[1],
+    radiusKmToGeohashPrecision(currentRadius)
+  );
 
       const queries =
         areaQueries(
