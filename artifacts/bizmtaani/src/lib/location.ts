@@ -135,6 +135,34 @@ function findNearbyWardNames(lat: number, lng: number, features: WardFeature[]):
   return names;
 }
 
+export async function forwardGeocodePlace(query: string): Promise<{ lat: number; lng: number } | null> {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const resp = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&countrycodes=ke&limit=1&q=${encodeURIComponent(
+        `${trimmed}, Kenya`
+      )}`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeoutId);
+
+    if (!resp.ok) return null;
+
+    const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
+    if (!results.length) return null;
+
+    return { lat: parseFloat(results[0].lat), lng: parseFloat(results[0].lon) };
+  } catch (e) {
+    console.warn("[location] forward geocode failed:", e);
+    return null;
+  }
+}
+
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
     const functions = getFunctions(app, "us-central1");
