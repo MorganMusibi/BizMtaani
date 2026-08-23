@@ -11,7 +11,6 @@ import { useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getWardInfo,
-  getAreaChoices,
   getWardCoordinates,
   type ResolvedLocation,
 } from "@/lib/location";
@@ -60,36 +59,6 @@ const FILTER_CHIPS = [
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
 
-function getCanonicalProductLocation(product: Product): {
-  ward: string;
-  constituency: string;
-  county: string;
-} {
-  const ward = product.ward?.trim() ?? "";
-  const constituency = product.constituency?.trim() ?? "";
-  const county = product.county?.trim() ?? "";
-
-  // Use MasterHierarchy.json as the source of truth.
-  // The ward determines its constituency and county.
-  if (hierarchyReady && ward) {
-    const canonical = findWardLocationSync(ward);
-
-    if (canonical) {
-      return {
-        ward: canonical.wardName,
-        constituency: canonical.constituencyName,
-        county: canonical.countyName,
-      };
-    }
-  }
-
-  // Fallback to the location saved on the advert.
-  return {
-    ward,
-    constituency,
-    county,
-  };
-}
 
 const ProductCard = memo(function ProductCard({
   product,
@@ -268,7 +237,7 @@ export default function Home() {
   const [gpsReady, setGpsReady] = useState(cachedLocationState?.gpsReady ?? false);
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cachedLocationState?.locationInfo ?? null);
   const [hierarchyReady, setHierarchyReady] = useState(false);
-  const [areaChoices, setAreaChoices] = useState<ResolvedLocation[]>([]);
+  
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
@@ -305,8 +274,7 @@ export default function Home() {
         if (resolved && wardChanged) {
           setLocationInfo(resolved);
           setUserCoords([lat, lng]);
-          const choices = await getAreaChoices(lat, lng);
-          setAreaChoices(choices ?? []);
+          
         } else if (!resolved) {
           // Couldn't resolve a ward this time — still worth updating
           // coords in case the caller relies on a fresher fix, but
@@ -575,8 +543,6 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
         await applyResolvedLocation({ lat, lng } as ResolvedLocation);
       }
 
-      const choices = await getAreaChoices(lat, lng);
-      setAreaChoices(choices ?? []);
     },
     async () => {
       setGpsGranted(false);
