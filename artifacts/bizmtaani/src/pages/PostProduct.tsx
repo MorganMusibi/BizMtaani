@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
@@ -15,7 +16,7 @@ import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { clearFeedCache } from "@/hooks/useHomeFeed";
 import { encodeGeohash } from "@/lib/geohash";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
-import { getWardInfo, type ResolvedLocation, } from "@/lib/location";
+import { getWardInfo, getWardCoordinates, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
@@ -152,8 +153,8 @@ const [priceDisplay, setPriceDisplay] =
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [wardInfo, setWardInfo] = useState<ResolvedLocation | null>(null);
   const [locationName, setLocationName] = useState("");
-  const [locationSearch, setLocationSearch] = useState("");
-  const [locationLoading, setLocationLoading] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [resolvingArea, setResolvingArea] = useState(false);
 
   // Step 4 — Plan & payment
   const [plan, setPlan] = useState<ListingPlan>("free");
@@ -805,31 +806,35 @@ function handleImageFiles(files: FileList | null) {
     setPriceListItems((prev) => prev.filter((_, idx) => idx !== i));
   }
 
-  async function searchLocation() {
-    if (!locationSearch.trim()) return;
-    setLocationLoading(true);
-    try {
-      const resp = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch + ", Kenya")}&limit=1`
-      );
-      const results = await resp.json();
-      if (results && results.length > 0) {
-        const { lat, lon, display_name } = results[0];
-        const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
-        setCoords(c);
-        const info = await getWardInfo(c.lat, c.lng);
-        setWardInfo(info);
-        setLocationName(info?.wardName ?? display_name.split(",")[0]);
-        toast({ title: "Location updated" });
-      } else {
-        toast({ title: "Location not found", description: "Try a more specific search.", variant: "destructive" });
-      }
-    } catch {
-      toast({ title: "Location search failed", variant: "destructive" });
-    } finally {
-      setLocationLoading(false);
-    }
+  async function handleAreaPicked(ward: {
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+}) {
+  setResolvingArea(true);
+  try {
+    const c = await getWardCoordinates(
+      ward.wardName,
+      ward.constituencyName,
+      ward.countyName
+    );
+
+    if (c) setCoords(c);
+
+    setWardInfo({
+      wardName: ward.wardName,
+      constituency: ward.constituencyName,
+      county: ward.countyName,
+      displayName: `${ward.wardName}, ${ward.constituencyName}`,
+    });
+    setLocationName(ward.wardName);
+
+    toast({ title: "Location updated" });
+    setShowAreaPicker(false);
+  } finally {
+    setResolvingArea(false);
   }
+}
     async function validateStep(): Promise<boolean> {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
@@ -3365,16 +3370,15 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <Input placeholder="Search a different location..."
-                  value={locationSearch}  onChange={(e) => setLocationSearch(e.target.value)}// Keep your existing handler here
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); searchLocation(); } }}
-                  className="flex-1 h-10 text-sm" />
-                <Button type="button" variant="outline" size="sm" onClick={searchLocation}
-                  disabled={locationLoading} className="h-10 px-4 flex-shrink-0">
-                  {locationLoading ? <Loader2 size={14} className="animate-spin" /> : "Search"}
-                </Button>
-              </div>
+              <Button
+  type="button"
+  variant="outline"
+  size="sm"
+  onClick={() => setShowAreaPicker(true)}
+  className="w-full h-10 text-sm"
+>
+  Search a different area
+</Button>
               {locationName && locationName !== wardInfo?.wardName && (
                 <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
               )}
@@ -3775,6 +3779,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </>
       )}
 
+    
       {/* M-Pesa listing payment modal */}
       <MpesaPaymentModal
         open={showPaymentModal}
@@ -3788,6 +3793,14 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           navigate(`/product/${pid}`);
         }}
       />
+      
+      {showAreaPicker && (
+  <AreaPickerSheet
+    onSearchSelect={handleAreaPicked}
+    resolving={resolvingArea}
+    onDismiss={() => setShowAreaPicker(false)}
+  />
+)}
             {/* Limit Reached Professional Modal */}
       {limitModalMessage && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
