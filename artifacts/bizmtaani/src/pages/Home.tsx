@@ -13,7 +13,6 @@ import {
   getWardInfo,
   getAreaChoices,
   getWardCoordinates,
-  forwardGeocodePlace,
   type ResolvedLocation,
 } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
@@ -274,7 +273,7 @@ export default function Home() {
   const hasPromptedArea = useRef(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
-  const [freeTextSearching, setFreeTextSearching] = useState(false);
+  
   
   // Tracks recent GPS-refresh failures (permission denied or GPS
   // hardware off) so we can offer the manual area search after
@@ -1133,9 +1132,7 @@ const totalVisible = rankedProducts.length;
 {showAreaPicker && (
   <AreaPickerSheet
     onSearchSelect={handleAreaSearchSelect}
-    onFreeTextSearch={handleFreeTextAreaSearch}
     resolving={resolvingAreaSearch}
-    freeTextSearching={freeTextSearching}
     onDismiss={() => setShowAreaPicker(false)}
   />
 )}
