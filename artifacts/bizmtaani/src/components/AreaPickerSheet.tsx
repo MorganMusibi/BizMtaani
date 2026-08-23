@@ -258,15 +258,10 @@ export function AreaPickerSheet({
 
               {showEmptyState && (
                 <p className="text-center text-xs text-muted-foreground py-6">
-                  No matching ward, constituency, or county found. Try a different spelling.
-                </p>
+                 Jaribu ku search na jina ya Constituency enye uko alafu uchague ward yako                </p>
               )}
 
-              {showEmptyState && (
-  <p className="text-center text-xs text-muted-foreground py-6">
-    No matching ward, constituency, or county found. Try a different spelling.
-  </p>
-)}
+              
             </>
           )}
         </div>
