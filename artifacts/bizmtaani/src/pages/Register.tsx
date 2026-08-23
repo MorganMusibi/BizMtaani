@@ -12,8 +12,8 @@ import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { getRecaptchaToken } from "@/lib/recaptcha";
-import { getWardInfo } from "@/lib/location";
-import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
+import { getWardCoordinates } from "@/lib/location";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,56 +34,7 @@ interface HomeLocation {
  * Times out in 4 s. Returns null on any failure — never throws.
  */
 
-async function geocodeArea(area: string): Promise<HomeLocation | null> {
-  const trimmed = area.trim();
 
-  // Validate what the user typed against MasterHierarchy.json directly.
-  // Handles "babadogo" -> "Baba Dogo" even if geocoding fails or times out.
-  const directCanonical = await resolveCanonicalLocation(trimmed);
-
-  try {
-    const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 4000);
-    const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(trimmed + ", Kenya")}&limit=1`,
-      { signal: controller.signal }
-    );
-    clearTimeout(tid);
-    const results = (await resp.json()) as Array<{ lat: string; lon: string }>;
-
-    if (!results.length) {
-      // No geocode hit — use the direct hierarchy match if we found one
-      return directCanonical
-        ? {
-            lat: 0, lng: 0,
-            areaName: directCanonical.wardName,
-            constituency: directCanonical.constituencyName,
-            county: directCanonical.countyName,
-          }
-        : null;
-    }
-
-    const { lat, lon } = results[0];
-    const c = { lat: parseFloat(lat), lng: parseFloat(lon) };
-    const info = await getWardInfo(c.lat, c.lng); // already canonicalized internally
-
-    // Prefer reverse-geocode result, then direct text match — never raw input
-    const areaName = info?.wardName || directCanonical?.wardName || trimmed;
-    const constituency = info?.constituency || directCanonical?.constituencyName || "";
-    const county = info?.county || directCanonical?.countyName || "";
-
-    return { lat: c.lat, lng: c.lng, areaName, constituency, county };
-  } catch {
-    return directCanonical
-      ? {
-          lat: 0, lng: 0,
-          areaName: directCanonical.wardName,
-          constituency: directCanonical.constituencyName,
-          county: directCanonical.countyName,
-        }
-      : null;
-  }
-}
 
 
 async function saveUserProfile(
@@ -149,7 +100,13 @@ export default function Register() {
 
   // Form fields
   const [name, setName] = useState("");
-  const [area, setArea] = useState("");
+  const [selectedWard, setSelectedWard] = useState<{
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+} | null>(null);
+const [showAreaPicker, setShowAreaPicker] = useState(false);
+const [resolvingArea, setResolvingArea] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
@@ -157,6 +114,36 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
 
+  async function handleAreaPicked(ward: {
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+}) {
+  setResolvingArea(true);
+  try {
+    const coords = await getWardCoordinates(
+      ward.wardName,
+      ward.constituencyName,
+      ward.countyName
+    );
+
+    setSelectedWard(ward);
+
+    if (!coords) {
+      // Rare — ward exists in MasterHierarchy.json but not in the
+      // GeoJSON map data. Still save the name so signup isn't blocked.
+      toast({
+        title: "Area saved",
+        description: "We couldn't pin it on the map, but your area is noted.",
+      });
+    }
+
+    setShowAreaPicker(false);
+  } finally {
+    setResolvingArea(false);
+  }
+  }
+  
   function handleTypeSelect(type: boolean) {
     setIsBusinessOwner(type);
     setStep(2);
@@ -168,10 +155,10 @@ export default function Register() {
       toast({ title: "Please enter your name", variant: "destructive" });
       return;
     }
-    if (!area.trim()) {
-      toast({ title: "Please enter your area / location", variant: "destructive" });
-      return;
-    }
+    if (!selectedWard) {
+  toast({ title: "Chagua eneo lako", variant: "destructive" });
+  return;
+}
     if (password.length < 6) {
       toast({ title: "Password too short", description: "At least 6 characters.", variant: "destructive" });
       return;
@@ -179,14 +166,18 @@ export default function Register() {
 
     setLoading(true);
     try {
-      // Geocode area (4 s timeout, non-blocking on failure)
-      const geo = await geocodeArea(area);
-      const homeLocation: HomeLocation = geo ?? {
-        lat: 0, lng: 0,
-        areaName: area.trim(),
-        constituency: "",
-        county: "",
-      };
+      const coords = await getWardCoordinates(
+  selectedWard.wardName,
+  selectedWard.constituencyName,
+  selectedWard.countyName
+);
+const homeLocation: HomeLocation = {
+  lat: coords?.lat ?? 0,
+  lng: coords?.lng ?? 0,
+  areaName: selectedWard.wardName,
+  constituency: selectedWard.constituencyName,
+  county: selectedWard.countyName,
+};
 
       const cred = await createUserWithEmailAndPassword(auth, email, password);
       await updateProfile(cred.user, { displayName: name.trim() });
@@ -227,19 +218,24 @@ export default function Register() {
   }
 
   async function handleGoogleLogin() {
-    if (!area.trim()) {
-      toast({ title: "Please enter your area / location first", variant: "destructive" });
-      return;
-    }
-    setGoogleLoading(true);
-    try {
-      const geo = await geocodeArea(area);
-      const homeLocation: HomeLocation = geo ?? {
-        lat: 0, lng: 0,
-        areaName: area.trim(),
-        constituency: "",
-        county: "",
-      };
+    if (!selectedWard) {
+  toast({ title: "Chagua eneo Lako Kwanza", variant: "destructive" });
+  return;
+}
+setGoogleLoading(true);
+try {
+  const coords = await getWardCoordinates(
+    selectedWard.wardName,
+    selectedWard.constituencyName,
+    selectedWard.countyName
+  );
+  const homeLocation: HomeLocation = {
+    lat: coords?.lat ?? 0,
+    lng: coords?.lng ?? 0,
+    areaName: selectedWard.wardName,
+    constituency: selectedWard.constituencyName,
+    county: selectedWard.countyName,
+  };
 
       const result = await signInWithPopup(
   auth,
@@ -398,24 +394,30 @@ if (!existingProfile.exists()) {
 
             {/* ── Location field (required, shared between email & Google flows) ── */}
             <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 mb-5">
-              <div className="flex items-center gap-1.5 mb-1.5">
-                <MapPin size={13} className="text-primary flex-shrink-0" />
-                <Label htmlFor="area" className="text-xs font-bold text-foreground">
-                  Your area / location *
-                </Label>
-              </div>
-              <Input
-                id="area"
-                data-testid="input-area"
-                placeholder="e.g. Kariobangi, Eastleigh, Githurai 45"
-                value={area}
-                onChange={(e) => setArea(e.target.value)}
-                className="h-11 bg-background"
-              />
-              <p className="text-[11px] text-muted-foreground mt-1.5">
-                Helps buyers find your ads and shows you nearby listings.
-              </p>
-            </div>
+  <div className="flex items-center gap-1.5 mb-1.5">
+    <MapPin size={13} className="text-primary flex-shrink-0" />
+    <Label className="text-xs font-bold text-foreground">
+      Your area / location *
+    </Label>
+  </div>
+  <button
+    type="button"
+    data-testid="button-select-area"
+    onClick={() => setShowAreaPicker(true)}
+    className="w-full h-11 px-3 rounded-xl bg-background border border-border text-left text-sm flex items-center"
+  >
+    {selectedWard ? (
+      <span className="font-semibold">
+        {selectedWard.wardName}, {selectedWard.constituencyName}
+      </span>
+    ) : (
+      <span className="text-muted-foreground">Tap to search your ward</span>
+    )}
+  </button>
+  <p className="text-[11px] text-muted-foreground mt-1.5">
+    Connect na wauzaji pamoja na wanunuzi karibu nawe.
+  </p>
+</div>
 
             <div className="mb-5">
               <Label htmlFor="referralCode" className="text-xs font-bold text-foreground">
@@ -509,6 +511,13 @@ if (!existingProfile.exists()) {
           </>
         )}
       </div>
+      {showAreaPicker && (
+  <AreaPickerSheet
+    onSearchSelect={handleAreaPicked}
+    resolving={resolvingArea}
+    onDismiss={() => setShowAreaPicker(false)}
+  />
+)}
     </div>
   );
 }
