@@ -17,7 +17,7 @@ import {
   startJobApplicationChat,
   type ChatParticipant,
 } from "@/lib/chatService";
-import { clearJobsCache, type JobPost } from "./Jobs";
+import { clearJobsCache, jobsCache, type JobPost } from "./Jobs";
 
 // Helper function needed for your component
 function timeAgo(seconds: number): string {
@@ -47,29 +47,30 @@ export default function JobDetail() {
   const [deleting, setDeleting] = useState(false);
 
 useEffect(() => {
-  async function loadJob() {
-    if (!params?.id) return;
+    async function loadJob() {
+      if (!params?.id) return;
 
-    // Try to reuse data already fetched by the Jobs feed first.
-    const cachedMatch = [...jobsCache.values()]
-      .flatMap((entry) => entry.jobs)
-      .find((j) => j.id === params.id);
+      // Reuse data already fetched by the Jobs feed instead of an
+      // extra Firestore read, if it's sitting in the feed's cache.
+      const cachedMatch = [...jobsCache.values()]
+        .flatMap((entry) => entry.jobs)
+        .find((j) => j.id === params.id) as JobPost | undefined;
 
-    if (cachedMatch) {
-      setJob(cachedMatch as JobPost);
+      if (cachedMatch) {
+        setJob(cachedMatch);
+        setLoading(false);
+        return;
+      }
+
+      const docRef = doc(db, "jobs", params.id);
+      const snap = await getDoc(docRef);
+      if (snap.exists()) {
+        setJob({ id: snap.id, ...snap.data() } as JobPost);
+      }
       setLoading(false);
-      return;
     }
-
-    const docRef = doc(db, "jobs", params.id);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      setJob({ id: snap.id, ...snap.data() } as JobPost);
-    }
-    setLoading(false);
-  }
-  loadJob();
-}, [params?.id]);
+    loadJob();
+  }, [params?.id]);
 
   async function handleDelete() {
   if (!job) return;
