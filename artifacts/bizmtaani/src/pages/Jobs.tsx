@@ -58,7 +58,7 @@ function saveJobsCacheToStorage(cache: Map<string, JobsCacheEntry>) {
   }
 }
 
-const jobsCache = loadJobsCacheFromStorage();
+export const jobsCache = loadJobsCacheFromStorage();
 
 // Called after a successful job post so the poster's own device shows
 // the new listing immediately instead of waiting out the TTL. Only
@@ -449,7 +449,7 @@ export default function Jobs() {
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center">
             <Briefcase size={14} className="text-white" />
           </div>
-          <span className="font-black text-lg tracking-tight">Jobs</span>
+          <span className="font-black text-lg tracking-tight">Local Jobs</span>
           {areaName && (
             <span className="text-xs text-muted-foreground font-medium">· {areaName} area</span>
           )}
