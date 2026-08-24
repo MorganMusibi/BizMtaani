@@ -46,18 +46,30 @@ export default function JobDetail() {
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
-  useEffect(() => {
-    async function loadJob() {
-      if (!params?.id) return;
-      const docRef = doc(db, "jobs", params.id);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        setJob({ id: snap.id, ...snap.data() } as JobPost);
-      }
+useEffect(() => {
+  async function loadJob() {
+    if (!params?.id) return;
+
+    // Try to reuse data already fetched by the Jobs feed first.
+    const cachedMatch = [...jobsCache.values()]
+      .flatMap((entry) => entry.jobs)
+      .find((j) => j.id === params.id);
+
+    if (cachedMatch) {
+      setJob(cachedMatch as JobPost);
       setLoading(false);
+      return;
     }
-    loadJob();
-  }, [params?.id]);
+
+    const docRef = doc(db, "jobs", params.id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      setJob({ id: snap.id, ...snap.data() } as JobPost);
+    }
+    setLoading(false);
+  }
+  loadJob();
+}, [params?.id]);
 
   async function handleDelete() {
   if (!job) return;
