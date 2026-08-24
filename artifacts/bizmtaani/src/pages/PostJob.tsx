@@ -165,7 +165,7 @@ export default function PostJob() {
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-5 pb-28 space-y-5">
+      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-5 pb-40 space-y-5">
         {/* Title & Company */}
         <div className="space-y-1.5">
           <Label>Job Title *</Label>
