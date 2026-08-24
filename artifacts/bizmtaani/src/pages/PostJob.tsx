@@ -342,14 +342,17 @@ export default function PostJob() {
       </form>
 
       {/* Submit */}
-      <div className="flex-shrink-0 bg-card border-t border-border px-4 py-4">
-        <Button
-          type="submit" onClick={handleSubmit}
-          className="w-full h-12 font-black text-base rounded-xl gap-2" disabled={submitting}
-        >
-          {submitting ? <Loader2 size={18} className="animate-spin" /> : <><Briefcase size={16} />Post Job Listing</>}
-        </Button>
-      </div>
+<div
+  className="fixed left-0 right-0 z-40 bg-card border-t border-border px-4 py-4"
+  style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+>
+  <Button
+    type="submit" onClick={handleSubmit}
+    className="w-full h-12 font-black text-base rounded-xl gap-2" disabled={submitting}
+  >
+    {submitting ? <Loader2 size={18} className="animate-spin" /> : <><Briefcase size={16} />Post Job Listing</>}
+  </Button>
+</div>
     </div>
   );
 }
