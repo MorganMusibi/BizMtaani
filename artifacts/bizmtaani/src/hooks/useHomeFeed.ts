@@ -1185,11 +1185,13 @@ const loadMore = useCallback(async () => {
 // ============================================================
 
 if (!areaDone && !areaLoading) {
-if (areaBuffer.length > 0) {
-  const nextPage = areaBuffer.slice(
-    0,
-    AREA_PAGE
-  );
+  try {
+    if (areaBuffer.length > 0) {
+      const nextPage = areaBuffer.slice(
+        0,
+        AREA_PAGE
+      );
+
 
   const remainingBuffer = areaBuffer.slice(
     AREA_PAGE
