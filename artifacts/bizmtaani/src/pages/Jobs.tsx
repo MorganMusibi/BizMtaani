@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 const PAGE_SIZE = 15;
 
-const JOBS_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 15 minutes
 const JOBS_LOCATION_TTL_MS = 15 * 60 * 1000;
 const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
 const JOBS_LOCATION_STORAGE_KEY = "bizmtaani_jobs_location_state";
