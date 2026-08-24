@@ -378,8 +378,6 @@ export default function Jobs() {
     getDocs(buildQuery())
       .then((snap) => {
 
-        console.log("Jobs found: " + snap.docs.length);
-
         const fetchedJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost));
         const fetchedCursor = snap.docs[snap.docs.length - 1] ?? null;
         const fetchedDone = snap.docs.length < PAGE_SIZE;
@@ -402,7 +400,7 @@ export default function Jobs() {
   setLoading(false);
 });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [locationReady, activeCategory, activeType, searchQuery]);
+  }, [locationReady, activeCategory, activeType]);
 
   const loadMore = useCallback(async () => {
     if (done || loadingMore || !cursor) return;
