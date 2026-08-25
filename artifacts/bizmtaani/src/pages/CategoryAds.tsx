@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
-import { ChevronLeft, Loader2, Package, MapPin } from "lucide-react";
+import { ChevronLeft, Loader2, Package, MapPin, Search } from "lucide-react"; // Added Search
 import { getCategoryDef, getCategoryBadgeColor } from "@/lib/categories";
 import { useHomeFeeds, rankProducts, getDistanceKm } from "@/hooks/useHomeFeed";
 import { useAuth } from "@/contexts/AuthContext";
 import { LocationBanner } from "@/components/LocationBanner";
 import { findWardLocationSync } from "@/lib/locationHierarchy";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet"; // ADD THIS
+import { Button } from "@/components/ui/button"; // ADD THIS
 
 export default function CategoryAds() {
   const { categoryKey, subcategory } = useParams<{ 
@@ -27,6 +29,11 @@ export default function CategoryAds() {
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [hierarchyReady, setHierarchyReady] = useState(false);
+  
+  // NEW: Refresh options and area picker state
+  const [showRefreshOptions, setShowRefreshOptions] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
 
   // Hierarchy loading
   useEffect(() => {
@@ -91,6 +98,102 @@ export default function CategoryAds() {
     }
   }, []);
 
+  // NEW: Handle area selection from picker
+  const handleAreaSelect = useCallback(
+    (choice: any) => {
+      setLocationInfo(choice);
+      if (choice.lat != null && choice.lng != null) {
+        setUserCoords([choice.lat, choice.lng]);
+      }
+      setGpsReady(true);
+      setShowAreaPicker(false);
+      localStorage.setItem("bizmtaani_area_chosen", JSON.stringify(choice));
+    },
+    []
+  );
+
+  // NEW: Handle area search selection
+  const handleAreaSearchSelect = useCallback(
+    async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+      setResolvingAreaSearch(true);
+      try {
+        const { getWardCoordinates } = await import("@/lib/location");
+        const coords = await getWardCoordinates(
+          ward.wardName,
+          ward.constituencyName,
+          ward.countyName
+        );
+
+        if (!coords) {
+          // toast would go here if we had useToast
+          return;
+        }
+
+        const resolved: any = {
+          lat: coords.lat,
+          lng: coords.lng,
+          wardName: ward.wardName,
+          constituency: ward.constituencyName,
+          county: ward.countyName,
+          displayName: `${ward.wardName}, ${ward.constituencyName}`,
+        };
+
+        handleAreaSelect(resolved);
+      } catch (error) {
+        console.warn("Failed to resolve selected area:", error);
+      } finally {
+        setResolvingAreaSearch(false);
+      }
+    },
+    [handleAreaSelect]
+  );
+
+  // NEW: Refresh location function (same as Home)
+  const refreshLocation = useCallback(() => {
+    if (!navigator.geolocation) return;
+    setRefreshingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setGpsGranted(true);
+        setLocationErrorMsg(null);
+        const { getWardInfo } = await import("@/lib/location");
+        const resolved = await getWardInfo(lat, lng);
+
+        const wardChanged = resolved?.wardName
+          ? resolved.wardName !== locationInfo?.wardName
+          : false;
+
+        if (resolved && wardChanged) {
+          setLocationInfo(resolved);
+          setUserCoords([lat, lng]);
+        } else if (!resolved) {
+          setUserCoords([lat, lng]);
+        }
+        setRefreshingLocation(false);
+      },
+      (error) => {
+        console.warn("Manual location refresh failed:", error);
+        setRefreshingLocation(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationErrorMsg(
+            "Location yako iko off. Enda browser settings uka i turn ON, kisha ujaribu tena."
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationErrorMsg(
+            "GPS yako iko off msee. Iwashe kwa phone settings, kisha ujaribu tena."
+          );
+        } else {
+          setLocationErrorMsg(
+            "location yako haipatikani sahii. Jaribu tena in a fewww!."
+          );
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, [locationInfo?.wardName]);
+
   // Use the shared hook!
   const {
     areaProducts,
@@ -107,11 +210,25 @@ export default function CategoryAds() {
     subcategory: subName,
   });
 
-  // Ranking and filtering
-  const rankedProducts = useMemo(() => {
-    if (!userCoords) return areaProducts;
-    return rankProducts(areaProducts, userCoords);
-  }, [areaProducts, userCoords]);
+  // Ranking and filtering - FIX: Apply visibility filtering for free ads
+const rankedProducts = useMemo(() => {
+  if (!userCoords) return areaProducts;
+  
+  // Filter products based on visibility rules (same as Home)
+  const visibleProducts = areaProducts.filter((p) => {
+    // For free ads (non-premium), only show if in same ward
+    const isPremium = (p.plan && p.plan.startsWith("premium")) || p.isPremium === true;
+    if (!isPremium) {
+      // Free ads: only visible if ward matches user's ward
+      if (!locationInfo?.wardName || !p.ward) return false;
+      return p.ward.trim().toLowerCase() === locationInfo.wardName.trim().toLowerCase();
+    }
+    // Premium ads: visible by distance (handled by useHomeFeeds)
+    return true;
+  });
+  
+  return rankProducts(visibleProducts, userCoords);
+}, [areaProducts, userCoords, locationInfo?.wardName]);
 
   // Infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -161,48 +278,15 @@ export default function CategoryAds() {
         <span className="font-black text-base truncate">{subName}</span>
       </header>
 
-      {/* Shared Location Banner */}
+      {/* Shared Location Banner - with refresh options popup */}
       <LocationBanner
         gpsReady={gpsReady}
         gpsGranted={gpsGranted}
         locationInfo={locationInfo}
         isSearchMode={false}
         refreshingLocation={refreshingLocation}
-        onRefresh={() => {
-          // Simple refresh: re-run location detection
-          setRefreshingLocation(true);
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-              async (position) => {
-                const lat = position.coords.latitude;
-                const lng = position.coords.longitude;
-                setGpsGranted(true);
-                setUserCoords([lat, lng]);
-                try {
-                  const { getWardInfo } = await import("@/lib/location");
-                  const resolved = await getWardInfo(lat, lng);
-                  if (resolved) setLocationInfo(resolved);
-                } catch (e) {}
-                setRefreshingLocation(false);
-              },
-              () => setRefreshingLocation(false),
-              { enableHighAccuracy: true, timeout: 6000 }
-            );
-          } else {
-            setRefreshingLocation(false);
-          }
-        }}
-        onSetArea={() => {
-          // Simple area picker fallback
-          const area = prompt("Enter your area (e.g., 'Baba Dogo'):");
-          if (area) {
-            setLocationInfo({ wardName: area });
-            localStorage.setItem(
-              "bizmtaani_location_state",
-              JSON.stringify({ locationInfo: { wardName: area } })
-            );
-          }
-        }}
+        onRefresh={() => setShowRefreshOptions(true)} // Show popup instead of direct refresh
+        onSetArea={() => setShowAreaPicker(true)}
         locationErrorMsg={locationErrorMsg}
       />
 
@@ -325,6 +409,66 @@ export default function CategoryAds() {
           </>
         )}
       </div>
+
+      {/* NEW: Refresh Options Popup - Same as Home */}
+      {showRefreshOptions && (
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
+            onClick={() => setShowRefreshOptions(false)}
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl border-t border-border px-5 pt-5"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+          >
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+            <p className="font-black text-base mb-4">Update your area</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setShowRefreshOptions(false);
+                  refreshLocation();
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
+              >
+                <MapPin size={18} className="text-primary flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-sm">Use GPS</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Detect my current location</p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setShowRefreshOptions(false);
+                  setShowAreaPicker(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-border bg-muted/40 text-left transition-all active:scale-[0.98]"
+              >
+                <Search size={18} className="text-muted-foreground flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-sm">Search manually</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Type jina la ward au Constituency enye uko</p>
+                </div>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowRefreshOptions(false)}
+              className="w-full mt-3 py-3 text-sm font-semibold text-muted-foreground"
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      )}
+
+      {/* NEW: Area Picker Sheet */}
+      {showAreaPicker && (
+        <AreaPickerSheet
+          onSearchSelect={handleAreaSearchSelect}
+          resolving={resolvingAreaSearch}
+          onDismiss={() => setShowAreaPicker(false)}
+        />
+      )}
     </div>
   );
-      }
+        }
