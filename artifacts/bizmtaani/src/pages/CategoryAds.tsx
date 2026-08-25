@@ -211,24 +211,24 @@ export default function CategoryAds() {
   });
 
   // Ranking and filtering - FIX: Apply visibility filtering for free ads
-  const rankedProducts = useMemo(() => {
-    if (!userCoords) return areaProducts;
-    
-    // Filter products based on visibility rules (same as Home)
-    const visibleProducts = areaProducts.filter((p) => {
-      // For free ads (non-premium), only show if in same ward
-      const isPremium = p.plan?.startsWith("premium") || p.isPremium;
-      if (!isPremium) {
-        // Free ads: only visible if ward matches user's ward
-        if (!locationInfo?.wardName || !p.ward) return false;
-        return p.ward.trim().toLowerCase() === locationInfo.wardName.trim().toLowerCase();
-      }
-      // Premium ads: visible by distance (handled by useHomeFeeds)
-      return true;
-    });
-    
-    return rankProducts(visibleProducts, userCoords);
-  }, [areaProducts, userCoords, locationInfo?.wardName]);
+const rankedProducts = useMemo(() => {
+  if (!userCoords) return areaProducts;
+  
+  // Filter products based on visibility rules (same as Home)
+  const visibleProducts = areaProducts.filter((p) => {
+    // For free ads (non-premium), only show if in same ward
+    const isPremium = (p.plan && p.plan.startsWith("premium")) || p.isPremium === true;
+    if (!isPremium) {
+      // Free ads: only visible if ward matches user's ward
+      if (!locationInfo?.wardName || !p.ward) return false;
+      return p.ward.trim().toLowerCase() === locationInfo.wardName.trim().toLowerCase();
+    }
+    // Premium ads: visible by distance (handled by useHomeFeeds)
+    return true;
+  });
+  
+  return rankProducts(visibleProducts, userCoords);
+}, [areaProducts, userCoords, locationInfo?.wardName]);
 
   // Infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
