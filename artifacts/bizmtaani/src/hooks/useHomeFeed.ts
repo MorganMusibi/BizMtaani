@@ -273,9 +273,10 @@ function getProductVisibilityScope(product: Product) {
   return "local";
 }
 
-export function isProductVisibleToUser(
+ export function isProductVisibleToUser(
   product: Product,
-  userCoords: [number, number]
+  userCoords: [number, number],
+  userWardName?: string
 ) {
   const distance = getDistanceKm(
     userCoords[0],
@@ -289,37 +290,33 @@ export function isProductVisibleToUser(
   // ============================================================
   // FREE / LOCAL ADVERTS
   //
-  // Free adverts are only visible within their local radius.
-  // Default maximum visibility = 2.5 km.
-  //
-  // Therefore:
-  // Stage 1: visible
-  // Stage 2+: not visible
+  // Free adverts are strictly ward-based — visible only to buyers
+  // whose resolved ward matches the advert's ward exactly. This is
+  // a name match, not a distance check, so a free advert in one
+  // ward (e.g. Baba Dogo) never leaks into a neighboring ward (e.g.
+  // Lucky Summer) just because the two happen to be physically close.
   // ============================================================
 
   if (scope === "local") {
-    const radius = product.visibilityRadiusKm ?? 2.5;
-
-    return distance <= radius;
+    if (!userWardName || !product.ward) return false;
+    return (
+      product.ward.trim().toLowerCase() ===
+      userWardName.trim().toLowerCase()
+    );
   }
 
   // ============================================================
   // PREMIUM / WIDER VISIBILITY ADVERTS
   //
-  // Premium adverts are eligible for progressive geographic
-  // discovery.
-  //
-  // The actual geographic stage is handled by the feed loader.
-  // Here we only confirm that the advert has wider visibility.
+  // Premium adverts use distance-based discovery, capped at
+  // HOME_FEED_MAX_RADIUS_KM — this is what "boosts" a premium
+  // advert beyond its own ward. Free adverts never use distance.
   // ============================================================
 
   if (
     scope === "county" ||
     scope === "all_areas"
   ) {
-    // Wider (premium) visibility is now capped at the same
-    // area-discovery ceiling as everything else. County-wide and
-    // countrywide reach have been removed — ward/area based only.
     return distance <= HOME_FEED_MAX_RADIUS_KM;
   }
 
@@ -388,10 +385,11 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
 }
 function filterVisibleProducts(
   products: Product[],
-  userCoords: [number, number]
+  userCoords: [number, number],
+  userWardName?: string
 ): Product[] {
   return products.filter((product) =>
-    isProductVisibleToUser(product, userCoords)
+    isProductVisibleToUser(product, userCoords, userWardName)
   );
 }
 
