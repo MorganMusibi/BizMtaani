@@ -22,10 +22,10 @@ const HOME_FEED_RADIUS_STEPS = [
   5,
   10,
   20,
-  50,
+  30,   // was 50
 ];
 
-const HOME_FEED_MAX_RADIUS_KM = 50;
+const HOME_FEED_MAX_RADIUS_KM = 30;   // was 50
 interface FeedCacheEntry {
   wardProducts: Product[];
   wardCursor: Cursor | null;
@@ -317,7 +317,10 @@ export function isProductVisibleToUser(
     scope === "county" ||
     scope === "all_areas"
   ) {
-    return true;
+    // Wider (premium) visibility is now capped at the same
+    // area-discovery ceiling as everything else. County-wide and
+    // countrywide reach have been removed — ward/area based only.
+    return distance <= HOME_FEED_MAX_RADIUS_KM;
   }
 
   return false;
@@ -1225,55 +1228,16 @@ if (!areaDone && !areaLoading) {
 }
 
     // ==========================================================
-    // STEP 1B — NATIONWIDE PREMIUM STAGE
+    // STEP 1B — DISCOVERY EXHAUSTED
     //
-    // Reached only after every geohash radius stage (2.5→50km) is
-    // exhausted. Fetches premium adverts from anywhere in Kenya,
-    // nearest-first within this page via sortNearbyProducts — so a
-    // closer premium advert still outranks a farther one even here.
+    // All geohash radius stages have been tried. Countrywide
+    // discovery has been removed — nothing further to load.
     // ==========================================================
 
     if (areaRadiusStage >= HOME_FEED_RADIUS_STEPS.length) {
-      if (nationwideDone) {
-        setAreaDone(true);
-        return;
-      }
-
-      const snap = await getDocs(
-        nationwidePremiumQuery(nationwideCursor ?? undefined)
-      );
-
-      const fetchedProducts = toProducts(snap.docs);
-      const sortedFetched = sortNearbyProducts(fetchedProducts, userCoords);
-
-      const mergedNationwide = sortNearbyProducts(dedupe(areaProducts, sortedFetched), userCoords);
-setAreaProducts(mergedNationwide);
-
-const newCursor = snap.docs[snap.docs.length - 1] ?? null;
-const isDone = snap.docs.length < AREA_PAGE;
-
-setNationwideCursor(newCursor);
-setNationwideDone(isDone);
-setAreaDone(isDone);
-
-feedCache.set(cacheKey, {
-  wardProducts,
-  wardCursor,
-  wardDone,
-  areaProducts: mergedNationwide,
-  areaBuffer,
-  areaCursors,
-  areaDonePrefixes,
-  areaDone: isDone,
-  areaRadiusStage,
-  nationwideCursor: newCursor,
-  nationwideDone: isDone,
-  timestamp: Date.now(),
-});
-saveFeedCacheToStorage(feedCache);
-
-return;
-}
+      setAreaDone(true);
+      return;
+    }
     // ==========================================================
     // STEP 2 — GET CURRENT GEOGRAPHIC STAGE
     // ==========================================================
@@ -1570,16 +1534,9 @@ if (allPrefixesDone && remainingBuffer.length === 0) {
     resolvedAreaDone = false;
     resolvedCursors = {};
     resolvedDonePrefixes = {};
-  } else if (!nationwideDone) {
-    // All geohash radius stages (up to 50km) are exhausted —
-    // move into the nationwide premium stage instead of ending.
-    setAreaRadiusStage(nextStage);
-    setAreaDone(false);
-
-    resolvedNextStage = nextStage;
-    resolvedAreaDone = false;
-  } else {
-    // Nationwide stage also exhausted — nothing left to load.
+} else {
+    // All radius stages are exhausted — countrywide discovery
+    // removed, so there's nothing further to load.
     setAreaDone(true);
     resolvedAreaDone = true;
   }
