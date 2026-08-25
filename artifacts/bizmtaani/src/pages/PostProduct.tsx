@@ -3446,7 +3446,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Free</span>
   <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
-  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to people within a short radius</p>
+  <p className="text-xs text-amber-600 font-semibold mt-1">Visible within a short radius</p>
 </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
@@ -3458,7 +3458,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Weekly Premium</span>
   <p className="text-sm text-muted-foreground">Up to 8 adverts at a time · 3 photos each · Live for 7 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to people up to 50km+ radius</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible at longer distance and boosted</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
@@ -3470,7 +3470,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Monthly Premium</span>
   <p className="text-sm text-muted-foreground">Up to 10 adverts at a time · 3 photos each · Live for 30 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Reaches people up to 50km away — and nationwide once nearby areas are covered</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible at longer distance and boosted</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
