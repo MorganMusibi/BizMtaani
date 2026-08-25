@@ -88,7 +88,6 @@ export async function uploadImage(
   form.append("signature", sig.signature);
   form.append("folder", sig.folder);
   form.append("allowed_formats", sig.allowedFormats);
-  form.append("max_file_size", String(sig.maxFileSize));
   
   const res = await fetch(
     `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
