@@ -192,7 +192,7 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   const signature = crypto
   .createHash("sha1")
   .update(
-    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
   )
   .digest("hex");
 
