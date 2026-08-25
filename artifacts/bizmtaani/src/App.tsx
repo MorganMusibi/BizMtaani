@@ -59,9 +59,19 @@ function NotificationSetup() {
 
 function ProfileSetupGate() {
   const { user, userProfile, profileLoading } = useAuth();
-  if (!user || profileLoading || userProfile !== null) return null;
+
+  // 1. Wait until auth/profile finished loading
+  if (!user || profileLoading) return null;
+
+  // 2. If userProfile exists and already has isBusinessOwner defined, skip modal
+  if (userProfile && typeof userProfile.isBusinessOwner === "boolean") {
+    return null;
+  }
+
+  // 3. Otherwise, render setup modal
   return <ProfileSetupModal />;
 }
+
 
 // BottomNav is hidden on full-screen flows where it would get in
 // the way: auth screens and the chat thread itself.
