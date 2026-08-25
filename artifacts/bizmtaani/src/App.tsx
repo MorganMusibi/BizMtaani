@@ -134,7 +134,7 @@ function App() {
           <Router />
           </WouterRouter>
           {showBottomNav && <BottomNav />}
-          {/* <ProfileSetupGate /> */}
+          <ProfileSetupGate />
           <InstallPrompt />
           <RecaptchaDisclosure />
           <Toaster />
