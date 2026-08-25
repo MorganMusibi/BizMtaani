@@ -1644,7 +1644,7 @@ const data = result.data as PublishAdvertResponse;
       errorMessage.toLowerCase().includes("archived")
     ) {
       setLimitModalMessage(
-        "You have reached your maximum limit of 3 active free adverts, or have 3 archived items. Please upgrade your plan or delete/manage existing listings to post a new one."
+        "You have reached your maximum limit of 3 active free adverts, or have 3 archived items. Upgrade to post more adverts, add more photos, and reach audiences up to 30km away — or delete/manage existing listings to post a new one."
       );
     } else {
       const message = getFirebaseErrorMessage(
