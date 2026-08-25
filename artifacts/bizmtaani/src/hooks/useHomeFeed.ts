@@ -611,7 +611,6 @@ function nationwidePremiumQuery(cursor?: Cursor) {
   );
 }
 
-// Add this function after nationwidePremiumQuery
 function categorySubcategoryQuery(
   category: string,
   subcategory: string,
@@ -619,6 +618,7 @@ function categorySubcategoryQuery(
 ) {
   const coll = collection(db, "products");
 
+  // Use the same approach as the original CategoryAds page
   if (cursor) {
     return query(
       coll,
@@ -640,6 +640,7 @@ function categorySubcategoryQuery(
     limit(AREA_PAGE)
   );
 }
+
 
 export function useHomeFeeds({
   gpsReady,
