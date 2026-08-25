@@ -578,7 +578,9 @@ if (relatedItems.length === 0 && currentProduct.category) {
           : null;
 
       const visibleRelatedProducts = recommendationCoords
-        ? relatedItems.filter((item) => isProductVisibleToUser(item, recommendationCoords))
+        ? relatedItems.filter((item) =>
+            isProductVisibleToUser(item, recommendationCoords, currentProduct.ward)
+          )
         : relatedItems;
 
       const rankedRelatedProducts = rankRelatedProducts(
