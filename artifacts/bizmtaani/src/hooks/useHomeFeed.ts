@@ -1,5 +1,16 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { collection, query, orderBy, where, limit, startAfter, getDocs, QueryDocumentSnapshot, DocumentData,
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  where, 
+  limit, 
+  startAfter, 
+  getDocs, 
+  getDoc,    
+  doc,       
+  QueryDocumentSnapshot, 
+  DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getNearbyGeohashPrefixes, radiusKmToGeohashPrecision } from "@/lib/geohash";
