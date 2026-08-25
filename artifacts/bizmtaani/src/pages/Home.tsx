@@ -635,6 +635,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
     initialLoading,
     loadMore,
     previewProducts,
+    areaIsPremiumOnly,
   } = useHomeFeeds({
     gpsReady,
     userCoords,
@@ -743,15 +744,21 @@ const handleAreaSearchSelect = useCallback(
     });
   }
 
-  const { rankedProducts, totalVisible } = useMemo(() => {
+  const { rankedWardProducts, rankedAreaProducts, totalVisible } = useMemo(() => {
     const wardIds = new Set(wardProducts.map((p) => p.id));
-    const allLoadedProducts = dedupe(
-      wardProducts,
-      areaProducts.filter((p) => !wardIds.has(p.id))
-    );
-    const filtered = applyFilters(allLoadedProducts);
-    const ranked = userCoords ? rankProducts(filtered, userCoords) : filtered;
-    return { rankedProducts: ranked, totalVisible: ranked.length };
+    const areaOnly = areaProducts.filter((p) => !wardIds.has(p.id));
+
+    const filteredWard = applyFilters(wardProducts);
+    const filteredArea = applyFilters(areaOnly);
+
+    const rankedWard = userCoords ? rankProducts(filteredWard, userCoords) : filteredWard;
+    const rankedArea = userCoords ? rankProducts(filteredArea, userCoords) : filteredArea;
+
+    return {
+      rankedWardProducts: rankedWard,
+      rankedAreaProducts: rankedArea,
+      totalVisible: rankedWard.length + rankedArea.length,
+    };
   }, [wardProducts, areaProducts, activeKey, searchQuery, userCoords]);
   
   const isLoadingMore = areaLoading;
@@ -965,7 +972,7 @@ const handleAreaSearchSelect = useCallback(
           </div>
         ) : (
           <div className="px-3 pt-3 pb-24">
-            {rankedProducts.length > 0 && (
+            {rankedWardProducts.length > 0 && (
   <>
     {!isSearchMode && (
       <div className="flex items-center gap-3 mb-3">
@@ -978,7 +985,7 @@ const handleAreaSearchSelect = useCallback(
     )}
 
     <div className="grid grid-cols-2 gap-3">
-      {rankedProducts.map((p) => (
+      {rankedWardProducts.map((p) => (
         <ProductCard
   key={p.id}
   product={p}
@@ -993,10 +1000,39 @@ const handleAreaSearchSelect = useCallback(
     </div>
   </>
 )}
-            
+
+            {rankedAreaProducts.length > 0 && (
+  <>
+    <div className="flex items-center gap-3 mb-3 mt-6">
+      <div className="h-px flex-1 bg-border" />
+      <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap px-1" style={{ color: areaIsPremiumOnly ? "#00A651" : undefined }}>
+        {isSearchMode
+          ? "More results"
+          : areaIsPremiumOnly
+          ? "More listings nearby · Premium"
+          : "More listings nearby"}
+      </span>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+
+    <div className="grid grid-cols-2 gap-3">
+      {rankedAreaProducts.map((p) => (
+        <ProductCard
+  key={p.id}
+  product={p}
+  userCoords={userCoords}
+  hierarchyReady={hierarchyReady}
+  onClick={(e) => {
+    e.stopPropagation();
+    setLocation(`/product/${p.id}`);
+  }}
+/>
+      ))}
+    </div>
+  </>
+)}
 
             <div ref={sentinelRef} className="h-1" />
-
             {isLoadingMore && (
               <div className="flex justify-center py-6">
                 <Loader2 size={22} className="animate-spin text-primary" />
