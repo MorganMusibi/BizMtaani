@@ -1603,5 +1603,11 @@ return {
   loadMore,
   previewProducts,
   previewLoading,
+  // True once discovery has moved past stage 0 (2.5km) — at that
+  // point isProductEligibleForFeedStage only allows premium adverts
+  // through, and free adverts are ward-matched so they never appear
+  // here anyway. areaProducts is effectively premium-only reach from
+  // here on, so the homepage can label this section accordingly.
+  areaIsPremiumOnly: areaRadiusStage >= 1,
 };
 }
