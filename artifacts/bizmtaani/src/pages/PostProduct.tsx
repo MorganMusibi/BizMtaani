@@ -3432,8 +3432,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
   onClick={() => {
     if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
       toast({
-        title: "Free plan allows only 1 photo",
-        description: "Remove extra photos, or choose Weekly or Monthly Premium instead.",
+        title: "Free plan allows only 1 photo per advert",
+        description: "Remove extra photos, or choose Weekly or Monthly Premium.",
         variant: "destructive",
       });
       return;
@@ -3446,10 +3446,29 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Free</span>
   <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
-  <p className="text-xs text-amber-600 font-semibold mt-1">Visible within a short radius</p>
+  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a shorter radius</p>
 </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
+
+      {plan === "free" && (
+        <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Upgrade to reach up to 30km radius Visibility and rank higher in the feed
+          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPlan("premium_weekly");
+            }}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+            style={{ color: "#00A651", backgroundColor: "#00A65115" }}
+          >
+            Upgrade →
+          </button>
+        </div>
+      )}
     </button>
 
     {/* Weekly Premium */}
