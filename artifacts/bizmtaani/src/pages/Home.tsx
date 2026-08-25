@@ -611,9 +611,9 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
         setShowAreaPicker(true);
       }
       setLocationErrorMsg(
-        "Kupata mtaa wako ina take long. Chagua eneo lako, au bonyeza Refresh baadaye."
+        "Taking longerto find your area?. Chagua eneo lako, au bonyeza Refresh."
       );
-    }, 15000);
+    }, 10000);
 
     return () => clearTimeout(timeoutId);
   }, [gpsReady]);
@@ -777,10 +777,10 @@ const handleAreaSearchSelect = useCallback(
 
   function bannerText() {
     if (isSearchMode) return "Searching across Kenya";
-    if (!locationInfo) return "Finding your area...";
+    if (!locationInfo) return "Set your area to see nearby adverts";
     const area = locationInfo.wardName;
     if (area) return `${area} area`;
-    return "Finding nearby adverts...";
+    return "Set your area to see nearby adverts";
   }
 
   return (
@@ -883,7 +883,7 @@ const handleAreaSearchSelect = useCallback(
       disabled={refreshingLocation}
       className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
     >
-      {refreshingLocation ? "Updating..." : "Refresh"}
+      {refreshingLocation ? "Updating..." : !locationInfo ? "Set area" : "Refresh"}
     </button>
   </div>
 )}
