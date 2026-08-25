@@ -828,7 +828,8 @@ setAreaDone(true);
 
         const docs = filterVisibleProducts(
   toProducts(snap.docs),
-  userCoords
+  userCoords,
+  wardName
 );
 
         localWardProducts = sortNearbyProducts(docs, userCoords);
@@ -960,7 +961,8 @@ const queries = areaQueries(
       return (
         isProductVisibleToUser(
           product,
-          userCoords
+          userCoords,
+          wardName
         ) &&
         isProductEligibleForFeedStage(
           product,
@@ -1329,7 +1331,8 @@ if (!areaDone && !areaLoading) {
           return (
             isProductVisibleToUser(
               product,
-              userCoords
+              userCoords,
+              locationInfo?.wardName
             ) &&
             isProductEligibleForFeedStage(
               product,
