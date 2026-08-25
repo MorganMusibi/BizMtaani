@@ -600,20 +600,54 @@ function nationwidePremiumQuery(cursor?: Cursor) {
   );
 }
 
+// Add this function after nationwidePremiumQuery
+function categorySubcategoryQuery(
+  category: string,
+  subcategory: string,
+  cursor?: Cursor
+) {
+  const coll = collection(db, "products");
+
+  if (cursor) {
+    return query(
+      coll,
+      where("category", "==", category),
+      where("subcategory", "==", subcategory),
+      where("status", "==", "active"),
+      orderBy("createdAt", "desc"),
+      startAfter(cursor),
+      limit(AREA_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    where("category", "==", category),
+    where("subcategory", "==", subcategory),
+    where("status", "==", "active"),
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
+}
+
 export function useHomeFeeds({
   gpsReady,
   userCoords,
   isSearchMode,
   locationInfo,
+  category,     
+  subcategory,  
 }: {
   gpsReady: boolean;
   userCoords: [number, number] | null;
   isSearchMode: boolean;
   locationInfo: {
-  wardName?: string;
-  constituency?: string;
-  county?: string;
-} | null;
+    wardName?: string;
+    constituency?: string;
+    county?: string;
+  } | null;
+  category?: string;      
+  subcategory?: string;   
 }) {
 
 // Synchronous cache read at hook-init time — if this exact ward/coords
@@ -802,6 +836,58 @@ setAreaDone(true);
     setWardProducts([]);
     setAreaProducts([]);
 
+    setWardDone(true);
+    setAreaDone(true);
+  }
+
+  setInitialLoading(false);
+  return;
+}
+    // ============================================================
+// CATEGORY/SUBCATEGORY MODE
+// Show products from a specific category/subcategory
+// ============================================================
+
+if (category && subcategory) {
+  try {
+    const snap = await getDocs(
+      categorySubcategoryQuery(category, subcategory)
+    );
+
+    const products = toProducts(snap.docs);
+
+    // Rank by distance if we have user coords
+    const rankedProducts = userCoords
+      ? sortNearbyProducts(products, userCoords)
+      : products;
+
+    setWardProducts([]);
+    setAreaProducts(rankedProducts);
+    setWardDone(true);
+    setAreaDone(snap.docs.length < AREA_PAGE);
+
+    // Cache the results
+    if (!isSearchMode) {
+      feedCache.set(cacheKey, {
+        wardProducts: [],
+        wardCursor: null,
+        wardDone: true,
+        areaProducts: rankedProducts,
+        areaBuffer: [],
+        areaCursors: {},
+        areaDonePrefixes: {},
+        areaDone: snap.docs.length < AREA_PAGE,
+        areaRadiusStage: 0,
+        nationwideCursor: null,
+        nationwideDone: false,
+        timestamp: Date.now(),
+      });
+      saveFeedCacheToStorage(feedCache);
+    }
+  } catch (error) {
+    console.error("Failed to load category products:", error);
+    setWardProducts([]);
+    setAreaProducts([]);
     setWardDone(true);
     setAreaDone(true);
   }
@@ -1116,6 +1202,8 @@ saveFeedCacheToStorage(feedCache);
   locationInfo?.constituency,
   locationInfo?.county,
   userCoords,
+  category,      
+  subcategory,  
 ]);
 
 const loadMore = useCallback(async () => {
@@ -1166,7 +1254,55 @@ const loadMore = useCallback(async () => {
 
     return;
   }
-  
+
+  // ============================================================
+// CATEGORY/SUBCATEGORY PAGINATION
+// ============================================================
+if (category && subcategory) {
+  if (areaDone || areaLoading) return;
+
+  setAreaLoading(true);
+  try {
+    // Get the current cursor from the last product
+    const lastProduct = areaProducts[areaProducts.length - 1];
+    if (!lastProduct) {
+      setAreaDone(true);
+      return;
+    }
+
+    // We need to fetch the actual document snapshot for the cursor
+    const docRef = doc(db, "products", lastProduct.id);
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      setAreaDone(true);
+      return;
+    }
+
+    const snap = await getDocs(
+      categorySubcategoryQuery(
+        category,
+        subcategory,
+        docSnap
+      )
+    );
+
+    const newProducts = toProducts(snap.docs);
+    
+    setAreaProducts((prev) => {
+      const merged = dedupe(prev, newProducts);
+      return userCoords
+        ? sortNearbyProducts(merged, userCoords)
+        : merged;
+    });
+
+    setAreaDone(snap.docs.length < AREA_PAGE);
+  } catch (error) {
+    console.error("Failed to load more category products:", error);
+  } finally {
+    setAreaLoading(false);
+  }
+  return;
+}
      // ============================================================
 // NORMAL FEED — PROGRESSIVE NEARBY AREA PAGINATION
 //
@@ -1591,6 +1727,8 @@ saveFeedCacheToStorage(feedCache);
   wardProducts,
   wardCursor,
   wardDone,
+  category,     
+  subcategory,   
 ]);
 return {
   wardProducts,
