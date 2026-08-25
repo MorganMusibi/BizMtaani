@@ -12,7 +12,21 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Install Latest Vercel CLI & Deploy
+      # 1. Install pnpm on the GitHub runner
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9 # Matches your pnpm version
+
+      # 2. Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      # 3. Install Vercel CLI & Deploy
+      - name: Install Vercel CLI & Deploy
         run: |
           npm install --global vercel@latest
           vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
