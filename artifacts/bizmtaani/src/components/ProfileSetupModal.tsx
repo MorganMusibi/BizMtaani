@@ -78,7 +78,7 @@ async function geocodeArea(area: string): Promise<HomeLocation | null> {
   }
 }
 export function ProfileSetupModal() {
-  const { user, refreshProfile, setProfileDirectly } = useAuth();
+  const { user, setProfileDirectly } = useAuth();
   const { toast } = useToast();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -128,9 +128,7 @@ export function ProfileSetupModal() {
       // Dismiss the modal immediately — don't wait for a Firestore re-read.
       // A slow or blocked read would leave the app in an infinite loading state.
       setProfileDirectly(profileData);
-
-      // Sync in background so the context stays fresh
-      void refreshProfile();
+    
     } catch (err) {
       toast({ title: "Could not save profile", description: "Please try again.", variant: "destructive" });
       console.error(err);
