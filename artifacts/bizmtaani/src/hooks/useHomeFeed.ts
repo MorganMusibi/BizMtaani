@@ -124,9 +124,11 @@ export function clearFeedCache() {
 
 function computeFeedCacheKey(
   wardName: string | undefined,
-  userCoords: [number, number]
+  userCoords: [number, number],
+  category?: string,
+  subcategory?: string
 ): string {
-  return `${wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
+  return `${wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}_${category ?? ""}_${subcategory ?? ""}`;
 }
 
 // Reads a still-fresh cache entry synchronously, for seeding a hook's
@@ -667,7 +669,7 @@ export function useHomeFeeds({
 // the first render after remounting doesn't show empty + spinner
 // before the effect below gets a chance to run.
 const initialCacheKey = !isSearchMode && gpsReady && userCoords
-  ? computeFeedCacheKey(locationInfo?.wardName, userCoords)
+  ? computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory)
   : null;
 const initialCached = initialCacheKey ? getFreshFeedCacheEntry(initialCacheKey) : null;
 // Consumed once by the effect below, then cleared — only the very
@@ -746,8 +748,7 @@ useEffect(() => {
 useEffect(() => {
   if (!gpsReady || !userCoords) return;
 
-  const cacheKeyForThisRun = computeFeedCacheKey(locationInfo?.wardName, userCoords);
-
+  const cacheKeyForThisRun = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
   // State was already seeded from this exact cache entry when the hook
   // first mounted — skip the reset-and-refetch for this one run only.
   if (!isSearchMode && skipNextResetRef.current === cacheKeyForThisRun) {
@@ -776,8 +777,7 @@ setSearchDone(false);
   const run = async () => {
     
 
-    const cacheKey = `${locationInfo?.wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`;
-
+    const cacheKey = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
     if (!isSearchMode) {
   const cached = feedCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < FEED_CACHE_TTL_MS) {
@@ -1221,7 +1221,7 @@ saveFeedCacheToStorage(feedCache);
 const loadMore = useCallback(async () => {
   if (!userCoords) return;
 
-  const cacheKey = computeFeedCacheKey(locationInfo?.wardName, userCoords);
+  const cacheKey = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
 
   // ============================================================
   // SEARCH PAGINATION
