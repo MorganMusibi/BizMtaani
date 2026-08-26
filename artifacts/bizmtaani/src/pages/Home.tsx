@@ -1,4 +1,3 @@
-
 import {
   useHomeFeeds,
   type Product,
@@ -10,6 +9,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useLocation } from "wouter";
 import { LocationBanner } from "@/components/LocationBanner";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocationContext } from "@/contexts/LocationContext"; // <-- ADD THIS IMPORT
 import {
   getWardInfo,
   getWardCoordinates,
@@ -28,38 +28,21 @@ import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
-const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
-const LOCATION_PROMPT_SHOWN_KEY = "bizmtaani_location_prompt_shown";
+// REMOVE these - they're now in the context
+// const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
+// const LOCATION_PROMPT_SHOWN_KEY = "bizmtaani_location_prompt_shown";
+// const LOCATION_CACHE_TTL_MS = 15 * 60 * 1000;
 
-const LOCATION_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+// REMOVE this function - it's now in the context
+// function loadCachedLocationState() { ... }
 
-function loadCachedLocationState() {
-  try {
-    const raw = localStorage.getItem(LOCATION_STATE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as {
-      userCoords: [number, number] | null;
-      gpsGranted: boolean;
-      gpsReady: boolean;
-      locationInfo: ResolvedLocation | null;
-      timestamp?: number;
-    };
-    // Expired or missing a timestamp (old cache format) — treat as stale
-    if (!parsed.timestamp || Date.now() - parsed.timestamp > LOCATION_CACHE_TTL_MS) {
-      return null;
-    }
-    return parsed;
-  } catch {
-    return null;
-  }
-}
+// REMOVE this - it's now in the context
+// let cachedLocationState = loadCachedLocationState();
 
-let cachedLocationState = loadCachedLocationState();
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
-
 
 const ProductCard = memo(function ProductCard({
   product,
@@ -75,25 +58,25 @@ const ProductCard = memo(function ProductCard({
   const distance = userCoords
     ? getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng)
     : null;
-const canonicalLocation =
-  hierarchyReady && product.ward
-    ? findWardLocationSync(product.ward.trim())
-    : undefined;
+  const canonicalLocation =
+    hierarchyReady && product.ward
+      ? findWardLocationSync(product.ward.trim())
+      : undefined;
 
-const displayWard =
-  canonicalLocation?.wardName ??
-  product.ward?.trim() ??
-  "";
+  const displayWard =
+    canonicalLocation?.wardName ??
+    product.ward?.trim() ??
+    "";
 
-const displayConstituency =
-  canonicalLocation?.constituencyName ??
-  product.constituency?.trim() ??
-  "";
+  const displayConstituency =
+    canonicalLocation?.constituencyName ??
+    product.constituency?.trim() ??
+    "";
 
-const displayCounty =
-  canonicalLocation?.countyName ??
-  product.county?.trim() ??
-  "";
+  const displayCounty =
+    canonicalLocation?.countyName ??
+    product.county?.trim() ??
+    "";
 
   const badgeColor = getCategoryBadgeColor(product.category);
 
@@ -123,8 +106,8 @@ const displayCounty =
   };
 
   const showPricingBasis =
-  product.category === "Services" ||
-  product.category === "Vehicles";
+    product.category === "Services" ||
+    product.category === "Vehicles";
 
   const basisSuffix =
     showPricingBasis && product.pricingBasis
@@ -160,17 +143,17 @@ const displayCounty =
 
         {displayImage ? (
           <img
-  src={getThumbnailUrl(displayImage)}
-  alt={product.title}
-  loading="lazy"
-  decoding="async"
-  className="w-full aspect-square object-cover"
-  onError={(e) => {
-    console.error("Image failed:", displayImage);
-    e.currentTarget.onerror = null;
-    e.currentTarget.src = "/placeholder-image.png";
-  }}
-/>
+            src={getThumbnailUrl(displayImage)}
+            alt={product.title}
+            loading="lazy"
+            decoding="async"
+            className="w-full aspect-square object-cover"
+            onError={(e) => {
+              console.error("Image failed:", displayImage);
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = "/placeholder-image.png";
+            }}
+          />
         ) : (
           <div className="w-full aspect-square bg-muted flex items-center justify-center">
             <Package size={28} className="text-muted-foreground" />
@@ -200,15 +183,14 @@ const displayCounty =
             <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded font-medium z-[5]">
               +{product.imageUrls.length - 1} photos
             </div>
-        )}
+          )}
       </div>
-            <div className="px-3 py-2.5">
+      <div className="px-3 py-2.5">
         <p className="font-bold text-sm leading-tight line-clamp-2">{product.title}</p>
         <div className="mt-1.5">
           {(displayWard || displayConstituency) && (
             <div className="flex items-center gap-1 text-[10px] text-muted-foreground min-w-0">
               <MapPin size={11} className="flex-shrink-0" />
-
               <span className="truncate">
                 {[displayWard, displayConstituency]
                   .filter(Boolean)
@@ -233,10 +215,27 @@ export default function Home() {
   const [, setLocation] = useLocation();
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(cachedLocationState?.userCoords ?? null);
-  const [gpsGranted, setGpsGranted] = useState(cachedLocationState?.gpsGranted ?? false);
-  const [gpsReady, setGpsReady] = useState(cachedLocationState?.gpsReady ?? false);
-  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cachedLocationState?.locationInfo ?? null);
+  
+  // REPLACE all local location state with the context
+  const { 
+    locationInfo,
+    userCoords,
+    gpsGranted,
+    gpsReady,
+    setLocationInfo,
+    setUserCoords,
+    setGpsGranted,
+    setGpsReady,
+    refreshLocation,
+    isLocationLoading
+  } = useLocationContext();
+
+  // REMOVE these local state declarations:
+  // const [userCoords, setUserCoords] = useState<...>(cachedLocationState?.userCoords ?? null);
+  // const [gpsGranted, setGpsGranted] = useState(cachedLocationState?.gpsGranted ?? false);
+  // const [gpsReady, setGpsReady] = useState(cachedLocationState?.gpsReady ?? false);
+  // const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cachedLocationState?.locationInfo ?? null);
+
   const [hierarchyReady, setHierarchyReady] = useState(false);
   
   const [showAreaPicker, setShowAreaPicker] = useState(false);
@@ -245,15 +244,13 @@ export default function Home() {
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [showRefreshOptions, setShowRefreshOptions] = useState(false);
   
-  // Tracks recent GPS-refresh failures (permission denied or GPS
-  // hardware off) so we can offer the manual area search after
-  // repeated attempts, instead of leaving the user stuck retrying a
-  // GPS prompt that clearly isn't going to succeed.
+  // Tracks recent GPS-refresh failures
   const refreshFailureTimestampsRef = useRef<number[]>([]);
   const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
   const REFRESH_FAILURE_THRESHOLD = 3;
 
-  const refreshLocation = useCallback(() => {
+  // REPLACE the refreshLocation function with one that uses the context
+  const handleRefreshLocation = useCallback(() => {
     if (!navigator.geolocation) return;
     setRefreshingLocation(true);
     navigator.geolocation.getCurrentPosition(
@@ -264,10 +261,6 @@ export default function Home() {
         setLocationErrorMsg(null);
         const resolved = await getWardInfo(lat, lng);
 
-        // Only update state (and therefore trigger a Home feed refetch)
-        // if the resolved area is genuinely different from what's
-        // already showing. Prevents a Refresh tap from re-querying
-        // Firestore when the user hasn't actually moved to a new area.
         const wardChanged = resolved?.wardName
           ? resolved.wardName !== locationInfo?.wardName
           : false;
@@ -275,16 +268,9 @@ export default function Home() {
         if (resolved && wardChanged) {
           setLocationInfo(resolved);
           setUserCoords([lat, lng]);
-          
         } else if (!resolved) {
-          // Couldn't resolve a ward this time — still worth updating
-          // coords in case the caller relies on a fresher fix, but
-          // don't touch locationInfo (avoids flashing "Unknown ward").
           setUserCoords([lat, lng]);
         } else {
-          // Same ward as before — nothing to update, no refetch. Let
-          // the user know the refresh actually ran, since otherwise a
-          // no-op refresh looks identical to a silently failed one.
           toast({
             title: "TULIAA! Uko",
             description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
@@ -310,9 +296,6 @@ export default function Home() {
           refreshFailureTimestampsRef.current = recent;
 
           if (recent.length >= REFRESH_FAILURE_THRESHOLD) {
-            // Repeated failed refreshes with GPS unavailable — stop
-            // asking them to keep retrying GPS and offer manual
-            // area search instead.
             refreshFailureTimestampsRef.current = [];
             setLocationErrorMsg(null);
             setShowAreaPicker(true);
@@ -323,7 +306,7 @@ export default function Home() {
 
         if (error.code === error.PERMISSION_DENIED) {
           setLocationErrorMsg(
-            "Location yako iko off. Enda  browser settings uka i turn ON, kisha ujaribu tena."
+            "Location yako iko off. Enda browser settings uka i turn ON, kisha ujaribu tena."
           );
         } else if (error.code === error.POSITION_UNAVAILABLE) {
           setLocationErrorMsg(
@@ -337,287 +320,33 @@ export default function Home() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, [locationInfo?.wardName]);
-  // Keep the module-level cache in sync so a later remount can skip
+  }, [locationInfo?.wardName, toast, setGpsGranted, setLocationInfo, setUserCoords]);
+
+  // REMOVE these useEffect hooks - they're now in the context:
+  // useEffect(() => { cachedLocationState = { ... } }, [userCoords, gpsGranted, gpsReady, locationInfo]);
+  // useEffect(() => { ... location reminder ... }, [toast]);
+  // useEffect(() => { ... requestGps ... }, [user, userProfile]);
+  // useEffect(() => { ... hard timeout ... }, [gpsReady]);
+
+  // KEEP this one - it's still needed
   useEffect(() => {
-    cachedLocationState = { userCoords, gpsGranted, gpsReady, locationInfo, timestamp: Date.now() };
-    try {
-      localStorage.setItem(LOCATION_STATE_STORAGE_KEY, JSON.stringify(cachedLocationState));
-    } catch {
-      // localStorage full or unavailable — in-memory cache still works for same-session nav
-    }
-  }, [userCoords, gpsGranted, gpsReady, locationInfo]);
-
-  useEffect(() => {
-  let cancelled = false;
-
-  getLocationHierarchy()
-    .then(() => {
-      if (!cancelled) {
-        setHierarchyReady(true);
-      }
-    })
-    .catch((error) => {
-      console.error(
-        "Failed to load MasterHierarchy.json:",
-        error
-      );
-
-      if (!cancelled) {
-        setHierarchyReady(true);
-      }
-    });
-
-  return () => {
-    cancelled = true;
-  };
-}, []);
-  useEffect(() => {
-  if (!("geolocation" in navigator)) return;
-
-  // Only show the location reminder once.
-  try {
-    const alreadyShown = localStorage.getItem(LOCATION_PROMPT_SHOWN_KEY);
-
-    if (alreadyShown === "true") {
-      return;
-    }
-  } catch {
-    // If localStorage is unavailable, continue normally.
-  }
-
-  if ("permissions" in navigator) {
-    navigator.permissions
-      .query({ name: "geolocation" as PermissionName })
-      .then((status) => {
-        // Only show the reminder if location hasn't been granted.
-        if (status.state === "prompt" || status.state === "denied") {
-          toast({
-            title: "Turn on location",
-            description:
-              "Enable GPS/location so we can show your area accurately on adverts and listings nearby.",
-          });
-
-          // Remember that the reminder has already been shown.
-          try {
-            localStorage.setItem(LOCATION_PROMPT_SHOWN_KEY, "true");
-          } catch {
-            // Ignore localStorage errors.
-          }
+    let cancelled = false;
+    getLocationHierarchy()
+      .then(() => {
+        if (!cancelled) {
+          setHierarchyReady(true);
         }
       })
       .catch((error) => {
-        console.warn("Unable to check location permission:", error);
+        console.error("Failed to load MasterHierarchy.json:", error);
+        if (!cancelled) {
+          setHierarchyReady(true);
+        }
       });
-  }
-}, [toast]);
-    useEffect(() => {
-    let cancelled = false;
-const applyResolvedLocation = async (location: ResolvedLocation, opts?: { skipCanonical?: boolean }) => {
-  if (cancelled) return;
-
-  let final = location;
-  if (location.wardName && !opts?.skipCanonical) {
-    const canonical = await resolveCanonicalLocation(
-      location.wardName,
-      location.constituency,
-      location.county
-    );
-    
-    if (canonical) {
-      final = {
-        ...location,
-        wardName: canonical.wardName,
-        constituency: canonical.constituencyName,
-        county: canonical.countyName,
-        displayName: `${canonical.wardName}, ${canonical.constituencyName}`,
-      };
-    }
-  }
-
-  setLocationInfo((prev) => {
-  if (
-    prev &&
-    prev.lat === final.lat &&
-    prev.lng === final.lng &&
-    prev.wardName === final.wardName &&
-    prev.constituency === final.constituency &&
-    prev.county === final.county
-  ) {
-    return prev;
-  }
-
-  return final;
-});
-  if (final.lat != null && final.lng != null) {
-    setUserCoords((prev) => {
-  if (
-    prev &&
-    prev[0] === final.lat &&
-    prev[1] === final.lng
-  ) {
-    return prev;
-  }
-
-  return [final.lat, final.lng];
-});
-  }
-  setGpsReady(true);
-  
-};
-
-    const useSavedProfileLocation = async (): Promise<boolean> => {
-  const saved = userProfile?.homeLocation;
-  if (saved && typeof saved.lat === "number" && typeof saved.lng === "number") {
-    const savedLocation: ResolvedLocation = {
-      lat: saved.lat,
-      lng: saved.lng,
-      wardName: saved.areaName,
-      constituency: saved.constituency,
-      county: saved.county,
-    };
-    await applyResolvedLocation(savedLocation);
-    return true;
-  }
-  return false;
-};
-
-const usePreviouslySelectedArea = async (): Promise<boolean> => {
-  
-  try {
-    const stored = localStorage.getItem(AREA_PICKER_STORAGE_KEY);
-    
-    if (!stored) return false;
-    const parsed = JSON.parse(stored) as ResolvedLocation;
-    
-    if (typeof parsed.lat !== "number" || typeof parsed.lng !== "number") {
-      
-      return false;
-    }
-    await applyResolvedLocation(parsed);
-    
-    return true;
-  } catch (error) {
-    console.error("[LOC] Failed to load saved area:", error);
-    return false;
-  }
-};
-
-    const requestGps = async () => {
-
-  // If the user already has a home area on file (typed at signup),
-  // show it immediately rather than waiting on the GPS prompt/timeout
-  // first. GPS is more precise once it resolves, so applyResolvedLocation
-  // is still allowed to overwrite this with a GPS fix moments later —
-  // this just means the homepage never sits blank for a user who
-  // already gave us an area name.
-  const hadSavedLocation = await useSavedProfileLocation();
-  if (hadSavedLocation) {
-    setGpsReady(true);
-  }
-
-  if (!navigator.geolocation) {
-    if (hadSavedLocation) return;
-    if (await usePreviouslySelectedArea()) return;
-    setGpsReady(true);
-    if (!hasPromptedArea.current) {
-      hasPromptedArea.current = true;
-      setShowAreaPicker(true);
-    }
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    async (position) => {
-      const lat = position.coords.latitude;
-      const lng = position.coords.longitude;
-      setGpsGranted(true);
-
-      const resolved = await getWardInfo(lat, lng);
-
-      if (resolved) {
-  await applyResolvedLocation({ ...resolved, lat, lng }, { skipCanonical: true });
-} else {
-  await applyResolvedLocation({ lat, lng } as ResolvedLocation, { skipCanonical: true });
-}
-
-    },
-    async () => {
-      setGpsGranted(false);
-
-      if (await useSavedProfileLocation()) {
-        setGpsReady(true);
-        return;
-      }
-      if (await usePreviouslySelectedArea()) {
-        setGpsReady(true);
-        return;
-      }
-
-      setGpsReady(true);
-      if (!hasPromptedArea.current) {
-        hasPromptedArea.current = true;
-        setShowAreaPicker(true);
-      }
-    },
-    {
-      enableHighAccuracy: true,
-      // Cut from 15s to 6s. A user who hesitates on the browser's
-      // "Allow location?" prompt was previously burning that
-      // hesitation time against a single long timeout, leaving the
-      // homepage blank the whole while. A shorter timeout gets a
-      // declining/hesitant user to the fallback chain (saved
-      // location → previously chosen area → manual area picker)
-      // much sooner.
-      timeout: 6000,
-      maximumAge: 0
-    }
-  );
-};
-    if (gpsReady) {
-      // Already resolved (cached from a previous mount) — skip
-      // GPS/geocoding entirely on remount.
-      return;
-    }
-
-    // Previously this waited for userProfile (a Firestore read) to
-    // finish before even requesting GPS — for a brand-new signup that
-    // adds a full extra round-trip of blank-screen time before the
-    // location prompt even appears. GPS/geolocation itself doesn't
-    // need the profile; only the useSavedProfileLocation() fallback
-    // path does, and that function already handles a not-yet-loaded
-    // profile gracefully (returns false and moves to the next
-    // fallback), so we no longer block on it here.
-    requestGps();
-
     return () => {
       cancelled = true;
     };
-  }, [user, userProfile]);
-
-  // Hard ceiling on the whole location-resolution flow (GPS prompt +
-  // reverse geocode + any fallback lookups). Without this, a slow or
-  // stalled step anywhere in that chain (e.g. a hung geocoding call)
-  // could leave "Finding your area..." spinning forever with no way
-  // out except reloading the page. If it hasn't resolved within the
-  // window below, we stop waiting, surface the manual area picker,
-  // and let the user retry via the Refresh button instead.
-  useEffect(() => {
-    if (gpsReady) return;
-
-    const timeoutId = setTimeout(() => {
-      setGpsReady(true);
-      if (!hasPromptedArea.current) {
-        hasPromptedArea.current = true;
-        setShowAreaPicker(true);
-      }
-      setLocationErrorMsg(
-        "Taking longerto find your area?. Chagua eneo lako, au bonyeza Refresh."
-      );
-    }, 10000);
-
-    return () => clearTimeout(timeoutId);
-  }, [gpsReady]);
+  }, []);
 
   const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -626,6 +355,7 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
   const isSearchMode = searchQuery.length > 0;
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
   const {
     wardProducts,
     areaProducts,
@@ -681,11 +411,12 @@ const usePreviouslySelectedArea = async (): Promise<boolean> => {
       setShowAreaPicker(false);
       localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
     },
-    []
+    [setLocationInfo, setUserCoords, setGpsReady]
   );
 
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
-const handleAreaSearchSelect = useCallback(
+  
+  const handleAreaSearchSelect = useCallback(
     async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
       setResolvingAreaSearch(true);
       try {
@@ -871,18 +602,19 @@ const handleAreaSearchSelect = useCallback(
         </div>
       </div>
 
-            <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         <LocationBanner
-  gpsReady={gpsReady}
-  gpsGranted={gpsGranted}
-  locationInfo={locationInfo}
-  isSearchMode={isSearchMode}
-  refreshingLocation={refreshingLocation}
-  onRefresh={() => setShowRefreshOptions(true)}
-  onSetArea={() => setShowAreaPicker(true)}
-  locationErrorMsg={locationErrorMsg}
-/>
-                      {locationErrorMsg && (
+          gpsReady={gpsReady}
+          gpsGranted={gpsGranted}
+          locationInfo={locationInfo}
+          isSearchMode={isSearchMode}
+          refreshingLocation={refreshingLocation}
+          onRefresh={() => setShowRefreshOptions(true)}
+          onSetArea={() => setShowAreaPicker(true)}
+          locationErrorMsg={locationErrorMsg}
+        />
+        
+        {locationErrorMsg && (
           <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -892,18 +624,15 @@ const handleAreaSearchSelect = useCallback(
               <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
                 {locationErrorMsg}
               </p>
-              
               <div className="flex items-center gap-2 mt-2">
-                {/* Try Again Button */}
                 <button
                   type="button"
-                  onClick={refreshLocation}
+                  onClick={handleRefreshLocation}
                   disabled={refreshingLocation}
                   className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
                 >
                   {refreshingLocation ? "Retrying..." : "Jaribu tena"}
                 </button>
-
               </div>
             </div>
             <button
@@ -968,64 +697,62 @@ const handleAreaSearchSelect = useCallback(
         ) : (
           <div className="px-3 pt-3 pb-24">
             {rankedWardProducts.length > 0 && (
-  <>
-    {!isSearchMode && (
-      <div className="flex items-center gap-3 mb-3">
-        <div className="h-px flex-1 bg-border" />
-        <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap px-1">
-          Nearby adverts
-        </span>
-        <div className="h-px flex-1 bg-border" />
-      </div>
-    )}
-
-    <div className="grid grid-cols-2 gap-3">
-      {rankedWardProducts.map((p) => (
-        <ProductCard
-  key={p.id}
-  product={p}
-  userCoords={userCoords}
-  hierarchyReady={hierarchyReady}
-  onClick={(e) => {
-    e.stopPropagation();
-    setLocation(`/product/${p.id}`);
-  }}
-/>
-      ))}
-    </div>
-  </>
-)}
+              <>
+                {!isSearchMode && (
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="h-px flex-1 bg-border" />
+                    <span className="text-xs font-bold text-muted-foreground uppercase tracking-wide whitespace-nowrap px-1">
+                      Nearby adverts
+                    </span>
+                    <div className="h-px flex-1 bg-border" />
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {rankedWardProducts.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      userCoords={userCoords}
+                      hierarchyReady={hierarchyReady}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/product/${p.id}`);
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             {rankedAreaProducts.length > 0 && (
-  <>
-    <div className="flex items-center gap-3 mb-3 mt-6">
-      <div className="h-px flex-1 bg-border" />
-      <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap px-1" style={{ color: areaIsPremiumOnly ? "#00A651" : undefined }}>
-        {isSearchMode
-          ? "More results"
-          : areaIsPremiumOnly
-          ? "More listings nearby · Premium"
-          : "More listings nearby"}
-      </span>
-      <div className="h-px flex-1 bg-border" />
-    </div>
-
-    <div className="grid grid-cols-2 gap-3">
-      {rankedAreaProducts.map((p) => (
-        <ProductCard
-  key={p.id}
-  product={p}
-  userCoords={userCoords}
-  hierarchyReady={hierarchyReady}
-  onClick={(e) => {
-    e.stopPropagation();
-    setLocation(`/product/${p.id}`);
-  }}
-/>
-      ))}
-    </div>
-  </>
-)}
+              <>
+                <div className="flex items-center gap-3 mb-3 mt-6">
+                  <div className="h-px flex-1 bg-border" />
+                  <span className="text-xs font-bold uppercase tracking-wide whitespace-nowrap px-1" style={{ color: areaIsPremiumOnly ? "#00A651" : undefined }}>
+                    {isSearchMode
+                      ? "More results"
+                      : areaIsPremiumOnly
+                      ? "More listings nearby · Premium"
+                      : "More listings nearby"}
+                  </span>
+                  <div className="h-px flex-1 bg-border" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  {rankedAreaProducts.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      userCoords={userCoords}
+                      hierarchyReady={hierarchyReady}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setLocation(`/product/${p.id}`);
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
 
             <div ref={sentinelRef} className="h-1" />
             {isLoadingMore && (
@@ -1073,63 +800,62 @@ const handleAreaSearchSelect = useCallback(
       )}
 
       {showRefreshOptions && (
-  <>
-    <div
-      className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
-      onClick={() => setShowRefreshOptions(false)}
-    />
-    <div
-      className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl border-t border-border px-5 pt-5"
-      style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-    >
-      <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-      <p className="font-black text-base mb-4">Update your area</p>
-      <div className="space-y-2">
-        <button
-          onClick={() => {
-            setShowRefreshOptions(false);
-            refreshLocation();
-          }}
-          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
-        >
-          <MapPin size={18} className="text-primary flex-shrink-0" />
-          <div>
-            <p className="font-bold text-sm">Use GPS</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Detect my current location</p>
+        <>
+          <div
+            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
+            onClick={() => setShowRefreshOptions(false)}
+          />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl border-t border-border px-5 pt-5"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+          >
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+            <p className="font-black text-base mb-4">Update your area</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  setShowRefreshOptions(false);
+                  handleRefreshLocation();
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
+              >
+                <MapPin size={18} className="text-primary flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-sm">Use GPS</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Detect my current location</p>
+                </div>
+              </button>
+              <button
+                onClick={() => {
+                  setShowRefreshOptions(false);
+                  setShowAreaPicker(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-border bg-muted/40 text-left transition-all active:scale-[0.98]"
+              >
+                <Search size={18} className="text-muted-foreground flex-shrink-0" />
+                <div>
+                  <p className="font-bold text-sm">Search manually</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Type jina la ward au Constituency enye uko</p>
+                </div>
+              </button>
+            </div>
+            <button
+              onClick={() => setShowRefreshOptions(false)}
+              className="w-full mt-3 py-3 text-sm font-semibold text-muted-foreground"
+            >
+              Cancel
+            </button>
           </div>
-        </button>
-        <button
-          onClick={() => {
-            setShowRefreshOptions(false);
-            setShowAreaPicker(true);
-          }}
-          className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-border bg-muted/40 text-left transition-all active:scale-[0.98]"
-        >
-          <Search size={18} className="text-muted-foreground flex-shrink-0" />
-          <div>
-            <p className="font-bold text-sm">Search manually</p>
-            <p className="text-xs text-muted-foreground mt-0.5">Type jina la ward au Constituency enye uko </p>
-          </div>
-        </button>
-      </div>
-      <button
-        onClick={() => setShowRefreshOptions(false)}
-        className="w-full mt-3 py-3 text-sm font-semibold text-muted-foreground"
-      >
-        Cancel
-      </button>
-    </div>
-  </>
-)}
-{showAreaPicker && (
-  <AreaPickerSheet
-    onSearchSelect={handleAreaSearchSelect}
-    resolving={resolvingAreaSearch}
-    onDismiss={() => setShowAreaPicker(false)}
-  />
-)}
+        </>
+      )}
       
-
+      {showAreaPicker && (
+        <AreaPickerSheet
+          onSearchSelect={handleAreaSearchSelect}
+          resolving={resolvingAreaSearch}
+          onDismiss={() => setShowAreaPicker(false)}
+        />
+      )}
     </div>
   );
-    }
+          }
