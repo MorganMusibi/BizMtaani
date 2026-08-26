@@ -9,6 +9,7 @@ interface LocationBannerProps {
   onRefresh: () => void;
   onSetArea: () => void;
   locationErrorMsg?: string | null;
+  hideRefreshButton?: boolean; // ADD THIS
 }
 
 export function LocationBanner({
@@ -20,6 +21,7 @@ export function LocationBanner({
   onRefresh,
   onSetArea,
   locationErrorMsg,
+  hideRefreshButton = false, // ADD THIS
 }: LocationBannerProps) {
   function bannerText() {
     if (isSearchMode) return "Searching across Kenya";
@@ -44,18 +46,20 @@ export function LocationBanner({
       <p className="text-xs text-muted-foreground flex-1 truncate">
         {bannerText()}
       </p>
-      <button
-        type="button"
-        onClick={locationInfo ? onRefresh : onSetArea}
-        disabled={refreshingLocation}
-        className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
-      >
-        {refreshingLocation
-          ? "Updating..."
-          : !locationInfo
-          ? "Set area"
-          : "Refresh"}
-      </button>
+      {!hideRefreshButton && ( // WRAP THE BUTTON WITH THIS CONDITION
+        <button
+          type="button"
+          onClick={locationInfo ? onRefresh : onSetArea}
+          disabled={refreshingLocation}
+          className="text-xs font-semibold text-primary flex-shrink-0 disabled:opacity-50"
+        >
+          {refreshingLocation
+            ? "Updating..."
+            : !locationInfo
+            ? "Set area"
+            : "Refresh"}
+        </button>
+      )}
     </div>
   );
 }
