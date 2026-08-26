@@ -1,19 +1,22 @@
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js");
-importScripts("https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging-compat.js");
+// /public/firebase-messaging-sw.js
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js");
+importScripts("https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js");
+
+let firebaseConfig = null;
 
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "FIREBASE_CONFIG") {
-    firebase.initializeApp(event.data.config);
+  if (event.data.type === "FIREBASE_CONFIG") {
+    firebaseConfig = event.data.config;
+    firebase.initializeApp(firebaseConfig);
     const messaging = firebase.messaging();
 
     messaging.onBackgroundMessage((payload) => {
-      const { title, body } = payload.notification ?? {};
-      const chatUrl = payload.data?.chatUrl ?? "/";
-      self.registration.showNotification(title ?? "BizMtaani", {
-        body: body ?? "You have a new message",
+      const { title, body } = payload.notification || {};
+      const data = payload.data || {};
+      self.registration.showNotification(title || "BizMtaani", {
+        body: body || "",
         icon: "/icon-192.png",
-        badge: "/icon-192.png",
-        data: { url: chatUrl },
+        data: { clickUrl: data.clickUrl || "/" },
       });
     });
   }
@@ -21,6 +24,15 @@ self.addEventListener("message", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const url = event.notification.data?.url ?? "/";
-  event.waitUntil(clients.openWindow(url));
+  const url = event.notification.data?.clickUrl || "/";
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+      for (const client of windowClients) {
+        if (client.url === url && "focus" in client) {
+          return client.focus();
+        }
+      }
+      return clients.openWindow(url);
+    })
+  );
 });
