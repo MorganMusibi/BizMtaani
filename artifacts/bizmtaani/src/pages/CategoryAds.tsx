@@ -1,14 +1,15 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useParams, useLocation } from "wouter";
-import { ChevronLeft, Loader2, Package, MapPin, Search } from "lucide-react"; // Added Search
+import { ChevronLeft, Loader2, Package, MapPin, Search } from "lucide-react";
 import { getCategoryDef, getCategoryBadgeColor } from "@/lib/categories";
 import { useHomeFeeds, rankProducts, getDistanceKm } from "@/hooks/useHomeFeed";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 import { LocationBanner } from "@/components/LocationBanner";
 import { findWardLocationSync } from "@/lib/locationHierarchy";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
-import { AreaPickerSheet } from "@/components/AreaPickerSheet"; // ADD THIS
-import { Button } from "@/components/ui/button"; // ADD THIS
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
+import { Button } from "@/components/ui/button";
 
 export default function CategoryAds() {
   const { categoryKey, subcategory } = useParams<{ 
@@ -17,6 +18,7 @@ export default function CategoryAds() {
   }>();
   const [, navigate] = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const catDef = categoryKey ? getCategoryDef(decodeURIComponent(categoryKey)) : undefined;
   const subName = subcategory ? decodeURIComponent(subcategory) : "";
@@ -30,7 +32,7 @@ export default function CategoryAds() {
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
   const [hierarchyReady, setHierarchyReady] = useState(false);
   
-  // NEW: Refresh options and area picker state
+  // Refresh options and area picker state
   const [showRefreshOptions, setShowRefreshOptions] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
@@ -98,7 +100,7 @@ export default function CategoryAds() {
     }
   }, []);
 
-  // NEW: Handle area selection from picker
+  // Handle area selection from picker
   const handleAreaSelect = useCallback(
     (choice: any) => {
       setLocationInfo(choice);
@@ -112,7 +114,7 @@ export default function CategoryAds() {
     []
   );
 
-  // NEW: Handle area search selection
+  // Handle area search selection
   const handleAreaSearchSelect = useCallback(
     async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
       setResolvingAreaSearch(true);
@@ -125,7 +127,10 @@ export default function CategoryAds() {
         );
 
         if (!coords) {
-          // toast would go here if we had useToast
+          toast({
+            title: "Couldn't find that area",
+            description: "Try a nearby, larger area name instead.",
+          });
           return;
         }
 
@@ -141,14 +146,18 @@ export default function CategoryAds() {
         handleAreaSelect(resolved);
       } catch (error) {
         console.warn("Failed to resolve selected area:", error);
+        toast({
+          title: "Something went wrong",
+          description: "Please try again or pick a different area.",
+        });
       } finally {
         setResolvingAreaSearch(false);
       }
     },
-    [handleAreaSelect]
+    [handleAreaSelect, toast]
   );
 
-  // NEW: Refresh location function (same as Home)
+  // Refresh location function with toast for same ward
   const refreshLocation = useCallback(() => {
     if (!navigator.geolocation) return;
     setRefreshingLocation(true);
@@ -170,6 +179,12 @@ export default function CategoryAds() {
           setUserCoords([lat, lng]);
         } else if (!resolved) {
           setUserCoords([lat, lng]);
+        } else if (resolved && !wardChanged) {
+          // Same ward - show the toast message
+          toast({
+            title: "TULIAA! Uko",
+            description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
+          });
         }
         setRefreshingLocation(false);
       },
@@ -192,7 +207,7 @@ export default function CategoryAds() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, [locationInfo?.wardName]);
+  }, [locationInfo?.wardName, toast]);
 
   // Use the shared hook!
   const {
@@ -210,25 +225,25 @@ export default function CategoryAds() {
     subcategory: subName,
   });
 
-  // Ranking and filtering - FIX: Apply visibility filtering for free ads
-const rankedProducts = useMemo(() => {
-  if (!userCoords) return areaProducts;
-  
-  // Filter products based on visibility rules (same as Home)
-  const visibleProducts = areaProducts.filter((p) => {
-    // For free ads (non-premium), only show if in same ward
-    const isPremium = (p.plan && p.plan.startsWith("premium")) || p.isPremium === true;
-    if (!isPremium) {
-      // Free ads: only visible if ward matches user's ward
-      if (!locationInfo?.wardName || !p.ward) return false;
-      return p.ward.trim().toLowerCase() === locationInfo.wardName.trim().toLowerCase();
-    }
-    // Premium ads: visible by distance (handled by useHomeFeeds)
-    return true;
-  });
-  
-  return rankProducts(visibleProducts, userCoords);
-}, [areaProducts, userCoords, locationInfo?.wardName]);
+  // Ranking and filtering - Apply visibility filtering for free ads
+  const rankedProducts = useMemo(() => {
+    if (!userCoords) return areaProducts;
+    
+    // Filter products based on visibility rules (same as Home)
+    const visibleProducts = areaProducts.filter((p) => {
+      // For free ads (non-premium), only show if in same ward
+      const isPremium = (p.plan && p.plan.startsWith("premium")) || p.isPremium === true;
+      if (!isPremium) {
+        // Free ads: only visible if ward matches user's ward
+        if (!locationInfo?.wardName || !p.ward) return false;
+        return p.ward.trim().toLowerCase() === locationInfo.wardName.trim().toLowerCase();
+      }
+      // Premium ads: visible by distance (handled by useHomeFeeds)
+      return true;
+    });
+    
+    return rankProducts(visibleProducts, userCoords);
+  }, [areaProducts, userCoords, locationInfo?.wardName]);
 
   // Infinite scroll
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -285,10 +300,40 @@ const rankedProducts = useMemo(() => {
         locationInfo={locationInfo}
         isSearchMode={false}
         refreshingLocation={refreshingLocation}
-        onRefresh={() => setShowRefreshOptions(true)} // Show popup instead of direct refresh
+        onRefresh={() => setShowRefreshOptions(true)}
         onSetArea={() => setShowAreaPicker(true)}
         locationErrorMsg={locationErrorMsg}
       />
+
+      {/* Location Error Message */}
+      {locationErrorMsg && (
+        <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
+          <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
+              Tunahitaji Location Yako 📍
+            </p>
+            <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+              {locationErrorMsg}
+            </p>
+            <button
+              type="button"
+              onClick={refreshLocation}
+              disabled={refreshingLocation}
+              className="mt-2 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
+            >
+              {refreshingLocation ? "Retrying..." : "Jaribu tena"}
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => setLocationErrorMsg(null)}
+            className="text-amber-900 dark:text-amber-200 hover:opacity-70 text-xs font-bold px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="px-3 pt-3">
         {initialLoading ? (
@@ -410,7 +455,7 @@ const rankedProducts = useMemo(() => {
         )}
       </div>
 
-      {/* NEW: Refresh Options Popup - Same as Home */}
+      {/* Refresh Options Popup - Same as Home */}
       {showRefreshOptions && (
         <>
           <div
@@ -461,7 +506,7 @@ const rankedProducts = useMemo(() => {
         </>
       )}
 
-      {/* NEW: Area Picker Sheet */}
+      {/* Area Picker Sheet */}
       {showAreaPicker && (
         <AreaPickerSheet
           onSearchSelect={handleAreaSearchSelect}
