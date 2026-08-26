@@ -421,14 +421,16 @@ export default function Jobs() {
             </button>
           </div>
         </div>
-
-{
-  <LocationBanner
-    isSearchMode={isSearchMode}
-    showRefresh={false}
-    showSetArea={false}
-  />
-}
+<LocationBanner
+  gpsReady={gpsReady}
+  gpsGranted={gpsGranted}
+  locationInfo={locationInfo}
+  isSearchMode={isSearchMode}
+  refreshingLocation={false}
+  onRefresh={() => {}}
+  onSetArea={() => {}}
+  locationErrorMsg={null}
+/>
 </header>
 
       {/* Search */}
