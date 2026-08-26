@@ -23,6 +23,70 @@ import {
 
 const PAGE_SIZE = 15;
 
+// Jobs caching for performance and cost savings
+const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
+
+interface JobsCacheEntry {
+  jobs: JobPostShape[];
+  cursor: Cursor | null;
+  done: boolean;
+  timestamp: number;
+}
+
+function loadJobsCacheFromStorage(): Map<string, JobsCacheEntry> {
+  try {
+    const raw = localStorage.getItem(JOBS_CACHE_STORAGE_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, Omit<JobsCacheEntry, "cursor"> & { cursor: null }>;
+    const map = new Map<string, JobsCacheEntry>();
+    Object.entries(parsed).forEach(([key, entry]) => {
+      map.set(key, { ...entry, cursor: null });
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
+function saveJobsCacheToStorage(cache: Map<string, JobsCacheEntry>) {
+  try {
+    const serializable: Record<string, unknown> = {};
+    cache.forEach((entry, key) => {
+      const { cursor, ...rest } = entry;
+      serializable[key] = rest;
+    });
+    localStorage.setItem(JOBS_CACHE_STORAGE_KEY, JSON.stringify(serializable));
+  } catch {
+    // localStorage full or unavailable — cache just won't persist across reload
+  }
+}
+
+export const jobsCache = loadJobsCacheFromStorage();
+
+// Called after a successful job post so the poster's own device shows
+// the new listing immediately instead of waiting out the TTL.
+export function clearJobsCache() {
+  jobsCache.clear();
+  try {
+    localStorage.removeItem(JOBS_CACHE_STORAGE_KEY);
+  } catch {
+    // safe to ignore
+  }
+}
+
+function computeJobsCacheKey(category: string, type: string): string {
+  return `${category}_${type}`;
+}
+
+function getFreshJobsCacheEntry(key: string): JobsCacheEntry | null {
+  const cached = jobsCache.get(key);
+  if (cached && Date.now() - cached.timestamp < JOBS_CACHE_TTL_MS) {
+    return cached;
+  }
+  return null;
+}
+
 export const JOB_CATEGORIES = [
   "All",
   "Domestic Work",
@@ -182,11 +246,15 @@ export default function Jobs() {
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
 
-  // Jobs state
-  const [jobs, setJobs] = useState<JobPost[]>([]);
-  const [cursor, setCursor] = useState<Cursor | null>(null);
-  const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(true);
+  // Jobs state with caching
+  const initialJobsCacheKey = computeJobsCacheKey(activeCategory, activeType);
+  const initialJobsCached = getFreshJobsCacheEntry(initialJobsCacheKey);
+  const skipNextJobsResetRef = useRef(initialJobsCached ? initialJobsCacheKey : null);
+
+  const [jobs, setJobs] = useState<JobPost[]>((initialJobsCached?.jobs as JobPost[]) ?? []);
+  const [cursor, setCursor] = useState<Cursor | null>(initialJobsCached?.cursor ?? null);
+  const [done, setDone] = useState(initialJobsCached?.done ?? false);
+  const [loading, setLoading] = useState(!initialJobsCached);
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -353,10 +421,29 @@ export default function Jobs() {
     return query(coll, ...constraints);
   }
 
-  // Fetch jobs when location is ready or filters change
+  // Fetch jobs with caching
   useEffect(() => {
     if (!gpsReady) return;
-    
+
+    const cacheKeyForThisRun = computeJobsCacheKey(activeCategory, activeType);
+
+    // State was already seeded from this exact cache entry when the
+    // component first mounted — skip the reset-and-refetch this once.
+    if (skipNextJobsResetRef.current === cacheKeyForThisRun) {
+      skipNextJobsResetRef.current = null;
+      return;
+    }
+    skipNextJobsResetRef.current = null;
+
+    const cached = getFreshJobsCacheEntry(cacheKeyForThisRun);
+    if (cached) {
+      setJobs(cached.jobs as JobPost[]);
+      setCursor(cached.cursor);
+      setDone(cached.done);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setJobs([]);
     setCursor(null);
@@ -367,10 +454,19 @@ export default function Jobs() {
         const fetchedJobs = snap.docs.map((d) => ({ id: d.id, ...d.data() } as JobPost));
         const fetchedCursor = snap.docs[snap.docs.length - 1] ?? null;
         const fetchedDone = snap.docs.length < PAGE_SIZE;
+
         setJobs(fetchedJobs);
         setCursor(fetchedCursor);
         setDone(fetchedDone);
         setLoading(false);
+
+        jobsCache.set(cacheKeyForThisRun, {
+          jobs: fetchedJobs,
+          cursor: fetchedCursor,
+          done: fetchedDone,
+          timestamp: Date.now(),
+        });
+        saveJobsCacheToStorage(jobsCache);
       })
       .catch((error) => {
         console.error("Failed to load jobs:", error);
@@ -415,7 +511,7 @@ export default function Jobs() {
     );
   }
 
-  // Sort jobs by proximity (matching homepage pattern)
+  // Sort jobs by proximity
   function sortJobs(list: JobPost[]) {
     const wardName = locationInfo?.wardName || null;
     const county = locationInfo?.county || null;
@@ -686,4 +782,4 @@ export default function Jobs() {
       )}
     </div>
   );
-                }
+}
