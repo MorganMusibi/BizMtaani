@@ -422,13 +422,14 @@ export default function Jobs() {
           </div>
         </div>
 
-        {
-          <LocationBanner
-  isSearchMode={isSearchMode}
-  showRefresh={false}
-  showSetArea={false}
-/>
-      </header>
+{
+  <LocationBanner
+    isSearchMode={isSearchMode}
+    showRefresh={false}
+    showSetArea={false}
+  />
+}
+</header>
 
       {/* Search */}
       {showSearch && (
