@@ -10,10 +10,9 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { getWardInfo, getWardCoordinates, type ResolvedLocation } from "@/lib/location";
+import { useLocationContext } from "@/contexts/LocationContext";
 import { getLocationHierarchy } from "@/lib/locationHierarchy";
 import { LocationBanner } from "@/components/LocationBanner";
-import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -225,18 +224,16 @@ export default function Jobs() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  // Location state (matching homepage pattern)
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [gpsGranted, setGpsGranted] = useState(false);
-  const [gpsReady, setGpsReady] = useState(false);
-  const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(null);
+  // Use location from context (shared with homepage)
+  const { 
+    locationInfo,
+    userCoords,
+    gpsGranted,
+    gpsReady,
+    isLocationLoading
+  } = useLocationContext();
+
   const [hierarchyReady, setHierarchyReady] = useState(false);
-  const [showAreaPicker, setShowAreaPicker] = useState(false);
-  const [refreshingLocation, setRefreshingLocation] = useState(false);
-  const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
-  const [showRefreshOptions, setShowRefreshOptions] = useState(false);
-  const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
-  const hasPromptedArea = useRef(false);
 
   // Filter states
   const [activeCategory, setActiveCategory] = useState("All");
@@ -271,133 +268,6 @@ export default function Jobs() {
     return () => { cancelled = true; };
   }, []);
 
-  // Location detection (matching homepage pattern)
-  useEffect(() => {
-    let cancelled = false;
-
-    const requestGps = async () => {
-      if (!navigator.geolocation) {
-        setGpsReady(true);
-        if (!hasPromptedArea.current) {
-          hasPromptedArea.current = true;
-          setShowAreaPicker(true);
-        }
-        return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setGpsGranted(true);
-          
-          const resolved = await getWardInfo(lat, lng);
-          if (resolved && !cancelled) {
-            setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
-            setUserCoords([lat, lng]);
-          }
-          setGpsReady(true);
-        },
-        async () => {
-          setGpsGranted(false);
-          setGpsReady(true);
-          if (!hasPromptedArea.current) {
-            hasPromptedArea.current = true;
-            setShowAreaPicker(true);
-          }
-        },
-        { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
-      );
-    };
-
-    requestGps();
-    return () => { cancelled = true; };
-  }, []);
-
-  // Hard timeout for location
-  useEffect(() => {
-    if (gpsReady) return;
-    const timeoutId = setTimeout(() => {
-      setGpsReady(true);
-      if (!hasPromptedArea.current) {
-        hasPromptedArea.current = true;
-        setShowAreaPicker(true);
-      }
-      setLocationErrorMsg("Taking long to find your area? Choose your area manually.");
-    }, 10000);
-    return () => clearTimeout(timeoutId);
-  }, [gpsReady]);
-
-  // Handle area selection
-  const handleAreaSelect = useCallback((choice: ResolvedLocation) => {
-    setLocationInfo(choice);
-    if (choice.lat != null && choice.lng != null) {
-      setUserCoords([choice.lat, choice.lng]);
-    }
-    setGpsReady(true);
-    setShowAreaPicker(false);
-    localStorage.setItem("bizmtaani_area_chosen", JSON.stringify(choice));
-  }, []);
-
-  const handleAreaSearchSelect = useCallback(async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
-    setResolvingAreaSearch(true);
-    try {
-      const coords = await getWardCoordinates(ward.wardName, ward.constituencyName, ward.countyName);
-      if (!coords) {
-        toast({ title: "Couldn't find that area", description: "Try a nearby area name instead." });
-        return;
-      }
-      const resolved: ResolvedLocation = {
-        lat: coords.lat,
-        lng: coords.lng,
-        wardName: ward.wardName,
-        constituency: ward.constituencyName,
-        county: ward.countyName,
-        displayName: `${ward.wardName}, ${ward.constituencyName}`,
-      } as ResolvedLocation;
-      handleAreaSelect(resolved);
-    } catch (error) {
-      toast({ title: "Something went wrong", description: "Please try again." });
-    } finally {
-      setResolvingAreaSearch(false);
-    }
-  }, [handleAreaSelect, toast]);
-
-  const refreshLocation = useCallback(() => {
-    if (!navigator.geolocation) return;
-    setRefreshingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setGpsGranted(true);
-        setLocationErrorMsg(null);
-        const resolved = await getWardInfo(lat, lng);
-        if (resolved) {
-          const wardChanged = resolved.wardName !== locationInfo?.wardName;
-          if (wardChanged) {
-            setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
-            setUserCoords([lat, lng]);
-          } else {
-            toast({ title: "TULIAA! Uko", description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined });
-          }
-        }
-        setRefreshingLocation(false);
-      },
-      (error) => {
-        setRefreshingLocation(false);
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationErrorMsg("Location yako iko off. Enda browser settings uka i turn ON.");
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setLocationErrorMsg("GPS yako iko off msee. Iwashe kwa phone settings.");
-        } else {
-          setLocationErrorMsg("location yako haipatikani sahii. Jaribu tena.");
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }, [locationInfo?.wardName, toast]);
-
   // Build query function
   function buildQuery(cur?: Cursor) {
     const coll = collection(db, "jobs");
@@ -421,7 +291,7 @@ export default function Jobs() {
     return query(coll, ...constraints);
   }
 
-  // Fetch jobs with caching
+  // Fetch jobs with caching - uses gpsReady from context
   useEffect(() => {
     if (!gpsReady) return;
 
@@ -511,7 +381,7 @@ export default function Jobs() {
     );
   }
 
-  // Sort jobs by proximity
+  // Sort jobs by proximity using location from context
   function sortJobs(list: JobPost[]) {
     const wardName = locationInfo?.wardName || null;
     const county = locationInfo?.county || null;
@@ -531,7 +401,7 @@ export default function Jobs() {
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
-      {/* Header with Location Banner */}
+      {/* Header with Location Banner - read-only, uses context */}
       <header className="flex-shrink-0 bg-card border-b border-border z-40">
         <div className="px-4 h-14 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -552,48 +422,18 @@ export default function Jobs() {
           </div>
         </div>
 
-        {/* Location Banner - same as homepage */}
+        {/* Location Banner - read-only display, no refresh button or area picker */}
         <LocationBanner
           gpsReady={gpsReady}
           gpsGranted={gpsGranted}
           locationInfo={locationInfo}
           isSearchMode={isSearchMode}
-          refreshingLocation={refreshingLocation}
-          onRefresh={() => setShowRefreshOptions(true)}
-          onSetArea={() => setShowAreaPicker(true)}
-          locationErrorMsg={locationErrorMsg}
+          refreshingLocation={false}
+          onRefresh={() => {}} // No-op - users change location on homepage
+          onSetArea={() => {}} // No-op - users change location on homepage
+          locationErrorMsg={null}
         />
       </header>
-
-      {/* Location Error Message - same as homepage */}
-      {locationErrorMsg && (
-        <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
-          <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-              Tunahitaji Location Yako 📍
-            </p>
-            <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-              {locationErrorMsg}
-            </p>
-            <button
-              type="button"
-              onClick={refreshLocation}
-              disabled={refreshingLocation}
-              className="mt-2 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
-            >
-              {refreshingLocation ? "Retrying..." : "Jaribu tena"}
-            </button>
-          </div>
-          <button
-            type="button"
-            onClick={() => setLocationErrorMsg(null)}
-            className="text-amber-900 dark:text-amber-200 hover:opacity-70 text-xs font-bold px-1"
-          >
-            ✕
-          </button>
-        </div>
-      )}
 
       {/* Search */}
       {showSearch && (
@@ -720,66 +560,6 @@ export default function Jobs() {
           <Button size="sm" onClick={() => setLocation("/login")}>Sign in</Button>
         </div>
       )}
-
-      {/* Refresh Options Sheet - same as homepage */}
-      {showRefreshOptions && (
-        <>
-          <div
-            className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-[2px]"
-            onClick={() => setShowRefreshOptions(false)}
-          />
-          <div
-            className="fixed bottom-0 left-0 right-0 z-[61] bg-card rounded-t-3xl border-t border-border px-5 pt-5"
-            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
-          >
-            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-            <p className="font-black text-base mb-4">Update your area</p>
-            <div className="space-y-2">
-              <button
-                onClick={() => {
-                  setShowRefreshOptions(false);
-                  refreshLocation();
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
-              >
-                <MapPin size={18} className="text-primary flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-sm">Use GPS</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Detect my current location</p>
-                </div>
-              </button>
-              <button
-                onClick={() => {
-                  setShowRefreshOptions(false);
-                  setShowAreaPicker(true);
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-border bg-muted/40 text-left transition-all active:scale-[0.98]"
-              >
-                <Search size={18} className="text-muted-foreground flex-shrink-0" />
-                <div>
-                  <p className="font-bold text-sm">Search manually</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">Type jina la ward au Constituency enye uko</p>
-                </div>
-              </button>
-            </div>
-            <button
-              onClick={() => setShowRefreshOptions(false)}
-              className="w-full mt-3 py-3 text-sm font-semibold text-muted-foreground"
-            >
-              Cancel
-            </button>
-          </div>
-        </>
-      )}
-
-      {/* Area Picker Sheet - same as homepage */}
-      {showAreaPicker && (
-        <AreaPickerSheet
-          onSearchSelect={handleAreaSearchSelect}
-          resolving={resolvingAreaSearch}
-          onDismiss={() => setShowAreaPicker(false)}
-        />
-      )}
     </div>
   );
-}
+  }
