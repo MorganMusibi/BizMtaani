@@ -9,7 +9,7 @@ import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
 import { useLocation } from "wouter";
 import { LocationBanner } from "@/components/LocationBanner";
 import { useAuth } from "@/contexts/AuthContext";
-import { useLocationContext } from "@/contexts/LocationContext"; // <-- ADD THIS IMPORT
+import { useLocationContext } from "@/contexts/LocationContext";
 import {
   getWardInfo,
   getWardCoordinates,
@@ -28,16 +28,6 @@ import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
-// REMOVE these - they're now in the context
-// const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
-// const LOCATION_PROMPT_SHOWN_KEY = "bizmtaani_location_prompt_shown";
-// const LOCATION_CACHE_TTL_MS = 15 * 60 * 1000;
-
-// REMOVE this function - it's now in the context
-// function loadCachedLocationState() { ... }
-
-// REMOVE this - it's now in the context
-// let cachedLocationState = loadCachedLocationState();
 
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
@@ -216,7 +206,6 @@ export default function Home() {
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
   
-  // REPLACE all local location state with the context
   const { 
     locationInfo,
     userCoords,
@@ -230,12 +219,6 @@ export default function Home() {
     isLocationLoading
   } = useLocationContext();
 
-  // REMOVE these local state declarations:
-  // const [userCoords, setUserCoords] = useState<...>(cachedLocationState?.userCoords ?? null);
-  // const [gpsGranted, setGpsGranted] = useState(cachedLocationState?.gpsGranted ?? false);
-  // const [gpsReady, setGpsReady] = useState(cachedLocationState?.gpsReady ?? false);
-  // const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cachedLocationState?.locationInfo ?? null);
-
   const [hierarchyReady, setHierarchyReady] = useState(false);
   
   const [showAreaPicker, setShowAreaPicker] = useState(false);
@@ -244,12 +227,10 @@ export default function Home() {
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [showRefreshOptions, setShowRefreshOptions] = useState(false);
   
-  // Tracks recent GPS-refresh failures
   const refreshFailureTimestampsRef = useRef<number[]>([]);
   const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
   const REFRESH_FAILURE_THRESHOLD = 3;
 
-  // REPLACE the refreshLocation function with one that uses the context
   const handleRefreshLocation = useCallback(() => {
     if (!navigator.geolocation) return;
     setRefreshingLocation(true);
@@ -322,13 +303,7 @@ export default function Home() {
     );
   }, [locationInfo?.wardName, toast, setGpsGranted, setLocationInfo, setUserCoords]);
 
-  // REMOVE these useEffect hooks - they're now in the context:
-  // useEffect(() => { cachedLocationState = { ... } }, [userCoords, gpsGranted, gpsReady, locationInfo]);
-  // useEffect(() => { ... location reminder ... }, [toast]);
-  // useEffect(() => { ... requestGps ... }, [user, userProfile]);
-  // useEffect(() => { ... hard timeout ... }, [gpsReady]);
-
-  // KEEP this one - it's still needed
+  // Load hierarchy
   useEffect(() => {
     let cancelled = false;
     getLocationHierarchy()
@@ -507,14 +482,6 @@ export default function Home() {
     setShowSearch(false);
   }
 
-  function bannerText() {
-    if (isSearchMode) return "Searching across Kenya";
-    if (!locationInfo) return "Set your area to see nearby adverts";
-    const area = locationInfo.wardName;
-    if (area) return `${area} area`;
-    return "Set your area to see nearby adverts";
-  }
-
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
       <header className="flex-shrink-0 bg-card border-b border-border px-4 h-14 flex items-center justify-between gap-3 z-40">
@@ -645,30 +612,8 @@ export default function Home() {
           </div>
         )}
 
-        {initialLoading && previewProducts.length > 0 ? (
-          <div className="px-3 pt-3 pb-24">
-            <div className="mx-3 mb-3 flex items-center gap-2 rounded-xl bg-muted/50 px-3 py-2">
-              <Loader2 size={14} className="animate-spin text-primary flex-shrink-0" />
-              <p className="text-xs text-muted-foreground">
-                Finding your area — showing recent listings across Kenya for now
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {previewProducts.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  userCoords={userCoords}
-                  hierarchyReady={hierarchyReady}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setLocation(`/product/${p.id}`);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        ) : initialLoading ? (
+        {/* Show loading spinner while initial loading and no products yet */}
+        {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">Finding nearby adverts...</p>
@@ -858,4 +803,4 @@ export default function Home() {
       )}
     </div>
   );
-          }
+      }
