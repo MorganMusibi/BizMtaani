@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { LocationProvider } from "@/contexts/LocationContext"; // <-- ADD THIS
 import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
@@ -128,17 +129,19 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <AuthProvider>
-          <NotificationSetup />
-          <EmailVerificationBanner />
-          <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-          </WouterRouter>
-          {showBottomNav && <BottomNav />}
-          <ProfileSetupGate />
-          <InstallPrompt />
-          <RecaptchaDisclosure />
-          <Toaster />
-          {showSplash && <SplashScreen onDone={handleSplashDone} />}
+          <LocationProvider> {/* <-- WRAP WITH LocationProvider HERE */}
+            <NotificationSetup />
+            <EmailVerificationBanner />
+            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+              <Router />
+            </WouterRouter>
+            {showBottomNav && <BottomNav />}
+            <ProfileSetupGate />
+            <InstallPrompt />
+            <RecaptchaDisclosure />
+            <Toaster />
+            {showSplash && <SplashScreen onDone={handleSplashDone} />}
+          </LocationProvider> {/* <-- CLOSE LocationProvider HERE */}
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
