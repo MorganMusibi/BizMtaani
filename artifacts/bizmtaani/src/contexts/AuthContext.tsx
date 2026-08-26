@@ -187,6 +187,14 @@ export function AuthProvider({
             return;
           }
 
+          // Mark the profile as loading immediately, before any
+          // awaits — closes the race window where `user` is set but
+          // `profileLoading` is still false and `userProfile` is
+          // still null from a previous state, which made
+          // ProfileSetupGate think this was a brand-new user with no
+          // profile and re-show the business-owner/buyer prompt.
+          setProfileLoading(true);
+
           // Register for push notifications — fire and forget, never
           // block auth state resolution on this.
           registerForNotifications(currentUser.uid).catch(() => {});
@@ -219,7 +227,6 @@ export function AuthProvider({
           // USER PROFILE
           // --------------------------------------------------
 
-          setProfileLoading(true);
 
           const docRef = doc(
             db,
