@@ -23,13 +23,16 @@ export default function CategoryAds() {
 
   // Use location from context (shared with homepage)
   const { 
-    locationInfo,
-    userCoords,
-    gpsGranted,
-    gpsReady,
-    refreshLocation,
-    isLocationLoading
-  } = useLocationContext();
+  locationInfo,
+  userCoords,
+  gpsGranted,
+  gpsReady,
+  refreshLocation,
+  isLocationLoading,
+  setLocationInfo,
+  setUserCoords,
+  setGpsReady,
+} = useLocationContext();
 
   const catDef = categoryKey ? getCategoryDef(decodeURIComponent(categoryKey)) : undefined;
   const subName = subcategory ? decodeURIComponent(subcategory) : "";
@@ -59,21 +62,18 @@ export default function CategoryAds() {
   }, []);
 
   // Handle area selection from picker
-  const handleAreaSelect = useCallback(
-    (choice: any) => {
-      // Update location in context
-      // The context will handle localStorage updates
-      const { setLocationInfo, setUserCoords, setGpsReady } = useLocationContext();
-      setLocationInfo(choice);
-      if (choice.lat != null && choice.lng != null) {
-        setUserCoords([choice.lat, choice.lng]);
-      }
-      setGpsReady(true);
-      setShowAreaPicker(false);
-      localStorage.setItem("bizmtaani_area_chosen", JSON.stringify(choice));
-    },
-    []
-  );
+const handleAreaSelect = useCallback(
+  (choice: any) => {
+    setLocationInfo(choice);
+    if (choice.lat != null && choice.lng != null) {
+      setUserCoords([choice.lat, choice.lng]);
+    }
+    setGpsReady(true);
+    setShowAreaPicker(false);
+    localStorage.setItem("bizmtaani_area_chosen", JSON.stringify(choice));
+  },
+  [setLocationInfo, setUserCoords, setGpsReady]
+);
 
   // Handle area search selection
   const handleAreaSearchSelect = useCallback(
