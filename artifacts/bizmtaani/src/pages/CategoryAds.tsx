@@ -4,6 +4,7 @@ import { ChevronLeft, Loader2, Package, MapPin, Search } from "lucide-react";
 import { getCategoryDef, getCategoryBadgeColor } from "@/lib/categories";
 import { useHomeFeeds, rankProducts, getDistanceKm } from "@/hooks/useHomeFeed";
 import { useAuth } from "@/contexts/AuthContext";
+import { useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { LocationBanner } from "@/components/LocationBanner";
 import { findWardLocationSync } from "@/lib/locationHierarchy";
@@ -20,17 +21,22 @@ export default function CategoryAds() {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Use location from context (shared with homepage)
+  const { 
+    locationInfo,
+    userCoords,
+    gpsGranted,
+    gpsReady,
+    refreshLocation,
+    isLocationLoading
+  } = useLocationContext();
+
   const catDef = categoryKey ? getCategoryDef(decodeURIComponent(categoryKey)) : undefined;
   const subName = subcategory ? decodeURIComponent(subcategory) : "";
 
-  // Location state (same as Home page)
-  const [userCoords, setUserCoords] = useState<[number, number] | null>(null);
-  const [gpsGranted, setGpsGranted] = useState(false);
-  const [gpsReady, setGpsReady] = useState(false);
-  const [locationInfo, setLocationInfo] = useState<{ wardName?: string } | null>(null);
+  const [hierarchyReady, setHierarchyReady] = useState(false);
   const [refreshingLocation, setRefreshingLocation] = useState(false);
   const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
-  const [hierarchyReady, setHierarchyReady] = useState(false);
   
   // Refresh options and area picker state
   const [showRefreshOptions, setShowRefreshOptions] = useState(false);
@@ -52,57 +58,12 @@ export default function CategoryAds() {
     return () => { cancelled = true; };
   }, []);
 
-  // Try to get location from cache
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem("bizmtaani_location_state");
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed.userCoords && parsed.locationInfo) {
-          setUserCoords(parsed.userCoords);
-          setGpsGranted(parsed.gpsGranted || false);
-          setGpsReady(true);
-          setLocationInfo(parsed.locationInfo);
-          return;
-        }
-      }
-    } catch (e) {
-      // Ignore
-    }
-
-    // Fallback: try GPS
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        async (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          setGpsGranted(true);
-          setUserCoords([lat, lng]);
-          
-          try {
-            const { getWardInfo } = await import("@/lib/location");
-            const resolved = await getWardInfo(lat, lng);
-            if (resolved) {
-              setLocationInfo(resolved);
-            }
-          } catch (e) {
-            // Ignore
-          }
-          setGpsReady(true);
-        },
-        () => {
-          setGpsReady(true);
-        },
-        { enableHighAccuracy: true, timeout: 6000 }
-      );
-    } else {
-      setGpsReady(true);
-    }
-  }, []);
-
   // Handle area selection from picker
   const handleAreaSelect = useCallback(
     (choice: any) => {
+      // Update location in context
+      // The context will handle localStorage updates
+      const { setLocationInfo, setUserCoords, setGpsReady } = useLocationContext();
       setLocationInfo(choice);
       if (choice.lat != null && choice.lng != null) {
         setUserCoords([choice.lat, choice.lng]);
@@ -157,57 +118,19 @@ export default function CategoryAds() {
     [handleAreaSelect, toast]
   );
 
-  // Refresh location function with toast for same ward
-  const refreshLocation = useCallback(() => {
-    if (!navigator.geolocation) return;
+  // Refresh location handler with toast for same ward
+  const handleRefreshLocation = useCallback(async () => {
     setRefreshingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setGpsGranted(true);
-        setLocationErrorMsg(null);
-        const { getWardInfo } = await import("@/lib/location");
-        const resolved = await getWardInfo(lat, lng);
-
-        const wardChanged = resolved?.wardName
-          ? resolved.wardName !== locationInfo?.wardName
-          : false;
-
-        if (resolved && wardChanged) {
-          setLocationInfo(resolved);
-          setUserCoords([lat, lng]);
-        } else if (!resolved) {
-          setUserCoords([lat, lng]);
-        } else if (resolved && !wardChanged) {
-          // Same ward - show the toast message
-          toast({
-            title: "TULIAA! Uko",
-            description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
-          });
-        }
-        setRefreshingLocation(false);
-      },
-      (error) => {
-        console.warn("Manual location refresh failed:", error);
-        setRefreshingLocation(false);
-        if (error.code === error.PERMISSION_DENIED) {
-          setLocationErrorMsg(
-            "Location yako iko off. Enda browser settings uka i turn ON, kisha ujaribu tena."
-          );
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setLocationErrorMsg(
-            "GPS yako iko off msee. Iwashe kwa phone settings, kisha ujaribu tena."
-          );
-        } else {
-          setLocationErrorMsg(
-            "location yako haipatikani sahii. Jaribu tena in a fewww!."
-          );
-        }
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
-  }, [locationInfo?.wardName, toast]);
+    try {
+      await refreshLocation();
+      // After refresh, check if location changed
+      // The toast is handled inside the context's refreshLocation
+    } catch (error) {
+      setLocationErrorMsg("Failed to refresh location. Please try again.");
+    } finally {
+      setRefreshingLocation(false);
+    }
+  }, [refreshLocation]);
 
   // Use the shared hook!
   const {
@@ -293,13 +216,13 @@ export default function CategoryAds() {
         <span className="font-black text-base truncate">{subName}</span>
       </header>
 
-      {/* Shared Location Banner - with refresh options popup */}
+      {/* Shared Location Banner - using context */}
       <LocationBanner
         gpsReady={gpsReady}
         gpsGranted={gpsGranted}
         locationInfo={locationInfo}
         isSearchMode={false}
-        refreshingLocation={refreshingLocation}
+        refreshingLocation={refreshingLocation || isLocationLoading}
         onRefresh={() => setShowRefreshOptions(true)}
         onSetArea={() => setShowAreaPicker(true)}
         locationErrorMsg={locationErrorMsg}
@@ -318,11 +241,11 @@ export default function CategoryAds() {
             </p>
             <button
               type="button"
-              onClick={refreshLocation}
-              disabled={refreshingLocation}
+              onClick={handleRefreshLocation}
+              disabled={refreshingLocation || isLocationLoading}
               className="mt-2 px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-bold rounded-lg transition-colors shadow-sm disabled:opacity-50"
             >
-              {refreshingLocation ? "Retrying..." : "Jaribu tena"}
+              {refreshingLocation || isLocationLoading ? "Retrying..." : "Jaribu tena"}
             </button>
           </div>
           <button
@@ -472,7 +395,7 @@ export default function CategoryAds() {
               <button
                 onClick={() => {
                   setShowRefreshOptions(false);
-                  refreshLocation();
+                  handleRefreshLocation();
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 border-primary/40 bg-primary/5 text-left transition-all active:scale-[0.98]"
               >
@@ -516,4 +439,4 @@ export default function CategoryAds() {
       )}
     </div>
   );
-        }
+          }
