@@ -383,18 +383,35 @@ export default function Jobs() {
 
   // Sort jobs by proximity using location from context
   function sortJobs(list: JobPost[]) {
-    const wardName = locationInfo?.wardName || null;
-    const county = locationInfo?.county || null;
-    return [...list].sort((a, b) => {
-      const expiredA = isJobExpired(a.deadline);
-      const expiredB = isJobExpired(b.deadline);
-      if (expiredA !== expiredB) return expiredA ? 1 : -1;
-      const tierA = wardName && a.ward === wardName ? 0 : county && a.county === county ? 1 : 2;
-      const tierB = wardName && b.ward === wardName ? 0 : county && b.county === county ? 1 : 2;
-      if (tierA !== tierB) return tierA - tierB;
-      return 0;
-    });
-  }
+  const wardName = locationInfo?.wardName || null;
+  const county = locationInfo?.county || null;
+  
+  return [...list].sort((a, b) => {
+    // Active jobs first
+    const aExpired = isJobExpired(a.deadline);
+    const bExpired = isJobExpired(b.deadline);
+    if (aExpired && !bExpired) return 1;
+    if (!aExpired && bExpired) return -1;
+    
+    // Same ward first
+    if (wardName) {
+      const aMatch = a.ward === wardName;
+      const bMatch = b.ward === wardName;
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+    }
+    
+    // Same county second
+    if (county) {
+      const aMatch = a.county === county;
+      const bMatch = b.county === county;
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+    }
+    
+    return 0;
+  });
+}
 
   const activeJobs = jobs.filter((j) => !isJobExpired(j.deadline));
   const visible = sortJobs(applyLocalFilters(activeJobs));
