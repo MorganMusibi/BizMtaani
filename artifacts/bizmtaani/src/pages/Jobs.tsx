@@ -430,6 +430,7 @@ export default function Jobs() {
   onRefresh={() => {}}
   onSetArea={() => {}}
   locationErrorMsg={null}
+  hideRefreshButton={true}
 />
 </header>
 
