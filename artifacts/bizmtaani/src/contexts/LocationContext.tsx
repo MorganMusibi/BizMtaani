@@ -1,7 +1,6 @@
 // contexts/LocationContext.tsx
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getWardInfo, type ResolvedLocation } from "@/lib/location";
-import { useAuth } from "@/contexts/AuthContext";
 
 interface LocationContextType {
   locationInfo: ResolvedLocation | null;
@@ -42,7 +41,6 @@ function loadCachedLocationState() {
 }
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const { user, userProfile, profileLoading } = useAuth();
   const cached = loadCachedLocationState();
   
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cached?.locationInfo ?? null);
@@ -66,54 +64,19 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   }, [userCoords, gpsGranted, gpsReady, locationInfo]);
 
-  // Helper to fallback to profile location or just set ready
-  const handleLocationFallback = () => {
-    // If profile is still loading, wait for it.
-    if (profileLoading) {
-      return;
-    }
-
-    // If user has a home location, use it
-    if (userProfile?.homeLocation) {
-      const home = userProfile.homeLocation;
-      if (home.lat && home.lng) {
-        const profileLoc: ResolvedLocation = {
-          lat: home.lat,
-          lng: home.lng,
-          wardName: home.areaName || undefined,
-          constituency: home.constituency || undefined,
-          county: home.county || undefined,
-        };
-        setLocationInfo(profileLoc);
-        setUserCoords([home.lat, home.lng]);
-        setGpsGranted(false);
-        setGpsReady(true);
-        setIsLocationLoading(false);
-        return;
-      }
-    }
-
-    // No location available, set ready without location
-    setGpsGranted(false);
-    setGpsReady(true);
-    setIsLocationLoading(false);
-  };
-
   // Initial location detection
   useEffect(() => {
-    // If we already have a fresh cache, we're done.
     if (cached?.gpsReady) {
       setIsLocationLoading(false);
       return;
     }
 
-    // If no geolocation, fallback to profile or set ready.
     if (!navigator.geolocation) {
-      handleLocationFallback();
+      setGpsReady(true);
+      setIsLocationLoading(false);
       return;
     }
 
-    // Try GPS
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const lat = position.coords.latitude;
@@ -129,44 +92,13 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         setIsLocationLoading(false);
       },
       () => {
-        // GPS failed - fallback to profile
-        handleLocationFallback();
+        setGpsGranted(false);
+        setGpsReady(true);
+        setIsLocationLoading(false);
       },
       { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
     );
   }, []);
-
-  // Re-check fallback when profile loads or changes
-  useEffect(() => {
-    if (!profileLoading && !gpsGranted) {
-      // If GPS hasn't been granted, we may use profile location
-      if (!locationInfo || (userProfile?.homeLocation && locationInfo.wardName !== userProfile.homeLocation.areaName)) {
-        handleLocationFallback();
-      }
-    }
-  }, [profileLoading, userProfile, gpsGranted]);
-
-  // Update location if profile changes and we don't have a GPS fix
-  useEffect(() => {
-    if (profileLoading) return;
-    if (gpsGranted) return; // If GPS is granted, we trust it
-    if (userProfile?.homeLocation && (!locationInfo || locationInfo.wardName !== userProfile.homeLocation.areaName)) {
-      const home = userProfile.homeLocation;
-      if (home.lat && home.lng) {
-        const profileLoc: ResolvedLocation = {
-          lat: home.lat,
-          lng: home.lng,
-          wardName: home.areaName || undefined,
-          constituency: home.constituency || undefined,
-          county: home.county || undefined,
-        };
-        setLocationInfo(profileLoc);
-        setUserCoords([home.lat, home.lng]);
-        setGpsReady(true);
-        setIsLocationLoading(false);
-      }
-    }
-  }, [userProfile, profileLoading, gpsGranted, locationInfo]);
 
   const refreshLocation = async () => {
     setIsLocationLoading(true);
@@ -228,4 +160,4 @@ export function useLocationContext() {
     throw new Error('useLocationContext must be used within a LocationProvider');
   }
   return context;
-}
+      }
