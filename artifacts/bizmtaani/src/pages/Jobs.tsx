@@ -422,17 +422,12 @@ export default function Jobs() {
           </div>
         </div>
 
-        {/* Location Banner - read-only display, no refresh button or area picker */}
-        <LocationBanner
-          gpsReady={gpsReady}
-          gpsGranted={gpsGranted}
-          locationInfo={locationInfo}
-          isSearchMode={isSearchMode}
-          refreshingLocation={false}
-          onRefresh={() => {}} // No-op - users change location on homepage
-          onSetArea={() => {}} // No-op - users change location on homepage
-          locationErrorMsg={null}
-        />
+        {
+          <LocationBanner
+  isSearchMode={isSearchMode}
+  showRefresh={false}
+  showSetArea={false}
+/>
       </header>
 
       {/* Search */}
