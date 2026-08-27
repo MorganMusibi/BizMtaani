@@ -2052,3 +2052,5 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
 
   return { success: true };
 });
+
+          export * from "./src/backfillVisibilityScope";
