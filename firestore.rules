@@ -1,79 +1,500 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function isAuth() { return request.auth != null; }
-    function isOwner(uid) { return isAuth() && request.auth.uid == uid; }
+    // ============================================================
+// ADMIN HELPER
+// ============================================================
 
-    // Users: own profile only
-    match /users/{uid} {
-      allow read, write: if isOwner(uid);
-    }
+function isAdmin() {
+return request.auth != null
+&& request.auth.token.admin == true;
+}
 
-    // Products: anyone reads active; only seller writes
-    match /products/{productId} {
-      allow read: if resource.data.status != 'pending_payment'
-                    || (isAuth() && request.auth.uid == resource.data.sellerId);
-      allow create: if isAuth() && request.resource.data.sellerId == request.auth.uid;
-      allow update, delete: if isAuth() && resource.data.sellerId == request.auth.uid;
-    }
+    // ============================================================
+// USERS
+// ============================================================
 
-    // Orders: buyer creates; buyer or seller reads; seller updates status only
-    match /orders/{orderId} {
-      allow read: if isAuth()
-                    && (request.auth.uid == resource.data.buyerId
-                        || request.auth.uid == resource.data.sellerId);
-      allow create: if isAuth()
-                      && request.resource.data.buyerId == request.auth.uid
-                      && request.resource.data.buyerId != request.resource.data.sellerId;
-      allow update: if isAuth()
-                      && resource.data.sellerId == request.auth.uid
-                      && request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['status', 'updatedAt']);
-      allow delete: if false;
-    }
+match /users/{userId} {
 
-    // Payments: owner reads; backend (Admin SDK) writes only
-    match /payments/{paymentId} {
-      allow read: if isAuth() && request.auth.uid == resource.data.userId;
-      allow write: if false;
-    }
+// Any authenticated user can read user profiles.
+allow read:
+if request.auth != null;
 
-    // Chats: participants only
-    match /chats/{chatId} {
-      allow read, write: if isAuth()
-                           && (request.auth.uid == resource.data.buyerId
-                               || request.auth.uid == resource.data.sellerId);
-      allow create: if isAuth()
-                      && (request.resource.data.buyerId == request.auth.uid
-                          || request.resource.data.sellerId == request.auth.uid);
-      match /messages/{msgId} {
-        allow read, write: if isAuth()
-                             && (request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.buyerId
-                                 || request.auth.uid == get(/databases/$(database)/documents/chats/$(chatId)).data.sellerId);
-      }
-    }
+// Users can only create their own profile.
+allow create:
+if request.auth != null
+&& request.auth.uid == userId;
 
-    // Jobs: anyone reads; authenticated creates; owner edits/deletes
-    match /jobs/{jobId} {
-      allow read: if true;
-      allow create: if isAuth() && request.resource.data.posterId == request.auth.uid;
-      allow update, delete: if isAuth() && resource.data.posterId == request.auth.uid;
-    }
+// Admins can update any user.
+//
+// Normal users can update their own profile,
+// but cannot modify privileged fields.
+allow update:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == userId
+&& request.resource.data.diff(resource.data)
+.affectedKeys()
+.hasNone([
+"isAdmin",
+"role",
+"admin",
+"adminRole",
+"blocked",
+"blockReason",
+"blockedAt",
+"subscriptionPlan",
+"premiumEndsAt"
+ ])
+);
+// Users can only delete their own profile.
+// Admins can delete any user.
+allow delete:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == userId
+);
+}
 
-    // Community posts: authenticated reads/creates; author edits/deletes
-    match /community_posts/{postId} {
-      allow read, create: if isAuth();
-      allow update, delete: if isAuth() && resource.data.authorId == request.auth.uid;
-      match /comments/{commentId} {
-        allow read, create: if isAuth();
-        allow update, delete: if isAuth() && resource.data.authorId == request.auth.uid;
-      }
-    }
+// ============================================================
+// PRODUCTS / ADVERTS
+// ============================================================
 
-    // Deny everything else
-    match /{document=**} {
-      allow read, write: if false;
-    }
+match /products/{productId} {
+
+// Anyone can view adverts.
+allow read:
+if true;
+
+// Authenticated users can create adverts.
+//
+// The sellerId must belong to the authenticated user.
+allow create:
+if request.auth != null
+&& request.resource.data.sellerId
+== request.auth.uid;
+
+// Only the product owner or admin can update.
+//
+// Normal users cannot transfer ownership by changing sellerId,
+// and can ONLY change the hotelMenu field — every other field
+// (status, plan, price, expiresAt, imageUrls, etc.) must stay
+// exactly as it was, since those are only meant to change via
+// the publishAdvert / mpesaCallback Cloud Functions.
+allow update:
+if isAdmin()
+|| (
+request.auth != null
+&& resource.data.sellerId
+== request.auth.uid
+&& request.resource.data.sellerId
+== resource.data.sellerId
+&& request.resource.data.diff(resource.data)
+.affectedKeys()
+.hasOnly(["hotelMenu"])
+);
+
+// Only the product owner or admin can delete.
+allow delete:
+if isAdmin()
+|| (
+request.auth != null
+&& resource.data.sellerId
+== request.auth.uid
+);
+}
+
+// ============================================================
+// JOBS
+// ============================================================
+
+match /jobs/{jobId} {
+
+// Anyone can view jobs.
+allow read:
+if true;
+
+// Authenticated users can create jobs.
+//
+// The posterId must belong to the authenticated user.
+allow create:
+if request.auth != null
+&& request.resource.data.posterId
+== request.auth.uid;
+
+// Only the job owner or admin can update.
+//
+// Normal users cannot transfer ownership
+// by changing posterId.
+allow update:
+if isAdmin()
+|| (
+request.auth != null
+&& resource.data.posterId
+== request.auth.uid
+&& request.resource.data.posterId
+== resource.data.posterId
+);
+
+// Client-side deletes are blocked entirely.
+//
+// Deleting a job must go through the deleteJob Cloud
+// Function, which also cleans up associated application
+// chats to avoid ghost chats referencing a deleted job.
+//
+// Firebase Cloud Functions using the Admin SDK
+// bypass Firestore Security Rules.
+allow delete:
+if false;
+}
+
+    // ============================================================
+// PAYMENTS
+// ============================================================
+
+match /payments/{paymentId} {
+
+// Admins can read any payment record. A buyer can read their own
+// payment record — this is what MpesaPaymentModal's live status
+// listener relies on to detect when an STK push completes.
+allow read:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == resource.data.buyerId
+);
+
+// Client-side users cannot create, update or delete payments.
+//
+// Firebase Cloud Functions using the Admin SDK
+// bypass Firestore Security Rules.
+allow create, update, delete:
+if false;
+}
+
+
+// ============================================================
+// MARKETERS
+// ============================================================
+
+match /marketers/{marketerId} {
+
+// A user can read their own marketer record (to check status,
+// referral code, and earnings on their Profile page). Admins can
+// read any marketer record.
+allow read:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == marketerId
+);
+
+// All writes go through approveMarketer / markPayoutPaid /
+// closeMonthlyEarnings Cloud Functions (Admin SDK bypasses this).
+allow create, update, delete:
+if false;
+}
+
+// ============================================================
+// MARKETER APPLICATIONS
+// ============================================================
+
+match /marketerApplications/{applicantId} {
+
+// A user can read their own application (to check pending status
+// on their Profile page). Admins can read any application, to
+// review and approve/reject them.
+allow read:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == applicantId
+);
+
+// Applications are created exclusively through the applyForMarketer
+// Cloud Function (Admin SDK bypasses this rule).
+allow create:
+if false;
+
+// Only admins can update (approve/reject) an application.
+allow update:
+if isAdmin();
+
+allow delete:
+if false;
+}
+// ============================================================
+// CHAT AND MESSAGING
+// KEEPING YOUR CURRENT WORKING RULES
+// ============================================================
+
+match /chats/{chatId} {
+
+// ------------------------------------------------------------
+  // CREATE CHAT
+  // ------------------------------------------------------------
+  // A user can only create a chat if they are one of the
+  // participants.
+  //
+  // This supports:
+  // - Direct chats
+  // - Product chats
+  // - Job application chats
+  // ------------------------------------------------------------
+
+  allow create:
+    if request.auth != null
+    && request.resource.data.participants is list
+    && request.resource.data.participants.size() >= 2
+    && request.auth.uid in request.resource.data.participants;
+
+  // ------------------------------------------------------------
+  // READ CHAT
+  // ------------------------------------------------------------
+  // Only participants can read the chat document.
+  // This is required by ChatList and ChatThread.
+  // ------------------------------------------------------------
+
+  allow read:
+    if request.auth != null
+    && request.auth.uid in resource.data.participants;
+
+
+  // ------------------------------------------------------------
+  // UPDATE CHAT
+  // ------------------------------------------------------------
+  // Participants can update the chat document.
+  //
+  // IMPORTANT:
+  // Do not allow normal users to change the participants list.
+  // This prevents one participant from adding/removing users
+  // from an existing chat.
+  //
+  // Other fields such as:
+  // - lastMessage
+  // - lastMessageAt
+  // - unreadCount
+  // - participantNames
+  // - participantPhotos
+  //
+  // can still be updated by participants.
+  // ------------------------------------------------------------
+
+  allow update:
+    if request.auth != null
+    && request.auth.uid in resource.data.participants
+    && request.resource.data.participants
+       == resource.data.participants;
+
+
+  // ------------------------------------------------------------
+  // DELETE CHAT
+  // ------------------------------------------------------------
+// A participant can delete the chat document.
+  //
+  // NOTE:
+  // Deleting the parent chat does not automatically delete
+  // subcollection messages in Firestore.
+  // ------------------------------------------------------------
+
+  allow delete:
+    if request.auth != null
+    && request.auth.uid in resource.data.participants;
+
+      match /messages/{messageId} {
+// ----------------------------------------------------------
+    // READ MESSAGES
+    // ----------------------------------------------------------
+    // Only chat participants can read messages.
+    // ----------------------------------------------------------
+
+    allow read:
+      if request.auth != null
+      && request.auth.uid in
+         get(
+           /databases/$(database)/documents/chats/$(chatId)
+         ).data.participants;
+
+
+    // ----------------------------------------------------------
+    // CREATE MESSAGE
+    // ----------------------------------------------------------
+    // Only chat participants can send messages.
+    //
+    // senderId MUST equal the authenticated user.
+    // This prevents someone from pretending to be another user.
+    // ----------------------------------------------------------
+
+    allow create:
+      if request.auth != null
+      && request.auth.uid in
+         get(
+           /databases/$(database)/documents/chats/$(chatId)
+         ).data.participants
+      && request.resource.data.senderId == request.auth.uid;
+
+
+    // ----------------------------------------------------------
+    // UPDATE MESSAGE
+    // ----------------------------------------------------------
+    //
+    // Participants can update messages, which supports:
+    //
+    // - deliveredAt
+    // - readAt
+    // - deletedFor
+    // - deletedForEveryone
+    //
+    // BUT:
+    // A user cannot change the senderId of a message.
+    //
+    // The original senderId must remain unchanged.
+    // ----------------------------------------------------------
+
+    allow update:
+      if request.auth != null
+      && request.auth.uid in
+         get(
+           /databases/$(database)/documents/chats/$(chatId)
+         ).data.participants
+      && request.resource.data.senderId
+         == resource.data.senderId;
+
+
+    // ----------------------------------------------------------
+    // DELETE MESSAGE
+    // ----------------------------------------------------------
+    //
+    // Only the original sender can permanently delete the
+    // Firestore message document.
+    //
+    // Your "Delete for me" feature should NOT use Firestore
+    // delete. It should update deletedFor instead.
+    //
+    // Your "Delete for everyone" feature can either:
+    //
+    // 1. Update deletedForEveryone = true
+    //    (recommended)
+    //
+    // OR
+    //
+    // 2. Permanently delete the document.
+    //
+    // This rule supports option 2 only for the sender.
+    // ----------------------------------------------------------
+
+    allow delete:
+      if request.auth != null
+      && request.auth.uid == resource.data.senderId;
   }
 }
+// ============================================================
+// MESSAGE REPORTS
+// ============================================================
+
+match /messageReports/{reportId} {
+
+// Message reports are created exclusively through the
+// submitMessageReport Cloud Function (verifies chat membership,
+// rate-limited; Admin SDK bypasses this rule). Direct client
+// writes are no longer permitted.
+allow create:
+if false;
+
+// Only admins can view reports.
+allow read:
+if isAdmin();
+
+// Only admins can update or delete reports.
+allow update, delete:
+if isAdmin();
+}
+// ============================================================
+// PRODUCT REPORTS
+// ============================================================
+
+match /reports/{reportId} {
+
+// Reports are created exclusively through the submitProductReport
+// Cloud Function (rate-limited, Admin SDK bypasses this rule).
+// Direct client writes are no longer permitted.
+allow create:
+if false;
+
+// Only admins can view reports.
+allow read:
+if isAdmin();
+
+// Only admins can update or delete reports.
+allow update, delete:
+if isAdmin();
+}
+
+// ============================================================
+// SUPPORT REPORTS
+// ============================================================
+
+match /supportReports/{reportId} {
+
+  // Support reports are created exclusively through the
+  // submitSupportReport Cloud Function (rate-limited, Admin SDK
+  // bypasses this rule). Direct client writes are no longer permitted.
+  allow create:
+    if false;
+
+  // Only admins can view, update, or delete support reports.
+  allow read, update, delete:
+    if isAdmin();
+}
+
+    // ============================================================
+// ADMIN AUDIT LOG
+// ============================================================
+
+match /adminAuditLog/{logId} {
+
+  // Only admins can write audit entries — both from Cloud Functions
+  // (Admin SDK, bypasses rules) and from direct admin dashboard writes.
+  allow create:
+    if isAdmin()
+    && request.resource.data.adminUid == request.auth.uid
+    && request.resource.data.action is string
+    && request.resource.data.createdAt == request.time;
+
+  // Only admins can review the log. Never editable or deletable —
+  // an audit trail that can be altered isn't a trail.
+  allow read:
+    if isAdmin();
+
+  allow update, delete:
+    if false;
+}
+// ============================================================
+// FCM TOKENS
+// ============================================================
+
+match /fcmTokens/{userId} {
+
+// Users can only access their own FCM token.
+allow read, create, update, delete:
+if request.auth != null
+&& request.auth.uid == userId;
+}
+
+// ============================================================
+// DEFAULT DENY
+// ============================================================
+//
+// Any collection not explicitly covered above
+// is denied by default because Firestore rules
+// are deny-by-default.
+//
+// No explicit catch-all rule is required here.
+// ============================================================
+}
+}
+
