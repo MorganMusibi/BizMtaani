@@ -6,11 +6,18 @@ import * as crypto from "crypto";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 
 admin.initializeApp();
 const db = admin.firestore();
+
+// Global ceiling for every function in this file — without this, an
+// abuse loop or traffic spike on any single function scales instances
+// unbounded, which is unbounded cost. Individual functions below can
+// still override these via their own options object (e.g. mpesaCallback).
+setGlobalOptions({ maxInstances: 10, memory: "256MiB", timeoutSeconds: 60 });
 
 // ─── Secrets ───────────────────────────────────────────────────────────────
 const cloudinaryApiKey = defineSecret("CLOUDINARY_API_KEY");
@@ -332,7 +339,7 @@ if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
 });
 
-export const mpesaCallback = onRequest(async (req, res) => {
+export const mpesaCallback = onRequest({ maxInstances: 20 }, async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
