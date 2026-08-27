@@ -5,7 +5,7 @@
 import * as crypto from "crypto";
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 
@@ -336,218 +336,222 @@ export const mpesaCallback = onRequest(async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
-    
+
     const paymentRef = db.collection("payments").doc(callback.CheckoutRequestID);
+
+    // Extract M-Pesa receipt number from Safaricom callback, if present —
+    // cheap synchronous work on data already in memory, safe to do
+    // before responding.
+    const callbackMetadata = callback.CallbackMetadata?.Item ?? [];
+    const mpesaCode =
+      callbackMetadata.find(
+        (item: { Name: string; Value?: unknown }) => item.Name === "MpesaReceiptNumber"
+      )?.Value ?? null;
 
     // Idempotency guard: Safaricom may deliver the same callback more
     // than once. Claim the payment atomically — only one concurrent
     // delivery can win the transaction and proceed past this point.
-    const claim = await db.runTransaction(async (tx) => {
+    // All heavy follow-up work (activation, commission, subscription
+    // extension, reactivation) is handled separately by
+    // processCompletedPayment, triggered off this status change — so
+    // this function can respond to Safaricom immediately, before any
+    // of that runs, rather than risk it being cut off mid-way once
+    // the response is sent.
+    await db.runTransaction(async (tx) => {
       const snap = await tx.get(paymentRef);
       const incomingHash = crypto.createHash("sha256").update(String(req.query["cbtoken"] ?? "")).digest("hex");
       if (!snap.exists || snap.data()?.callbackTokenHash !== incomingHash) {
-        return { shouldProcess: false, paymentData: null };
+        return;
       }
       const existingStatus = snap.data()?.status;
       if (existingStatus === "completed" || existingStatus === "failed") {
-        return { shouldProcess: false, paymentData: null };
+        return;
       }
-      // Claim it now, inside the transaction, before any other work runs.
-      tx.update(paymentRef, {
-        status: callback.ResultCode === 0 ? "completed" : "failed",
-      });
-      return { shouldProcess: true, paymentData: snap.data()! };
-    });
 
-    if (claim.shouldProcess) {
-      const paymentSnap = { data: () => claim.paymentData }; // keeps below code unchanged
       if (callback.ResultCode === 0) {
-  const paymentData = paymentSnap.data()!;
-
-  // Retrieve the plan from the payment record to determine duration
-  const plan = paymentData.plan ?? "free";
-  const durationDays = LISTING_DURATIONS[plan] ?? 7;
-
-  // Extract M-Pesa receipt number from Safaricom callback
-  const callbackMetadata =
-    callback.CallbackMetadata?.Item ?? [];
-
-  const mpesaCode =
-    callbackMetadata.find(
-      (item: { Name: string; Value?: unknown }) =>
-        item.Name === "MpesaReceiptNumber"
-    )?.Value ?? null;
-
-  // Save M-Pesa receipt (status was already claimed atomically above)
-  await paymentRef.update({
-    mpesaCode,
-    completedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-        // Activate the advert
-await db.collection("products").doc(paymentData.productId).update({
-  status: "active",
-  paidAt: admin.firestore.FieldValue.serverTimestamp(),
-  expiresAt: admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() + durationDays * 86_400_000)
-  )
-});
-
-await sendPushToUid(
-  paymentData.buyerId,
-  "Your advert is live! 🎉",
-  "Payment confirmed — your listing is now visible to buyers.",
-  { type: "advert_activated", productId: paymentData.productId }
-);
-
-        // Pay marketer commission, once per referred user, on their
-        // first successful premium payment only.
-        try {
-  const referralRef = db.collection("referrals").doc(paymentData.buyerId);
-  const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
-  const commission = Math.round(amountPaid * COMMISSION_RATE);
-  const now = new Date();
-  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-  let commissionJustPaid: { marketerUid: string } | null = null;
-
-  await db.runTransaction(async (tx) => {
-    const referralSnap = await tx.get(referralRef);
-    if (!referralSnap.exists || referralSnap.data()?.commissionPaidOut) return;
-
-    const { marketerUid } = referralSnap.data()!;
-    const marketerRef = db.collection("marketers").doc(marketerUid);
-    const marketerSnap = await tx.get(marketerRef);
-    const data = marketerSnap.data() ?? {};
-    const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
-    const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
-
-    tx.update(marketerRef, {
-      totalEarnedKES: admin.firestore.FieldValue.increment(commission),
-      signupsThisMonth: carriedCount + 1,
-      signupsMonthKey: monthKey,
-      earningsThisMonth: carriedEarnings + commission,
-      earningsMonthKey: monthKey,
-    });
-    tx.update(referralRef, { commissionPaidOut: true });
-
-    commissionJustPaid = { marketerUid };
-  });
-
-  if (commissionJustPaid) {
-    const { marketerUid } = commissionJustPaid;
-
-    await db.collection("referralCommissions").add({
-      marketerUid,
-      referredUserUid: paymentData.buyerId,
-      paymentId: callback.CheckoutRequestID,
-      amountPaidKES: amountPaid,
-      commissionKES: commission,
-      type: "first_premium_payment",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    try {
-      const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
-      const marketerToken = marketerTokenSnap.exists ? marketerTokenSnap.data()?.token : null;
-      if (marketerToken) {
-        await admin.messaging().send({
-          token: marketerToken,
-          notification: {
-            title: "Congrats🥳 Umepata commission! 🎉",
-            body: `Someone you referred went premium — KES ${commission} added to your earnings.`,
-          },
-          data: { type: "referral_commission" },
+        tx.update(paymentRef, {
+          status: "completed",
+          mpesaCode,
+          completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
-      }
-    } catch (notifyError) {
-      console.error("Failed to notify marketer of commission:", notifyError);
-    }
-  }
-} catch (error) {
-  console.error("Failed to process referral commission:", error);
-}
-
-        // Extend existing premium subscription instead of resetting it
-const userRef = db.collection("users").doc(paymentData.buyerId);
-const userSnap = await userRef.get();
-
-const userData = userSnap.exists ? userSnap.data() : null;
-
-const existingPremiumEndsAt =
-  userData?.premiumEndsAt?.toDate?.() ?? null;
-
-const now = new Date();
-
-// If the user already has an active subscription,
-// add the new duration to the existing expiry date.
-// Otherwise, start from now.
-const subscriptionStartDate =
-  existingPremiumEndsAt && existingPremiumEndsAt > now
-    ? existingPremiumEndsAt
-    : now;
-
-const newPremiumEndsAt = new Date(
-  subscriptionStartDate.getTime() +
-    durationDays * 86_400_000
-);
-
-const premiumEndsTimestamp =
-  admin.firestore.Timestamp.fromDate(newPremiumEndsAt);
-
-// Update main user subscription fields
-await userRef.set(
-  {
-    subscriptionPlan: plan,
-    premiumEndsAt: premiumEndsTimestamp,
-  },
-  { merge: true }
-);
-
-// Update detailed subscription document
-await userRef
-  .collection("subscription")
-  .doc("active")
-  .set({
-    planType: plan,
-    premiumEndsAt: premiumEndsTimestamp,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-        // Reactivate any archived hotel menu adverts now that the
-        // subscription has renewed. Bounded to 50 reads so this stays
-        // cheap even if it never needs to write anything.
-        const archivedAds = await db
-          .collection("products")
-          .where("sellerId", "==", paymentData.buyerId)
-          .where("status", "==", "archived")
-          .limit(50)
-          .get();
-
-        const reactivateBatch = db.batch();
-        let reactivatedCount = 0;
-        archivedAds.docs.forEach((doc) => {
-          const data = doc.data();
-          if (data.hotelMenu !== undefined && data.hotelMenu !== null) {
-            reactivateBatch.update(doc.ref, {
-              status: "active",
-              expiresAt: premiumEndsTimestamp,
-            });
-            reactivatedCount++;
-          }
-        });
-        if (reactivatedCount > 0) {
-          await reactivateBatch.commit();
-        }
       } else {
-        // Payment failed or was cancelled by the user (status already claimed above)
-        await paymentRef.update({
+        tx.update(paymentRef, {
+          status: "failed",
           failureReason: callback.ResultDesc ?? "Payment failed",
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       }
-    }
+    });
   } catch (err) { console.error(err); }
   res.json({ ResultCode: 0, ResultDesc: "Accepted" });
 });
+
+/**
+ * Fires when a payment doc's status changes to "completed" (set by
+ * mpesaCallback's fast claim transaction above). Does all the heavy
+ * follow-up work — advert activation, buyer notification, marketer
+ * commission, subscription extension, hotel-menu ad reactivation —
+ * outside the HTTP request/response cycle, so none of it risks being
+ * cut off by Cloud Run's post-response CPU throttling.
+ */
+export const processCompletedPayment = onDocumentUpdated(
+  "payments/{paymentId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!after) return;
+    if (before?.status === "completed" || after.status !== "completed") return;
+
+    const paymentData = after;
+    const checkoutRequestId = event.params.paymentId;
+
+    const plan = paymentData.plan ?? "free";
+    const durationDays = LISTING_DURATIONS[plan] ?? 7;
+
+    // Activate the advert
+    await db.collection("products").doc(paymentData.productId).update({
+      status: "active",
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + durationDays * 86_400_000)
+      ),
+    });
+
+    await sendPushToUid(
+      paymentData.buyerId,
+      "Your advert is live! 🎉",
+      "Payment confirmed — your listing is now visible to buyers.",
+      { type: "advert_activated", productId: paymentData.productId }
+    );
+
+    // Pay marketer commission, once per referred user, on their
+    // first successful premium payment only.
+    try {
+      const referralRef = db.collection("referrals").doc(paymentData.buyerId);
+      const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
+      const commission = Math.round(amountPaid * COMMISSION_RATE);
+      const now = new Date();
+      const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      let commissionJustPaid: { marketerUid: string } | null = null;
+
+      await db.runTransaction(async (tx) => {
+        const referralSnap = await tx.get(referralRef);
+        if (!referralSnap.exists || referralSnap.data()?.commissionPaidOut) return;
+
+        const { marketerUid } = referralSnap.data()!;
+        const marketerRef = db.collection("marketers").doc(marketerUid);
+        const marketerSnap = await tx.get(marketerRef);
+        const data = marketerSnap.data() ?? {};
+        const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
+        const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
+
+        tx.update(marketerRef, {
+          totalEarnedKES: admin.firestore.FieldValue.increment(commission),
+          signupsThisMonth: carriedCount + 1,
+          signupsMonthKey: monthKey,
+          earningsThisMonth: carriedEarnings + commission,
+          earningsMonthKey: monthKey,
+        });
+        tx.update(referralRef, { commissionPaidOut: true });
+
+        commissionJustPaid = { marketerUid };
+      });
+
+      if (commissionJustPaid) {
+        const { marketerUid } = commissionJustPaid;
+
+        await db.collection("referralCommissions").add({
+          marketerUid,
+          referredUserUid: paymentData.buyerId,
+          paymentId: checkoutRequestId,
+          amountPaidKES: amountPaid,
+          commissionKES: commission,
+          type: "first_premium_payment",
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+
+        try {
+          const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
+          const marketerToken = marketerTokenSnap.exists ? marketerTokenSnap.data()?.token : null;
+          if (marketerToken) {
+            await admin.messaging().send({
+              token: marketerToken,
+              notification: {
+                title: "Congrats🥳 Umepata commission! 🎉",
+                body: `Someone you referred went premium — KES ${commission} added to your earnings.`,
+              },
+              data: { type: "referral_commission" },
+            });
+          }
+        } catch (notifyError) {
+          console.error("Failed to notify marketer of commission:", notifyError);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to process referral commission:", error);
+    }
+
+    // Extend existing premium subscription instead of resetting it
+    const userRef = db.collection("users").doc(paymentData.buyerId);
+    const userSnap = await userRef.get();
+
+    const userData = userSnap.exists ? userSnap.data() : null;
+
+    const existingPremiumEndsAt = userData?.premiumEndsAt?.toDate?.() ?? null;
+
+    const now = new Date();
+
+    const subscriptionStartDate =
+      existingPremiumEndsAt && existingPremiumEndsAt > now ? existingPremiumEndsAt : now;
+
+    const newPremiumEndsAt = new Date(
+      subscriptionStartDate.getTime() + durationDays * 86_400_000
+    );
+
+    const premiumEndsTimestamp = admin.firestore.Timestamp.fromDate(newPremiumEndsAt);
+
+    await userRef.set(
+      {
+        subscriptionPlan: plan,
+        premiumEndsAt: premiumEndsTimestamp,
+      },
+      { merge: true }
+    );
+
+    await userRef.collection("subscription").doc("active").set({
+      planType: plan,
+      premiumEndsAt: premiumEndsTimestamp,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Reactivate any archived hotel menu adverts now that the
+    // subscription has renewed. Bounded to 50 reads so this stays
+    // cheap even if it never needs to write anything.
+    const archivedAds = await db
+      .collection("products")
+      .where("sellerId", "==", paymentData.buyerId)
+      .where("status", "==", "archived")
+      .limit(50)
+      .get();
+
+    const reactivateBatch = db.batch();
+    let reactivatedCount = 0;
+    archivedAds.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.hotelMenu !== undefined && data.hotelMenu !== null) {
+        reactivateBatch.update(doc.ref, {
+          status: "active",
+          expiresAt: premiumEndsTimestamp,
+        });
+        reactivatedCount++;
+      }
+    });
+    if (reactivatedCount > 0) {
+      await reactivateBatch.commit();
+    }
+  }
+);
 
 async function deleteCloudinaryImage(publicId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
