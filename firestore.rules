@@ -22,10 +22,24 @@ match /users/{userId} {
 allow read:
 if request.auth != null;
 
-// Users can only create their own profile.
+// Users can only create their own profile, and cannot self-grant
+// privileged or monetisation fields at creation time — same
+// restriction as update, since account creation is a direct client
+// write (Register.tsx / ProfileSetupModal.tsx), not a Cloud Function.
 allow create:
 if request.auth != null
-&& request.auth.uid == userId;
+&& request.auth.uid == userId
+&& !request.resource.data.keys().hasAny([
+"isAdmin",
+"role",
+"admin",
+"adminRole",
+"blocked",
+"blockReason",
+"blockedAt",
+"subscriptionPlan",
+"premiumEndsAt"
+]);
 
 // Admins can update any user.
 //
