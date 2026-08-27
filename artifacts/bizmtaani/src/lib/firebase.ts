@@ -17,17 +17,10 @@ const firebaseConfig = {
 
 export const app = initializeApp(firebaseConfig);
 
-// App Check — proves requests are coming from your real app, not a
-// scripted client. Currently in monitor-only mode: enforcement isn't
-// turned on yet in Firebase Console, so this just starts sending
-// tokens and populating the metrics dashboard. Debug token lets
-// localhost keep working during development without a real domain
-// match.
-if (import.meta.env.DEV) {
-  // @ts-expect-error — Firebase's documented way to enable App Check
-  // debug mode locally; not typed in the SDK.
-  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-}
+// App Check — proves requests are coming from the real deployed app,
+// not a scripted client. Currently in monitor-only mode: enforcement
+// isn't turned on yet in Firebase Console, so this just starts
+// sending tokens and populating the metrics dashboard.
 initializeAppCheck(app, {
   provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
   isTokenAutoRefreshEnabled: true,
