@@ -328,7 +328,7 @@ if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
   const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(stkBody) });
   const darajaData = await darajaRes.json() as any;
   if (!darajaRes.ok || darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
-  await db.collection("payments").doc(darajaData.CheckoutRequestID).set({ checkoutRequestId: darajaData.CheckoutRequestID, callbackToken, plan, productId, buyerId: request.auth.uid, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  await db.collection("payments").doc(darajaData.CheckoutRequestID).set({ checkoutRequestId: darajaData.CheckoutRequestID, callbackTokenHash: crypto.createHash("sha256").update(callbackToken).digest("hex"), plan, productId, buyerId: request.auth.uid, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp() });
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
 });
 
@@ -344,7 +344,8 @@ export const mpesaCallback = onRequest(async (req, res) => {
     // delivery can win the transaction and proceed past this point.
     const claim = await db.runTransaction(async (tx) => {
       const snap = await tx.get(paymentRef);
-      if (!snap.exists || snap.data()?.callbackToken !== req.query["cbtoken"]) {
+      const incomingHash = crypto.createHash("sha256").update(String(req.query["cbtoken"] ?? "")).digest("hex");
+      if (!snap.exists || snap.data()?.callbackTokenHash !== incomingHash) {
         return { shouldProcess: false, paymentData: null };
       }
       const existingStatus = snap.data()?.status;
