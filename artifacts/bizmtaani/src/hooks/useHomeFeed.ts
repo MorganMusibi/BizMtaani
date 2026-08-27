@@ -1,15 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  where, 
-  limit, 
-  startAfter, 
-  getDocs, 
-  getDoc,    
-  doc,       
-  QueryDocumentSnapshot, 
+import {
+  collection,
+  query,
+  orderBy,
+  where,
+  limit,
+  startAfter,
+  getDocs,
+  Timestamp,
+  QueryDocumentSnapshot,
   DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -37,18 +36,57 @@ const HOME_FEED_RADIUS_STEPS = [
 ];
 
 const HOME_FEED_MAX_RADIUS_KM = 30;   // was 50
+
+// ============================================================
+// SERIALIZABLE CURSORS
+//
+// Firestore QueryDocumentSnapshot objects cannot survive a
+// JSON.stringify round trip, which is why the old cache had to
+// strip cursors before writing to localStorage (and lost your
+// place in every paginated list on every hard reload).
+//
+// Both order-by fields this file ever uses (createdAt, geohash)
+// can be represented as plain, serializable values instead, and
+// Firestore's startAfter() accepts raw field values just as
+// happily as it accepts a document snapshot — so we build cursors
+// from the field values directly and never need the snapshot
+// itself past the point of extracting it.
+// ============================================================
+type CreatedAtCursor = { seconds: number; nanoseconds: number };
+type GeohashCursor = string;
+
+function createdAtCursorFromDoc(
+  doc: QueryDocumentSnapshot<DocumentData>
+): CreatedAtCursor | null {
+  const createdAt = doc.get("createdAt");
+  if (!createdAt || typeof createdAt.seconds !== "number") return null;
+  return {
+    seconds: createdAt.seconds,
+    nanoseconds: typeof createdAt.nanoseconds === "number" ? createdAt.nanoseconds : 0,
+  };
+}
+
+function geohashCursorFromDoc(
+  doc: QueryDocumentSnapshot<DocumentData>
+): GeohashCursor | null {
+  const geohash = doc.get("geohash");
+  return typeof geohash === "string" ? geohash : null;
+}
+
+function createdAtCursorToTimestamp(cursor: CreatedAtCursor): Timestamp {
+  return new Timestamp(cursor.seconds, cursor.nanoseconds);
+}
+
 interface FeedCacheEntry {
   wardProducts: Product[];
-  wardCursor: Cursor | null;
+  wardCursor: CreatedAtCursor | null;
   wardDone: boolean;
   areaProducts: Product[];
   areaBuffer: Product[];
-  areaCursors: Record<string, Cursor | null>;
+  areaCursors: Record<string, GeohashCursor | null>;
   areaDonePrefixes: Record<string, boolean>;
   areaDone: boolean;
   areaRadiusStage: number;
-  nationwideCursor: Cursor | null;
-  nationwideDone: boolean;
   timestamp: number;
 }
 const FEED_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
@@ -56,10 +94,14 @@ function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   try {
     const raw = localStorage.getItem("bizmtaani_feed_cache");
     if (!raw) return new Map();
-    const parsed = JSON.parse(raw) as Record<string, Omit<FeedCacheEntry, "wardCursor" | "areaCursors" | "nationwideCursor"> & { wardCursor: null; areaCursors: Record<string, null>; nationwideCursor: null }>;
+    const parsed = JSON.parse(raw) as Record<string, FeedCacheEntry>;
     const map = new Map<string, FeedCacheEntry>();
+    // FIX: cursors are now plain JSON-safe values (a {seconds,nanoseconds}
+    // object or a geohash string), so — unlike the old wardCursor/
+    // areaCursors/nationwideCursor snapshot fields — they survive the
+    // round trip and are restored as-is instead of being nulled out.
     Object.entries(parsed).forEach(([key, entry]) => {
-      map.set(key, { ...entry, wardCursor: null, areaCursors: {}, nationwideCursor: null });
+      map.set(key, entry);
     });
     return map;
   } catch {
@@ -88,10 +130,11 @@ function saveFeedCacheToStorage(cache: Map<string, FeedCacheEntry>) {
       }
     }
 
-    const serializable: Record<string, unknown> = {};
+    // FIX: no more stripping wardCursor/areaCursors/nationwideCursor —
+    // they're plain values now, so the whole entry is serializable.
+    const serializable: Record<string, FeedCacheEntry> = {};
     cache.forEach((entry, key) => {
-      const { wardCursor, areaCursors, nationwideCursor, ...rest } = entry;
-      serializable[key] = rest;
+      serializable[key] = entry;
     });
     localStorage.setItem("bizmtaani_feed_cache", JSON.stringify(serializable));
   } catch {
@@ -103,11 +146,40 @@ const feedCache = loadFeedCacheFromStorage();
 
 // Lightweight, nationwide "recent listings" used only as placeholder
 // content while the real location-based feed is still resolving (GPS
-// permission prompt, reverse geocode, ward/area queries). Cached
-// briefly at module level so re-mounting Home within the TTL doesn't
-// re-fetch it.
+// permission prompt, reverse geocode, ward/area queries).
+//
+// FIX: this used to be an in-memory-only module variable, which meant
+// it reset on every hard reload/full navigation and re-ran the query
+// every single time — the exact "re-runs on every hard load" cost
+// called out in the review. It's now persisted the same way feedCache
+// is, with its own TTL and key.
 const PREVIEW_CACHE_TTL_MS = 5 * 60 * 1000;
-let previewCache: { products: Product[]; timestamp: number } | null = null;
+const PREVIEW_CACHE_KEY = "bizmtaani_preview_cache";
+
+function loadPreviewCacheFromStorage(): { products: Product[]; timestamp: number } | null {
+  try {
+    const raw = localStorage.getItem(PREVIEW_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { products: Product[]; timestamp: number };
+    if (Date.now() - parsed.timestamp >= PREVIEW_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePreviewCacheToStorage(products: Product[]) {
+  try {
+    localStorage.setItem(
+      PREVIEW_CACHE_KEY,
+      JSON.stringify({ products, timestamp: Date.now() })
+    );
+  } catch {
+    // localStorage full or unavailable — preview just won't persist across reload
+  }
+}
+
+let previewCache: { products: Product[]; timestamp: number } | null = loadPreviewCacheFromStorage();
 
 // Called after a successful advert post so the poster's own device
 // shows the new advert immediately instead of waiting out the TTL.
@@ -117,6 +189,15 @@ export function clearFeedCache() {
   feedCache.clear();
   try {
     localStorage.removeItem("bizmtaani_feed_cache");
+  } catch {
+    // localStorage unavailable — nothing to clear, safe to ignore
+  }
+  // FIX: also clear the (now persisted) preview cache, so a poster's
+  // own new listing shows up in the nationwide preview strip too,
+  // instead of only in their ward/area feed.
+  previewCache = null;
+  try {
+    localStorage.removeItem(PREVIEW_CACHE_KEY);
   } catch {
     // localStorage unavailable — nothing to clear, safe to ignore
   }
@@ -175,7 +256,14 @@ county?: string;
   phone?: string;
   geohash?: string;
 
-  createdAt?: { seconds: number } | null;
+  // FIX: nanoseconds added alongside seconds. The raw Firestore
+  // Timestamp on the document always carries both — toProducts()
+  // spreads the whole raw document, so this was always present on
+  // the actual object, just not declared in the type. Declaring it
+  // lets category-page pagination build an exact-precision cursor
+  // straight from an already-loaded Product, without the extra
+  // getDoc() read the old code needed just to look the snapshot back up.
+  createdAt?: { seconds: number; nanoseconds: number } | null;
   expiresAt?: { seconds: number } | null;
 
   status?: string;
@@ -187,7 +275,6 @@ visibilityRadiusKm?: number;
 isPremium?: boolean;
 verified?: boolean;
 }
-type Cursor = QueryDocumentSnapshot<DocumentData>;
 
  export function getDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number) {
   const R = 6371;
@@ -495,7 +582,7 @@ export function rankProducts(
 
 function wardQuery(
   wardName: string,
-  cursor?: Cursor
+  cursor?: CreatedAtCursor | null
 ) {
   const coll = collection(db, "products");
 
@@ -504,7 +591,7 @@ function wardQuery(
       coll,
       where("ward", "==", wardName),
       orderBy("createdAt", "desc"),
-      startAfter(cursor),
+      startAfter(createdAtCursorToTimestamp(cursor)),
       limit(WARD_PAGE)
     );
   }
@@ -517,7 +604,7 @@ function wardQuery(
   );
 }
   function searchQueryAllProducts(
-  cursor?: Cursor
+  cursor?: CreatedAtCursor | null
 ) {
   const coll = collection(db, "products");
 
@@ -525,7 +612,7 @@ function wardQuery(
     return query(
       coll,
       orderBy("createdAt", "desc"),
-      startAfter(cursor),
+      startAfter(createdAtCursorToTimestamp(cursor)),
       limit(AREA_PAGE)
     );
   }
@@ -536,11 +623,43 @@ function wardQuery(
     limit(AREA_PAGE)
   );
   }
+
+// ============================================================
+// FIX — SERVER-SIDE PREMIUM FILTER (the big one)
+//
+// isProductEligibleForFeedStage() already rejects every non-premium
+// product for stageIndex >= 1 — but the old areaQueries() had no way
+// to tell Firestore that, so it fetched (and paid for) every free
+// listing in the geohash prefix too, just to throw almost all of it
+// away client-side. In a ward with lots of free listings and few
+// premium ones, a single scroll-triggered stage expansion could read
+// through that ward's *entire* free-listing history before the
+// "buffer full or prefix exhausted" loop ever stopped.
+//
+// `premiumOnly` adds where("visibilityScope","in",["county","all_areas"])
+// so stages 1+ only ever fetch documents that could possibly pass the
+// stage filter in the first place.
+//
+// IMPORTANT — this relies on visibilityScope being set on the
+// document. getProductVisibilityScope()'s legacy fallback (an old
+// premium doc with `plan`/`isPremium` set but no `visibilityScope`
+// field) still works for *stage 0* and for direct visibility checks,
+// but a server-side `where` clause can't see a field that isn't
+// there — a legacy premium doc with no visibilityScope would be
+// silently skipped by this filter at stage 1+. Run the one-off
+// backfill script (provided alongside this file) before shipping
+// this change, so every existing premium doc has visibilityScope
+// explicitly set to "county" or "all_areas". New adverts already set
+// this field going forward (per getProductVisibilityScope's "new
+// adverts" branch), so this is a one-time migration, not an ongoing
+// requirement.
+// ============================================================
 function areaQueries(
   coords: [number, number],
   radiusKm: number,
-  cursors: Record<string, Cursor | null> = {},
-  donePrefixes: Record<string, boolean> = {}
+  cursors: Record<string, GeohashCursor | null> = {},
+  donePrefixes: Record<string, boolean> = {},
+  premiumOnly: boolean = false
 ) {
   const prefixes = getNearbyGeohashPrefixes(
   coords[0],
@@ -559,12 +678,16 @@ function areaQueries(
       }
 
       const cursor = cursors[key];
+      const scopeFilter = premiumOnly
+        ? [where("visibilityScope", "in", ["county", "all_areas"] as const)]
+        : [];
 
       if (cursor) {
         return query(
           coll,
           where("geohash", ">=", prefix),
           where("geohash", "<", prefix + "\uf8ff"),
+          ...scopeFilter,
           orderBy("geohash"),
           startAfter(cursor),
           limit(AREA_BUFFER_FETCH)
@@ -575,6 +698,7 @@ function areaQueries(
         coll,
         where("geohash", ">=", prefix),
         where("geohash", "<", prefix + "\uf8ff"),
+        ...scopeFilter,
         orderBy("geohash"),
         limit(AREA_BUFFER_FETCH)
       );
@@ -584,39 +708,10 @@ function areaQueries(
     );
 }
 
-// Unbounded by geohash — used only once the normal 2.5→50km discovery
-// stages are exhausted, to surface premium adverts from anywhere in
-// Kenya. Only matches adverts with an explicit visibilityScope of
-// "county" or "all_areas" — legacy premium adverts without that field
-// set are still found via the normal radius stages (isPremiumProduct
-// still makes them eligible there), just not by this nationwide stage.
-function nationwidePremiumQuery(cursor?: Cursor) {
-  const coll = collection(db, "products");
-
-  if (cursor) {
-    return query(
-      coll,
-      where("status", "==", "active"),
-      where("visibilityScope", "in", ["county", "all_areas"]),
-      orderBy("createdAt", "desc"),
-      startAfter(cursor),
-      limit(AREA_PAGE)
-    );
-  }
-
-  return query(
-    coll,
-    where("status", "==", "active"),
-    where("visibilityScope", "in", ["county", "all_areas"]),
-    orderBy("createdAt", "desc"),
-    limit(AREA_PAGE)
-  );
-}
-
 function categorySubcategoryQuery(
   category: string,
   subcategory: string,
-  cursor?: Cursor
+  cursor?: CreatedAtCursor | null
 ) {
   const coll = collection(db, "products");
 
@@ -628,7 +723,7 @@ function categorySubcategoryQuery(
       where("subcategory", "==", subcategory),
       where("status", "==", "active"),
       orderBy("createdAt", "desc"),
-      startAfter(cursor),
+      startAfter(createdAtCursorToTimestamp(cursor)),
       limit(AREA_PAGE)
     );
   }
@@ -677,7 +772,7 @@ const initialCached = initialCacheKey ? getFreshFeedCacheEntry(initialCacheKey) 
 const skipNextResetRef = useRef(initialCached ? initialCacheKey : null);
 
 const [wardProducts, setWardProducts] = useState<Product[]>(initialCached?.wardProducts ?? []);
-  const [wardCursor, setWardCursor] = useState<Cursor | null>(initialCached?.wardCursor ?? null);
+  const [wardCursor, setWardCursor] = useState<CreatedAtCursor | null>(initialCached?.wardCursor ?? null);
   const [wardDone, setWardDone] = useState(initialCached?.wardDone ?? false);
   const [wardLoading, setWardLoading] = useState(false);
 
@@ -688,7 +783,7 @@ const [areaProducts, setAreaProducts] = useState<Product[]>(initialCached?.areaP
 // 1 = 5 km
 // 2 = 10 km
 // 3 = 20 km
-// 4 = 50 km
+// 4 = 30 km
 //
 // This controls candidate discovery only.
 // It does NOT change advert visibility permissions.
@@ -697,17 +792,12 @@ const [areaRadiusStage, setAreaRadiusStage] = useState(initialCached?.areaRadius
 // These act as the nearby pagination buffer.
 const [areaBuffer, setAreaBuffer] = useState<Product[]>(initialCached?.areaBuffer ?? []);
 
-const [areaCursors, setAreaCursors] = useState<Record<string, Cursor | null>>(initialCached?.areaCursors ?? {});
+const [areaCursors, setAreaCursors] = useState<Record<string, GeohashCursor | null>>(initialCached?.areaCursors ?? {});
 const [areaDonePrefixes, setAreaDonePrefixes] = useState<Record<string, boolean>>(initialCached?.areaDonePrefixes ?? {});
 const [areaDone, setAreaDone] = useState(initialCached?.areaDone ?? false);
 const [areaLoading, setAreaLoading] = useState(false);
 
-// Nationwide premium discovery — only used once the geohash radius
-// stages (2.5→50km) are exhausted. Tracked separately since it isn't
-// geohash-keyed like areaCursors/areaDonePrefixes.
-const [nationwideCursor, setNationwideCursor] = useState<Cursor | null>(initialCached?.nationwideCursor ?? null);
-const [nationwideDone, setNationwideDone] = useState(initialCached?.nationwideDone ?? false);
-const [searchCursor, setSearchCursor] = useState<Cursor | null>(null);
+const [searchCursor, setSearchCursor] = useState<CreatedAtCursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
 const [initialLoading, setInitialLoading] = useState(!initialCached);
@@ -734,6 +824,7 @@ useEffect(() => {
       if (!cancelled) {
         setPreviewProducts(products);
         previewCache = { products, timestamp: Date.now() };
+        savePreviewCacheToStorage(products);
       }
     } catch (error) {
       console.error("Failed to load preview listings:", error);
@@ -769,8 +860,6 @@ setAreaCursors({});
 setAreaDone(false);
 setAreaDonePrefixes({});   
 setAreaRadiusStage(0);
-setNationwideCursor(null);
-setNationwideDone(false);
 
 setSearchCursor(null);
 setSearchDone(false);
@@ -790,8 +879,6 @@ setSearchDone(false);
     setAreaDonePrefixes(cached.areaDonePrefixes);
     setAreaDone(cached.areaDone);
     setAreaRadiusStage(cached.areaRadiusStage ?? 0);
-    setNationwideCursor(cached.nationwideCursor);
-    setNationwideDone(cached.nationwideDone);
     setInitialLoading(false);
     return;
   }
@@ -826,11 +913,8 @@ setSearchDone(false);
       )
     );
 
-    setSearchCursor(
-  snap.docs[
-    snap.docs.length - 1
-  ] ?? null
-);
+    const lastDoc = snap.docs[snap.docs.length - 1];
+    setSearchCursor(lastDoc ? createdAtCursorFromDoc(lastDoc) : null);
 
 setSearchDone(
   snap.docs.length < AREA_PAGE
@@ -890,8 +974,6 @@ if (category && subcategory) {
         areaDonePrefixes: {},
         areaDone: snap.docs.length < AREA_PAGE,
         areaRadiusStage: 0,
-        nationwideCursor: null,
-        nationwideDone: false,
         timestamp: Date.now(),
       });
       saveFeedCacheToStorage(feedCache);
@@ -915,7 +997,7 @@ if (category && subcategory) {
     const wardName = locationInfo?.wardName ?? "";
 
     let localWardProducts: Product[] = [];
-    let localWardCursor: Cursor | null = null;
+    let localWardCursor: CreatedAtCursor | null = null;
     let localWardDone = true;
 
     if (wardName) {
@@ -931,7 +1013,8 @@ if (category && subcategory) {
 );
 
         localWardProducts = sortNearbyProducts(docs, userCoords);
-        localWardCursor = snap.docs[snap.docs.length - 1] ?? null;
+        const lastWardDoc = snap.docs[snap.docs.length - 1];
+        localWardCursor = lastWardDoc ? createdAtCursorFromDoc(lastWardDoc) : null;
         localWardDone = snap.docs.length < WARD_PAGE;
 
 setWardProducts(localWardProducts);
@@ -980,8 +1063,6 @@ setWardDone(localWardDone);
   areaDonePrefixes: {},
   areaDone: false,
   areaRadiusStage: 1,
-  nationwideCursor: null,
-  nationwideDone: false,
   timestamp: Date.now(),
 });
 saveFeedCacheToStorage(feedCache);
@@ -1003,7 +1084,7 @@ return;
 // ============================================================
 
 try {
-  let currentCursors: Record<string, Cursor | null> = {};
+  let currentCursors: Record<string, GeohashCursor | null> = {};
   let currentDonePrefixes: Record<string, boolean> = {};
 
   let collectedProducts: Product[] = [];
@@ -1028,11 +1109,16 @@ try {
   radiusKmToGeohashPrecision(currentRadius)
 );
 
+// Stage 0 allows both free and premium adverts (see
+// isProductEligibleForFeedStage), so it must NOT use the
+// premium-only server-side filter — that filter is only safe
+// for stage >= 1.
 const queries = areaQueries(
   userCoords,
   currentRadius,
   currentCursors,
-  currentDonePrefixes
+  currentDonePrefixes,
+  false
 );
 
     if (queries.length === 0) {
@@ -1095,7 +1181,7 @@ const queries = areaQueries(
 
     const updatedCursors: Record<
       string,
-      Cursor | null
+      GeohashCursor | null
     > = {
       ...currentCursors,
     };
@@ -1123,8 +1209,9 @@ const queries = areaQueries(
         return;
       }
 
-      if (snap.docs.length > 0) {
-        updatedCursors[key] = snap.docs[snap.docs.length - 1];
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      if (lastDoc) {
+        updatedCursors[key] = geohashCursorFromDoc(lastDoc);
       }
 
       if (snap.docs.length < AREA_BUFFER_FETCH) {
@@ -1183,8 +1270,6 @@ const queries = areaQueries(
   areaDonePrefixes: currentDonePrefixes,
   areaDone: localAreaDone,
   areaRadiusStage: 0,
-  nationwideCursor: null,
-  nationwideDone: false,
   timestamp: Date.now(),
 });
 saveFeedCacheToStorage(feedCache);
@@ -1248,9 +1333,8 @@ const loadMore = useCallback(async () => {
         );
       });
 
-      setSearchCursor(
-        snap.docs[snap.docs.length - 1] ?? searchCursor
-      );
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      setSearchCursor(lastDoc ? createdAtCursorFromDoc(lastDoc) : searchCursor);
 
       setSearchDone(
         snap.docs.length < AREA_PAGE
@@ -1275,17 +1359,14 @@ if (category && subcategory) {
 
   setAreaLoading(true);
   try {
-    // Get the current cursor from the last product
+    // FIX: the cursor is now built straight from the last loaded
+    // Product's own createdAt (seconds + nanoseconds — see the
+    // Product interface note above), so this no longer needs the
+    // extra getDoc() round trip the old code used purely to look the
+    // document snapshot back up. That was one full read spent on
+    // every single category page, just to reconstruct a cursor.
     const lastProduct = areaProducts[areaProducts.length - 1];
-    if (!lastProduct) {
-      setAreaDone(true);
-      return;
-    }
-
-    // We need to fetch the actual document snapshot for the cursor
-    const docRef = doc(db, "products", lastProduct.id);
-    const docSnap = await getDoc(docRef);
-    if (!docSnap.exists()) {
+    if (!lastProduct?.createdAt) {
       setAreaDone(true);
       return;
     }
@@ -1294,7 +1375,7 @@ if (category && subcategory) {
       categorySubcategoryQuery(
         category,
         subcategory,
-        docSnap
+        lastProduct.createdAt
       )
     );
 
@@ -1324,7 +1405,7 @@ if (category && subcategory) {
 //   Stage 1 → 5 km
 //   Stage 2 → 10 km
 //   Stage 3 → 20 km
-//   Stage 4 → 50 km
+//   Stage 4 → 30 km
 //
 // The feed always tries the closest geographic stage first.
 // When that stage is exhausted, it expands outward.
@@ -1366,8 +1447,6 @@ if (!areaDone && !areaLoading) {
     areaDonePrefixes,
     areaDone,
     areaRadiusStage,
-    nationwideCursor,
-    nationwideDone,
     timestamp: Date.now(),
   });
   saveFeedCacheToStorage(feedCache);
@@ -1396,9 +1475,15 @@ if (!areaDone && !areaLoading) {
       ] ??
       HOME_FEED_MAX_RADIUS_KM;
 
+    // FIX: stage >= 1 only ever accepts premium products (see
+    // isProductEligibleForFeedStage), so from here on areaQueries()
+    // is told to filter for that server-side instead of fetching
+    // every free listing in the prefix just to discard it client-side.
+    const stageIsPremiumOnly = areaRadiusStage >= 1;
+
     let currentCursors: Record<
       string,
-      Cursor | null
+      GeohashCursor | null
     > = {
       ...areaCursors,
     };
@@ -1441,7 +1526,8 @@ if (!areaDone && !areaLoading) {
           userCoords,
           currentRadius,
           currentCursors,
-          currentDonePrefixes
+          currentDonePrefixes,
+          stageIsPremiumOnly
         );
 
       if (queries.length === 0) {
@@ -1530,7 +1616,7 @@ if (!areaDone && !areaLoading) {
 
       const updatedCursors: Record<
         string,
-        Cursor | null
+        GeohashCursor | null
       > = {
         ...currentCursors,
       };
@@ -1567,15 +1653,14 @@ if (!areaDone && !areaLoading) {
             return;
           }
 
-          if (
-            snap.docs.length > 0
-          ) {
-            updatedCursors[
-              key
-            ] =
-              snap.docs[
-                snap.docs.length - 1
-              ];
+          const lastDoc =
+            snap.docs[
+              snap.docs.length - 1
+            ];
+
+          if (lastDoc) {
+            updatedCursors[key] =
+              geohashCursorFromDoc(lastDoc);
           }
 
           if (
@@ -1704,8 +1789,6 @@ feedCache.set(cacheKey, {
   areaDonePrefixes: resolvedDonePrefixes,
   areaDone: resolvedAreaDone,
   areaRadiusStage: resolvedNextStage,
-  nationwideCursor,
-  nationwideDone,
   timestamp: Date.now(),
 });
 saveFeedCacheToStorage(feedCache);
@@ -1733,8 +1816,6 @@ saveFeedCacheToStorage(feedCache);
   areaRadiusStage,
   areaCursors,
   areaDonePrefixes,
-  nationwideCursor,
-  nationwideDone,
   locationInfo?.wardName,
   wardProducts,
   wardCursor,
