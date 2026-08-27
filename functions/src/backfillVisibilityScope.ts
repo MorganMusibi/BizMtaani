@@ -51,11 +51,11 @@ export const backfillVisibilityScope = onRequest(
     try {
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        const pageQuery = cursorDoc
+        const pageQuery: FirebaseFirestore.Query = cursorDoc
           ? productsRef.orderBy("__name__").startAfter(cursorDoc).limit(BACKFILL_BATCH_SIZE)
           : productsRef.orderBy("__name__").limit(BACKFILL_BATCH_SIZE);
 
-        const snap = await pageQuery.get();
+        const snap: FirebaseFirestore.QuerySnapshot = await pageQuery.get();
         if (snap.empty) break;
 
         const batch = db.batch();
