@@ -3,7 +3,8 @@ import { getAuth, browserLocalPersistence, setPersistence } from "firebase/auth"
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported } from "firebase/messaging";
-import { getFunctions } from "firebase/functions"; // Added this
+import { getFunctions } from "firebase/functions";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check"; // NEW
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -15,6 +16,23 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
+
+// App Check — proves requests are coming from your real app, not a
+// scripted client. Currently in monitor-only mode: enforcement isn't
+// turned on yet in Firebase Console, so this just starts sending
+// tokens and populating the metrics dashboard. Debug token lets
+// localhost keep working during development without a real domain
+// match.
+if (import.meta.env.DEV) {
+  // @ts-expect-error — Firebase's documented way to enable App Check
+  // debug mode locally; not typed in the SDK.
+  self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+initializeAppCheck(app, {
+  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
+  isTokenAutoRefreshEnabled: true,
+});
+
 export const auth = getAuth(app);
 
 // Keep users signed in across browser restarts
