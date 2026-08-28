@@ -4,7 +4,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check"; // NEW
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -29,7 +29,7 @@ if (import.meta.env.DEV) {
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
 initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
+  provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
   isTokenAutoRefreshEnabled: true,
 });
 
