@@ -105,6 +105,91 @@ function isPremiumProduct(product: Product) {
     product.isPremium === true
   );
 }
+
+// Local dedupe-by-id — kept separate from useHomeFeed's own dedupe()
+// rather than importing it, since that one is typed against
+// useHomeFeed's own Product interface and this file declares its own
+// (structurally similar but independently maintained) Product type.
+function dedupeById(existing: Product[], incoming: Product[]): Product[] {
+  const ids = new Set(existing.map((p) => p.id));
+  return [...existing, ...incoming.filter((p) => !ids.has(p.id))];
+}
+
+// ============================================================
+// FIX — SAME "DON'T FETCH WHAT YOU'LL DISCARD" PATTERN AS
+// useHomeFeed.ts's areaQueries() AND CategoryAds's category queries.
+//
+// The old version ran one nationwide query per scope level
+// (subcategory, then category as a fallback) with no ward or
+// visibilityScope filter at all, then threw away every result that
+// isProductVisibleToUser() said the viewer shouldn't see. For a
+// "show 3 related items" widget this was never the same order of
+// cost as the home feed's radius fan-out, but it's the same
+// unnecessary-read shape, and worth fixing the same way while we're
+// touching this file — plus it's a smaller, cheaper query change
+// than the home feed's, since it doesn't need pagination at all.
+//
+// Split into a ward-scoped free query and a visibilityScope-scoped
+// premium query, same as categoryFreeQuery/categoryPremiumQuery in
+// useHomeFeed.ts. currentProduct.ward is used as the scope — matching
+// exactly what the old code already did by passing currentProduct.ward
+// as isProductVisibleToUser's userWardName argument (i.e. "related
+// items" has always meant "near this advert", not "near the viewer's
+// own resolved home ward").
+//
+// No new Firestore composite index should be needed for these two —
+// unlike categoryFreeQuery/categoryPremiumQuery, there's no orderBy
+// here, and Firestore can satisfy multiple equality/`in` filters
+// without a manual composite index as long as no ordering or range
+// filter is involved. If Firestore does ask for one (visible as a
+// console-link error), the fix is identical to the category-page
+// index walkthrough — just click its link.
+// ============================================================
+async function fetchScopedRelated(
+  fieldName: "subcategory" | "category",
+  fieldValue: string,
+  currentProductId: string,
+  currentProductWard: string | undefined,
+  fetchLimit: number
+): Promise<Product[]> {
+  const coll = collection(db, "products");
+
+  const freeQueryPromise = currentProductWard
+    ? getDocs(
+        query(
+          coll,
+          where(fieldName, "==", fieldValue),
+          where("status", "==", "active"),
+          where("ward", "==", currentProductWard),
+          limit(fetchLimit)
+        )
+      )
+    : Promise.resolve(null);
+
+  const premiumQueryPromise = getDocs(
+    query(
+      coll,
+      where(fieldName, "==", fieldValue),
+      where("status", "==", "active"),
+      where("visibilityScope", "in", ["county", "all_areas"] as const),
+      limit(fetchLimit)
+    )
+  );
+
+  const [freeSnap, premiumSnap] = await Promise.all([freeQueryPromise, premiumQueryPromise]);
+
+  const freeItems = freeSnap
+    ? freeSnap.docs
+        .filter((d) => d.id !== currentProductId)
+        .map((d) => ({ id: d.id, ...d.data() } as Product))
+    : [];
+
+  const premiumItems = premiumSnap.docs
+    .filter((d) => d.id !== currentProductId)
+    .map((d) => ({ id: d.id, ...d.data() } as Product));
+
+  return dedupeById(freeItems, premiumItems).filter(isNotExpired);
+}
 function getComparablePrice(p: Product): number {
   return p.rentPerMonth ?? p.price ?? 0;
 }
@@ -539,37 +624,9 @@ useEffect(() => {
 
       setProduct(currentProduct);
 
-      let relatedItems: Product[] = [];
-
-      if (currentProduct.subcategory) {
-  const subcategoryQuery = query(
-    collection(db, "products"),
-    where("subcategory", "==", currentProduct.subcategory),
-    where("status", "==", "active"),
-    limit(5)
-  );
-  const subcategorySnap = await getDocs(subcategoryQuery);
-  relatedItems = subcategorySnap.docs
-    .filter((d) => d.id !== currentProduct.id)
-    .map((d) => ({ id: d.id, ...d.data() } as Product))
-    .filter(isNotExpired);
-}
-
-if (relatedItems.length === 0 && currentProduct.category) {
-  const categoryQuery = query(
-    collection(db, "products"),
-    where("category", "==", currentProduct.category),
-    where("status", "==", "active"),
-    limit(6)
-  );
-  const categorySnap = await getDocs(categoryQuery);
-  relatedItems = categorySnap.docs
-    .filter((d) => d.id !== currentProduct.id)
-    .map((d) => ({ id: d.id, ...d.data() } as Product))
-    .filter(isNotExpired);
-}
-
-      // Store raw fetched items temporarily or compute with current fallback coords
+      // Coords used both to decide premium-ad visibility (distance cap)
+      // and to rank results — falls back to the advert's own location
+      // when the viewer hasn't granted GPS.
       const recommendationCoords: [number, number] | null =
         userCoords
           ? [userCoords.lat, userCoords.lng]
@@ -577,11 +634,45 @@ if (relatedItems.length === 0 && currentProduct.category) {
           ? [currentProduct.lat, currentProduct.lng]
           : null;
 
-      const visibleRelatedProducts = recommendationCoords
-        ? relatedItems.filter((item) =>
-            isProductVisibleToUser(item, recommendationCoords, currentProduct.ward)
-          )
-        : relatedItems;
+      let visibleRelatedProducts: Product[] = [];
+
+      if (currentProduct.subcategory) {
+        const scoped = await fetchScopedRelated(
+          "subcategory",
+          currentProduct.subcategory,
+          currentProduct.id,
+          currentProduct.ward,
+          5
+        );
+        visibleRelatedProducts = recommendationCoords
+          ? scoped.filter((item) =>
+              isProductVisibleToUser(item, recommendationCoords, currentProduct.ward)
+            )
+          : scoped;
+      }
+
+      // FIX: this fallback used to trigger on relatedItems.length === 0
+      // — the RAW fetch count, before visibility filtering. That meant
+      // if the subcategory query returned docs but every one of them
+      // turned out to be invisible to this viewer (e.g. all from other
+      // wards), the code never fell back to the broader category
+      // search, and the section could render empty even though a
+      // category-level search might have found something visible.
+      // Checking the post-filter visible count instead fixes that.
+      if (visibleRelatedProducts.length === 0 && currentProduct.category) {
+        const scoped = await fetchScopedRelated(
+          "category",
+          currentProduct.category,
+          currentProduct.id,
+          currentProduct.ward,
+          6
+        );
+        visibleRelatedProducts = recommendationCoords
+          ? scoped.filter((item) =>
+              isProductVisibleToUser(item, recommendationCoords, currentProduct.ward)
+            )
+          : scoped;
+      }
 
       const rankedRelatedProducts = rankRelatedProducts(
         visibleRelatedProducts,
