@@ -9,7 +9,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
-const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
+
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -102,32 +102,31 @@ async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<
   }
 
   try {
-    // Initialize the Enterprise client
+    // Dynamically import the package at runtime
+    const { RecaptchaEnterpriseServiceClient } = await import('@google-cloud/recaptcha-enterprise');
     const client = new RecaptchaEnterpriseServiceClient();
     
     const projectId = process.env.GCLOUD_PROJECT;
-    const assessment = await client.createAssessment({
+    const [assessment] = await client.createAssessment({
       parent: `projects/${projectId}`,
       assessment: {
         event: {
           token: token,
-          siteKey: "6Lddkngt4AAAAAnNcYmsgANe0PNuJC5xN1Ltv7dYRL8", // Your Site Key
+          siteKey: "6Lddkngt4AAAAAnNcYmsgANe0PNuJC5xN1Ltv7dYRL8",
           expectedAction: expectedAction,
         },
       },
     });
 
-    const response = assessment[0];
-    
-    if (!response.tokenProperties?.valid) {
+    if (!assessment.tokenProperties?.valid) {
       throw new HttpsError("permission-denied", "Invalid reCAPTCHA token.");
     }
 
-    if (response.tokenProperties?.action !== expectedAction) {
+    if (assessment.tokenProperties?.action !== expectedAction) {
       throw new HttpsError("permission-denied", "reCAPTCHA action mismatch.");
     }
 
-    const score = response.riskAnalysis?.score ?? 0;
+    const score = assessment.riskAnalysis?.score ?? 0;
     if (score < 0.5) {
       throw new HttpsError("permission-denied", "reCAPTCHA score too low.");
     }
