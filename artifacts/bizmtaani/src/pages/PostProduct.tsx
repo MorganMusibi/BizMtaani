@@ -1415,7 +1415,15 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
-  const recaptchaToken = await getRecaptchaToken("publish_advert");
+  // Safely get reCAPTCHA token with fallback
+let recaptchaToken = "";
+try {
+  recaptchaToken = await getRecaptchaToken("publish_advert");
+} catch (error) {
+  console.warn("reCAPTCHA not available, proceeding without token:", error);
+  // In production, you might want to show an error instead
+  // But for now, we'll proceed (your backend should handle missing token)
+}
 
   const publishAdvert = httpsCallable<
     typeof docData & { recaptchaToken: string },
