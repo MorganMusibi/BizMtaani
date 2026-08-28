@@ -1108,11 +1108,53 @@ async function throttleNominatim() {
   }
   lastNominatimCallAt = Date.now();
 }
+// Replace the existing throttleNominatim with this distributed version
+async function throttleNominatimWithLock(): Promise<void> {
+  const lockDocId = "nominatim_throttle";
+  const lockRef = db.collection("rateLimitLocks").doc(lockDocId);
+  const minGapMs = 1100;
+
+  let acquired = false;
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (!acquired && attempts < maxAttempts) {
+    attempts++;
+    
+    try {
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(lockRef);
+        const now = Date.now();
+        const lastCallAt = snap.exists ? snap.data()?.lastCallAt?.toMillis() ?? 0 : 0;
+        
+        if (now - lastCallAt < minGapMs) {
+          throw new Error("Rate limit in effect, retry later");
+        }
+        
+        tx.set(lockRef, {
+          lastCallAt: admin.firestore.Timestamp.fromMillis(now),
+          expireAt: admin.firestore.Timestamp.fromMillis(now + 2000),
+        });
+        
+        acquired = true;
+      });
+    } catch (error) {
+      // Another instance held the lock or rate limit was active
+      if (attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+    }
+  }
+
+  if (!acquired) {
+    // Fallback: wait locally if we couldn't get the lock
+    await new Promise(resolve => setTimeout(resolve, minGapMs));
+  }
+          }
 export const reverseGeocode = onCall(
   {
     cors: true,
-    maxInstances: 1, // forces all calls through one instance, serializing requests
-    concurrency: 1,  // ensures that one instance only processes one call at a time
+    // maxInstances and concurrency removed
   },
   async (request) => {
     const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
@@ -1125,21 +1167,19 @@ export const reverseGeocode = onCall(
     const cacheKey = `${lat.toFixed(3)}_${lng.toFixed(3)}`;
     const cacheRef = db.collection("geocodeCache").doc(cacheKey);
 
-    // 1. Check persistent cache first — avoids hitting Nominatim at all
     const cached = await cacheRef.get();
     if (cached.exists) {
       return cached.data();
     }
 
-    // 2. Not cached — throttle, then call Nominatim
-    await throttleNominatim();
+    // Use the distributed lock instead of the local throttle
+    await throttleNominatimWithLock();
 
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
 
     const res = await fetch(url, {
       headers: {
         "Accept-Language": "en",
-        // Nominatim's usage policy requires a real identifying User-Agent
         "User-Agent": "BizMtaani/1.0 (contact: morganmusibi@gmail.com)",
       },
     });
@@ -1165,12 +1205,11 @@ export const reverseGeocode = onCall(
       county: addr.county ?? null,
     };
 
-    // 3. Save to cache permanently — ward boundaries don't move
     await cacheRef.set(result);
-
     return result;
   }
 );
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
