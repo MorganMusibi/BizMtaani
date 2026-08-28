@@ -4,7 +4,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -28,9 +28,15 @@ if (import.meta.env.DEV) {
   // debug mode locally; not typed in the SDK.
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
-initializeAppCheck(app, {
+export const appCheck = initializeAppCheck(app, {
   provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
   isTokenAutoRefreshEnabled: true,
+});
+
+// Warm up the App Check token in the background so it's cached before the
+// first Firestore read or Cloud Function call. This runs without awaiting.
+getToken(appCheck, false).catch(() => {
+  // Silent fail - if it fails here, the first actual Firebase call will fetch it anyway.
 });
 
 export const auth = getAuth(app);
