@@ -688,6 +688,7 @@ async function revokeAdmin(targetUser: AdminUser) {
 
   // -------------------------------------------------------
   // REPORTS — live subscription, only once admin confirmed
+  // ✅ KEPT REALTIME - needed for moderation queue
   // -------------------------------------------------------
   useEffect(() => {
     if (adminLoading || !user || !isAdmin) return;
@@ -720,33 +721,35 @@ async function revokeAdmin(targetUser: AdminUser) {
 
     return () => unsub();
   }, [adminLoading, user, isAdmin]);
+  
   // -------------------------------------------------------
-// SUPPORT REPORTS — live subscription, only once admin confirmed
-// -------------------------------------------------------
-useEffect(() => {
-  if (adminLoading || !user || !isAdmin) return;
+  // SUPPORT REPORTS — live subscription, only once admin confirmed
+  // ✅ KEPT REALTIME - needed for urgent support issues
+  // -------------------------------------------------------
+  useEffect(() => {
+    if (adminLoading || !user || !isAdmin) return;
 
-  const q = query(
-    collection(db, "supportReports"),
-    where("status", "==", "open"),
-    orderBy("createdAt", "desc"),
-    limit(50)
-  );
+    const q = query(
+      collection(db, "supportReports"),
+      where("status", "==", "open"),
+      orderBy("createdAt", "desc"),
+      limit(50)
+    );
 
-  const unsub = onSnapshot(
-    q,
-    (snap) => {
-      setSupportReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportReport)));
-      setSupportReportsLoading(false);
-    },
-    (error) => {
-      console.error("Failed to load support reports:", error);
-      setSupportReportsLoading(false);
-    }
-  );
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setSupportReports(snap.docs.map((d) => ({ id: d.id, ...d.data() } as SupportReport)));
+        setSupportReportsLoading(false);
+      },
+      (error) => {
+        console.error("Failed to load support reports:", error);
+        setSupportReportsLoading(false);
+      }
+    );
 
-  return () => unsub();
-}, [adminLoading, user, isAdmin]);
+    return () => unsub();
+  }, [adminLoading, user, isAdmin]);
 
   // -------------------------------------------------------
   // USERS — loaded lazily when tab is opened
@@ -991,6 +994,18 @@ async function dismissSupportReport(reportId: string) {
     ...(isOwner ? [{ title: "Audit Log", icon: Shield, tab: "auditlog" as Tab }] : []),
   ];
 
+  // Function to refresh overview stats
+  const refreshOverview = () => {
+    dashboardStatsCache = null;
+    setStatsLoading(true);
+    // The useEffect will re-run and reload data
+    // Force a re-render by updating a state
+    setStatsError("");
+    // Reload insights too
+    setInsightsLoading(true);
+    // The useEffect will re-run
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -1079,11 +1094,23 @@ async function dismissSupportReport(reportId: string) {
         <main className="flex-1 p-4 md:p-8 pb-24 md:pb-8">
           {activeTab === "overview" && (
             <>
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold">Dashboard Overview</h2>
-                <p className="mt-1 text-muted-foreground">
-                  Monitor and manage the BizMtaani marketplace.
-                </p>
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Dashboard Overview</h2>
+                  <p className="mt-1 text-muted-foreground">
+                    Monitor and manage the BizMtaani marketplace.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={refreshOverview}
+                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
 
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1175,7 +1202,7 @@ async function dismissSupportReport(reportId: string) {
               <div className="mb-6">
                 <h2 className="text-2xl font-bold">Reports</h2>
                 <p className="mt-1 text-muted-foreground">
-                  Adverts flagged by users, awaiting review.
+                  Adverts flagged by users, awaiting review. (Live updates)
                 </p>
               </div>
 
@@ -1247,7 +1274,7 @@ async function dismissSupportReport(reportId: string) {
     <div className="mb-6">
       <h2 className="text-2xl font-bold">Support Reports</h2>
       <p className="mt-1 text-muted-foreground">
-        Problems reported directly by users.
+        Problems reported directly by users. (Live updates)
       </p>
     </div>
 
@@ -1322,13 +1349,30 @@ async function dismissSupportReport(reportId: string) {
 
           {activeTab === "users" && (
             <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">Users</h2>
-                <p className="mt-1 text-muted-foreground">
-                  {userSearchResults !== null
-                    ? `${userSearchResults.length} result${userSearchResults.length === 1 ? "" : "s"} for "${userSearchQuery}"`
-                    : "Most recent 50 users."}
-                </p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Users</h2>
+                  <p className="mt-1 text-muted-foreground">
+                    {userSearchResults !== null
+                      ? `${userSearchResults.length} result${userSearchResults.length === 1 ? "" : "s"} for "${userSearchQuery}"`
+                      : "Most recent 50 users."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsersLoaded(false);
+                    setUsers([]);
+                    setUsersLoading(true);
+                    loadUsers();
+                  }}
+                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
 
               <div className="mb-4 flex gap-2">
@@ -1492,9 +1536,26 @@ async function dismissSupportReport(reportId: string) {
 
           {activeTab === "adverts" && (
             <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">Adverts</h2>
-                <p className="mt-1 text-muted-foreground">Most recent 50 adverts.</p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Adverts</h2>
+                  <p className="mt-1 text-muted-foreground">Most recent 50 adverts.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdvertsLoaded(false);
+                    setAdverts([]);
+                    setAdvertsLoading(true);
+                    loadAdverts();
+                  }}
+                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
 
               {advertsLoading ? (
@@ -1541,9 +1602,26 @@ async function dismissSupportReport(reportId: string) {
 
           {activeTab === "jobs" && (
             <>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold">Jobs</h2>
-                <p className="mt-1 text-muted-foreground">Most recent 50 job posts.</p>
+              <div className="mb-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Jobs</h2>
+                  <p className="mt-1 text-muted-foreground">Most recent 50 job posts.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setJobsLoaded(false);
+                    setJobs([]);
+                    setJobsLoading(true);
+                    loadJobs();
+                  }}
+                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
               </div>
 
               {jobsLoading ? (
