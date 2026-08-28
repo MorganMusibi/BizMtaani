@@ -75,7 +75,8 @@ const CLEANUP_LIMIT = 150;
 const ARCHIVE_RETENTION_HOURS = 48;
 const MINIMUM_PAYOUT_KES = 350; // adjust to whatever makes sense for your M-Pesa costs
 
-// ═══════════════════════════════════════════════════════════════════════════
+
+    // ═══════════════════════════════════════════════════════════════════════════
 // BATCH COMMITTER HELPER
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -112,8 +113,8 @@ class BatchCommitter {
    * Add an update operation to the batch. Auto-commits if limit reached.
    */
   update(
-    docRef: FirebaseFirestore.DocumentReference,
-    data: FirebaseFirestore.UpdateData
+    docRef: FirebaseFirestore.DocumentReference<unknown>,
+    data: FirebaseFirestore.UpdateData<unknown>
   ): void {
     this.batch.update(docRef, data);
     this.opCount++;
@@ -123,7 +124,7 @@ class BatchCommitter {
   /**
    * Add a delete operation to the batch. Auto-commits if limit reached.
    */
-  delete(docRef: FirebaseFirestore.DocumentReference): void {
+  delete(docRef: FirebaseFirestore.DocumentReference<unknown>): void {
     this.batch.delete(docRef);
     this.opCount++;
     this.checkAndCommit();
@@ -143,6 +144,26 @@ class BatchCommitter {
       this.batch = db.batch();
     }
   }
+
+  /**
+   * Commit any remaining operations in the current batch.
+   * Must call this at the end of your loop.
+   */
+  async finalize(): Promise<void> {
+    if (this.opCount > 0) {
+      await this.batch.commit();
+      this.commitCount++;
+      this.opCount = 0;
+    }
+  }
+
+  /**
+   * Get the total number of commits performed.
+   */
+  get totalCommits(): number {
+    return this.commitCount;
+  }
+}
 
   /**
    * Commit any remaining operations in the current batch.
@@ -869,7 +890,14 @@ export const scheduledCleanup = onSchedule(
     try {
       const result = await runCleanup();
        console.log(
-  `Cleanup complete. Archived: ${result.archived}, Deleted pending adverts: ${result.deletedPending}, Deleted pending payments: ${result.deletedPayments}, Purged old archived adverts: ${result.purgedArchived}, Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, Orphaned chats removed: ${result.orphanedChatsDeleted}, Purged orphaned draft images: ${result.purgedDraftImages}`
+`Cleanup complete. Archived: ${result.archived}, ` +
+`Deleted pending adverts: ${result.deletedPending}, ` +
+`Deleted pending payments: ${result.deletedPayments}, ` +
+`Purged old archived adverts: ${result.purgedArchived}, ` +
+`Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, ` +
+`Orphaned chats removed: ${result.orphanedChatsDeleted}, ` +
+`Purged orphaned draft images: ${result.purgedDraftImages}, ` +
+`Batch commits: ${result.batchCommits}`
 );
     } catch (error) {
       console.error("Cleanup failed:", error);
