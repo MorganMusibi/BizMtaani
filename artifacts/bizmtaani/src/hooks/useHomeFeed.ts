@@ -32,7 +32,7 @@ const HOME_FEED_RADIUS_STEPS = [
   5,
   10,
   20,
-  30,   // was 50
+  30,  
 ];
 
 const HOME_FEED_MAX_RADIUS_KM = 30;   // was 50
@@ -97,7 +97,7 @@ interface FeedCacheEntry {
   categoryPremiumDone?: boolean;
   timestamp: number;
 }
-const FEED_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
+const FEED_CACHE_TTL_MS = 30 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
 function loadFeedCacheFromStorage(): Map<string, FeedCacheEntry> {
   try {
     const raw = localStorage.getItem("bizmtaani_feed_cache");
