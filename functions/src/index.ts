@@ -9,7 +9,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
-import { RecaptchaEnterpriseServiceClient } from "@google-cloud/recaptcha-enterprise";
+const { RecaptchaEnterpriseServiceClient } = require('@google-cloud/recaptcha-enterprise');
 
 admin.initializeApp();
 const db = admin.firestore();
