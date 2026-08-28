@@ -1,23 +1,20 @@
 declare global {
   interface Window {
     grecaptcha?: {
-      enterprise?: {
+      enterprise: {
         ready: (cb: () => void) => void;
         execute: (siteKey: string, options: { action: string }) => Promise<string>;
       };
-      ready: (cb: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
     };
   }
 }
 
-const RECAPTCHA_SITE_KEY = "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8";
+const RECAPTCHA_SITE_KEY = "6Lddkngt4AAAAAnNcYmsgANe0PNuJC5xN1Ltv7dYRL8";
 
 let recaptchaLoadPromise: Promise<void> | null = null;
 
 function loadRecaptchaScript(): Promise<void> {
-  // Check if already loaded (either standard or enterprise)
-  if (window.grecaptcha?.enterprise || window.grecaptcha) {
+  if (window.grecaptcha?.enterprise) {
     return Promise.resolve();
   }
 
@@ -27,12 +24,11 @@ function loadRecaptchaScript(): Promise<void> {
 
   recaptchaLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    // Use the correct Enterprise URL
     script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
     script.async = true;
     script.onload = () => {
-      // Wait a moment for the script to fully initialize
-      setTimeout(resolve, 100);
+      // Wait for enterprise to initialize
+      setTimeout(resolve, 200);
     };
     script.onerror = () => {
       recaptchaLoadPromise = null;
@@ -48,11 +44,11 @@ export async function getRecaptchaToken(action: string): Promise<string> {
   await loadRecaptchaScript();
 
   return new Promise((resolve, reject) => {
-    // Try enterprise first, then fallback to standard
-    const grecaptcha = window.grecaptcha?.enterprise || window.grecaptcha;
+    // ✅ Use enterprise.enterprise (NOT grecaptcha directly)
+    const grecaptcha = window.grecaptcha?.enterprise;
     
     if (!grecaptcha) {
-      reject(new Error("reCAPTCHA not loaded"));
+      reject(new Error("reCAPTCHA Enterprise not loaded"));
       return;
     }
 
