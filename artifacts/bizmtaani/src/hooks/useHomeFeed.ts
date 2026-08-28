@@ -87,6 +87,14 @@ interface FeedCacheEntry {
   areaDonePrefixes: Record<string, boolean>;
   areaDone: boolean;
   areaRadiusStage: number;
+  // Only used in category/subcategory mode — two independently paginated
+  // sub-queries (see categoryFreeQuery/categoryPremiumQuery below) whose
+  // merged, deduped results are what the hook exposes as areaProducts
+  // in that mode. Undefined/unused in normal home-feed and search modes.
+  categoryFreeCursor?: CreatedAtCursor | null;
+  categoryFreeDone?: boolean;
+  categoryPremiumCursor?: CreatedAtCursor | null;
+  categoryPremiumDone?: boolean;
   timestamp: number;
 }
 const FEED_CACHE_TTL_MS = 20 * 60 * 1000; // 20 minutes — freshness for the poster's own device is handled by clearFeedCache() at post time instead
@@ -708,20 +716,56 @@ function areaQueries(
     );
 }
 
-function categorySubcategoryQuery(
+// ============================================================
+// FIX — CATEGORY PAGES NOW USE THE SAME "DON'T FETCH WHAT YOU'LL
+// DISCARD" PRINCIPLE AS THE HOME FEED.
+//
+// The old single categorySubcategoryQuery() pulled the most recent
+// N active docs in a category/subcategory NATIONWIDE, with no ward
+// or scope filter at all. CategoryAds.tsx then filtered out every
+// free ad that wasn't in the viewer's own ward, client-side, AFTER
+// paying for all of them. In a category with lots of free listings
+// scattered across many wards, a "page" of 20 fetched docs could
+// collapse to a handful actually shown — the same over-fetch pattern
+// fixed in the home feed's areaQueries(), just happening here too.
+//
+// It also meant areaDone (and therefore "No more adverts" / whether
+// infinite-scroll keeps calling loadMore) was computed from the raw
+// fetched count, not the post-filter visible count — so the feed
+// could report "not done" while showing almost nothing, or the
+// reverse.
+//
+// Fix: split into two independently-scoped, independently-paginated
+// queries — exactly mirroring how the normal home feed already
+// separates "ward query" (free) from "area query" (premium):
+//   - categoryFreeQuery: ward-scoped, only ever returns free ads the
+//     viewer is actually allowed to see.
+//   - categoryPremiumQuery: visibilityScope-scoped, same filter the
+//     home feed's stage-1+ areaQueries() already uses.
+// Both queries need a composite index (category + subcategory +
+// status + ward + createdAt for the free one; category + subcategory
+// + status + visibilityScope + createdAt for the premium one) —
+// Firestore will show a console link to auto-create either index the
+// first time each query runs, same as any other new compound query.
+// ============================================================
+function categoryFreeQuery(
   category: string,
   subcategory: string,
+  wardName: string,
   cursor?: CreatedAtCursor | null
 ) {
   const coll = collection(db, "products");
+  const baseFilters = [
+    where("category", "==", category),
+    where("subcategory", "==", subcategory),
+    where("status", "==", "active"),
+    where("ward", "==", wardName),
+  ];
 
-  // Use the same approach as the original CategoryAds page
   if (cursor) {
     return query(
       coll,
-      where("category", "==", category),
-      where("subcategory", "==", subcategory),
-      where("status", "==", "active"),
+      ...baseFilters,
       orderBy("createdAt", "desc"),
       startAfter(createdAtCursorToTimestamp(cursor)),
       limit(AREA_PAGE)
@@ -730,9 +774,38 @@ function categorySubcategoryQuery(
 
   return query(
     coll,
+    ...baseFilters,
+    orderBy("createdAt", "desc"),
+    limit(AREA_PAGE)
+  );
+}
+
+function categoryPremiumQuery(
+  category: string,
+  subcategory: string,
+  cursor?: CreatedAtCursor | null
+) {
+  const coll = collection(db, "products");
+  const baseFilters = [
     where("category", "==", category),
     where("subcategory", "==", subcategory),
     where("status", "==", "active"),
+    where("visibilityScope", "in", ["county", "all_areas"] as const),
+  ];
+
+  if (cursor) {
+    return query(
+      coll,
+      ...baseFilters,
+      orderBy("createdAt", "desc"),
+      startAfter(createdAtCursorToTimestamp(cursor)),
+      limit(AREA_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    ...baseFilters,
     orderBy("createdAt", "desc"),
     limit(AREA_PAGE)
   );
@@ -800,6 +873,16 @@ const [areaLoading, setAreaLoading] = useState(false);
 const [searchCursor, setSearchCursor] = useState<CreatedAtCursor | null>(null);
 const [searchDone, setSearchDone] = useState(false);
 const [searchLoading, setSearchLoading] = useState(false);
+
+// Category/subcategory mode only — independent cursors/done flags for
+// the two separately-scoped sub-queries (free/ward-scoped and
+// premium/visibilityScope-scoped) that get merged into areaProducts.
+// Unused in normal home-feed and search modes.
+const [categoryFreeCursor, setCategoryFreeCursor] = useState<CreatedAtCursor | null>(initialCached?.categoryFreeCursor ?? null);
+const [categoryFreeDone, setCategoryFreeDone] = useState(initialCached?.categoryFreeDone ?? false);
+const [categoryPremiumCursor, setCategoryPremiumCursor] = useState<CreatedAtCursor | null>(initialCached?.categoryPremiumCursor ?? null);
+const [categoryPremiumDone, setCategoryPremiumDone] = useState(initialCached?.categoryPremiumDone ?? false);
+
 const [initialLoading, setInitialLoading] = useState(!initialCached);
 
 // Independent of GPS/location — fetches immediately on mount so the
@@ -863,6 +946,11 @@ setAreaRadiusStage(0);
 
 setSearchCursor(null);
 setSearchDone(false);
+
+setCategoryFreeCursor(null);
+setCategoryFreeDone(false);
+setCategoryPremiumCursor(null);
+setCategoryPremiumDone(false);
   const run = async () => {
     
 
@@ -879,6 +967,10 @@ setSearchDone(false);
     setAreaDonePrefixes(cached.areaDonePrefixes);
     setAreaDone(cached.areaDone);
     setAreaRadiusStage(cached.areaRadiusStage ?? 0);
+    setCategoryFreeCursor(cached.categoryFreeCursor ?? null);
+    setCategoryFreeDone(cached.categoryFreeDone ?? false);
+    setCategoryPremiumCursor(cached.categoryPremiumCursor ?? null);
+    setCategoryPremiumDone(cached.categoryPremiumDone ?? false);
     setInitialLoading(false);
     return;
   }
@@ -945,22 +1037,47 @@ setAreaDone(true);
 // ============================================================
 
 if (category && subcategory) {
-  try {
-    const snap = await getDocs(
-      categorySubcategoryQuery(category, subcategory)
-    );
+  const categoryWardName = locationInfo?.wardName ?? "";
 
-    const products = toProducts(snap.docs);
+  try {
+    // FIX: two separately-scoped queries instead of one nationwide
+    // fetch + client-side ward discard — see the comment above
+    // categoryFreeQuery/categoryPremiumQuery for why. Free-ad query is
+    // skipped entirely when there's no resolved ward yet (matching
+    // how the normal home feed's ward query behaves with no wardName).
+    const [freeSnap, premiumSnap] = await Promise.all([
+      categoryWardName
+        ? getDocs(categoryFreeQuery(category, subcategory, categoryWardName))
+        : Promise.resolve(null),
+      getDocs(categoryPremiumQuery(category, subcategory)),
+    ]);
+
+    const freeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
+    const premiumProducts = toProducts(premiumSnap.docs);
+    const merged = dedupe(freeProducts, premiumProducts);
 
     // Rank by distance if we have user coords
     const rankedProducts = userCoords
-      ? sortNearbyProducts(products, userCoords)
-      : products;
+      ? sortNearbyProducts(merged, userCoords)
+      : merged;
+
+    const localFreeDone = categoryWardName ? freeSnap!.docs.length < AREA_PAGE : true;
+    const localPremiumDone = premiumSnap.docs.length < AREA_PAGE;
+    const localFreeCursor = categoryWardName && freeSnap!.docs.length > 0
+      ? createdAtCursorFromDoc(freeSnap!.docs[freeSnap!.docs.length - 1])
+      : null;
+    const localPremiumCursor = premiumSnap.docs.length > 0
+      ? createdAtCursorFromDoc(premiumSnap.docs[premiumSnap.docs.length - 1])
+      : null;
 
     setWardProducts([]);
     setAreaProducts(rankedProducts);
     setWardDone(true);
-    setAreaDone(snap.docs.length < AREA_PAGE);
+    setCategoryFreeCursor(localFreeCursor);
+    setCategoryFreeDone(localFreeDone);
+    setCategoryPremiumCursor(localPremiumCursor);
+    setCategoryPremiumDone(localPremiumDone);
+    setAreaDone(localFreeDone && localPremiumDone);
 
     // Cache the results
     if (!isSearchMode) {
@@ -972,8 +1089,12 @@ if (category && subcategory) {
         areaBuffer: [],
         areaCursors: {},
         areaDonePrefixes: {},
-        areaDone: snap.docs.length < AREA_PAGE,
+        areaDone: localFreeDone && localPremiumDone,
         areaRadiusStage: 0,
+        categoryFreeCursor: localFreeCursor,
+        categoryFreeDone: localFreeDone,
+        categoryPremiumCursor: localPremiumCursor,
+        categoryPremiumDone: localPremiumDone,
         timestamp: Date.now(),
       });
       saveFeedCacheToStorage(feedCache);
@@ -983,6 +1104,8 @@ if (category && subcategory) {
     setWardProducts([]);
     setAreaProducts([]);
     setWardDone(true);
+    setCategoryFreeDone(true);
+    setCategoryPremiumDone(true);
     setAreaDone(true);
   }
 
@@ -1359,28 +1482,28 @@ if (category && subcategory) {
 
   setAreaLoading(true);
   try {
-    // FIX: the cursor is now built straight from the last loaded
-    // Product's own createdAt (seconds + nanoseconds — see the
-    // Product interface note above), so this no longer needs the
-    // extra getDoc() round trip the old code used purely to look the
-    // document snapshot back up. That was one full read spent on
-    // every single category page, just to reconstruct a cursor.
-    const lastProduct = areaProducts[areaProducts.length - 1];
-    if (!lastProduct?.createdAt) {
-      setAreaDone(true);
-      return;
-    }
+    const categoryWardName = locationInfo?.wardName ?? "";
 
-    const snap = await getDocs(
-      categorySubcategoryQuery(
-        category,
-        subcategory,
-        lastProduct.createdAt
-      )
-    );
+    // FIX: each sub-query pages off its own tracked cursor
+    // (categoryFreeCursor / categoryPremiumCursor in state) instead of
+    // reverse-engineering a single cursor from the last merged,
+    // re-sorted product — which broke down once there were two
+    // independently-scoped queries feeding the same list. A query
+    // whose own side is already exhausted is skipped entirely rather
+    // than re-fetched.
+    const [freeSnap, premiumSnap] = await Promise.all([
+      !categoryFreeDone && categoryWardName
+        ? getDocs(categoryFreeQuery(category, subcategory, categoryWardName, categoryFreeCursor))
+        : Promise.resolve(null),
+      !categoryPremiumDone
+        ? getDocs(categoryPremiumQuery(category, subcategory, categoryPremiumCursor))
+        : Promise.resolve(null),
+    ]);
 
-    const newProducts = toProducts(snap.docs);
-    
+    const newFreeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
+    const newPremiumProducts = premiumSnap ? toProducts(premiumSnap.docs) : [];
+    const newProducts = dedupe(newFreeProducts, newPremiumProducts);
+
     setAreaProducts((prev) => {
       const merged = dedupe(prev, newProducts);
       return userCoords
@@ -1388,7 +1511,20 @@ if (category && subcategory) {
         : merged;
     });
 
-    setAreaDone(snap.docs.length < AREA_PAGE);
+    const nextFreeDone = freeSnap ? freeSnap.docs.length < AREA_PAGE : categoryFreeDone;
+    const nextPremiumDone = premiumSnap ? premiumSnap.docs.length < AREA_PAGE : categoryPremiumDone;
+    const nextFreeCursor = freeSnap && freeSnap.docs.length > 0
+      ? createdAtCursorFromDoc(freeSnap.docs[freeSnap.docs.length - 1])
+      : categoryFreeCursor;
+    const nextPremiumCursor = premiumSnap && premiumSnap.docs.length > 0
+      ? createdAtCursorFromDoc(premiumSnap.docs[premiumSnap.docs.length - 1])
+      : categoryPremiumCursor;
+
+    setCategoryFreeDone(nextFreeDone);
+    setCategoryPremiumDone(nextPremiumDone);
+    setCategoryFreeCursor(nextFreeCursor);
+    setCategoryPremiumCursor(nextPremiumCursor);
+    setAreaDone(nextFreeDone && nextPremiumDone);
   } catch (error) {
     console.error("Failed to load more category products:", error);
   } finally {
@@ -1822,6 +1958,10 @@ saveFeedCacheToStorage(feedCache);
   wardDone,
   category,     
   subcategory,   
+  categoryFreeDone,
+  categoryPremiumDone,
+  categoryFreeCursor,
+  categoryPremiumCursor,
 ]);
 return {
   wardProducts,
