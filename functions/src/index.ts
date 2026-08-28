@@ -9,6 +9,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
+import { RecaptchaEnterpriseServiceClient } from "@google-cloud/recaptcha-enterprise";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -100,16 +101,39 @@ async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<
   if (typeof token !== "string" || !token.trim()) {
     throw new HttpsError("invalid-argument", "Missing reCAPTCHA token.");
   }
-  const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: `secret=${recaptchaSecretKey.value()}&response=${token}`,
-  });
-  if (!res.ok) {
-    throw new HttpsError("internal", "reCAPTCHA verification service unavailable.");
-  }
-  const data = (await res.json()) as { success: boolean; score?: number; action?: string };
-  if (!data.success || data.action !== expectedAction || (data.score ?? 0) < 0.5) {
+
+  try {
+    // Initialize the Enterprise client
+    const client = new RecaptchaEnterpriseServiceClient();
+    
+    const projectId = process.env.GCLOUD_PROJECT;
+    const assessment = await client.createAssessment({
+      parent: `projects/${projectId}`,
+      assessment: {
+        event: {
+          token: token,
+          siteKey: "6Lddkngt4AAAAAnNcYmsgANe0PNuJC5xN1Ltv7dYRL8", // Your Site Key
+          expectedAction: expectedAction,
+        },
+      },
+    });
+
+    const response = assessment[0];
+    
+    if (!response.tokenProperties?.valid) {
+      throw new HttpsError("permission-denied", "Invalid reCAPTCHA token.");
+    }
+
+    if (response.tokenProperties?.action !== expectedAction) {
+      throw new HttpsError("permission-denied", "reCAPTCHA action mismatch.");
+    }
+
+    const score = response.riskAnalysis?.score ?? 0;
+    if (score < 0.5) {
+      throw new HttpsError("permission-denied", "reCAPTCHA score too low.");
+    }
+  } catch (error) {
+    console.error("reCAPTCHA verification error:", error);
     throw new HttpsError("permission-denied", "reCAPTCHA verification failed.");
   }
 }
