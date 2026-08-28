@@ -1,24 +1,23 @@
 declare global {
   interface Window {
     grecaptcha?: {
+      enterprise?: {
+        ready: (cb: () => void) => void;
+        execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      };
       ready: (cb: () => void) => void;
       execute: (siteKey: string, options: { action: string }) => Promise<string>;
     };
   }
 }
 
-const RECAPTCHA_SITE_KEY = "6LfdW4wtAAAAAJonWa3TejbOoRJ44p9vQ8wU8kUC"; // same site key as in index.html
+const RECAPTCHA_SITE_KEY = "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8";
 
-// The reCAPTCHA script is no longer loaded eagerly in index.html —
-// it's only needed on the few screens that call getRecaptchaToken
-// (publish advert, submit referral, etc), so we load it lazily here,
-// the first time it's actually needed, and cache the load so repeat
-// calls in the same session don't re-inject the script.
 let recaptchaLoadPromise: Promise<void> | null = null;
 
 function loadRecaptchaScript(): Promise<void> {
-  if (window.grecaptcha) {
-    // Already loaded (e.g. a previous call already finished) — skip.
+  // Check if already loaded (either standard or enterprise)
+  if (window.grecaptcha?.enterprise || window.grecaptcha) {
     return Promise.resolve();
   }
 
@@ -28,12 +27,14 @@ function loadRecaptchaScript(): Promise<void> {
 
   recaptchaLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://recaptcha.googleapis.com/v3/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
+    // Use the correct Enterprise URL
+    script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
     script.async = true;
-    script.onload = () => resolve();
+    script.onload = () => {
+      // Wait a moment for the script to fully initialize
+      setTimeout(resolve, 100);
+    };
     script.onerror = () => {
-      // Allow a later call to retry, in case this failure was a
-      // transient network issue rather than a permanent one.
       recaptchaLoadPromise = null;
       reject(new Error("Failed to load reCAPTCHA script"));
     };
@@ -47,15 +48,23 @@ export async function getRecaptchaToken(action: string): Promise<string> {
   await loadRecaptchaScript();
 
   return new Promise((resolve, reject) => {
-    if (!window.grecaptcha) {
+    // Try enterprise first, then fallback to standard
+    const grecaptcha = window.grecaptcha?.enterprise || window.grecaptcha;
+    
+    if (!grecaptcha) {
       reject(new Error("reCAPTCHA not loaded"));
       return;
     }
-    window.grecaptcha.ready(() => {
-      window.grecaptcha!
-        .execute(RECAPTCHA_SITE_KEY, { action })
-        .then(resolve)
-        .catch(reject);
-    });
+
+    try {
+      grecaptcha.ready(() => {
+        grecaptcha
+          .execute(RECAPTCHA_SITE_KEY, { action })
+          .then(resolve)
+          .catch(reject);
+      });
+    } catch (error) {
+      reject(error);
+    }
   });
 }
