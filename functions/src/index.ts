@@ -165,25 +165,6 @@ class BatchCommitter {
   }
 }
 
-  /**
-   * Commit any remaining operations in the current batch.
-   * Must call this at the end of your loop.
-   */
-  async finalize(): Promise<void> {
-    if (this.opCount > 0) {
-      await this.batch.commit();
-      this.commitCount++;
-      this.opCount = 0;
-    }
-  }
-
-  /**
-   * Get the total number of commits performed.
-   */
-  get totalCommits(): number {
-    return this.commitCount;
-  }
-}
 
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
