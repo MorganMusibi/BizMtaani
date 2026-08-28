@@ -403,50 +403,53 @@ useEffect(() => {
   );
 
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
-  
-  const handleAreaSearchSelect = useCallback(
-    const handleProductClick = useCallback((productId: string) => {
+
+
+const handleProductClick = useCallback((productId: string) => {
   setLocation(`/product/${productId}`);
 }, [setLocation]);
-    async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
-      setResolvingAreaSearch(true);
-      try {
-        const coords = await getWardCoordinates(
-          ward.wardName,
-          ward.constituencyName,
-          ward.countyName
-        );
 
-        if (!coords) {
-          toast({
-            title: "Couldn't find that area on the map",
-            description: "Try a nearby, larger area name instead.",
-          });
-          return;
-        }
 
-        const resolved: ResolvedLocation = {
-          lat: coords.lat,
-          lng: coords.lng,
-          wardName: ward.wardName,
-          constituency: ward.constituencyName,
-          county: ward.countyName,
-          displayName: `${ward.wardName}, ${ward.constituencyName}`,
-        } as ResolvedLocation;
+const handleAreaSearchSelect = useCallback(
+  async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+    setResolvingAreaSearch(true);
+    try {
+      const coords = await getWardCoordinates(
+        ward.wardName,
+        ward.constituencyName,
+        ward.countyName
+      );
 
-        handleAreaSelect(resolved);
-      } catch (error) {
-        console.warn("Failed to resolve selected area:", error);
+      if (!coords) {
         toast({
-          title: "Something went wrong",
-          description: "Please try again or pick a different area.",
+          title: "Couldn't find that area on the map",
+          description: "Try a nearby, larger area name instead.",
         });
-      } finally {
-        setResolvingAreaSearch(false);
+        return;
       }
-    },
-    [handleAreaSelect, toast]
-  );
+
+      const resolved: ResolvedLocation = {
+        lat: coords.lat,
+        lng: coords.lng,
+        wardName: ward.wardName,
+        constituency: ward.constituencyName,
+        county: ward.countyName,
+        displayName: `${ward.wardName}, ${ward.constituencyName}`,
+      } as ResolvedLocation;
+
+      handleAreaSelect(resolved);
+    } catch (error) {
+      console.warn("Failed to resolve selected area:", error);
+      toast({
+        title: "Something went wrong",
+        description: "Please try again or pick a different area.",
+      });
+    } finally {
+      setResolvingAreaSearch(false);
+    }
+  },
+  [handleAreaSelect, toast]
+);
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
