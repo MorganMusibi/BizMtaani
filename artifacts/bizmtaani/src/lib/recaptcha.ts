@@ -28,7 +28,7 @@ function loadRecaptchaScript(): Promise<void> {
 
   recaptchaLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement("script");
-    script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
+    script.src = `https://recaptcha.googleapis.com/v3/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
     script.async = true;
     script.onload = () => resolve();
     script.onerror = () => {
