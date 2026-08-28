@@ -27,7 +27,6 @@ const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
 const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
-const recaptchaSecretKey = defineSecret("RECAPTCHA_SECRET_KEY");
 
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
@@ -283,7 +282,7 @@ export const attachDraftUploadImage = onCall({ cors: true }, async (request) => 
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
 
-export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, recaptchaSecretKey], cors: true }, async (request) => {
+export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
   await verifyRecaptcha(recaptchaToken, "initiate_payment");
@@ -1115,7 +1114,6 @@ export const reverseGeocode = onCall(
     cors: true,
     maxInstances: 1, // forces all calls through one instance, serializing requests
     concurrency: 1,  // ensures that one instance only processes one call at a time
-    secrets: [recaptchaSecretKey],
   },
   async (request) => {
     const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
@@ -1178,7 +1176,7 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
+export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, recaptchaToken, ...otherData } = request.data;
@@ -1934,7 +1932,7 @@ export const setMarketerStatus = onCall({ cors: true }, async (request) => {
  * Determines whether it's a marketer code or another user's own code,
  * and records the relationship. A user can only be referred once, ever.
  */
-export const submitReferralCode = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
+export const submitReferralCode = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { code, recaptchaToken } = request.data as { code?: string; recaptchaToken?: string };
@@ -1989,7 +1987,7 @@ export const submitReferralCode = onCall({ cors: true, secrets: [recaptchaSecret
  * application doc — cheap, and prevents duplicate applications by
  * using the user's own uid as the document ID (upsert, not append).
  */
-export const applyForMarketer = onCall({ cors: true, secrets: [recaptchaSecretKey] }, async (request) => {
+export const applyForMarketer = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const uid = request.auth.uid;
