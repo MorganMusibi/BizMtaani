@@ -1,6 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
 import { 
   doc, 
@@ -12,10 +10,7 @@ import {
   limit, 
   getDocs,
   startAfter,
-  getCountFromServer,
-  Timestamp,
-  updateDoc,
-  increment
+  QueryDocumentSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -60,32 +55,95 @@ interface Commission {
 interface ReferredUser {
   uid: string;
   displayName: string;
+  email?: string;
+  photoURL?: string;
   joinedAt?: { seconds: number } | null;
   commissionPaidOut: boolean;
   isPremium: boolean;
 }
 
-interface DashboardStats {
-  totalEarned: number;
-  totalWithdrawn: number;
-  availableBalance: number;
-  monthlyEarnings: number;
-  monthlySignups: number;
-  pendingCommissions: number;
-}
+// ─── Multi-Level Cache ───────────────────────────────────────────────
 
-// ─── Cache ────────────────────────────────────────────────────────────
-
+// Cache for marketer dashboard data
 interface MarketerCache {
   marketer: MarketerData;
   commissions: Commission[];
   referrals: ReferredUser[];
-  stats: DashboardStats;
+  timestamp: number;
+  hasMoreCommissions: boolean;
+  hasMoreReferrals: boolean;
+  lastCommissionDoc: QueryDocumentSnapshot | null;
+  lastReferralDoc: QueryDocumentSnapshot | null;
+}
+
+const MARKETER_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
+const marketerCacheByUid = new Map<string, MarketerCache>();
+
+// ✅ User profile cache - persists across dashboard sessions
+interface UserProfile {
+  displayName: string;
+  email: string;
+  isPremium: boolean;
+  photoURL: string;
   timestamp: number;
 }
 
-const CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutes
-const cachedDataByUid = new Map<string, MarketerCache>();
+const USER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const userProfileCache: Record<string, UserProfile> = {};
+
+// ─── Cache Functions ──────────────────────────────────────────────────
+
+// Export for Profile.tsx logout
+export function clearMarketerDashboardCache() {
+  marketerCacheByUid.clear();
+  // Also clear user profiles on logout
+  Object.keys(userProfileCache).forEach(key => delete userProfileCache[key]);
+}
+
+// Helper to get user profiles with caching
+async function getUserProfiles(uids: string[]): Promise<Map<string, UserProfile>> {
+  const result = new Map<string, UserProfile>();
+  const uncachedUids: string[] = [];
+
+  // 1. Check cache first
+  for (const uid of uids) {
+    const cached = userProfileCache[uid];
+    if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL_MS) {
+      result.set(uid, cached);
+    } else {
+      uncachedUids.push(uid);
+    }
+  }
+
+  // 2. Fetch uncached users from Firestore
+  if (uncachedUids.length > 0) {
+    // Fetch in chunks of 10 (Firestore 'in' limit)
+    for (let i = 0; i < uncachedUids.length; i += 10) {
+      const chunk = uncachedUids.slice(i, i + 10);
+      const userSnap = await getDocs(
+        query(collection(db, "users"), where("__name__", "in", chunk))
+      );
+      
+      userSnap.docs.forEach((d) => {
+        const data = d.data();
+        const now = Date.now();
+        const profile: UserProfile = {
+          displayName: data.displayName || "Unknown User",
+          email: data.email || "",
+          isPremium: !!(data.premiumEndsAt && data.premiumEndsAt.toDate() > new Date()),
+          photoURL: data.photoURL || "",
+          timestamp: now,
+        };
+        
+        // Store in cache
+        userProfileCache[d.id] = profile;
+        result.set(d.id, profile);
+      });
+    }
+  }
+
+  return result;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────
 
@@ -116,22 +174,21 @@ export default function MarketerDashboard() {
   const [marketer, setMarketer] = useState<MarketerData | null>(null);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [referrals, setReferrals] = useState<ReferredUser[]>([]);
-  const [stats, setStats] = useState<DashboardStats | null>(null);
   
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   
-  // Pagination state for commissions
+  // Pagination - Commissions
   const [commissionsLoading, setCommissionsLoading] = useState(false);
   const [hasMoreCommissions, setHasMoreCommissions] = useState(true);
-  const [commissionsLastDoc, setCommissionsLastDoc] = useState<any>(null);
+  const [lastCommissionDoc, setLastCommissionDoc] = useState<QueryDocumentSnapshot | null>(null);
   const COMMISSIONS_PAGE_SIZE = 15;
 
-  // Pagination state for referrals
+  // Pagination - Referrals
   const [referralsLoading, setReferralsLoading] = useState(false);
   const [hasMoreReferrals, setHasMoreReferrals] = useState(true);
-  const [referralsLastDoc, setReferralsLastDoc] = useState<any>(null);
+  const [lastReferralDoc, setLastReferralDoc] = useState<QueryDocumentSnapshot | null>(null);
   const REFERRALS_PAGE_SIZE = 15;
 
   // ─── Load Data ─────────────────────────────────────────────────────
@@ -139,14 +196,17 @@ export default function MarketerDashboard() {
   const loadMarketerData = useCallback(async (force = false) => {
     if (!user) return;
 
-    // Check cache
+    // Check marketer cache (only if not forcing refresh)
     if (!force) {
-      const cached = cachedDataByUid.get(user.uid);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+      const cached = marketerCacheByUid.get(user.uid);
+      if (cached && Date.now() - cached.timestamp < MARKETER_CACHE_TTL_MS) {
         setMarketer(cached.marketer);
         setCommissions(cached.commissions);
         setReferrals(cached.referrals);
-        setStats(cached.stats);
+        setHasMoreCommissions(cached.hasMoreCommissions);
+        setHasMoreReferrals(cached.hasMoreReferrals);
+        setLastCommissionDoc(cached.lastCommissionDoc);
+        setLastReferralDoc(cached.lastReferralDoc);
         setLoading(false);
         return;
       }
@@ -156,7 +216,7 @@ export default function MarketerDashboard() {
     setRefreshing(true);
 
     try {
-      // ─── 1. Fetch Marketer Document ───────────────────────────────
+      // ─── 1. Fetch Marketer Document (1 read) ──────────────────────
       const marketerSnap = await getDoc(doc(db, "marketers", user.uid));
       if (!marketerSnap.exists()) {
         setLoading(false);
@@ -166,31 +226,7 @@ export default function MarketerDashboard() {
 
       const marketerData = marketerSnap.data() as MarketerData;
 
-      // ─── 2. Fetch Stats with Aggregation ──────────────────────────
-      // Use getCountFromServer for counts (cheaper than reading docs)
-      
-      // Count pending commissions (not paid out)
-      const pendingSnap = await getCountFromServer(
-        query(
-          collection(db, "referrals"),
-          where("marketerUid", "==", user.uid),
-          where("commissionPaidOut", "==", false)
-        )
-      );
-
-      const today = new Date();
-      const monthKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
-
-      const statsData: DashboardStats = {
-        totalEarned: marketerData.totalEarnedKES || 0,
-        totalWithdrawn: marketerData.totalWithdrawnKES || 0,
-        availableBalance: (marketerData.totalEarnedKES || 0) - (marketerData.totalWithdrawnKES || 0),
-        monthlyEarnings: marketerData.earningsMonthKey === monthKey ? (marketerData.earningsThisMonth || 0) : 0,
-        monthlySignups: marketerData.earningsMonthKey === monthKey ? (marketerData.signupsThisMonth || 0) : 0,
-        pendingCommissions: pendingSnap.data().count,
-      };
-
-      // ─── 3. Fetch Recent Commissions (Paginated) ─────────────────
+      // ─── 2. Fetch Commissions (1 read for 15 docs) ────────────────
       const commissionsQuery = query(
         collection(db, "referralCommissions"),
         where("marketerUid", "==", user.uid),
@@ -203,11 +239,7 @@ export default function MarketerDashboard() {
         (d) => ({ id: d.id, ...d.data() } as Commission)
       );
 
-      setCommissions(commissionsData);
-      setCommissionsLastDoc(commissionsSnap.docs[commissionsSnap.docs.length - 1] || null);
-      setHasMoreCommissions(commissionsSnap.docs.length === COMMISSIONS_PAGE_SIZE);
-
-      // ─── 4. Fetch Referrals (Paginated) ──────────────────────────
+      // ─── 3. Fetch Referrals with Cached User Data ──────────────────
       const referralsQuery = query(
         collection(db, "referrals"),
         where("marketerUid", "==", user.uid),
@@ -216,32 +248,46 @@ export default function MarketerDashboard() {
       );
       
       const referralsSnap = await getDocs(referralsQuery);
-      const referralsData = referralsSnap.docs.map((d) => {
+      
+      // ✅ Use cached user profiles
+      const userUids = referralsSnap.docs.map((d) => d.id);
+      const userProfileMap = userUids.length > 0 
+        ? await getUserProfiles(userUids) 
+        : new Map();
+
+      const referralsData: ReferredUser[] = referralsSnap.docs.map((d) => {
         const data = d.data();
+        const userProfile = userProfileMap.get(d.id);
         return {
           uid: d.id,
-          displayName: data.displayName || "Unknown User",
+          displayName: userProfile?.displayName || "Unknown User",
+          email: userProfile?.email || "",
+          photoURL: userProfile?.photoURL || "",
           joinedAt: data.createdAt || null,
           commissionPaidOut: data.commissionPaidOut || false,
-          isPremium: data.isPremium || false,
-        } as ReferredUser;
+          isPremium: userProfile?.isPremium || false,
+        };
       });
 
-      setReferrals(referralsData);
-      setReferralsLastDoc(referralsSnap.docs[referralsSnap.docs.length - 1] || null);
-      setHasMoreReferrals(referralsSnap.docs.length === REFERRALS_PAGE_SIZE);
-
-      // ─── 5. Update State ──────────────────────────────────────────
+      // ─── 4. Update State ──────────────────────────────────────────
       setMarketer(marketerData);
-      setStats(statsData);
+      setCommissions(commissionsData);
+      setReferrals(referralsData);
+      setHasMoreCommissions(commissionsSnap.docs.length === COMMISSIONS_PAGE_SIZE);
+      setHasMoreReferrals(referralsSnap.docs.length === REFERRALS_PAGE_SIZE);
+      setLastCommissionDoc(commissionsSnap.docs[commissionsSnap.docs.length - 1] || null);
+      setLastReferralDoc(referralsSnap.docs[referralsSnap.docs.length - 1] || null);
 
-      // ─── 6. Update Cache ──────────────────────────────────────────
-      cachedDataByUid.set(user.uid, {
+      // ─── 5. Update Marketer Cache ──────────────────────────────────
+      marketerCacheByUid.set(user.uid, {
         marketer: marketerData,
         commissions: commissionsData,
         referrals: referralsData,
-        stats: statsData,
         timestamp: Date.now(),
+        hasMoreCommissions: commissionsSnap.docs.length === COMMISSIONS_PAGE_SIZE,
+        hasMoreReferrals: referralsSnap.docs.length === REFERRALS_PAGE_SIZE,
+        lastCommissionDoc: commissionsSnap.docs[commissionsSnap.docs.length - 1] || null,
+        lastReferralDoc: referralsSnap.docs[referralsSnap.docs.length - 1] || null,
       });
 
     } catch (error) {
@@ -255,15 +301,15 @@ export default function MarketerDashboard() {
   // ─── Load More Commissions ────────────────────────────────────────
 
   const loadMoreCommissions = useCallback(async () => {
-    if (!user || commissionsLoading || !hasMoreCommissions) return;
+    if (!user || commissionsLoading || !hasMoreCommissions || !lastCommissionDoc) return;
     setCommissionsLoading(true);
 
     try {
-      let q = query(
+      const q = query(
         collection(db, "referralCommissions"),
         where("marketerUid", "==", user.uid),
         orderBy("createdAt", "desc"),
-        startAfter(commissionsLastDoc),
+        startAfter(lastCommissionDoc),
         limit(COMMISSIONS_PAGE_SIZE)
       );
 
@@ -279,7 +325,7 @@ export default function MarketerDashboard() {
       );
 
       setCommissions((prev) => [...prev, ...newCommissions]);
-      setCommissionsLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setLastCommissionDoc(snap.docs[snap.docs.length - 1] || null);
       setHasMoreCommissions(snap.docs.length === COMMISSIONS_PAGE_SIZE);
 
     } catch (error) {
@@ -287,20 +333,20 @@ export default function MarketerDashboard() {
     } finally {
       setCommissionsLoading(false);
     }
-  }, [user, commissionsLastDoc, hasMoreCommissions, commissionsLoading]);
+  }, [user, lastCommissionDoc, hasMoreCommissions, commissionsLoading]);
 
   // ─── Load More Referrals ──────────────────────────────────────────
 
   const loadMoreReferrals = useCallback(async () => {
-    if (!user || referralsLoading || !hasMoreReferrals) return;
+    if (!user || referralsLoading || !hasMoreReferrals || !lastReferralDoc) return;
     setReferralsLoading(true);
 
     try {
-      let q = query(
+      const q = query(
         collection(db, "referrals"),
         where("marketerUid", "==", user.uid),
         orderBy("createdAt", "desc"),
-        startAfter(referralsLastDoc),
+        startAfter(lastReferralDoc),
         limit(REFERRALS_PAGE_SIZE)
       );
 
@@ -311,19 +357,28 @@ export default function MarketerDashboard() {
         return;
       }
 
-      const newReferrals = snap.docs.map((d) => {
+      // ✅ Use cached user profiles for new referrals
+      const userUids = snap.docs.map((d) => d.id);
+      const userProfileMap = userUids.length > 0 
+        ? await getUserProfiles(userUids) 
+        : new Map();
+
+      const newReferrals: ReferredUser[] = snap.docs.map((d) => {
         const data = d.data();
+        const userProfile = userProfileMap.get(d.id);
         return {
           uid: d.id,
-          displayName: data.displayName || "Unknown User",
+          displayName: userProfile?.displayName || "Unknown User",
+          email: userProfile?.email || "",
+          photoURL: userProfile?.photoURL || "",
           joinedAt: data.createdAt || null,
           commissionPaidOut: data.commissionPaidOut || false,
-          isPremium: data.isPremium || false,
-        } as ReferredUser;
+          isPremium: userProfile?.isPremium || false,
+        };
       });
 
       setReferrals((prev) => [...prev, ...newReferrals]);
-      setReferralsLastDoc(snap.docs[snap.docs.length - 1] || null);
+      setLastReferralDoc(snap.docs[snap.docs.length - 1] || null);
       setHasMoreReferrals(snap.docs.length === REFERRALS_PAGE_SIZE);
 
     } catch (error) {
@@ -331,7 +386,7 @@ export default function MarketerDashboard() {
     } finally {
       setReferralsLoading(false);
     }
-  }, [user, referralsLastDoc, hasMoreReferrals, referralsLoading]);
+  }, [user, lastReferralDoc, hasMoreReferrals, referralsLoading]);
 
   // ─── Initial Load ──────────────────────────────────────────────────
 
@@ -341,7 +396,6 @@ export default function MarketerDashboard() {
       return;
     }
 
-    // Check if user is a marketer
     const checkAndLoad = async () => {
       const marketerSnap = await getDoc(doc(db, "marketers", user.uid));
       if (!marketerSnap.exists()) {
@@ -436,24 +490,29 @@ export default function MarketerDashboard() {
           <div className="bg-gradient-to-br from-[#00A651] to-[#00A651]/80 rounded-2xl p-4 text-white col-span-2">
             <p className="text-xs font-semibold opacity-90">Available Balance</p>
             <p className="font-black text-2xl mt-1">
-              {formatCurrency(stats?.availableBalance || 0)}
+              {formatCurrency((marketer.totalEarnedKES || 0) - (marketer.totalWithdrawnKES || 0))}
             </p>
             <div className="flex items-center gap-4 mt-2 text-xs opacity-80">
-              <span>Earned: {formatCurrency(stats?.totalEarned || 0)}</span>
-              <span>Paid: {formatCurrency(stats?.totalWithdrawn || 0)}</span>
+              <span>Earned: {formatCurrency(marketer.totalEarnedKES || 0)}</span>
+              <span>Paid: {formatCurrency(marketer.totalWithdrawnKES || 0)}</span>
             </div>
           </div>
 
           <div className="bg-card border border-border rounded-2xl p-4">
             <p className="text-xs text-muted-foreground">This Month</p>
-            <p className="font-bold text-lg">{formatCurrency(stats?.monthlyEarnings || 0)}</p>
-            <p className="text-xs text-muted-foreground">{stats?.monthlySignups || 0} signups</p>
+            <p className="font-bold text-lg">{formatCurrency(marketer.earningsThisMonth || 0)}</p>
+            <p className="text-xs text-muted-foreground">{marketer.signupsThisMonth || 0} signups</p>
           </div>
 
           <div className="bg-card border border-border rounded-2xl p-4">
-            <p className="text-xs text-muted-foreground">Pending Commissions</p>
-            <p className="font-bold text-lg">{stats?.pendingCommissions || 0}</p>
-            <p className="text-xs text-muted-foreground">Not yet paid out</p>
+            <p className="text-xs text-muted-foreground">Status</p>
+            <p className={`font-bold text-lg capitalize ${
+              marketer.status === "active" ? "text-green-600" :
+              marketer.status === "suspended" ? "text-red-600" :
+              "text-amber-600"
+            }`}>
+              {marketer.status || "Pending"}
+            </p>
           </div>
         </div>
 
@@ -581,6 +640,9 @@ export default function MarketerDashboard() {
                 >
                   <div>
                     <p className="font-bold text-sm">{r.displayName}</p>
+                    {r.email && (
+                      <p className="text-[10px] text-muted-foreground">{r.email}</p>
+                    )}
                     {r.joinedAt && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         Joined {timeAgo(r.joinedAt.seconds)}
