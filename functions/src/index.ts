@@ -75,8 +75,7 @@ const CLEANUP_LIMIT = 150;
 const ARCHIVE_RETENTION_HOURS = 48;
 const MINIMUM_PAYOUT_KES = 350; // adjust to whatever makes sense for your M-Pesa costs
 
-
-    // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
 // BATCH COMMITTER HELPER
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -99,12 +98,16 @@ class BatchCommitter {
   /**
    * Add a set operation to the batch. Auto-commits if limit reached.
    */
-  set<T>(
-    docRef: FirebaseFirestore.DocumentReference<T>,
-    data: T,
+  set(
+    docRef: FirebaseFirestore.DocumentReference,
+    data: any,
     options?: FirebaseFirestore.SetOptions
   ): void {
-    this.batch.set(docRef, data, options);
+    if (options) {
+      this.batch.set(docRef, data, options);
+    } else {
+      this.batch.set(docRef, data);
+    }
     this.opCount++;
     this.checkAndCommit();
   }
@@ -113,8 +116,8 @@ class BatchCommitter {
    * Add an update operation to the batch. Auto-commits if limit reached.
    */
   update(
-    docRef: FirebaseFirestore.DocumentReference<unknown>,
-    data: FirebaseFirestore.UpdateData<unknown>
+    docRef: FirebaseFirestore.DocumentReference,
+    data: any
   ): void {
     this.batch.update(docRef, data);
     this.opCount++;
@@ -124,7 +127,7 @@ class BatchCommitter {
   /**
    * Add a delete operation to the batch. Auto-commits if limit reached.
    */
-  delete(docRef: FirebaseFirestore.DocumentReference<unknown>): void {
+  delete(docRef: FirebaseFirestore.DocumentReference): void {
     this.batch.delete(docRef);
     this.opCount++;
     this.checkAndCommit();
