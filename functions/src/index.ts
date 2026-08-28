@@ -75,6 +75,95 @@ const CLEANUP_LIMIT = 150;
 const ARCHIVE_RETENTION_HOURS = 48;
 const MINIMUM_PAYOUT_KES = 350; // adjust to whatever makes sense for your M-Pesa costs
 
+// ═══════════════════════════════════════════════════════════════════════════
+// BATCH COMMITTER HELPER
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Auto-commits Firestore batches when they reach the limit (400 ops,
+ * safely under Firestore's 500 hard limit). Use this instead of
+ * db.batch() in loops that can exceed 500 writes.
+ */
+class BatchCommitter {
+  private batch: FirebaseFirestore.WriteBatch;
+  private opCount: number = 0;
+  private commitCount: number = 0;
+  private readonly maxOps: number;
+
+  constructor(maxOps: number = 400) {
+    this.batch = db.batch();
+    this.maxOps = maxOps;
+  }
+
+  /**
+   * Add a set operation to the batch. Auto-commits if limit reached.
+   */
+  set<T>(
+    docRef: FirebaseFirestore.DocumentReference<T>,
+    data: T,
+    options?: FirebaseFirestore.SetOptions
+  ): void {
+    this.batch.set(docRef, data, options);
+    this.opCount++;
+    this.checkAndCommit();
+  }
+
+  /**
+   * Add an update operation to the batch. Auto-commits if limit reached.
+   */
+  update(
+    docRef: FirebaseFirestore.DocumentReference,
+    data: FirebaseFirestore.UpdateData
+  ): void {
+    this.batch.update(docRef, data);
+    this.opCount++;
+    this.checkAndCommit();
+  }
+
+  /**
+   * Add a delete operation to the batch. Auto-commits if limit reached.
+   */
+  delete(docRef: FirebaseFirestore.DocumentReference): void {
+    this.batch.delete(docRef);
+    this.opCount++;
+    this.checkAndCommit();
+  }
+
+  /**
+   * Check if batch is full, commit if needed, and start a fresh batch.
+   */
+  private checkAndCommit(): void {
+    if (this.opCount >= this.maxOps) {
+      this.batch.commit().catch((err) => {
+        console.error(`Batch ${this.commitCount + 1} commit failed:`, err);
+        throw err;
+      });
+      this.commitCount++;
+      this.opCount = 0;
+      this.batch = db.batch();
+    }
+  }
+
+  /**
+   * Commit any remaining operations in the current batch.
+   * Must call this at the end of your loop.
+   */
+  async finalize(): Promise<void> {
+    if (this.opCount > 0) {
+      await this.batch.commit();
+      this.commitCount++;
+      this.opCount = 0;
+    }
+  }
+
+  /**
+   * Get the total number of commits performed.
+   */
+  get totalCommits(): number {
+    return this.commitCount;
+  }
+}
+
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
 }
@@ -621,21 +710,23 @@ async function deleteCloudinaryImagesBatched(publicIds: string[], batchSize = 10
 // ═══════════════════════════════════════════════════════════════════════════
 // 3. CLEANUP
 // ═══════════════════════════════════════════════════════════════════════════
- 
+
 async function runCleanup() {
   const now = admin.firestore.Timestamp.now();
+  const oneHourAgo = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() - 60 * 60 * 1000)
+  );
+  const archiveCutoff = admin.firestore.Timestamp.fromDate(
+    new Date(Date.now() - ARCHIVE_RETENTION_HOURS * 60 * 60 * 1000)
+  );
 
-  // Archive expired active adverts
+  // ─── Fetch all documents to process ──────────────────────────────────
+
   const expiredActive = await db.collection("products")
     .where("status", "==", "active")
     .where("expiresAt", "<", now)
     .limit(CLEANUP_LIMIT)
     .get();
-
-  // Delete abandoned pending payment adverts older than 1 hour
-  const oneHourAgo = admin.firestore.Timestamp.fromDate(
-    new Date(Date.now() - 60 * 60 * 1000)
-  );
 
   const expiredPending = await db.collection("products")
     .where("status", "==", "pending_payment")
@@ -649,67 +740,59 @@ async function runCleanup() {
     .limit(CLEANUP_LIMIT)
     .get();
 
-  // Permanently delete adverts that have sat archived past retention
-  const archiveCutoff = admin.firestore.Timestamp.fromDate(
-  new Date(Date.now() - ARCHIVE_RETENTION_HOURS * 60 * 60 * 1000)
-);
-
   const staleArchived = await db.collection("products")
     .where("status", "==", "archived")
     .where("archivedAt", "<", archiveCutoff)
     .limit(CLEANUP_LIMIT)
     .get();
 
-  const batch = db.batch();
-
-  // Archive expired active adverts — stamp archivedAt so we can
-  // later purge them once ARCHIVE_RETENTION_DAYS has passed.
-  expiredActive.docs.forEach((doc) => {
-    batch.update(doc.ref, {
-      status: "archived",
-      archivedAt: now,
-    });
-  });
-
-  // Delete abandoned pending adverts and their Cloudinary images
-  for (const doc of expiredPending.docs) {
-    const data = doc.data();
-
-    if (Array.isArray(data.imageUrls)) {
-      const publicIds = data.imageUrls
-        .map((img: any) => (typeof img === "string" ? null : img.public_id))
-        .filter((id: any): id is string => !!id);
-      await deleteCloudinaryImagesBatched(publicIds);
-    }
-
-    batch.delete(doc.ref);
-  }
-
-  // Delete abandoned pending payment records
-  expiredPayments.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-
-  // Clean up unclaimed draft uploads — images uploaded to Cloudinary
-  // but never turned into an advert (user abandoned the form).
   const staleDrafts = await db.collection("draftUploads")
     .where("claimed", "==", false)
     .where("createdAt", "<", oneHourAgo)
     .limit(CLEANUP_LIMIT)
     .get();
 
+  // ─── Use BatchCommitter instead of a single batch ──────────────────
+
+  const committer = new BatchCommitter(400);
   let purgedDraftImages = 0;
+  let purgedChats = 0;
+
+  // 1. Archive expired active adverts
+  expiredActive.docs.forEach((doc) => {
+    committer.update(doc.ref, {
+      status: "archived",
+      archivedAt: now,
+    });
+  });
+
+  // 2. Delete abandoned pending adverts and their Cloudinary images
+  for (const doc of expiredPending.docs) {
+    const data = doc.data();
+    if (Array.isArray(data.imageUrls)) {
+      const publicIds = data.imageUrls
+        .map((img: any) => (typeof img === "string" ? null : img.public_id))
+        .filter((id: any): id is string => !!id);
+      await deleteCloudinaryImagesBatched(publicIds);
+    }
+    committer.delete(doc.ref);
+  }
+
+  // 3. Delete abandoned pending payment records
+  expiredPayments.docs.forEach((doc) => {
+    committer.delete(doc.ref);
+  });
+
+  // 4. Clean up unclaimed draft uploads
   for (const draftDoc of staleDrafts.docs) {
     const data = draftDoc.data();
     const publicIds: string[] = Array.isArray(data.publicIds) ? data.publicIds : [];
     await deleteCloudinaryImagesBatched(publicIds);
     purgedDraftImages += publicIds.length;
-    batch.delete(draftDoc.ref);
+    committer.delete(draftDoc.ref);
   }
 
-  // Permanently purge adverts archived past retention — delete their
-  // Cloudinary images, their chats (and messages), then the advert itself
-  let purgedChats = 0;
+  // 5. Permanently purge adverts archived past retention
   for (const doc of staleArchived.docs) {
     const data = doc.data();
 
@@ -729,14 +812,10 @@ async function runCleanup() {
       purgedChats++;
     }
 
-    batch.delete(doc.ref);
+    committer.delete(doc.ref);
   }
 
-  // Orphaned chats — the product or job they reference no longer
-  // exists (e.g. deleted outside the normal deleteAdvert/deleteJob
-  // path). Ordered by createdAt with an age filter so each run
-  // advances through the collection instead of re-scanning the
-  // same first page forever.
+  // 6. Delete orphaned chats
   const orphanCandidates = await db.collection("chats")
     .where("createdAt", "<", oneHourAgo)
     .orderBy("createdAt")
@@ -762,7 +841,8 @@ async function runCleanup() {
     }
   }
 
-  await batch.commit();
+  // 7. Finalize — commit any remaining operations
+  await committer.finalize();
 
   return {
     archived: expiredActive.size,
@@ -772,6 +852,7 @@ async function runCleanup() {
     purgedChatsFromPurgedAds: purgedChats,
     orphanedChatsDeleted: orphanedChats,
     purgedDraftImages,
+    batchCommits: committer.totalCommits,
   };
 }
 
@@ -849,61 +930,86 @@ async function runExpiringAdvertReminders() {
 }
 
 export const closeMonthlyEarnings = onSchedule(
-  { schedule: "0 0 1 * *", timeZone: "Africa/Nairobi" }, // 00:00 on the 1st of each month
+  { schedule: "0 0 1 * *", timeZone: "Africa/Nairobi" },
   async () => {
     const now = new Date();
     const closedMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const closedMonthKey = `${closedMonth.getFullYear()}-${String(closedMonth.getMonth() + 1).padStart(2, "0")}`;
     const newMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    const marketersSnap = await db.collection("marketers").get();
-    const batch = db.batch();
+    const committer = new BatchCommitter(400);
+    let processedCount = 0;
+    let lastDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+    const pageSize = 100; // Read in chunks to avoid memory issues
 
-    marketersSnap.docs.forEach((doc) => {
-  const data = doc.data();
-  const earnedThatMonth = data.earningsMonthKey === closedMonthKey
-    ? (data.earningsThisMonth ?? 0)
-    : 0;
-  const signupsThatMonth = data.signupsMonthKey === closedMonthKey
-    ? (data.signupsThisMonth ?? 0)
-    : 0;
+    // ─── Paginated loop: process all marketers in chunks ─────────────
 
-  if (earnedThatMonth < MINIMUM_PAYOUT_KES) {
-    // Below threshold — carry the amount into the new month instead
-    // of creating a payable snapshot, so it accumulates until it's
-    // worth paying out.
-    batch.update(doc.ref, {
-      earningsThisMonth: earnedThatMonth,
-      earningsMonthKey: newMonthKey,
-      signupsThisMonth: 0,
-      signupsMonthKey: newMonthKey,
-    });
-    return;
-  }
+    while (true) {
+      let query = db.collection("marketers").orderBy("__name__").limit(pageSize);
+      if (lastDoc) {
+        query = query.startAfter(lastDoc);
+      }
 
-  const payoutRef = db.collection("payouts").doc(closedMonthKey)
-    .collection("marketers").doc(doc.id);
+      const marketersSnap = await query.get();
 
-  batch.set(payoutRef, {
-    marketerUid: doc.id,
-    referralCode: data.referralCode ?? null,
-    earningsKES: earnedThatMonth,
-    signups: signupsThatMonth,
-    monthKey: closedMonthKey,
-    paid: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+      if (marketersSnap.empty) break;
 
-  batch.update(doc.ref, {
-    earningsThisMonth: 0,
-    earningsMonthKey: newMonthKey,
-    signupsThisMonth: 0,
-    signupsMonthKey: newMonthKey,
-  });
-});
+      lastDoc = marketersSnap.docs[marketersSnap.docs.length - 1];
 
-    await batch.commit();
-    console.log(`Closed earnings for ${closedMonthKey}: ${marketersSnap.size} marketers snapshotted.`);
+      for (const doc of marketersSnap.docs) {
+        const data = doc.data();
+        const earnedThatMonth = data.earningsMonthKey === closedMonthKey
+          ? (data.earningsThisMonth ?? 0)
+          : 0;
+        const signupsThatMonth = data.signupsMonthKey === closedMonthKey
+          ? (data.signupsThisMonth ?? 0)
+          : 0;
+
+        if (earnedThatMonth < MINIMUM_PAYOUT_KES) {
+          // Below threshold — carry the amount into the new month
+          committer.update(doc.ref, {
+            earningsThisMonth: earnedThatMonth,
+            earningsMonthKey: newMonthKey,
+            signupsThisMonth: 0,
+            signupsMonthKey: newMonthKey,
+          });
+        } else {
+          const payoutRef = db.collection("payouts").doc(closedMonthKey)
+            .collection("marketers").doc(doc.id);
+
+          committer.set(payoutRef, {
+            marketerUid: doc.id,
+            referralCode: data.referralCode ?? null,
+            earningsKES: earnedThatMonth,
+            signups: signupsThatMonth,
+            monthKey: closedMonthKey,
+            paid: false,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          });
+
+          committer.update(doc.ref, {
+            earningsThisMonth: 0,
+            earningsMonthKey: newMonthKey,
+            signupsThisMonth: 0,
+            signupsMonthKey: newMonthKey,
+          });
+        }
+
+        processedCount++;
+      }
+
+      // If we got fewer docs than pageSize, we've reached the end
+      if (marketersSnap.docs.length < pageSize) break;
+    }
+
+    // ─── Finalize any remaining operations ────────────────────────────
+
+    await committer.finalize();
+
+    console.log(
+      `Closed earnings for ${closedMonthKey}: ${processedCount} marketers processed, ` +
+      `${committer.totalCommits} batch commits.`
+    );
   }
 );
 
