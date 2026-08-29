@@ -1322,7 +1322,8 @@ export const reverseGeocode = onCall(
     maxInstances: 1,
     concurrency: 1,
   },
-  const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
+  async (request) => {
+    const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
 
     if (typeof lat !== "number" || typeof lng !== "number") {
       throw new HttpsError("invalid-argument", "lat and lng are required numbers.");
