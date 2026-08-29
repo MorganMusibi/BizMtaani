@@ -422,17 +422,6 @@ export async function sendChatMessage(params: {
 
     transaction.update(chatRef, updateData);
 
-    // FIX: mirror the per-chat unread delta into each user's own
-    // totalUnreadCount doc — a single denormalized counter so
-    // getUnreadCount() can read one document instead of scanning
-    // every chat the user has ever had.
-    const senderUserRef = doc(db, "users", senderId);
-    const recipientUserRef = doc(db, "users", recipientUid);
-    const previousSenderUnread = unread[senderId] || 0;
-
-    transaction.set(senderUserRef, { totalUnreadCount: increment(-previousSenderUnread) }, { merge: true });
-    transaction.set(recipientUserRef, { totalUnreadCount: increment(1) }, { merge: true });
-
     return { messageId: messageRef.id };
   });
 
@@ -521,14 +510,6 @@ export async function forwardChatMessage(params: {
     updateData[`unreadCount.${recipientUid}`] = (unread[recipientUid] || 0) + 1;
 
     transaction.update(targetChatRef, updateData);
-
-    // FIX: same denormalized-counter mirror as sendChatMessage.
-    const senderUserRef = doc(db, "users", senderId);
-    const recipientUserRef = doc(db, "users", recipientUid);
-    const previousSenderUnread = unread[senderId] || 0;
-
-    transaction.set(senderUserRef, { totalUnreadCount: increment(-previousSenderUnread) }, { merge: true });
-    transaction.set(recipientUserRef, { totalUnreadCount: increment(1) }, { merge: true });
   });
 }
 
@@ -542,13 +523,12 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
   if (!chatId || !userId) return;
 
   const chatRef = doc(db, "chats", chatId);
-  const userRef = doc(db, "users", userId);
 
-  // Clears the unread badge (both the per-chat count and the
-  // denormalized per-user total) and reports back how many messages
-  // were actually unread, so the batch step below can be skipped
-  // entirely when there was nothing to mark — avoids paying for a
-  // query that would just come back empty.
+  // Clears the unread badge on the chat doc itself. The matching drop
+  // in this user's denormalized totalUnreadCount is now handled
+  // server-side by the onChatUnreadCountChanged Cloud Function trigger
+  // (see functions/index.ts), which diffs this same unreadCount field —
+  // not here, and not for other users' docs from client code at all.
   const previousUnread = await runTransaction(db, async (transaction) => {
     const chatSnap = await transaction.get(chatRef);
     if (!chatSnap.exists()) return 0;
@@ -565,8 +545,6 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
       [`unreadCount.${userId}`]: 0,
       updatedAt: serverTimestamp(),
     });
-
-    transaction.set(userRef, { totalUnreadCount: increment(-unreadForUser) }, { merge: true });
 
     return unreadForUser;
   });
@@ -592,7 +570,6 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
     await batch.commit();
   }
 }
-
 
 /*
 |--------------------------------------------------------------------------
