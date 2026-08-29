@@ -535,7 +535,7 @@ export default function MarketerDashboard() {
             Share your code
           </Button>
           <p className="text-xs text-muted-foreground">
-            Earn 14.2% commission when someone you refer makes their first premium purchase.
+            Earn 25% commission when someone you refer makes their first premium purchase.
           </p>
         </div>
 
