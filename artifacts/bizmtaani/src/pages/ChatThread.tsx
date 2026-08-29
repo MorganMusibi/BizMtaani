@@ -183,8 +183,50 @@ export default function ChatThread() {
       }
     );
 
-    // ─── OPTIMIZED MESSAGES LOADING ────────────────────────────────────
-    // ✅ Load initial messages with getDocs (one-time read)
+    let unsubscribeNewMessages: (() => void) | null = null;
+
+    const setupNewMessagesListener = (loadedMessages: Message[]) => {
+      if (!chatId) return;
+
+      const lastMessage = loadedMessages[loadedMessages.length - 1];
+      const lastTimestamp = lastMessage?.createdAt;
+
+      let q = query(
+        collection(db, "chats", chatId, "messages"),
+        orderBy("createdAt", "asc")
+      );
+
+      if (lastTimestamp) {
+        q = query(q, where("createdAt", ">", lastTimestamp));
+      } else {
+        q = query(q, limitToLast(1));
+      }
+
+      unsubscribeNewMessages = onSnapshot(
+        q,
+        (snapshot) => {
+          const newMessages = snapshot.docs
+            .map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }))
+            .filter((message) => !message.deletedFor?.includes(user.uid));
+
+          if (newMessages.length > 0) {
+            setMessages((prev) => {
+              const existingIds = new Set(prev.map((m) => m.id));
+              const uniqueNew = newMessages.filter((m) => !existingIds.has(m.id));
+              return [...prev, ...uniqueNew];
+            });
+
+            throttleMarkAsRead();
+          }
+        },
+        (error) => {
+          console.error("New messages listener error:", error);
+        }
+      );
+    };
 
     const loadInitialMessages = async () => {
       try {
@@ -202,7 +244,7 @@ export default function ChatThread() {
 
         // Reverse to get chronological order
         const sortedMessages = loadedMessages.reverse();
-        
+
         // Filter out deleted messages
         const filteredMessages = sortedMessages.filter(
           (message) => !message.deletedFor?.includes(user.uid)
@@ -220,6 +262,11 @@ export default function ChatThread() {
         // ✅ Throttled markAsRead
         throttleMarkAsRead();
 
+        // FIX: attach the live listener now, using the array we just
+        // fetched — not stale `messages` state, and not gated behind
+        // state that hasn't re-rendered yet.
+        setupNewMessagesListener(filteredMessages);
+
       } catch (error) {
         console.error("Failed to load initial messages:", error);
         setError("Unable to load messages.");
@@ -229,59 +276,7 @@ export default function ChatThread() {
 
     loadInitialMessages();
 
-    // ─── LISTEN FOR NEW MESSAGES ONLY ──────────────────────────────────
-    // ✅ Only listens for messages after the last loaded one
-
-    let unsubscribeNewMessages: (() => void) | null = null;
-
-    const setupNewMessagesListener = () => {
-      if (!chatId || !initialMessagesLoaded) return;
-
-      const lastMessage = messages[messages.length - 1];
-      const lastTimestamp = lastMessage?.createdAt;
-
-      let q = query(
-        collection(db, "chats", chatId, "messages"),
-        orderBy("createdAt", "asc")
-      );
-
-      if (lastTimestamp) {
-        q = query(q, where("createdAt", ">", lastTimestamp));
-      } else {
-        // If no messages, listen for the first ones
-        q = query(q, limitToLast(1));
-      }
-
-      unsubscribeNewMessages = onSnapshot(
-        q,
-        (snapshot) => {
-          const newMessages = snapshot.docs
-            .map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }))
-            .filter((message) => !message.deletedFor?.includes(user.uid));
-
-          if (newMessages.length > 0) {
-            setMessages((prev) => {
-              // Avoid duplicates
-              const existingIds = new Set(prev.map((m) => m.id));
-              const uniqueNew = newMessages.filter((m) => !existingIds.has(m.id));
-              return [...prev, ...uniqueNew];
-            });
-
-            // ✅ Throttled markAsRead for new messages
-            throttleMarkAsRead();
-          }
-        },
-        (error) => {
-          console.error("New messages listener error:", error);
-        }
-      );
-    };
-
-    setupNewMessagesListener();
-
+    
     // ─── CLEANUP ──────────────────────────────────────────────────────
 
     return () => {
