@@ -503,7 +503,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
       </p>
     </div>
     <p className="text-xs text-muted-foreground text-right max-w-[55%]">
-      You earn 14.2% every time someone you refer goes premium
+      You earn 25% every time someone you refer goes premium
     </p>
   </div>
 )}
