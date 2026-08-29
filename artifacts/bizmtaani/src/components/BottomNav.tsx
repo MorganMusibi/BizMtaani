@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { LayoutGrid, Package, MessageCircle, User, Briefcase, Info } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { prefetchRoute } from "@/lib/prefetch";
 
@@ -20,16 +20,11 @@ export function BottomNav() {
       setUnreadTotal(0);
       return;
     }
-    const q = query(
-      collection(db, "chats"),
-      where("participants", "array-contains", user.uid)
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      const total = snap.docs.reduce((sum, d) => {
-        const data = d.data() as Chat;
-        return sum + (data.unreadCount?.[user.uid] ?? 0);
-      }, 0);
-      setUnreadTotal(total);
+    // FIX: read the single denormalized counter instead of scanning
+    // every chat this user has ever been part of on every mount, and
+    // re-summing it live on every change to any of those chats.
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      setUnreadTotal(snap.exists() ? (snap.data().totalUnreadCount ?? 0) : 0);
     });
     return unsub;
   }, [user]);
