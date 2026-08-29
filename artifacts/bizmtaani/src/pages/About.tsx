@@ -74,7 +74,7 @@ const FAQ = [
   },
   {
     q: "How does a marketer earn money?",
-    a: "Once approved, you get a unique referral code to share. You earn 14.2% commission whenever someone who signed up using your code makes their first Premium payment. Repeat payments from the same person don't earn additional commission.",
+    a: "Once approved, you get a unique referral code to share. You earn 25% commission whenever someone who signed up using your code makes their first Premium payment. Repeat payments from the same person don't earn additional commission.",
   },
   {
     q: "When and how do I get paid?",
@@ -194,7 +194,7 @@ export default function About() {
               <div>
                 <p className="font-bold text-sm">Earn by referring premium users</p>
                 <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
-                  Approved marketers earn 14.2% commission every time someone they referred
+                  Approved marketers earn 25% commission every time someone they referred
                   makes their first Premium payment. Track your monthly earnings and referrals
                   from your Marketer Dashboard, accessible from your Profile.
                 </p>
@@ -254,7 +254,8 @@ export default function About() {
             </a>
 
             <a
-              href="mailto:morganmusibi@gmail.com"
+              <a
+              href="mailto:bizmtaani2@gmail.com"
               className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
