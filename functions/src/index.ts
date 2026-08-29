@@ -1573,7 +1573,7 @@ try {
   requiresPayment: status === "pending_payment",
   plan: effectivePlan,
 };
-  });
+  
  
 
 export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
