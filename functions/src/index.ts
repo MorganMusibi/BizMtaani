@@ -49,8 +49,8 @@ const FOLDER_MAP: Record<string, string> = {
 // Update these to reflect the plans actually used in your frontend (mpesa.ts)
 const PLAN_AMOUNTS: Record<string, number> = { 
   free: 0, 
-  premium_weekly: 100, 
-  premium_monthly: 350 
+  premium_weekly: 120, 
+  premium_monthly: 400 
 };
 
 // If you are using limits in your backend, update them here:
@@ -62,8 +62,8 @@ const MAX_PHOTO_LIMIT: Record<string, number> = {
 
 const MAX_ACTIVE_ADS: Record<string, number> = {
   free: 3,
-  premium_weekly: 8,
-  premium_monthly: 10,
+  premium_weekly: 5,
+  premium_monthly: 8,
 };
 // Add this in your Constants section
 const LISTING_DURATIONS: Record<string, number> = {
@@ -73,7 +73,7 @@ const LISTING_DURATIONS: Record<string, number> = {
 };
 const CLEANUP_LIMIT = 150;
 const ARCHIVE_RETENTION_HOURS = 48;
-const MINIMUM_PAYOUT_KES = 350; // adjust to whatever makes sense for your M-Pesa costs
+const MINIMUM_PAYOUT_KES = 500; // adjust to whatever makes sense for your M-Pesa costs
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BATCH COMMITTER HELPER
@@ -89,15 +89,13 @@ class BatchCommitter {
   private opCount: number = 0;
   private commitCount: number = 0;
   private readonly maxOps: number;
+  private pendingCommits: Promise<unknown>[] = [];
 
   constructor(maxOps: number = 400) {
     this.batch = db.batch();
     this.maxOps = maxOps;
   }
 
-  /**
-   * Add a set operation to the batch. Auto-commits if limit reached.
-   */
   set(
     docRef: FirebaseFirestore.DocumentReference,
     data: any,
@@ -112,9 +110,6 @@ class BatchCommitter {
     this.checkAndCommit();
   }
 
-  /**
-   * Add an update operation to the batch. Auto-commits if limit reached.
-   */
   update(
     docRef: FirebaseFirestore.DocumentReference,
     data: any
@@ -124,50 +119,43 @@ class BatchCommitter {
     this.checkAndCommit();
   }
 
-  /**
-   * Add a delete operation to the batch. Auto-commits if limit reached.
-   */
   delete(docRef: FirebaseFirestore.DocumentReference): void {
     this.batch.delete(docRef);
     this.opCount++;
     this.checkAndCommit();
   }
 
-  /**
-   * Check if batch is full, commit if needed, and start a fresh batch.
-   */
   private checkAndCommit(): void {
     if (this.opCount >= this.maxOps) {
-      this.batch.commit().catch((err) => {
-        console.error(`Batch ${this.commitCount + 1} commit failed:`, err);
-        throw err;
-      });
+      const batchToCommit = this.batch;
       this.commitCount++;
+      this.pendingCommits.push(
+        batchToCommit.commit().catch((err) => {
+          console.error(`Batch ${this.commitCount} commit failed:`, err);
+          throw err;
+        })
+      );
       this.opCount = 0;
       this.batch = db.batch();
     }
   }
 
-  /**
-   * Commit any remaining operations in the current batch.
-   * Must call this at the end of your loop.
-   */
   async finalize(): Promise<void> {
     if (this.opCount > 0) {
-      await this.batch.commit();
+      this.pendingCommits.push(this.batch.commit());
       this.commitCount++;
       this.opCount = 0;
     }
+    // Surfaces any failed intermediate commit to the caller instead
+    // of letting it vanish as an unhandled rejection.
+    await Promise.all(this.pendingCommits);
+    this.pendingCommits = [];
   }
 
-  /**
-   * Get the total number of commits performed.
-   */
   get totalCommits(): number {
     return this.commitCount;
   }
 }
-
 
 function isSandbox(): boolean {
   return (process.env.MPESA_ENVIRONMENT ?? "sandbox") !== "production";
@@ -1318,7 +1306,8 @@ async function throttleNominatimWithLock(): Promise<void> {
 export const reverseGeocode = onCall(
   {
     cors: true,
-    // maxInstances and concurrency removed
+    maxInstances: 1,
+    concurrency: 1,
   },
   async (request) => {
     const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
@@ -1336,8 +1325,7 @@ export const reverseGeocode = onCall(
       return cached.data();
     }
 
-    // Use the distributed lock instead of the local throttle
-    await throttleNominatimWithLock();
+    await throttleNominatim();
 
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
 
