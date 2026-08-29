@@ -396,6 +396,10 @@ export async function sendChatMessage(params: {
       // ✅ Add read tracking
       readBy: {
         [senderId]: true, // Sender has "read" their own message
+        [recipientUid]: false, // FIX: must exist and be false, or a
+        // `where("readBy.<uid>", "==", false)` query can never match it
+        // — Firestore's == filter only matches documents where the
+        // field exists, not documents where it's missing.
       },
       // ✅ Add delivery tracking
       deliveredAt: serverTimestamp(),
@@ -487,6 +491,7 @@ export async function forwardChatMessage(params: {
       deletedForEveryone: false,
       readBy: {
         [senderId]: true,
+        [recipientUid]: false, // FIX: same reasoning as sendChatMessage
       },
       deliveredAt: serverTimestamp(),
     };
@@ -520,7 +525,9 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
 
   const chatRef = doc(db, "chats", chatId);
 
-  // ✅ Use transaction to check participant and update atomically
+  // ✅ Transaction handles the participant check + clearing the
+  // unread badge count — both atomic, both reads/writes going
+  // through the transaction object as required.
   await runTransaction(db, async (transaction) => {
     const chatSnap = await transaction.get(chatRef);
     if (!chatSnap.exists()) return;
@@ -531,34 +538,38 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
       throw new Error("You are not a participant in this conversation.");
     }
 
-    // ✅ Clear unread count
-    const unread = chat.unreadCount || {};
     transaction.update(chatRef, {
       [`unreadCount.${userId}`]: 0,
       updatedAt: serverTimestamp(),
     });
-
-    // ✅ OPTIMIZED: Mark messages as read in a batch
-    // Get unread messages for this user (max 50 to avoid large batches)
-    const unreadMessagesQuery = query(
-      collection(db, "chats", chatId, "messages"),
-      where(`readBy.${userId}`, "==", false),
-      limit(50)
-    );
-
-    const unreadMessages = await getDocs(unreadMessagesQuery);
-    
-    if (!unreadMessages.empty) {
-      const batch = writeBatch(db);
-      unreadMessages.docs.forEach((doc) => {
-        batch.update(doc.ref, {
-          [`readBy.${userId}`]: true,
-          readAt: serverTimestamp(),
-        });
-      });
-      await batch.commit();
-    }
   });
+
+  // FIX: marking individual messages as read is now a separate step,
+  // after the transaction commits — it uses a plain getDocs() + batch,
+  // which was previously mixed into the transaction callback above.
+  // Firestore transactions require every read inside the callback to
+  // go through transaction.get(); a getDocs() call didn't, so this
+  // was never really part of the atomic transaction to begin with.
+  // Splitting it out doesn't change behavior, just makes the split
+  // between "atomic part" and "batch part" honest.
+  const unreadMessagesQuery = query(
+    collection(db, "chats", chatId, "messages"),
+    where(`readBy.${userId}`, "==", false),
+    limit(50)
+  );
+
+  const unreadMessages = await getDocs(unreadMessagesQuery);
+
+  if (!unreadMessages.empty) {
+    const batch = writeBatch(db);
+    unreadMessages.docs.forEach((doc) => {
+      batch.update(doc.ref, {
+        [`readBy.${userId}`]: true,
+        readAt: serverTimestamp(),
+      });
+    });
+    await batch.commit();
+  }
 }
 
 /*
