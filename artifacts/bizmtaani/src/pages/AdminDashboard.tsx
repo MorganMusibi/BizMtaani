@@ -188,6 +188,7 @@ export default function AdminDashboard() {
   const [pendingSupportCount, setPendingSupportCount] = useState<number | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
+  const [overviewRefreshKey, setOverviewRefreshKey] = useState(0);
 // Today's insights
   const [todayActiveAdverts, setTodayActiveAdverts] = useState<number | null>(null);
   const [todayNewUsers, setTodayNewUsers] = useState<number | null>(null);
@@ -265,8 +266,8 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [auditLogLoaded, setAuditLogLoaded] = useState(false);
   const [adminNames, setAdminNames] = useState<Record<string, string>>({});
   
-  async function loadJobs() {
-    if (jobsLoaded) return;
+  async function loadJobs(force = false) {
+    if (jobsLoaded && !force) return;
     setJobsLoading(true);
     try {
       const snap = await getDocs(
@@ -666,7 +667,7 @@ async function revokeAdmin(targetUser: AdminUser) {
     }
 
     loadDashboardStats();
-  }, [adminLoading, user, isAdmin]);
+  }, [adminLoading, user, isAdmin, overviewRefreshKey]);
   
   
 
@@ -738,8 +739,8 @@ async function revokeAdmin(targetUser: AdminUser) {
   // -------------------------------------------------------
   // USERS — loaded lazily when tab is opened
   // -------------------------------------------------------
-  async function loadUsers() {
-    if (usersLoaded) return;
+  async function loadUsers(force = false) {
+    if (usersLoaded && !force) return;
     setUsersLoading(true);
     try {
       const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(50)));
@@ -784,8 +785,8 @@ async function revokeAdmin(targetUser: AdminUser) {
   // -------------------------------------------------------
   // ADVERTS — loaded lazily when tab is opened
   // -------------------------------------------------------
-  async function loadAdverts() {
-    if (advertsLoaded) return;
+  async function loadAdverts(force = false) {
+    if (advertsLoaded && !force) return;
     setAdvertsLoading(true);
     try {
       const snap = await getDocs(
@@ -981,13 +982,7 @@ async function dismissSupportReport(reportId: string) {
   // Function to refresh overview stats
   const refreshOverview = () => {
     dashboardStatsCache = null;
-    setStatsLoading(true);
-    // The useEffect will re-run and reload data
-    // Force a re-render by updating a state
-    setStatsError("");
-    // Reload insights too
-    setInsightsLoading(true);
-    // The useEffect will re-run
+    setOverviewRefreshKey((k) => k + 1);
   };
 
   return (
@@ -1344,12 +1339,7 @@ async function dismissSupportReport(reportId: string) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setUsersLoaded(false);
-                    setUsers([]);
-                    setUsersLoading(true);
-                    loadUsers();
-                  }}
+                  onClick={() => loadUsers(true)}
                   className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1527,12 +1517,7 @@ async function dismissSupportReport(reportId: string) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setAdvertsLoaded(false);
-                    setAdverts([]);
-                    setAdvertsLoading(true);
-                    loadAdverts();
-                  }}
+                  onClick={() => loadAdverts(true)}
                   className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1593,12 +1578,7 @@ async function dismissSupportReport(reportId: string) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setJobsLoaded(false);
-                    setJobs([]);
-                    setJobsLoading(true);
-                    loadJobs();
-                  }}
+                  onClick={() => loadJobs(true)}
                   className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
