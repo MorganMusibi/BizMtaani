@@ -78,7 +78,7 @@ const FAQ = [
   },
   {
     q: "When and how do I get paid?",
-    a: "Earnings are tracked monthly and reset at the start of each new month. If your earnings for the month meet the minimum payout threshold, they're queued for payout. Payments are sent to the M-Pesa number on file — contact BizMtaani to confirm your payout.",
+    a: "Earnings are tracked monthly and reset at the start of each new month. If your earnings for the month reach at least KES 500, they're queued for payout — amounts below that carry over into the next month until they reach the threshold. Payments are sent to the M-Pesa number on file — contact BizMtaani to confirm your payout.",
   },
   {
     q: "Where do I enter a referral code?",
@@ -254,8 +254,7 @@ export default function About() {
             </a>
 
             <a
-              <a
-              href="mailto:bizmtaani2@gmail.com"
+               href="mailto:bizmtaani2@gmail.com"
               className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
             >
               <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
