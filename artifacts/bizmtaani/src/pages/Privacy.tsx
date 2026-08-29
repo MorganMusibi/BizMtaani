@@ -343,7 +343,7 @@ export default function Privacy() {
               <p className="font-bold text-sm">BizMtaani Support</p>
 
               <p className="text-sm text-muted-foreground mt-2">
-                Email: morganmusibi@gmail.com
+                Email: bizmtaani2@gmail.com
               </p>
 
               <p className="text-sm text-muted-foreground mt-1">
