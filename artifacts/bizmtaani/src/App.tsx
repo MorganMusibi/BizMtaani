@@ -76,8 +76,7 @@ function ProfileSetupGate() {
 
 // BottomNav is hidden on full-screen flows where it would get in
 // the way: auth screens and the chat thread itself.
-const HIDDEN_BOTTOM_NAV_PREFIXES = ["/login", "/register", "/reset-password", "/chat/"];
-
+const HIDDEN_BOTTOM_NAV_PREFIXES = ["/login", "/register", "/reset-password", "/chat/", "/admin"];
 function useShouldShowBottomNav(): boolean {
   const [location] = useLocation();
   return !HIDDEN_BOTTOM_NAV_PREFIXES.some((prefix) => location.startsWith(prefix));
