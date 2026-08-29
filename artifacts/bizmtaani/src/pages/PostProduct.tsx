@@ -3192,9 +3192,9 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-bold">
-                  Photos (Optional • up to {maxPossiblePhotoLimit[plan]})
+                  Photos (Optional • up to {photoLimit})
                 </label>
-                <span className="text-xs text-muted-foreground">{imageFiles.length}/{maxPossiblePhotoLimit[plan]}</span>
+                <span className="text-xs text-muted-foreground">{imageFiles.length}/{photoLimit}</span>
               </div>
 
               {imageFiles.length === 0 && (
@@ -3453,7 +3453,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Free</span>
-  <p className="text-sm text-muted-foreground">Up to 3 adverts at a time · 1 photo each · Live for 7 days</p>
+  <p className="text-sm text-muted-foreground">Up to 3 adverts with maximum of 1 photo each · Live for 7 days</p>
   <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a shorter radius</p>
 </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
@@ -3484,8 +3484,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Weekly Premium</span>
-  <p className="text-sm text-muted-foreground">Up to 8 adverts at a time · 3 photos each · Live for 7 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible at longer distance and boosted</p>
+  <p className="text-sm text-muted-foreground">Up to 5 adverts with maximum of 3 photos each · Live for 7 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to a WIDE audience (boosted💪)</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
@@ -3496,8 +3496,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Monthly Premium</span>
-  <p className="text-sm text-muted-foreground">Up to 10 adverts at a time · 3 photos each · Live for 30 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible at longer distance and boosted</p>
+  <p className="text-sm text-muted-foreground">Up to 8 adverts with maximum of 3 photos each · Live for 30 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to a WIDE audience (boosted💪)</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
