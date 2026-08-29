@@ -3,8 +3,8 @@
  *
  * Plans:
  * free            — 0 KES, 1 photo per advert, 7 days, up to 3 active adverts
- * premium_weekly  — 100 KES, up to 3 photos per advert, 7 days, up to 8 active adverts
- * premium_monthly — 350 KES, up to 3 photos per advert, 30 days, up to 10 active adverts
+ * premium_weekly  — 120 KES, up to 3 photos per advert, 7 days, up to 5 active adverts
+ * premium_monthly — 400 KES, up to 3 photos per advert, 30 days, up to 8 active adverts
  *
  * Payment is processed via Firebase Cloud Function `initiateMpesaPayment`,
  * which calls the Daraja STK push API server-side.
@@ -44,8 +44,8 @@ export const LISTING_DURATION_DAYS: Record<ListingPlan, number> = {
 
 export const MAX_ACTIVE_ADVERTS: Record<ListingPlan, number> = {
   free: 3,
-  premium_weekly: 8,
-  premium_monthly: 10,
+  premium_weekly: 5,
+  premium_monthly: 8,
 };
 
 // ============================================================
@@ -65,8 +65,8 @@ export const MAX_PHOTO_LIMIT: Record<ListingPlan, number> = {
 
 export const PLAN_AMOUNTS: Record<ListingPlan, number> = {
   free: 0,
-  premium_weekly: 100,
-  premium_monthly: 350,
+  premium_weekly: 120,
+  premium_monthly: 400,
 };
 
 // ============================================================
