@@ -1212,6 +1212,52 @@ export const adminSendNotification = onCall({ cors: true }, async (request) => {
   return { success: true };
 });
 
+/**
+ * Mirrors changes to a chat's per-participant unreadCount map into a
+ * single denormalized totalUnreadCount field on each affected user's
+ * own /users/{uid} doc — one document to read instead of scanning
+ * every chat a user has ever had. Runs via Admin SDK, so it can write
+ * to another user's doc regardless of what client-side security rules
+ * allow. Client code (sendChatMessage, forwardChatMessage,
+ * markChatAsRead) should never attempt this kind of cross-user write
+ * directly — that's exactly what just broke message sending.
+ */
+export const onChatUnreadCountChanged = onDocumentUpdated(
+  "chats/{chatId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+
+    const beforeUnread: Record<string, number> = before.unreadCount ?? {};
+    const afterUnread: Record<string, number> = after.unreadCount ?? {};
+
+    const affectedUids = new Set([
+      ...Object.keys(beforeUnread),
+      ...Object.keys(afterUnread),
+    ]);
+
+    const batch = db.batch();
+    let hasWrites = false;
+
+    for (const uid of affectedUids) {
+      const delta = (afterUnread[uid] ?? 0) - (beforeUnread[uid] ?? 0);
+      if (delta === 0) continue;
+
+      batch.set(
+        db.collection("users").doc(uid),
+        { totalUnreadCount: admin.firestore.FieldValue.increment(delta) },
+        { merge: true }
+      );
+      hasWrites = true;
+    }
+
+    if (hasWrites) {
+      await batch.commit();
+    }
+  }
+);
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 4B. REVERSE GEOCODING (Nominatim proxy with cache + rate limiting)
 // ═══════════════════════════════════════════════════════════════════════════
