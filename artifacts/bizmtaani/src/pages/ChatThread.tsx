@@ -219,7 +219,14 @@ export default function ChatThread() {
               return [...prev, ...uniqueNew];
             });
 
-            throttleMarkAsRead();
+            // FIX: sendChatMessage() already marks the sender's own
+            // message as read and zeroes their own unread count — no
+            // need to trigger another markChatAsRead round trip when
+            // the "new" message is one you just sent yourself.
+            const hasIncomingFromOther = newMessages.some((m) => m.senderId !== user.uid);
+            if (hasIncomingFromOther) {
+              throttleMarkAsRead();
+            }
           }
         },
         (error) => {
