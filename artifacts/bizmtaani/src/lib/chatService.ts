@@ -417,11 +417,21 @@ export async function sendChatMessage(params: {
       deletedFor: chat.deletedFor || [],
     };
 
-    // ✅ Update unread counts
     updateData[`unreadCount.${senderId}`] = 0;
     updateData[`unreadCount.${recipientUid}`] = (unread[recipientUid] || 0) + 1;
 
     transaction.update(chatRef, updateData);
+
+    // FIX: mirror the per-chat unread delta into each user's own
+    // totalUnreadCount doc — a single denormalized counter so
+    // getUnreadCount() can read one document instead of scanning
+    // every chat the user has ever had.
+    const senderUserRef = doc(db, "users", senderId);
+    const recipientUserRef = doc(db, "users", recipientUid);
+    const previousSenderUnread = unread[senderId] || 0;
+
+    transaction.set(senderUserRef, { totalUnreadCount: increment(-previousSenderUnread) }, { merge: true });
+    transaction.set(recipientUserRef, { totalUnreadCount: increment(1) }, { merge: true });
 
     return { messageId: messageRef.id };
   });
@@ -511,6 +521,14 @@ export async function forwardChatMessage(params: {
     updateData[`unreadCount.${recipientUid}`] = (unread[recipientUid] || 0) + 1;
 
     transaction.update(targetChatRef, updateData);
+
+    // FIX: same denormalized-counter mirror as sendChatMessage.
+    const senderUserRef = doc(db, "users", senderId);
+    const recipientUserRef = doc(db, "users", recipientUid);
+    const previousSenderUnread = unread[senderId] || 0;
+
+    transaction.set(senderUserRef, { totalUnreadCount: increment(-previousSenderUnread) }, { merge: true });
+    transaction.set(recipientUserRef, { totalUnreadCount: increment(1) }, { merge: true });
   });
 }
 
@@ -524,34 +542,37 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
   if (!chatId || !userId) return;
 
   const chatRef = doc(db, "chats", chatId);
+  const userRef = doc(db, "users", userId);
 
-  // ✅ Transaction handles the participant check + clearing the
-  // unread badge count — both atomic, both reads/writes going
-  // through the transaction object as required.
-  await runTransaction(db, async (transaction) => {
+  // Clears the unread badge (both the per-chat count and the
+  // denormalized per-user total) and reports back how many messages
+  // were actually unread, so the batch step below can be skipped
+  // entirely when there was nothing to mark — avoids paying for a
+  // query that would just come back empty.
+  const previousUnread = await runTransaction(db, async (transaction) => {
     const chatSnap = await transaction.get(chatRef);
-    if (!chatSnap.exists()) return;
+    if (!chatSnap.exists()) return 0;
 
     const chat = chatSnap.data() as ChatData;
-
     if (!chat.participants?.includes(userId)) {
       throw new Error("You are not a participant in this conversation.");
     }
+
+    const unreadForUser = (chat.unreadCount || {})[userId] || 0;
+    if (unreadForUser === 0) return 0;
 
     transaction.update(chatRef, {
       [`unreadCount.${userId}`]: 0,
       updatedAt: serverTimestamp(),
     });
+
+    transaction.set(userRef, { totalUnreadCount: increment(-unreadForUser) }, { merge: true });
+
+    return unreadForUser;
   });
 
-  // FIX: marking individual messages as read is now a separate step,
-  // after the transaction commits — it uses a plain getDocs() + batch,
-  // which was previously mixed into the transaction callback above.
-  // Firestore transactions require every read inside the callback to
-  // go through transaction.get(); a getDocs() call didn't, so this
-  // was never really part of the atomic transaction to begin with.
-  // Splitting it out doesn't change behavior, just makes the split
-  // between "atomic part" and "batch part" honest.
+  if (previousUnread === 0) return;
+
   const unreadMessagesQuery = query(
     collection(db, "chats", chatId, "messages"),
     where(`readBy.${userId}`, "==", false),
@@ -572,6 +593,7 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
   }
 }
 
+
 /*
 |--------------------------------------------------------------------------
 | GET UNREAD COUNT - OPTIMIZED WITH COUNTS
@@ -581,22 +603,11 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
 export async function getUnreadCount(userId: string): Promise<number> {
   if (!userId) return 0;
 
-  // ✅ Use getCountFromServer for cheap count
-  const chatsSnap = await getDocs(
-    query(
-      collection(db, "chats"),
-      where("participants", "array-contains", userId)
-    )
-  );
-
-  let totalUnread = 0;
-  for (const chatDoc of chatsSnap.docs) {
-    const chat = chatDoc.data() as ChatData;
-    const unread = chat.unreadCount || {};
-    totalUnread += unread[userId] || 0;
-  }
-
-  return totalUnread;
+  // FIX: one document read instead of scanning every chat this user
+  // has ever been part of. Relies on totalUnreadCount being kept in
+  // sync by sendChatMessage / forwardChatMessage / markChatAsRead.
+  const userSnap = await getDoc(doc(db, "users", userId));
+  return userSnap.exists() ? ((userSnap.data() as any).totalUnreadCount ?? 0) : 0;
 }
 
 /*
