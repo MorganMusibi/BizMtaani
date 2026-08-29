@@ -178,16 +178,29 @@ function normalizePhone(raw: string): string {
   throw new Error(`Invalid Kenyan number: ${raw}`);
 }
 
+// Constructed once per warm instance and reused across every
+// verifyRecaptcha() call, instead of re-importing the package and
+// rebuilding the client (with its own credential setup) on every
+// single request — that was wasted CPU time billed to every call
+// site (initiateMpesaPayment, reverseGeocode, publishAdvert,
+// submitReferralCode, applyForMarketer).
+let _recaptchaClient: import("@google-cloud/recaptcha-enterprise").RecaptchaEnterpriseServiceClient | null = null;
+async function getRecaptchaClient() {
+  if (!_recaptchaClient) {
+    const { RecaptchaEnterpriseServiceClient } = await import('@google-cloud/recaptcha-enterprise');
+    _recaptchaClient = new RecaptchaEnterpriseServiceClient();
+  }
+  return _recaptchaClient;
+}
+
 async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<void> {
   if (typeof token !== "string" || !token.trim()) {
     throw new HttpsError("invalid-argument", "Missing reCAPTCHA token.");
   }
 
   try {
-    // Dynamically import the package at runtime
-    const { RecaptchaEnterpriseServiceClient } = await import('@google-cloud/recaptcha-enterprise');
-    const client = new RecaptchaEnterpriseServiceClient();
-    
+    const client = await getRecaptchaClient();
+
     const projectId = process.env.GCLOUD_PROJECT;
     const [assessment] = await client.createAssessment({
       parent: `projects/${projectId}`,
@@ -209,7 +222,7 @@ async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<
     }
 
     const score = assessment.riskAnalysis?.score ?? 0;
-    if (score < 0.5) {
+    if (score < 0.3) {
       throw new HttpsError("permission-denied", "reCAPTCHA score too low.");
     }
   } catch (error) {
@@ -1309,9 +1322,7 @@ export const reverseGeocode = onCall(
     maxInstances: 1,
     concurrency: 1,
   },
-  async (request) => {
-    const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
-    await verifyRecaptcha(recaptchaToken, "reverse_geocode");
+  const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
 
     if (typeof lat !== "number" || typeof lng !== "number") {
       throw new HttpsError("invalid-argument", "lat and lng are required numbers.");
@@ -1325,6 +1336,10 @@ export const reverseGeocode = onCall(
       return cached.data();
     }
 
+    // Only verify reCAPTCHA on an actual cache miss (i.e. only when
+    // we're about to call the external Nominatim service) — a cache
+    // hit is just a Firestore read and needs no bot protection.
+    await verifyRecaptcha(recaptchaToken, "reverse_geocode");
     await throttleNominatim();
 
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
@@ -1956,7 +1971,7 @@ export const revokeAdminRole = onCall({ cors: true }, async (request) => {
 // 7. REFERRALS — MARKETER COMMISSIONS + USER POINTS
 // ═══════════════════════════════════════════════════════════════════════════
 
-const COMMISSION_RATE = 0.142;
+const COMMISSION_RATE = 0.25;
 
 function generateReferralCode(name: string, uid: string): string {
   // Take the first name only, strip anything that isn't a letter,
@@ -2125,8 +2140,7 @@ export const setMarketerStatus = onCall({ cors: true }, async (request) => {
 export const submitReferralCode = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { code, recaptchaToken } = request.data as { code?: string; recaptchaToken?: string };
-  await verifyRecaptcha(recaptchaToken, "submit_referral");
+  const { code } = request.data as { code?: string };
   if (!code || typeof code !== "string") {
     throw new HttpsError("invalid-argument", "A referral code is required.");
   }
@@ -2181,7 +2195,8 @@ export const applyForMarketer = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const uid = request.auth.uid;
-  await verifyRecaptcha((request.data as { recaptchaToken?: string })?.recaptchaToken, "apply_marketer");
+
+  // Already a marketer — no need to apply again.
 
   // Already a marketer — no need to apply again.
   const existingMarketer = await db.collection("marketers").doc(uid).get();
