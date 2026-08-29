@@ -158,10 +158,15 @@ interface DashboardStatsCache {
   successfulPayments: number | null;
   pendingReportsCount: number | null;
   pendingSupportCount: number | null;
+  todayActiveAdverts: number | null;
+  todayNewUsers: number | null;
+  expiredCount: number | null;
+  premiumExpiringSoon: number | null;
+  failedPayments: number | null;
   timestamp: number;
 }
 let dashboardStatsCache: DashboardStatsCache | null = null;
-const DASHBOARD_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 3 minutes
+const DASHBOARD_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 export default function AdminDashboard() {
   const { user, isAdmin, adminLoading } = useAuth();
@@ -519,18 +524,26 @@ async function revokeAdmin(targetUser: AdminUser) {
       const uidsToResolve = Array.from(new Set(entries.map((e) => e.adminUid))).filter(
         (uid) => !adminNames[uid]
       );
-      if (uidsToResolve.length > 0) {
-        const results = await Promise.all(
-          uidsToResolve.map(async (uid) => {
-            try {
-              const snap = await getDocs(query(collection(db, "users"), where("__name__", "==", uid), limit(1)));
-              return [uid, snap.docs[0]?.data()?.displayName ?? uid] as const;
-            } catch {
-              return [uid, uid] as const;
-            }
-          })
-        );
-        setAdminNames((prev) => ({ ...prev, ...Object.fromEntries(results) }));
+    if (uidsToResolve.length > 0) {
+        try {
+          const resultsMap: Record<string, string> = {};
+          for (let i = 0; i < uidsToResolve.length; i += 30) {
+            const chunk = uidsToResolve.slice(i, i + 30);
+            const snap = await getDocs(
+              query(collection(db, "users"), where("__name__", "in", chunk))
+            );
+            snap.docs.forEach((d) => {
+              resultsMap[d.id] = d.data()?.displayName ?? d.id;
+            });
+          }
+          // Any uid with no matching user doc falls back to the raw uid.
+          uidsToResolve.forEach((uid) => {
+            if (!(uid in resultsMap)) resultsMap[uid] = uid;
+          });
+          setAdminNames((prev) => ({ ...prev, ...resultsMap }));
+        } catch (error) {
+          console.error("Failed to resolve admin names:", error);
+        }
       }
     } catch (error) {
       console.error("Failed to load audit log:", error);
@@ -551,7 +564,13 @@ async function revokeAdmin(targetUser: AdminUser) {
       setSuccessfulPayments(dashboardStatsCache.successfulPayments);
       setPendingReportsCount(dashboardStatsCache.pendingReportsCount);
       setPendingSupportCount(dashboardStatsCache.pendingSupportCount);
+      setTodayActiveAdverts(dashboardStatsCache.todayActiveAdverts);
+      setTodayNewUsers(dashboardStatsCache.todayNewUsers);
+      setExpiredCount(dashboardStatsCache.expiredCount);
+      setPremiumExpiringSoon(dashboardStatsCache.premiumExpiringSoon);
+      setFailedPayments(dashboardStatsCache.failedPayments);
       setStatsLoading(false);
+      setInsightsLoading(false);
       return;
     }
 
@@ -560,20 +579,52 @@ async function revokeAdmin(targetUser: AdminUser) {
         setStatsLoading(true);
         setStatsError("");
 
-        const usersSnapshot = await getCountFromServer(collection(db, "users"));
-        const activeAdvertsSnapshot = await getCountFromServer(
-          query(collection(db, "products"), where("status", "==", "active"))
-        );
-        const jobsSnapshot = await getCountFromServer(collection(db, "jobs"));
-        const paymentsSnapshot = await getCountFromServer(
-          query(collection(db, "payments"), where("status", "==", "completed"))
-        );
-        const reportsCountSnapshot = await getCountFromServer(
-          query(collection(db, "reports"), where("status", "==", "pending"))
-        );
-        const supportCountSnapshot = await getCountFromServer(
-          query(collection(db, "supportReports"), where("status", "==", "open"))
-        );
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const startOfTodayTs = Timestamp.fromDate(startOfToday);
+        const nowTs = Timestamp.now();
+        const in48h = Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000));
+        const todayDateStr = startOfToday.toISOString().split("T")[0];
+
+        const [
+          usersSnapshot,
+          activeAdvertsSnapshot,
+          jobsSnapshot,
+          paymentsSnapshot,
+          reportsCountSnapshot,
+          supportCountSnapshot,
+          activeTodaySnap,
+          newUsersSnap,
+          expiredAdvertsSnap,
+          expiredJobsSnap,
+          premiumExpiringSnap,
+          failedPaymentsSnap,
+        ] = await Promise.all([
+          getCountFromServer(collection(db, "users")),
+          getCountFromServer(query(collection(db, "products"), where("status", "==", "active"))),
+          getCountFromServer(collection(db, "jobs")),
+          getCountFromServer(query(collection(db, "payments"), where("status", "==", "completed"))),
+          getCountFromServer(query(collection(db, "reports"), where("status", "==", "pending"))),
+          getCountFromServer(query(collection(db, "supportReports"), where("status", "==", "open"))),
+          getCountFromServer(
+            query(collection(db, "products"), where("status", "==", "active"), where("createdAt", ">=", startOfTodayTs))
+          ),
+          getCountFromServer(query(collection(db, "users"), where("createdAt", ">=", startOfTodayTs))).catch(() => null),
+          getCountFromServer(
+            query(collection(db, "products"), where("status", "==", "active"), where("expiresAt", "<", nowTs))
+          ),
+          getCountFromServer(query(collection(db, "jobs"), where("deadline", "<", todayDateStr))),
+          getCountFromServer(
+            query(
+              collection(db, "products"),
+              where("status", "==", "active"),
+              where("plan", "in", ["premium_weekly", "premium_monthly"]),
+              where("expiresAt", ">", nowTs),
+              where("expiresAt", "<=", in48h)
+            )
+          ),
+          getCountFromServer(query(collection(db, "payments"), where("status", "==", "failed"))),
+        ]);
 
         const next: DashboardStatsCache = {
           totalUsers: usersSnapshot.data().count,
@@ -582,6 +633,11 @@ async function revokeAdmin(targetUser: AdminUser) {
           successfulPayments: paymentsSnapshot.data().count,
           pendingReportsCount: reportsCountSnapshot.data().count,
           pendingSupportCount: supportCountSnapshot.data().count,
+          todayActiveAdverts: activeTodaySnap.data().count,
+          todayNewUsers: newUsersSnap ? newUsersSnap.data().count : null,
+          expiredCount: expiredAdvertsSnap.data().count + expiredJobsSnap.data().count,
+          premiumExpiringSoon: premiumExpiringSnap.data().count,
+          failedPayments: failedPaymentsSnap.data().count,
           timestamp: Date.now(),
         };
 
@@ -591,6 +647,12 @@ async function revokeAdmin(targetUser: AdminUser) {
         setSuccessfulPayments(next.successfulPayments);
         setPendingReportsCount(next.pendingReportsCount);
         setPendingSupportCount(next.pendingSupportCount);
+        setTodayActiveAdverts(next.todayActiveAdverts);
+        setTodayNewUsers(next.todayNewUsers);
+        setExpiredCount(next.expiredCount);
+        setPremiumExpiringSoon(next.premiumExpiringSoon);
+        setFailedPayments(next.failedPayments);
+        setInsightsLoading(false);
 
         dashboardStatsCache = next;
       } catch (error) {
@@ -606,85 +668,7 @@ async function revokeAdmin(targetUser: AdminUser) {
     loadDashboardStats();
   }, [adminLoading, user, isAdmin]);
   
-  useEffect(() => {
-    if (adminLoading || !user || !isAdmin) return;
-
-    async function loadInsights() {
-      try {
-        setInsightsLoading(true);
-
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
-        const startOfTodayTs = Timestamp.fromDate(startOfToday);
-        const nowTs = Timestamp.now();
-        const in48h = Timestamp.fromDate(new Date(Date.now() + 48 * 60 * 60 * 1000));
-        const todayDateStr = startOfToday.toISOString().split("T")[0];
-
-        // Active adverts posted today
-        const activeTodaySnap = await getCountFromServer(
-          query(
-            collection(db, "products"),
-            where("status", "==", "active"),
-            where("createdAt", ">=", startOfTodayTs)
-          )
-        );
-        setTodayActiveAdverts(activeTodaySnap.data().count);
-
-        // New users today
-        try {
-          const newUsersSnap = await getCountFromServer(
-            query(
-              collection(db, "users"),
-              where("createdAt", ">=", startOfTodayTs)
-            )
-          );
-          setTodayNewUsers(newUsersSnap.data().count);
-        } catch {
-          setTodayNewUsers(null);
-        }
-
-        // Expired adverts still marked active (not yet cleaned up)
-        const expiredAdvertsSnap = await getCountFromServer(
-          query(
-            collection(db, "products"),
-            where("status", "==", "active"),
-            where("expiresAt", "<", nowTs)
-          )
-        );
-
-        // Expired jobs (deadline passed) — deadline stored as "YYYY-MM-DD" string
-        const expiredJobsSnap = await getCountFromServer(
-          query(collection(db, "jobs"), where("deadline", "<", todayDateStr))
-        );
-
-        setExpiredCount(expiredAdvertsSnap.data().count + expiredJobsSnap.data().count);
-
-        // Premium adverts expiring in the next 48 hours
-        const premiumExpiringSnap = await getCountFromServer(
-          query(
-            collection(db, "products"),
-            where("status", "==", "active"),
-            where("plan", "in", ["premium_weekly", "premium_monthly"]),
-            where("expiresAt", ">", nowTs),
-            where("expiresAt", "<=", in48h)
-          )
-        );
-        setPremiumExpiringSoon(premiumExpiringSnap.data().count);
-
-        // Failed M-Pesa payments (requires the Cloud Function fix above)
-        const failedPaymentsSnap = await getCountFromServer(
-          query(collection(db, "payments"), where("status", "==", "failed"))
-        );
-        setFailedPayments(failedPaymentsSnap.data().count);
-      } catch (error) {
-        console.error("Failed to load insights:", error);
-      } finally {
-        setInsightsLoading(false);
-      }
-    }
-
-    loadInsights();
-  }, [adminLoading, user, isAdmin]);
+  
 
   // -------------------------------------------------------
   // REPORTS — live subscription, only once admin confirmed
@@ -758,7 +742,7 @@ async function revokeAdmin(targetUser: AdminUser) {
     if (usersLoaded) return;
     setUsersLoading(true);
     try {
-      const snap = await getDocs(query(collection(db, "users"), limit(50)));
+      const snap = await getDocs(query(collection(db, "users"), orderBy("createdAt", "desc"), limit(50)));
       setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as AdminUser)));
       setUsersLoaded(true);
     } catch (error) {
