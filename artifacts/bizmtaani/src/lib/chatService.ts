@@ -393,11 +393,8 @@ export async function sendChatMessage(params: {
       deletedFor: [],
       deletedForEveryone: false,
       forwarded: false,
-      participants: chat.participants,   // ← new: lets rules skip the get()
-      readBy: {
-        [senderId]: true,
-        [recipientUid]: false,
-      },
+      participants: chat.participants,
+      unreadBy: [recipientUid],
       deliveredAt: serverTimestamp(),
     };
 
@@ -484,11 +481,8 @@ export async function forwardChatMessage(params: {
       forwarded: true,
       deletedFor: [],
       deletedForEveryone: false,
-      participants: targetChat.participants,   // ← new
-      readBy: {
-        [senderId]: true,
-        [recipientUid]: false,
-      },
+      participants: targetChat.participants,
+      unreadBy: [recipientUid],
       deliveredAt: serverTimestamp(),
     };
     transaction.set(messageRef, messageData);
@@ -547,10 +541,9 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
 
   if (previousUnread === 0) return;
 
-  const unreadMessagesQuery = query(
+const unreadMessagesQuery = query(
     collection(db, "chats", chatId, "messages"),
-    where("participants", "array-contains", userId),
-    where(`readBy.${userId}`, "==", false),
+    where("unreadBy", "array-contains", userId),
     limit(50)
   );
 
@@ -560,14 +553,13 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
     const batch = writeBatch(db);
     unreadMessages.docs.forEach((doc) => {
       batch.update(doc.ref, {
-        [`readBy.${userId}`]: true,
+        unreadBy: arrayRemove(userId),
         readAt: serverTimestamp(),
       });
     });
     await batch.commit();
   }
 }
-
 /*
 |--------------------------------------------------------------------------
 | GET UNREAD COUNT - OPTIMIZED WITH COUNTS
