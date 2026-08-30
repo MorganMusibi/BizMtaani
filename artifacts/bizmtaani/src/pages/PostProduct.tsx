@@ -2224,9 +2224,13 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               { value: "quote_only", label: "Request Quote" },
             ].map((option) => (
               <button
+                <button
                 key={option.value}
                 type="button"
-                onClick={() => setServicePricingType(option.value)}
+                onClick={() => {
+                  setServicePricingType(option.value);
+                  setPriceDisplay(option.value === "quote_only" ? "quote" : "fixed");
+                }}
                 className={`py-2.5 px-3 rounded-xl border-2 text-sm font-semibold transition-all ${
                   servicePricingType === option.value
                     ? "border-primary bg-primary/5 text-primary"
@@ -3722,16 +3726,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               </div>
             </div>
 
-            <p className="text-xs text-center text-muted-foreground px-4">
-  By clicking{" "}
-  {hasActivePremium
-    ? "Publish Advert"
-    : plan === "free"
-      ? "Publish Free"
-      : "Pay & Publish"}
-  , you agree to our terms and conditions.
-</p>
-          </div>
+            </div>
         )}
         </div>
       {/* Bottom action */}
