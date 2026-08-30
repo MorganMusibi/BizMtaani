@@ -298,25 +298,50 @@ async function sendPushToUid(
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const ALLOWED_UPLOAD_FORMATS = "jpg,jpeg,png,webp";
 
+const UPLOAD_SIGNATURE_COOLDOWN_MS = 3_000; // stops a script from minting signatures/draftUploads docs faster than a real user ever could
+
 export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  // Per-user cooldown — each call writes a draftUploads doc, so an
+  // unthrottled endpoint is write amplification waiting to happen.
+  const uploadCooldownRef = db.collection("uploadSignatureCooldowns").doc(request.auth.uid);
+  const uploadCooldownSnap = await uploadCooldownRef.get();
+  const lastSignatureAt = uploadCooldownSnap.exists ? uploadCooldownSnap.data()?.lastRequestedAt?.toMillis() : null;
+  if (lastSignatureAt && Date.now() - lastSignatureAt < UPLOAD_SIGNATURE_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a moment before uploading another photo."
+    );
+  }
+  await uploadCooldownRef.set({
+    lastRequestedAt: admin.firestore.FieldValue.serverTimestamp(),
+    expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 60 * 1000)),
+  });
+
   const reqData = request.data as Record<string, unknown>;
   const uploadType = (reqData.uploadType as string | undefined) ?? "product";
-  const folder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
+
+  // Scope every upload under the uploader's own uid — ties ownership
+  // directly into the Cloudinary folder path, so two users' uploads
+  // can never collide and any later audit/cleanup can filter by
+  // folder prefix per user.
+  const baseFolder = FOLDER_MAP[uploadType] ?? FOLDER_MAP["product"];
+  const folder = `${baseFolder}/${request.auth.uid}`;
   const timestamp = Math.floor(Date.now() / 1000);
 
   // Every parameter included in the signature is enforced by
   // Cloudinary server-side — a client cannot alter these without
-  // invalidating the signature, so this closes the gap left by an
-  // unsigned preset (which your app doesn't use anyway). max_file_size
-  // must be included here AND sent as a form field in the actual
-  // upload request (see uploadImage in cloudinaryUpload.ts) — if either
-  // side is missing or mismatched, Cloudinary rejects with "Invalid
-  // Signature".
+  // invalidating the signature. max_file_size is now actually signed
+  // (previously only claimed to be) and MUST also be sent as a form
+  // field in the actual upload request (see uploadImage.ts) — if
+  // either side is missing or mismatched, Cloudinary rejects with
+  // "Invalid Signature". Params must appear in alphabetical order in
+  // the signed string per Cloudinary's requirement.
   const signature = crypto
   .createHash("sha1")
   .update(
-    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
   )
   .digest("hex");
 
