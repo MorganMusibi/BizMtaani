@@ -2224,7 +2224,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               { value: "quote_only", label: "Request Quote" },
             ].map((option) => (
               <button
-                <button
+                
                 key={option.value}
                 type="button"
                 onClick={() => {
