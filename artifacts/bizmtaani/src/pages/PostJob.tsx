@@ -3,8 +3,9 @@ import { useLocation } from "wouter";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { getWardInfo } from "@/lib/location";
+import { getWardInfo, getWardCoordinates } from "@/lib/location";
 import { encodeGeohash } from "@/lib/geohash";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -51,6 +52,8 @@ export default function PostJob() {
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationFailed, setLocationFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [resolvingArea, setResolvingArea] = useState(false);
 
   useEffect(() => {
   if (!user) { navigate("/login"); return; }
@@ -80,6 +83,32 @@ export default function PostJob() {
     );
   }
 }, [user, userProfile, navigate]);
+
+  async function handleAreaPicked(area: {
+    wardName: string;
+    constituencyName: string;
+    countyName: string;
+  }) {
+    setResolvingArea(true);
+    try {
+      const c = await getWardCoordinates(
+        area.wardName,
+        area.constituencyName,
+        area.countyName
+      );
+
+      if (c) setCoords(c);
+
+      setWard(area.wardName);
+      setCounty(area.countyName);
+      setLocationFailed(false);
+
+      toast({ title: "Location updated" });
+      setShowAreaPicker(false);
+    } finally {
+      setResolvingArea(false);
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -346,7 +375,25 @@ export default function PostJob() {
     </span>
   </div>
 )}
+
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setShowAreaPicker(true)}
+          className="w-full h-10 text-sm"
+        >
+          Search a different area
+        </Button>
       </form>
+
+      {showAreaPicker && (
+        <AreaPickerSheet
+          onSearchSelect={handleAreaPicked}
+          resolving={resolvingArea}
+          onDismiss={() => setShowAreaPicker(false)}
+        />
+      )}
 
       {/* Submit */}
 <div
