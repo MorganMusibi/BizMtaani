@@ -549,6 +549,7 @@ export async function markChatAsRead(chatId: string, userId: string): Promise<vo
 
   const unreadMessagesQuery = query(
     collection(db, "chats", chatId, "messages"),
+    where("participants", "array-contains", userId),
     where(`readBy.${userId}`, "==", false),
     limit(50)
   );
