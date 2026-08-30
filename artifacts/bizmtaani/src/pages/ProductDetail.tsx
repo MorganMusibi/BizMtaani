@@ -1446,8 +1446,11 @@ const itemDistance =
       )}
 {/* --- MENU MODAL --- */}
       {showMenu && product.hotelMenu && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
-          <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl">
+        <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
+          <div
+            className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
+          >
             <div className="flex items-center justify-between">
               <h3 className="font-black text-lg">Menu</h3>
               <div className="flex items-center gap-3">
@@ -1552,8 +1555,11 @@ const itemDistance =
       )}
     {/* --- PRICE LIST MODAL --- */}
       {showPriceList && Array.isArray(product.priceList) && (
-       <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-         <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 pb-24 space-y-4 shadow-2xl">
+       <div className="fixed inset-0 z-[70] bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
+         <div
+           className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 space-y-4 shadow-2xl"
+           style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
+         >
             <div className="flex items-center justify-between">
               <h3 className="font-black text-lg">Other Items</h3>
               <button
