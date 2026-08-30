@@ -152,6 +152,19 @@ request.auth != null
 == request.auth.uid
 && request.resource.data.posterId
 == resource.data.posterId
+)
+|| (
+// Lazy-expire: any authenticated user whose client fetched
+// this job past its deadline can flip status active -> expired.
+// Locked to exactly that one field/value transition, and the
+// deadline check is done server-side against request.time so a
+// client can't mark a still-active job expired early.
+request.auth != null
+&& resource.data.status == "active"
+&& request.resource.data.diff(resource.data)
+     .affectedKeys().hasOnly(["status"])
+&& request.resource.data.status == "expired"
+&& request.time > timestamp.value(resource.data.deadline + "T23:59:59Z")
 );
 
 // Client-side deletes are blocked entirely.
