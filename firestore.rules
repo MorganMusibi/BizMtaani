@@ -332,92 +332,39 @@ match /chats/{chatId} {
     if request.auth != null
     && request.auth.uid in resource.data.participants;
 
-      match /messages/{messageId} {
-// ----------------------------------------------------------
-    // READ MESSAGES
-    // ----------------------------------------------------------
-    // Only chat participants can read messages.
-    // ----------------------------------------------------------
-
+    match /messages/{messageId} {
+    // READ / UPDATE: participants is stored on the message doc
+    // itself (denormalized at write time), so no get() on the
+    // parent chat doc is needed — saves one extra read per message
+    // read/write.
     allow read:
       if request.auth != null
-      && request.auth.uid in
-         get(
-           /databases/$(database)/documents/chats/$(chatId)
-         ).data.participants;
+      && request.auth.uid in resource.data.participants;
 
-
-    // ----------------------------------------------------------
-    // CREATE MESSAGE
-    // ----------------------------------------------------------
-    // Only chat participants can send messages.
-    //
-    // senderId MUST equal the authenticated user.
-    // This prevents someone from pretending to be another user.
-    // ----------------------------------------------------------
-
+    // CREATE: no resource.data yet, so check the incoming doc's own
+    // participants list, and require it match the parent chat's
+    // participants exactly so a sender can't fabricate a fake list.
     allow create:
       if request.auth != null
-      && request.auth.uid in
-         get(
-           /databases/$(database)/documents/chats/$(chatId)
-         ).data.participants
-      && request.resource.data.senderId == request.auth.uid;
-
-
-    // ----------------------------------------------------------
-    // UPDATE MESSAGE
-    // ----------------------------------------------------------
-    //
-    // Participants can update messages, which supports:
-    //
-    // - deliveredAt
-    // - readAt
-    // - deletedFor
-    // - deletedForEveryone
-    //
-    // BUT:
-    // A user cannot change the senderId of a message.
-    //
-    // The original senderId must remain unchanged.
-    // ----------------------------------------------------------
+      && request.auth.uid in request.resource.data.participants
+      && request.resource.data.senderId == request.auth.uid
+      && request.resource.data.participants
+         == get(
+              /databases/$(database)/documents/chats/$(chatId)
+            ).data.participants;
 
     allow update:
       if request.auth != null
-      && request.auth.uid in
-         get(
-           /databases/$(database)/documents/chats/$(chatId)
-         ).data.participants
+      && request.auth.uid in resource.data.participants
       && request.resource.data.senderId
-         == resource.data.senderId;
-
-
-    // ----------------------------------------------------------
-    // DELETE MESSAGE
-    // ----------------------------------------------------------
-    //
-    // Only the original sender can permanently delete the
-    // Firestore message document.
-    //
-    // Your "Delete for me" feature should NOT use Firestore
-    // delete. It should update deletedFor instead.
-    //
-    // Your "Delete for everyone" feature can either:
-    //
-    // 1. Update deletedForEveryone = true
-    //    (recommended)
-    //
-    // OR
-    //
-    // 2. Permanently delete the document.
-    //
-    // This rule supports option 2 only for the sender.
-    // ----------------------------------------------------------
+         == resource.data.senderId
+      && request.resource.data.participants
+         == resource.data.participants;
 
     allow delete:
       if request.auth != null
       && request.auth.uid == resource.data.senderId;
-  }
+  }  
 }
 // ============================================================
 // MESSAGE REPORTS
