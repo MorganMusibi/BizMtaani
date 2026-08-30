@@ -79,10 +79,9 @@ async function applyReferralCodeIfPresent(code: string): Promise<boolean> {
     return false;
   }
 
-  try {
-    const recaptchaToken = await getRecaptchaToken("submit_referral");
+try {
     const submitReferralCode = httpsCallable(functions, "submitReferralCode");
-    await submitReferralCode({ code: trimmed, recaptchaToken });
+    await submitReferralCode({ code: trimmed });
     return true;
   } catch (error) {
     console.warn("Referral code could not be applied:", error);
