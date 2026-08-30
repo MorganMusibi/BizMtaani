@@ -151,25 +151,26 @@ export default function PostJob() {
     setSubmitting(true);
     try {
       await addDoc(collection(db, "jobs"), {
-        title: title.trim(),
-        company: company.trim(),
-        category,
-        jobType,
-        salary: salary.trim() || null,
-        deadline: deadline,
-        description: description.trim(),
-        requirements: requirements.trim() || null,
-        contact: contact.trim(),
-        contactMethod,
-        ward,
-        county,
-        lat: coords?.lat ?? null,
-        lng: coords?.lng ?? null,
-        geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
-        posterId: user.uid,
-        posterName: userProfile?.businessName || userProfile?.displayName || user.displayName || "Recruiter",
-        createdAt: serverTimestamp(),
-      });
+  title: title.trim(),
+  company: company.trim(),
+  category,
+  jobType,
+  salary: salary.trim() || null,
+  deadline: deadline,
+  description: description.trim(),
+  requirements: requirements.trim() || null,
+  contact: contact.trim(),
+  contactMethod,
+  ward,
+  county,
+  lat: coords?.lat ?? null,
+  lng: coords?.lng ?? null,
+  geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
+  posterId: user.uid,
+  posterName: userProfile?.businessName || userProfile?.displayName || user.displayName || "Recruiter",
+  status: "active",
+  createdAt: serverTimestamp(),
+});
       clearJobsCache();
       toast({ title: "Job posted!", description: "Your job listing is now live." });
       navigate("/jobs");
