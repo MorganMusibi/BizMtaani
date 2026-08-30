@@ -4,6 +4,7 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { getWardInfo } from "@/lib/location";
+import { encodeGeohash } from "@/lib/geohash";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +48,7 @@ export default function PostJob() {
 >("none");
   const [ward, setWard] = useState("");
   const [county, setCounty] = useState("");
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationFailed, setLocationFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -55,9 +57,10 @@ export default function PostJob() {
   
   // Check if we have a saved location from the profile
   // This works regardless of whether they are a business or individual
-  if (userProfile?.homeLocation) {
+ if (userProfile?.homeLocation) {
     setWard(userProfile.homeLocation.areaName);
     setCounty(userProfile.homeLocation.county);
+    setCoords({ lat: userProfile.homeLocation.lat, lng: userProfile.homeLocation.lng });
   } else {
     // Fallback: try GPS. If it fails or is denied, leave ward/county
     // empty rather than guessing a city — an inaccurate location on a
@@ -68,6 +71,7 @@ export default function PostJob() {
         const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
         setWard(info.wardName);
         setCounty(info.county);
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
       () => {
         setLocationFailed(true);
