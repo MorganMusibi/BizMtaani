@@ -1240,19 +1240,21 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
     description: description.trim(),
 
 price:
-  isAccommodation && !isAccommodationSale && !isAccommodationLand
-    ? extractPriceValue(rentPerMonth)
-    : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+  priceDisplay === "contact" || priceDisplay === "quote"
+    ? 0
+    : isAccommodation && !isAccommodationSale && !isAccommodationLand
       ? extractPriceValue(rentPerMonth)
-      : isEventListing
-        ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
-        : isProfessionalService && servicePricingType === "quote_only"
-          ? 0
-          : isTransport && pricingBasis === "quote_only"
+      : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+        ? extractPriceValue(rentPerMonth)
+        : isEventListing
+          ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
+          : isProfessionalService && servicePricingType === "quote_only"
             ? 0
-            : priceDisplay === "custom"
+            : isTransport && pricingBasis === "quote_only"
               ? 0
-              : extractPriceValue(price),
+              : priceDisplay === "custom"
+                ? 0
+                : extractPriceValue(price),
 
     priceRaw: price.trim(),
     priceText: priceDisplay === "custom" ? priceText.trim() : "",
@@ -1502,20 +1504,21 @@ setPublishingFree(true);
       title: title.trim(),
       description: description.trim(),
 price:
-  isAccommodation && !isAccommodationSale && !isAccommodationLand
-    ? extractPriceValue(rentPerMonth)
-    : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+  priceDisplay === "contact" || priceDisplay === "quote"
+    ? 0
+    : isAccommodation && !isAccommodationSale && !isAccommodationLand
       ? extractPriceValue(rentPerMonth)
-      : isEventListing
-        ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
-        : isProfessionalService && servicePricingType === "quote_only"
-          ? 0
-          : isTransport && pricingBasis === "quote_only"
+      : isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLand
+        ? extractPriceValue(rentPerMonth)
+        : isEventListing
+          ? (priceDisplay === "free" ? 0 : extractPriceValue(ticketPrice))
+          : isProfessionalService && servicePricingType === "quote_only"
             ? 0
-            : priceDisplay === "custom"
+            : isTransport && pricingBasis === "quote_only"
               ? 0
-              : extractPriceValue(price),
-
+              : priceDisplay === "custom"
+                ? 0
+                : extractPriceValue(price),
       priceRaw: price.trim(),
       priceText: priceDisplay === "custom" ? priceText.trim() : "",
       rentPerMonthRaw: rentPerMonth.trim(),
