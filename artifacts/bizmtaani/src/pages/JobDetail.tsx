@@ -367,6 +367,15 @@ useEffect(() => {
           {applyLabel}
         </Button>
       )}
+
+    <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-4 py-3">
+      <p className="text-xs font-bold text-amber-800 dark:text-amber-400">
+        ⚠️ Kaa rada na SCAM jobs, usioshwe!
+      </p>
+      <p className="text-xs text-amber-700 dark:text-amber-500 mt-1 leading-relaxed">
+        BizMtaani jobs hazihitaji ulipie pesa ama utume M-Pesa kabla ya interview ya Mundu khu Mundu.
+      </p>
+    </div>
   </div>
 )}
         
