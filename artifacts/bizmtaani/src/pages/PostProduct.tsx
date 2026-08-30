@@ -2880,7 +2880,12 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   <button
                     key={value}
                     type="button"
-                    onClick={() => setPricingBasis(value)}
+                    onClick={() => {
+  setPricingBasis(value);
+  if (value === "quote_only") {
+    setPriceDisplay("quote");
+  }
+}}
                     className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
                       pricingBasis === value
                         ? "border-primary bg-primary/5 text-primary"
