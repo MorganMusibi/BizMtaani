@@ -15,7 +15,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   collection, query, orderBy, where, limit, startAfter,
-  getDocs, type QueryDocumentSnapshot, type DocumentData,
+  getDocs, writeBatch, type QueryDocumentSnapshot, type DocumentData,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -214,6 +214,22 @@ function toJobs(docs: QueryDocumentSnapshot<DocumentData>[]): JobPost[] {
       if (isJobExpired(j.deadline)) return false;
       return true;
     });
+}
+// Fire-and-forget: flips any expired-but-still-"active" docs in this
+// batch to status "expired" so future queries (which already filter
+// status=="active") stop fetching them. Never awaited/blocking.
+function lazyExpireJobs(docs: QueryDocumentSnapshot<DocumentData>[]) {
+  const expired = docs.filter((d) => {
+    const data = d.data() as JobPost;
+    return data.status !== "expired" && isJobExpired(data.deadline);
+  });
+  if (expired.length === 0) return;
+
+  const batch = writeBatch(db);
+  expired.forEach((d) => batch.update(d.ref, { status: "expired" }));
+  batch.commit().catch(() => {
+    // fine — it'll just get caught again next time it surfaces
+  });
 }
 
 function dedupe(existing: JobPost[], incoming: JobPost[]): JobPost[] {
@@ -484,6 +500,7 @@ export default function Jobs() {
         if (!userCoords) {
           // No location yet — cheap fallback, no distance filtering.
           const snap = await getDocs(fallbackQuery(activeCategory, activeType));
+          lazyExpireJobs(snap.docs);
           const fetched = toJobs(snap.docs);
           const nextCursor = snap.docs[snap.docs.length - 1] ?? null;
           const fetchedDone = snap.docs.length < PAGE_SIZE;
