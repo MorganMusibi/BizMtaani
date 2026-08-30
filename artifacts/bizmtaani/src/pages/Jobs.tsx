@@ -325,6 +325,7 @@ async function fetchAreaPage(
 
   snapshots.forEach((snap, i) => {
     const { prefix } = targets[i];
+    lazyExpireJobs(snap.docs);
     const jobs = toJobs(snap.docs).filter((job) => {
       if (job.lat == null || job.lng == null) return false;
       const distance = getDistanceKm(coords[0], coords[1], job.lat, job.lng);
@@ -559,6 +560,7 @@ export default function Jobs() {
       if (!userCoords) {
         if (!fallbackCursor) { setDone(true); return; }
         const snap = await getDocs(fallbackQuery(activeCategory, activeType, fallbackCursor));
+        lazyExpireJobs(snap.docs);
         const newJobs = toJobs(snap.docs);
         setJobs((prev) => dedupe(prev, newJobs));
         setFallbackCursor(snap.docs[snap.docs.length - 1] ?? null);
