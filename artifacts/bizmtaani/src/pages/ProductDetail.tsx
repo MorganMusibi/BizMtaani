@@ -1553,7 +1553,7 @@ const itemDistance =
     {/* --- PRICE LIST MODAL --- */}
       {showPriceList && Array.isArray(product.priceList) && (
        <div className="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-         <div className="bg-background w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-3xl p-5 space-y-4 shadow-2xl">
+         <div className="bg-background w-full max-h-[80vh] overflow-y-auto rounded-t-3xl p-5 pb-24 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="font-black text-lg">Other Items</h3>
               <button
