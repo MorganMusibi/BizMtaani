@@ -192,15 +192,16 @@ export default function ChatThread() {
       const lastTimestamp = lastMessage?.createdAt;
 
       let q = query(
-        collection(db, "chats", chatId, "messages"),
-        orderBy("createdAt", "asc")
-      );
+  collection(db, "chats", chatId, "messages"),
+  where("participants", "array-contains", user.uid),
+  orderBy("createdAt", "asc")
+);
 
-      if (lastTimestamp) {
-        q = query(q, where("createdAt", ">", lastTimestamp));
-      } else {
-        q = query(q, limitToLast(1));
-      }
+if (lastTimestamp) {
+  q = query(q, where("createdAt", ">", lastTimestamp));
+} else {
+  q = query(q, limitToLast(1));
+}
 
       unsubscribeNewMessages = onSnapshot(
         q,
@@ -238,10 +239,11 @@ export default function ChatThread() {
     const loadInitialMessages = async () => {
       try {
         const q = query(
-          collection(db, "chats", chatId, "messages"),
-          orderBy("createdAt", "desc"),
-          limitToLast(20)
-        );
+  collection(db, "chats", chatId, "messages"),
+  where("participants", "array-contains", user.uid),
+  orderBy("createdAt", "desc"),
+  limitToLast(20)
+);
 
         const snapshot = await getDocs(q);
         const loadedMessages = snapshot.docs.map((doc) => ({
@@ -341,11 +343,12 @@ export default function ChatThread() {
       }
 
       let q = query(
-        collection(db, "chats", chatId, "messages"),
-        orderBy("createdAt", "desc"),
-        startAfter(firstDoc),
-        limit(20)
-      );
+  collection(db, "chats", chatId, "messages"),
+  where("participants", "array-contains", user.uid),
+  orderBy("createdAt", "desc"),
+  startAfter(firstDoc),
+  limit(20)
+);
 
       const snapshot = await getDocs(q);
       
