@@ -393,15 +393,11 @@ export async function sendChatMessage(params: {
       deletedFor: [],
       deletedForEveryone: false,
       forwarded: false,
-      // ✅ Add read tracking
+      participants: chat.participants,   // ← new: lets rules skip the get()
       readBy: {
-        [senderId]: true, // Sender has "read" their own message
-        [recipientUid]: false, // FIX: must exist and be false, or a
-        // `where("readBy.<uid>", "==", false)` query can never match it
-        // — Firestore's == filter only matches documents where the
-        // field exists, not documents where it's missing.
+        [senderId]: true,
+        [recipientUid]: false,
       },
-      // ✅ Add delivery tracking
       deliveredAt: serverTimestamp(),
     };
 
@@ -488,13 +484,13 @@ export async function forwardChatMessage(params: {
       forwarded: true,
       deletedFor: [],
       deletedForEveryone: false,
+      participants: targetChat.participants,   // ← new
       readBy: {
         [senderId]: true,
-        [recipientUid]: false, // FIX: same reasoning as sendChatMessage
+        [recipientUid]: false,
       },
       deliveredAt: serverTimestamp(),
     };
-
     transaction.set(messageRef, messageData);
 
     // Update chat document
