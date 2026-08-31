@@ -1994,8 +1994,42 @@ export const revokeAdminRole = onCall({ cors: true }, async (request) => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 7. REFERRALS — MARKETER COMMISSIONS + USER POINTS
+// 7. REFERRALS — MARKETER COMMISSIONS
 // ═══════════════════════════════════════════════════════════════════════════
+/**
+
+ * Atomically reserves a referral code by creating a
+ * referralCodes/{CODE} doc inside a transaction — the transaction
+ * only succeeds if that doc doesn't already exist, so two concurrent
+ * approveMarketer calls can never both win the same code. Throws
+ * after maxAttempts instead of silently falling through to a
+ * duplicate, unlike the old query-then-write approach.
+ */
+async function reserveReferralCode(uid: string, name: string): Promise<string> {
+  const maxAttempts = 10;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const code = generateReferralCode(name, uid);
+    const codeRef = db.collection("referralCodes").doc(code);
+    try {
+      const reserved = await db.runTransaction(async (tx) => {
+        const codeSnap = await tx.get(codeRef);
+        if (codeSnap.exists) return false;
+        tx.set(codeRef, {
+          marketerUid: uid,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        return true;
+      });
+      if (reserved) return code;
+    } catch (err) {
+      console.error("Referral code reservation transaction failed:", err);
+    }
+  }
+  throw new HttpsError(
+    "resource-exhausted",
+    "Could not generate a unique referral code. Please try again."
+  );
+}
 
 const COMMISSION_RATE = 0.25;
 
@@ -2027,7 +2061,6 @@ function generateReferralCode(name: string, uid: string): string {
 export const approveMarketer = onCall({ cors: true }, async (request) => {
   requireAdmin(request);
 
-
   const { uid } = request.data as { uid?: string };
   if (!uid) throw new HttpsError("invalid-argument", "A user UID is required.");
 
@@ -2045,28 +2078,48 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     : "";
 
   const marketerName = applicationData?.fullName || fallbackName;
+  const marketerRef = db.collection("marketers").doc(uid);
+  const existingMarketerSnap = await marketerRef.get();
 
-  let code = generateReferralCode(marketerName, uid);
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const clash = await db.collection("marketers")
-      .where("referralCode", "==", code)
-      .limit(1)
-      .get();
-    if (clash.empty) break;
-    code = generateReferralCode(marketerName, uid);
+  let code: string;
+
+  if (existingMarketerSnap.exists && existingMarketerSnap.data()?.referralCode) {
+    // Re-approval (e.g. reactivating a suspended marketer, or
+    // re-running approval after their application details changed) —
+    // NEVER touch their existing code or earnings. A fresh set()
+    // here would reset totalEarnedKES/totalWithdrawnKES to 0 and
+    // issue a brand-new code, orphaning the one already printed on
+    // their flyers/shared publicly.
+    code = existingMarketerSnap.data()!.referralCode;
+
+    await marketerRef.set(
+      {
+        status: "active",
+        fullName: applicationData?.fullName ?? fallbackName,
+        email: applicationData?.email ?? fallbackEmail,
+        idNumber: applicationData?.idNumber ?? existingMarketerSnap.data()?.idNumber ?? "",
+        mpesaNumber: applicationData?.mpesaNumber ?? existingMarketerSnap.data()?.mpesaNumber ?? "",
+      },
+      { merge: true }
+    );
+  } else {
+    // New marketer — reserve a genuinely unique code via the
+    // transactional lock, throwing rather than silently writing a
+    // clash if every attempt is taken.
+    code = await reserveReferralCode(uid, marketerName);
+
+    await marketerRef.set({
+      referralCode: code,
+      status: "active",
+      totalEarnedKES: 0,
+      totalWithdrawnKES: 0,
+      fullName: applicationData?.fullName ?? fallbackName,
+      email: applicationData?.email ?? fallbackEmail,
+      idNumber: applicationData?.idNumber ?? "",
+      mpesaNumber: applicationData?.mpesaNumber ?? "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   }
-
-  await db.collection("marketers").doc(uid).set({
-    referralCode: code,
-    status: "active",
-    totalEarnedKES: 0,
-    totalWithdrawnKES: 0,
-    fullName: applicationData?.fullName ?? fallbackName,
-    email: applicationData?.email ?? fallbackEmail,
-    idNumber: applicationData?.idNumber ?? "",
-    mpesaNumber: applicationData?.mpesaNumber ?? "",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
 
   // Mark the application as approved, if it exists, so it doesn't
   // show up as pending anywhere and its data stays as a record.
