@@ -33,17 +33,20 @@ export default function Profile() {
   
   useEffect(() => {
     if (!user) return;
-
     const cacheKey = `bizmtaani_marketer_status_${user.uid}`;
+    const CACHE_TTL_MS = 20 * 60 * 1000; // ✅ 20 minutes TTL to prevent excessive reads
 
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
         const parsed = JSON.parse(cached);
-        setIsMarketer(parsed.isMarketer);
-        setMarketerData(parsed.marketerData);
-        setHasPendingApplication(parsed.hasPendingApplication);
-        return; // Already know the answer this session — skip the reads.
+        // ✅ Only skip reads if cache is fresh (< 20 mins)
+        if (Date.now() - parsed.timestamp < CACHE_TTL_MS) {
+          setIsMarketer(parsed.isMarketer);
+          setMarketerData(parsed.marketerData);
+          setHasPendingApplication(parsed.hasPendingApplication);
+          return; 
+        }
       }
     } catch {
       // Corrupt or unavailable cache — fall through and fetch normally.
@@ -55,11 +58,9 @@ export default function Profile() {
         const data = snap.exists() ? snap.data() : null;
         setIsMarketer(isMkt);
         setMarketerData(data);
-
         getDoc(docRef(db, "marketerApplications", user.uid)).then((appSnap) => {
           const pending = appSnap.exists() && appSnap.data()?.status === "pending";
           setHasPendingApplication(pending);
-
           try {
             sessionStorage.setItem(
               cacheKey,
@@ -67,11 +68,11 @@ export default function Profile() {
                 isMarketer: isMkt,
                 marketerData: data,
                 hasPendingApplication: pending,
+                timestamp: Date.now(), // ✅ Added timestamp for TTL check
               })
             );
           } catch {
-            // sessionStorage full or unavailable — caching is a
-            // performance optimization only, safe to skip.
+            // sessionStorage full or unavailable — safe to ignore
           }
         });
       });
