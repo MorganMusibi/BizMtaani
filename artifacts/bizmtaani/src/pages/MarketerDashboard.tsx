@@ -88,31 +88,42 @@ interface UserProfile {
   timestamp: number;
 }
 
-const USER_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const userProfileCache: Record<string, UserProfile> = {};
+const USER_CACHE_TTL_MS = 60 * 60 * 1000; // ✅ Increased to 60 minutes
 
 // ─── Cache Functions ──────────────────────────────────────────────────
 
 // Export for Profile.tsx logout
 export function clearMarketerDashboardCache() {
   marketerCacheByUid.clear();
-  // Also clear user profiles on logout
-  Object.keys(userProfileCache).forEach(key => delete userProfileCache[key]);
+  // Also clear sessionStorage user profiles on logout
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith("bizmtaani_user_profile_")) {
+      sessionStorage.removeItem(key);
+    }
+  }
 }
 
-// Helper to get user profiles with caching
+// Helper to get user profiles with persistent sessionStorage caching
 async function getUserProfiles(uids: string[]): Promise<Map<string, UserProfile>> {
   const result = new Map<string, UserProfile>();
   const uncachedUids: string[] = [];
 
-  // 1. Check cache first
+  // 1. Check sessionStorage cache first (survives page reloads)
   for (const uid of uids) {
-    const cached = userProfileCache[uid];
-    if (cached && Date.now() - cached.timestamp < USER_CACHE_TTL_MS) {
-      result.set(uid, cached);
-    } else {
-      uncachedUids.push(uid);
+    try {
+      const cachedStr = sessionStorage.getItem(`bizmtaani_user_profile_${uid}`);
+      if (cachedStr) {
+        const cached: UserProfile = JSON.parse(cachedStr);
+        if (Date.now() - cached.timestamp < USER_CACHE_TTL_MS) {
+          result.set(uid, cached);
+          continue;
+        }
+      }
+    } catch {
+      // Ignore parse errors, fall through to fetch
     }
+    uncachedUids.push(uid);
   }
 
   // 2. Fetch uncached users from Firestore
@@ -123,7 +134,6 @@ async function getUserProfiles(uids: string[]): Promise<Map<string, UserProfile>
       const userSnap = await getDocs(
         query(collection(db, "users"), where("__name__", "in", chunk))
       );
-      
       userSnap.docs.forEach((d) => {
         const data = d.data();
         const now = Date.now();
@@ -134,9 +144,12 @@ async function getUserProfiles(uids: string[]): Promise<Map<string, UserProfile>
           photoURL: data.photoURL || "",
           timestamp: now,
         };
-        
-        // Store in cache
-        userProfileCache[d.id] = profile;
+        // ✅ Store in sessionStorage for cross-page/session persistence
+        try {
+          sessionStorage.setItem(`bizmtaani_user_profile_${d.id}`, JSON.stringify(profile));
+        } catch {
+          // sessionStorage full or unavailable — caching is a performance optimization only
+        }
         result.set(d.id, profile);
       });
     }
