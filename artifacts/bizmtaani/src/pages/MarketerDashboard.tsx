@@ -25,7 +25,8 @@ import {
   ChevronDown,
   RefreshCw,
   Users,
-  Gift
+  Gift,
+  AlertCircle   // ← add this
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -191,6 +192,9 @@ export default function MarketerDashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+const [commissionsError, setCommissionsError] = useState<string | null>(null);
+const [referralsError, setReferralsError] = useState<string | null>(null);
   
   // Pagination - Commissions
   const [commissionsLoading, setCommissionsLoading] = useState(false);
@@ -226,16 +230,18 @@ export default function MarketerDashboard() {
     }
 
     setLoading(true);
-    setRefreshing(true);
+setRefreshing(true);
+setError(null);
 
-    try {
-      // ─── 1. Fetch Marketer Document (1 read) ──────────────────────
-      const marketerSnap = await getDoc(doc(db, "marketers", user.uid));
-      if (!marketerSnap.exists()) {
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
+try {
+  // ─── 1. Fetch Marketer Document (1 read) ──────────────────────
+  const marketerSnap = await getDoc(doc(db, "marketers", user.uid));
+  if (!marketerSnap.exists()) {
+    setMarketer(null);
+    setLoading(false);
+    setRefreshing(false);
+    return;
+  }
 
       const marketerData = marketerSnap.data() as MarketerData;
 
@@ -303,21 +309,23 @@ export default function MarketerDashboard() {
         lastReferralDoc: referralsSnap.docs[referralsSnap.docs.length - 1] || null,
       });
 
-    } catch (error) {
-      console.error("Failed to load marketer dashboard:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+    } catch (err) {
+  console.error("Failed to load marketer dashboard:", err);
+  setError("Something went wrong loading your dashboard. Please try again.");
+} finally {
+  setLoading(false);
+  setRefreshing(false);
+}
   }, [user]);
 
   // ─── Load More Commissions ────────────────────────────────────────
 
   const loadMoreCommissions = useCallback(async () => {
     if (!user || commissionsLoading || !hasMoreCommissions || !lastCommissionDoc) return;
-    setCommissionsLoading(true);
+setCommissionsLoading(true);
+setCommissionsError(null);
 
-    try {
+try {
       const q = query(
         collection(db, "referralCommissions"),
         where("marketerUid", "==", user.uid),
@@ -341,20 +349,22 @@ export default function MarketerDashboard() {
       setLastCommissionDoc(snap.docs[snap.docs.length - 1] || null);
       setHasMoreCommissions(snap.docs.length === COMMISSIONS_PAGE_SIZE);
 
-    } catch (error) {
-      console.error("Failed to load more commissions:", error);
-    } finally {
-      setCommissionsLoading(false);
-    }
+    } catch (err) {
+  console.error("Failed to load more commissions:", err);
+  setCommissionsError("Couldn't load more. Try again.");
+} finally {
+  setCommissionsLoading(false);
+}
   }, [user, lastCommissionDoc, hasMoreCommissions, commissionsLoading]);
 
   // ─── Load More Referrals ──────────────────────────────────────────
 
   const loadMoreReferrals = useCallback(async () => {
     if (!user || referralsLoading || !hasMoreReferrals || !lastReferralDoc) return;
-    setReferralsLoading(true);
+setReferralsLoading(true);
+setReferralsError(null);
 
-    try {
+try {
       const q = query(
         collection(db, "referrals"),
         where("marketerUid", "==", user.uid),
@@ -394,11 +404,12 @@ export default function MarketerDashboard() {
       setLastReferralDoc(snap.docs[snap.docs.length - 1] || null);
       setHasMoreReferrals(snap.docs.length === REFERRALS_PAGE_SIZE);
 
-    } catch (error) {
-      console.error("Failed to load more referrals:", error);
-    } finally {
-      setReferralsLoading(false);
-    }
+    } catch (err) {
+  console.error("Failed to load more referrals:", err);
+  setReferralsError("Couldn't load more. Try again.");
+} finally {
+  setReferralsLoading(false);
+}
   }, [user, lastReferralDoc, hasMoreReferrals, referralsLoading]);
 
   // ─── Initial Load ──────────────────────────────────────────────────
@@ -409,16 +420,7 @@ export default function MarketerDashboard() {
       return;
     }
 
-    const checkAndLoad = async () => {
-      const marketerSnap = await getDoc(doc(db, "marketers", user.uid));
-      if (!marketerSnap.exists()) {
-        setLoading(false);
-        return;
-      }
-      loadMarketerData();
-    };
-
-    checkAndLoad();
+    loadMarketerData();
   }, [user, navigate, loadMarketerData]);
 
   // ─── Handlers ──────────────────────────────────────────────────────
@@ -453,9 +455,21 @@ export default function MarketerDashboard() {
     );
   }
 
-  // ─── Not a Marketer ─────────────────────────────────────────────────
+  // ─── Not a Marketer / Error ──────────────────────────────────────────
 
   if (!marketer) {
+    if (error) {
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-background">
+          <div className="text-center">
+            <AlertCircle size={48} className="mx-auto text-destructive" />
+            <h2 className="font-bold text-lg mt-4">Couldn't load dashboard</h2>
+            <p className="text-sm text-muted-foreground mt-2 max-w-sm">{error}</p>
+          </div>
+          <Button onClick={() => loadMarketerData(true)}>Try again</Button>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-background">
         <div className="text-center">
@@ -611,6 +625,10 @@ export default function MarketerDashboard() {
                 </div>
               ))}
 
+              {commissionsError && (
+                <p className="text-xs text-destructive text-center py-1">{commissionsError}</p>
+              )}
+
               {hasMoreCommissions && (
                 <button
                   onClick={loadMoreCommissions}
@@ -680,6 +698,10 @@ export default function MarketerDashboard() {
                   </div>
                 </div>
               ))}
+
+              {referralsError && (
+                <p className="text-xs text-destructive text-center py-1">{referralsError}</p>
+              )}
 
               {hasMoreReferrals && (
                 <button
