@@ -496,6 +496,10 @@ export const mpesaCallback = onRequest({ maxInstances: 20 }, async (req, res) =>
       callbackMetadata.find(
         (item: { Name: string; Value?: unknown }) => item.Name === "MpesaReceiptNumber"
       )?.Value ?? null;
+    const confirmedAmount =
+      callbackMetadata.find(
+        (item: { Name: string; Value?: unknown }) => item.Name === "Amount"
+      )?.Value ?? null;
 
     // Idempotency guard: Safaricom may deliver the same callback more
     // than once. Claim the payment atomically — only one concurrent
@@ -521,6 +525,7 @@ export const mpesaCallback = onRequest({ maxInstances: 20 }, async (req, res) =>
         tx.update(paymentRef, {
           status: "completed",
           mpesaCode,
+          confirmedAmountKES: typeof confirmedAmount === "number" ? confirmedAmount : null,
           completedAt: admin.firestore.FieldValue.serverTimestamp(),
         });
       } else {
@@ -577,12 +582,20 @@ export const processCompletedPayment = onDocumentUpdated(
     // first successful premium payment only.
     try {
       const referralRef = db.collection("referrals").doc(paymentData.buyerId);
-      const amountPaid = PLAN_AMOUNTS[plan] ?? 0;
+      // Prefer the amount Safaricom actually confirmed in the
+      // callback over the static plan price — falls back to
+      // PLAN_AMOUNTS only if the callback didn't include it for
+      // some reason.
+      const amountPaid =
+        typeof paymentData.confirmedAmountKES === "number"
+          ? paymentData.confirmedAmountKES
+          : PLAN_AMOUNTS[plan] ?? 0;
       const commission = Math.round(amountPaid * COMMISSION_RATE);
       const now = new Date();
       const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
       let commissionJustPaid: { marketerUid: string } | null = null;
+      let commissionFailureReason: string | null = null;
 
       await db.runTransaction(async (tx) => {
         const referralSnap = await tx.get(referralRef);
@@ -591,6 +604,22 @@ export const processCompletedPayment = onDocumentUpdated(
         const { marketerUid } = referralSnap.data()!;
         const marketerRef = db.collection("marketers").doc(marketerUid);
         const marketerSnap = await tx.get(marketerRef);
+
+        if (!marketerSnap.exists) {
+          // Marketer record is gone (deleted, or the referral row is
+          // stale/inconsistent). Don't let tx.update() throw here —
+          // that would abort the whole transaction and swallow the
+          // commission with zero trace. Flag it on the referral doc
+          // instead, visible for manual reconciliation.
+          tx.update(referralRef, {
+            commissionPaidOut: false,
+            commissionFailedAt: admin.firestore.FieldValue.serverTimestamp(),
+            commissionFailureReason: "marketer_not_found",
+          });
+          commissionFailureReason = "marketer_not_found";
+          return;
+        }
+
         const data = marketerSnap.data() ?? {};
         const carriedCount = data.signupsMonthKey === monthKey ? (data.signupsThisMonth ?? 0) : 0;
         const carriedEarnings = data.earningsMonthKey === monthKey ? (data.earningsThisMonth ?? 0) : 0;
@@ -606,6 +635,12 @@ export const processCompletedPayment = onDocumentUpdated(
 
         commissionJustPaid = { marketerUid };
       });
+
+      if (commissionFailureReason) {
+        console.error(
+          `Commission payout failed for referral ${paymentData.buyerId}: ${commissionFailureReason}. Flagged on the referral doc for manual review.`
+        );
+      }
 
       if (commissionJustPaid) {
         const { marketerUid } = commissionJustPaid;
@@ -1092,6 +1127,14 @@ export const markPayoutPaid = onCall({ cors: true }, async (request) => {
     }
     const payoutData = payoutSnap.data()!;
     if (payoutData.paid) return; // already processed — avoid double-counting
+
+    const marketerSnap = await tx.get(marketerRef);
+    if (!marketerSnap.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        "The marketer record for this payout no longer exists. This payout was not marked as paid — resolve manually."
+      );
+    }
 
     tx.update(payoutRef, { paid: true, paidAt: admin.firestore.FieldValue.serverTimestamp() });
     tx.update(marketerRef, {
@@ -2227,10 +2270,9 @@ export const submitReferralCode = onCall({ cors: true }, async (request) => {
   const uid = request.auth.uid;
   const trimmedCode = code.trim().toUpperCase();
 
-  // A user cannot be referred twice, by either track.
+  // A user cannot be referred twice.
   const existingReferral = await db.collection("referrals").doc(uid).get();
-  const existingUserReferral = await db.collection("userReferrals").doc(uid).get();
-  if (existingReferral.exists || existingUserReferral.exists) {
+  if (existingReferral.exists) {
     throw new HttpsError("failed-precondition", "A referral code has already been applied to this account.");
   }
 
