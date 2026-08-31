@@ -12,6 +12,29 @@ interface CloudinarySignatureResult {
   allowedFormats: string;
   maxFileSize: number;
 }
+
+async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000); // 30s per attempt
+      try {
+        const res = await fetch(url, { ...init, signal: controller.signal });
+        return res;
+      } finally {
+        clearTimeout(timeout);
+      }
+    } catch (err) {
+      lastErr = err;
+      if (i < attempts - 1) {
+        await new Promise((r) => setTimeout(r, 800 * (i + 1))); // 800ms, 1.6s
+      }
+    }
+  }
+  throw lastErr;
+}
+
 /**
  * Compress an image client-side before it ever reaches Cloudinary.
  * Cuts storage credits at upload time, and bandwidth credits every
@@ -20,13 +43,23 @@ interface CloudinarySignatureResult {
  * Falls back to the original file if compression fails for any
  * reason (e.g. unsupported format) — never blocks a user's upload.
  */
-async function compressImageBeforeUpload(
-  file: File,
-  type: ImageUploadType
-): Promise<File> {
-  // Skip compression for tiny files — not worth the CPU cost
-  if (file.size < 150 * 1024) {
-    return file;
+async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
+  if (file.size < 150 * 1024) return file;
+
+  let workingFile = file;
+
+  if (/heic|heif/i.test(file.type) || /\.hei[cf]$/i.test(file.name)) {
+    try {
+      const { default: heic2any } = await import("https://esm.sh/heic2any@0.0.4");
+      const converted = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+      workingFile = new File(
+        [converted as Blob],
+        file.name.replace(/\.hei[cf]$/i, ".jpg"),
+        { type: "image/jpeg" }
+      );
+    } catch (error) {
+      console.warn("HEIC conversion failed, will try compressing original:", error);
+    }
   }
 
   const options =
@@ -36,11 +69,10 @@ async function compressImageBeforeUpload(
 
   try {
     const { default: imageCompression } = await import("browser-image-compression");
-    const compressed = await imageCompression(file, options);
-    return compressed;
+    return await imageCompression(workingFile, options);
   } catch (error) {
     console.warn("Image compression failed, uploading original:", error);
-    return file;
+    return workingFile; // still smaller than the raw HEIC if conversion succeeded
   }
 }
 
@@ -91,10 +123,10 @@ export async function uploadImage(
   form.append("allowed_formats", sig.allowedFormats);
   form.append("max_file_size", String(sig.maxFileSize));
   
-  const res = await fetch(
-    `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
-    { method: "POST", body: form }
-  );
+  const res = await fetchWithRetry(
+  `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+  { method: "POST", body: form }
+);
 
   if (!res.ok) {
     const data = (await res.json().catch(() => null)) as {
