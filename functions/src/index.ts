@@ -1010,78 +1010,96 @@ export const closeMonthlyEarnings = onSchedule(
     const closedMonthKey = `${closedMonth.getFullYear()}-${String(closedMonth.getMonth() + 1).padStart(2, "0")}`;
     const newMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-    const committer = new BatchCommitter(400);
     let processedCount = 0;
+    let payoutCount = 0;
     let lastDoc: FirebaseFirestore.DocumentSnapshot | null = null;
-    const pageSize = 100; // Read in chunks to avoid memory issues
-
-    // ─── Paginated loop: process all marketers in chunks ─────────────
+    const pageSize = 100; // Just for pagination — each marketer is still closed out individually below
 
     while (true) {
-      let query = db.collection("marketers").orderBy("__name__").limit(pageSize);
+      let listQuery = db.collection("marketers").orderBy("__name__").limit(pageSize);
       if (lastDoc) {
-        query = query.startAfter(lastDoc);
+        listQuery = listQuery.startAfter(lastDoc);
       }
 
-      const marketersSnap = await query.get();
-
+      const marketersSnap = await listQuery.get();
       if (marketersSnap.empty) break;
-
       lastDoc = marketersSnap.docs[marketersSnap.docs.length - 1];
 
-      for (const doc of marketersSnap.docs) {
-        const data = doc.data();
-        const earnedThatMonth = data.earningsMonthKey === closedMonthKey
-          ? (data.earningsThisMonth ?? 0)
-          : 0;
-        const signupsThatMonth = data.signupsMonthKey === closedMonthKey
-          ? (data.signupsThisMonth ?? 0)
-          : 0;
+      // Each marketer is closed out in its OWN transaction, re-reading
+      // the doc fresh at write time — a commission landing mid-run
+      // (processCompletedPayment incrementing this same doc
+      // concurrently) causes Firestore to retry this transaction
+      // against the new value instead of the earlier page-level read
+      // silently overwriting it and losing the commission.
+      for (const docRef of marketersSnap.docs.map((d) => d.ref)) {
+        try {
+          const result = await db.runTransaction(async (tx) => {
+            const snap = await tx.get(docRef);
+            if (!snap.exists) return null;
+            const data = snap.data()!;
 
-        if (earnedThatMonth < MINIMUM_PAYOUT_KES) {
-          // Below threshold — carry the amount into the new month
-          committer.update(doc.ref, {
-            earningsThisMonth: earnedThatMonth,
-            earningsMonthKey: newMonthKey,
-            signupsThisMonth: 0,
-            signupsMonthKey: newMonthKey,
-          });
-        } else {
-          const payoutRef = db.collection("payouts").doc(closedMonthKey)
-            .collection("marketers").doc(doc.id);
+            const earnedThatMonth = data.earningsMonthKey === closedMonthKey
+              ? (data.earningsThisMonth ?? 0)
+              : 0;
+            const signupsThatMonth = data.signupsMonthKey === closedMonthKey
+              ? (data.signupsThisMonth ?? 0)
+              : 0;
 
-          committer.set(payoutRef, {
-            marketerUid: doc.id,
-            referralCode: data.referralCode ?? null,
-            earningsKES: earnedThatMonth,
-            signups: signupsThatMonth,
-            monthKey: closedMonthKey,
-            paid: false,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            if (earnedThatMonth < MINIMUM_PAYOUT_KES) {
+              // Below threshold — roll the month key forward only.
+              // Deliberately NOT resetting earningsThisMonth/
+              // signupsThisMonth: leaving both untouched carries them
+              // together into the new month, so the signup count
+              // never drifts out of sync with the carried balance.
+              tx.update(docRef, {
+                earningsMonthKey: newMonthKey,
+                signupsMonthKey: newMonthKey,
+              });
+              return { paidOut: false };
+            }
+
+            const payoutRef = db.collection("payouts").doc(closedMonthKey)
+              .collection("marketers").doc(docRef.id);
+
+            tx.set(payoutRef, {
+              marketerUid: docRef.id,
+              referralCode: data.referralCode ?? null,
+              earningsKES: earnedThatMonth,
+              signups: signupsThatMonth,
+              monthKey: closedMonthKey,
+              paid: false,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
+
+            // Decrement by exactly what was just read and paid out —
+            // never reset to a literal 0. Any commission that
+            // increments this doc between this transaction's read and
+            // commit forces a retry against the new value, so nothing
+            // gets silently lost.
+            tx.update(docRef, {
+              earningsThisMonth: admin.firestore.FieldValue.increment(-earnedThatMonth),
+              signupsThisMonth: admin.firestore.FieldValue.increment(-signupsThatMonth),
+              earningsMonthKey: newMonthKey,
+              signupsMonthKey: newMonthKey,
+            });
+
+            return { paidOut: true };
           });
 
-          committer.update(doc.ref, {
-            earningsThisMonth: 0,
-            earningsMonthKey: newMonthKey,
-            signupsThisMonth: 0,
-            signupsMonthKey: newMonthKey,
-          });
+          if (result) {
+            processedCount++;
+            if (result.paidOut) payoutCount++;
+          }
+        } catch (error) {
+          console.error(`Failed to close monthly earnings for marketer ${docRef.id}:`, error);
         }
-
-        processedCount++;
       }
 
-      // If we got fewer docs than pageSize, we've reached the end
       if (marketersSnap.docs.length < pageSize) break;
     }
 
-    // ─── Finalize any remaining operations ────────────────────────────
-
-    await committer.finalize();
-
     console.log(
-      `Closed earnings for ${closedMonthKey}: ${processedCount} marketers processed, ` +
-      `${committer.totalCommits} batch commits.`
+      `Closed earnings for ${closedMonthKey}: ${processedCount} marketers processed, ${payoutCount} payouts created.`
     );
   }
 );
@@ -1155,7 +1173,11 @@ export const getTopMarketers = onCall({ cors: true }, async (request) => {
     return { leaderboard: _leaderboardCache.leaderboard };
   }
 
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
   const snap = await db.collection("marketers")
+    .where("earningsMonthKey", "==", currentMonthKey)
     .orderBy("earningsThisMonth", "desc")
     .limit(10)
     .get();
