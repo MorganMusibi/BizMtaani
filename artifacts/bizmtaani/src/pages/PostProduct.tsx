@@ -21,6 +21,31 @@ import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
+
+// Uploads files with limited concurrency instead of all-at-once, so a
+// weak connection isn't asked to push several images in parallel.
+async function uploadImagesLimited(
+  files: File[],
+  draftId: string,
+  concurrency = 2
+): Promise<Awaited<ReturnType<typeof uploadImage>>[]> {
+  const results: Awaited<ReturnType<typeof uploadImage>>[] = new Array(files.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < files.length) {
+      const i = next++;
+      results[i] = await uploadImage(files[i], "product", draftId);
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, files.length) }, worker)
+  );
+
+  return results;
+}
+
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
 interface PublishAdvertResponse {
@@ -1230,9 +1255,7 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
   if (!draftIdRef.current) {
     draftIdRef.current = crypto.randomUUID();
   }
-  const uploadedImages = await Promise.all(
-    imageFiles.map((file) => uploadImage(file, "product", draftIdRef.current))
-  );
+  const uploadedImages = await uploadImagesLimited(imageFiles, draftIdRef.current);
 
   // 2. Prepare advert data
   const docData = {
@@ -1495,9 +1518,7 @@ setPublishingFree(true);
     if (!draftIdRef.current) {
       draftIdRef.current = crypto.randomUUID();
     }
-    const uploadedImages = await Promise.all(
-      imageFiles.map((file) => uploadImage(file, "product", draftIdRef.current))
-    );
+    const uploadedImages = await uploadImagesLimited(imageFiles, draftIdRef.current);
 
     // Prepare advert data
     const docData: any = {
