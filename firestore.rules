@@ -279,6 +279,19 @@ if false;
 }
 
 // ============================================================
+// REFERRAL CODES (uniqueness registry)
+// ============================================================
+
+match /referralCodes/{code} {
+
+// Purely an internal uniqueness lock written inside
+// approveMarketer's transaction (Admin SDK bypasses this rule).
+// No client ever needs to read or write this directly.
+allow read, write:
+if false;
+}
+
+// ============================================================
 // REFERRAL COMMISSIONS
 // ============================================================
 
