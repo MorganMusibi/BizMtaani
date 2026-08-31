@@ -643,17 +643,17 @@ export const processCompletedPayment = onDocumentUpdated(
       }
 
       if (commissionJustPaid) {
-        const { marketerUid } = commissionJustPaid;
-
-        await db.collection("referralCommissions").add({
-          marketerUid,
-          referredUserUid: paymentData.buyerId,
-          paymentId: checkoutRequestId,
-          amountPaidKES: amountPaid,
-          commissionKES: commission,
-          type: "first_premium_payment",
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
+                const { marketerUid } = commissionJustPaid;
+                await db.collection("referralCommissions").add({
+                    marketerUid,
+                    referredUserUid: paymentData.buyerId,
+                    paymentId: checkoutRequestId,
+                    amountPaidKES: amountPaid,
+                    commissionKES: commission,
+                    type: "first_premium_payment",
+                    paymentStatus: "completed", // ✅ ADDED: Denormalized to prevent future N+1 reads
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
 
         try {
           const marketerTokenSnap = await db.collection("fcmTokens").doc(marketerUid).get();
