@@ -184,16 +184,15 @@ if false;
 // ============================================================
 
 match /payments/{paymentId} {
-
-// Admins can read any payment record. A buyer can read their own
-// payment record — this is what MpesaPaymentModal's live status
-// listener relies on to detect when an STK push completes.
-allow read:
-if isAdmin()
-|| (
-request.auth != null
-&& request.auth.uid == resource.data.buyerId
-);
+  // Admins can read any payment record. A buyer can read their own
+  // payment record — this is what MpesaPaymentModal's live status
+  // listener relies on to detect when an STK push completes.
+  // ⚠️ ADMIN COST NOTE: Client-side admin queries MUST be paginated 
+  // (e.g., .limit(50)) or routed through a Cloud Function to prevent 
+  // unbounded reads.
+  allow read: if isAdmin() || (
+    request.auth != null && request.auth.uid == resource.data.buyerId
+  );
 
 // Client-side users cannot create, update or delete payments.
 //
