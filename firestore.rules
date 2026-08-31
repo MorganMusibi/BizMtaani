@@ -254,6 +254,81 @@ if isAdmin();
 allow delete:
 if false;
 }
+
+// ============================================================
+// REFERRALS
+// ============================================================
+
+match /referrals/{referredUserId} {
+
+// A marketer can read their own list of referrals (Marketer
+// Dashboard's "People You've Referred" section, filtered by
+// marketerUid == request.auth.uid). Admins can read any.
+allow read:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == resource.data.marketerUid
+);
+
+// All writes go through submitReferralCode (Admin SDK bypasses
+// this rule) — a client can never create or alter a referral
+// record directly.
+allow create, update, delete:
+if false;
+}
+
+// ============================================================
+// REFERRAL COMMISSIONS
+// ============================================================
+
+match /referralCommissions/{commissionId} {
+
+// A marketer can read their own commission history (Marketer
+// Dashboard's "Recent Commissions" section). Admins can read any.
+allow read:
+if isAdmin()
+|| (
+request.auth != null
+&& request.auth.uid == resource.data.marketerUid
+);
+
+// All writes happen inside processCompletedPayment (Admin SDK
+// bypasses this rule) — never a direct client write.
+allow create, update, delete:
+if false;
+}
+
+// ============================================================
+// PAYOUTS
+// ============================================================
+
+match /payouts/{monthKey} {
+
+// The payout summary doc itself carries no per-marketer data —
+// admin-only, matching the getMonthlyPayouts callable being the
+// only intended read path.
+allow read:
+if isAdmin();
+
+allow create, update, delete:
+if false;
+
+match /marketers/{marketerId} {
+
+// Admin-only — matches getMonthlyPayouts/markPayoutPaid being the
+// only Cloud-Function-mediated access path. No direct client reads
+// are expected here even for the marketer themselves; the Marketer
+// Dashboard only ever shows totalEarnedKES/totalWithdrawnKES off
+// the /marketers/{uid} doc, not this payouts subcollection.
+allow read:
+if isAdmin();
+
+allow create, update, delete:
+if false;
+}
+}
+
 // ============================================================
 // CHAT AND MESSAGING
 // KEEPING YOUR CURRENT WORKING RULES
