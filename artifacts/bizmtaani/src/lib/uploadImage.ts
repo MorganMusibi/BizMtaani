@@ -115,12 +115,13 @@ export async function uploadImage(
   // (getCloudinarySignature), so all three must be included here
   // exactly as signed.
   const form = new FormData();
-  form.append("file", compressedFile);
-  form.append("api_key", sig.apiKey);
-  form.append("timestamp", String(sig.timestamp));
-  form.append("signature", sig.signature);
-  form.append("folder", sig.folder);
-  form.append("allowed_formats", sig.allowedFormats);
+form.append("file", compressedFile);
+form.append("allowed_formats", sig.allowedFormats);  // ✅ Alphabetical
+form.append("api_key", sig.apiKey);                 // ✅ Alphabetical
+form.append("folder", sig.folder);                  // ✅ Alphabetical
+form.append("max_file_size", String(sig.maxFileSize)); // ✅ Add this in alphabetical position
+form.append("signature", sig.signature);            // ✅ Alphabetical
+form.append("timestamp", String(sig.timestamp));    // ✅ Alphabetical
   
   
   const res = await fetchWithRetry(
