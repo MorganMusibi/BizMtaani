@@ -134,13 +134,14 @@ const res = await fetchWithRetry(
 );
 
   if (!res.ok) {
-    const data = (await res.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(
-      data?.error?.message ?? `Upload failed (HTTP ${res.status})`
-    );
-  }
+  const data = await res.json().catch(() => null);
+  console.log("=== CLOUDINARY ERROR ===");
+  console.log("Status:", res.status);
+  console.log("Response:", data);
+  throw new Error(
+    data?.error?.message ?? `Upload failed (HTTP ${res.status})`
+  );
+}
 const data = (await res.json()) as {
   secure_url: string;
   public_id: string;
