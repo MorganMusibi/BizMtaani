@@ -60,21 +60,21 @@ function loadRecaptchaScript(): Promise<void> {
   return recaptchaLoadPromise;
 }
 
+
 export async function getRecaptchaToken(action: string): Promise<string> {
   await loadRecaptchaScript();
 
   return new Promise((resolve, reject) => {
-    // ✅ Use enterprise.enterprise (NOT grecaptcha directly)
-    const grecaptcha = window.grecaptcha?.enterprise;
-    
-    if (!grecaptcha) {
+    const enterprise = window.grecaptcha?.enterprise;
+
+    if (!enterprise) {
       reject(new Error("reCAPTCHA Enterprise not loaded"));
       return;
     }
 
     try {
-      grecaptcha.ready(() => {
-        grecaptcha
+      enterprise.ready(() => {
+        enterprise
           .execute(RECAPTCHA_SITE_KEY, { action })
           .then(resolve)
           .catch(reject);
@@ -84,3 +84,4 @@ export async function getRecaptchaToken(action: string): Promise<string> {
     }
   });
 }
+
