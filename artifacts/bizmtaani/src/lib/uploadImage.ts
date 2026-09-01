@@ -10,7 +10,6 @@ interface CloudinarySignatureResult {
   apiKey: string;
   cloudName: string;
   allowedFormats: string;
-  maxFileSize: number;
 }
 
 async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Promise<Response> {
@@ -96,6 +95,11 @@ export async function uploadImage(
   url: string;
   public_id: string;
 }> {
+  // File size validation
+  if (file.size > 8 * 1024 * 1024) {
+    throw new Error("File too large. Maximum size is 8MB.");
+  }
+  
   const compressedFile = await compressImageBeforeUpload(file, type);
 
   const functions = getFunctions(app, "us-central1");
@@ -118,13 +122,8 @@ export async function uploadImage(
 params.append("allowed_formats", sig.allowedFormats);
 params.append("api_key", sig.apiKey);
 params.append("folder", sig.folder);
-params.append("max_file_size", String(sig.maxFileSize));
 params.append("signature", sig.signature);
 params.append("timestamp", String(sig.timestamp));
-
-const form = new FormData();
-form.append("file", compressedFile);
-  
   
   const res = await fetchWithRetry(
   `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload?${params.toString()}`,
