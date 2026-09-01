@@ -48,6 +48,7 @@ export default defineConfig({
         clientsClaim: true,
         cleanupOutdatedCaches: true,
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globIgnores: ["**/AdminDashboard-*.js", "**/MarketerDashboard-*.js", "**/charts-vendor-*.js", "**/leaflet-vendor-*.js"],
         navigateFallback: "/index.html",
         // Don't intercept the Firebase messaging SW or any non-SPA paths
         navigateFallbackDenylist: [/\/firebase-messaging-sw\.js/, /\/api\//],
