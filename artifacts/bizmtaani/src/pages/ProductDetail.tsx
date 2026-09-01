@@ -28,6 +28,7 @@ interface ProductDetailCacheEntry {
 }
 const productDetailCache = new Map<string, ProductDetailCacheEntry>();
 const PRODUCT_DETAIL_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+const MAX_CACHED_PRODUCTS = 30; // caps memory growth over a long browsing session
 
 // GPS location persists indefinitely for the session — no reason to
 // re-request it every time this page mounts.
@@ -689,6 +690,12 @@ useEffect(() => {
           relatedProducts: finalRelated,
           timestamp: Date.now(),
         });
+
+        if (productDetailCache.size > MAX_CACHED_PRODUCTS) {
+          const oldestKey = [...productDetailCache.entries()]
+            .sort((a, b) => a[1].timestamp - b[1].timestamp)[0][0];
+          productDetailCache.delete(oldestKey);
+        }
       }
     } catch (error) {
       console.error("Failed to load product or related adverts:", error);
