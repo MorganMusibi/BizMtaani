@@ -207,7 +207,7 @@ async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<
       assessment: {
         event: {
           token: token,
-          siteKey: "6LddmkgtAAAAANcYmsgNAENDPJJC5xNItv7dYRL8",
+          siteKey: "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8",
           expectedAction: expectedAction,
         },
       },
