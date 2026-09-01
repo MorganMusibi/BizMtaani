@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-const RECAPTCHA_SITE_KEY = "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8";
+const RECAPTCHA_SITE_KEY = "6LddmkgtAAAAANcYmsgNAENDPJJC5xNItv7dYRL8";
 
 let recaptchaLoadPromise: Promise<void> | null = null;
 
