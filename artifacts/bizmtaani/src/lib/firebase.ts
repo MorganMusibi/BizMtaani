@@ -23,15 +23,18 @@ export const app = initializeApp(firebaseConfig);
 // tokens and populating the metrics dashboard. Debug token lets
 // localhost keep working during development without a real domain
 // match.
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY || "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8";
+
 if (import.meta.env.DEV) {
-  // @ts-expect-error — Firebase's documented way to enable App Check
-  // debug mode locally; not typed in the SDK.
+  // @ts-expect-error — Firebase App Check local debug mode
   self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
 }
+
 export const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaEnterpriseProvider(import.meta.env.VITE_RECAPTCHA_APPCHECK_SITE_KEY),
+  provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
   isTokenAutoRefreshEnabled: true,
 });
+
 
 // Warm up the App Check token in the background so it's cached before the
 // first Firestore read or Cloud Function call. This runs without awaiting.
