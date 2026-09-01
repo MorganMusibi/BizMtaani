@@ -598,6 +598,7 @@ function wardQuery(
     return query(
       coll,
       where("ward", "==", wardName),
+      where("status", "==", "active"),
       orderBy("createdAt", "desc"),
       startAfter(createdAtCursorToTimestamp(cursor)),
       limit(WARD_PAGE)
@@ -607,10 +608,12 @@ function wardQuery(
   return query(
     coll,
     where("ward", "==", wardName),
+    where("status", "==", "active"),
     orderBy("createdAt", "desc"),
     limit(WARD_PAGE)
   );
 }
+
   function searchQueryAllProducts(
   cursor?: CreatedAtCursor | null
 ) {
@@ -619,6 +622,7 @@ function wardQuery(
   if (cursor) {
     return query(
       coll,
+      where("status", "==", "active"),
       orderBy("createdAt", "desc"),
       startAfter(createdAtCursorToTimestamp(cursor)),
       limit(AREA_PAGE)
@@ -627,6 +631,7 @@ function wardQuery(
 
   return query(
     coll,
+    where("status", "==", "active"),
     orderBy("createdAt", "desc"),
     limit(AREA_PAGE)
   );
@@ -695,6 +700,7 @@ function areaQueries(
           coll,
           where("geohash", ">=", prefix),
           where("geohash", "<", prefix + "\uf8ff"),
+          where("status", "==", "active"),
           ...scopeFilter,
           orderBy("geohash"),
           startAfter(cursor),
@@ -706,6 +712,7 @@ function areaQueries(
         coll,
         where("geohash", ">=", prefix),
         where("geohash", "<", prefix + "\uf8ff"),
+        where("status", "==", "active"),
         ...scopeFilter,
         orderBy("geohash"),
         limit(AREA_BUFFER_FETCH)
