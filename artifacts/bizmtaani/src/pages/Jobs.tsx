@@ -757,7 +757,7 @@ export default function Jobs() {
                 {searchQuery
                   ? "Try a different search term"
                   : userCoords
-                  ? "No jobs within 30km of your area yet"
+                  ? "No jobs around your area yet"
                   : "No listings in this category yet"}
               </p>
             </div>
@@ -771,7 +771,7 @@ export default function Jobs() {
           <div className="px-3 pt-3 space-y-3">
             <p className="text-xs text-muted-foreground px-1">
               {visible.length} job{visible.length !== 1 ? "s" : ""} found
-              {locationInfo?.wardName && !searchQuery && userCoords ? ` · within 30km of ${locationInfo.wardName}` : ""}
+              {!searchQuery && userCoords ? " near you" : ""}
             </p>
             {visible.map((job) => (
               <JobCard key={job.id} job={job} onClick={() => setLocation(`/jobs/${job.id}`)} />
