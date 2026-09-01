@@ -124,8 +124,11 @@ params.append("api_key", sig.apiKey);
 params.append("folder", sig.folder);
 params.append("signature", sig.signature);
 params.append("timestamp", String(sig.timestamp));
-  
-  const res = await fetchWithRetry(
+
+const form = new FormData(); // ✅ MAKE SURE THIS EXISTS
+form.append("file", compressedFile);
+
+const res = await fetchWithRetry(
   `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload?${params.toString()}`,
   { method: "POST", body: form }
 );
