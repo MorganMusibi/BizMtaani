@@ -341,7 +341,7 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   const signature = crypto
   .createHash("sha1")
   .update(
-    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&max_file_size=${MAX_UPLOAD_BYTES}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
+    `allowed_formats=${ALLOWED_UPLOAD_FORMATS}&folder=${folder}&timestamp=${timestamp}${cloudinaryApiSecret.value()}`
   )
   .digest("hex");
 
@@ -359,15 +359,14 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
   expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 24 * 60 * 60 * 1000)),
 }, { merge: true });
   return {
-    signature,
-    timestamp,
-    folder,
-    apiKey: cloudinaryApiKey.value(),
-    cloudName: cloudinaryCloudName.value(),
-    draftId,
-    allowedFormats: ALLOWED_UPLOAD_FORMATS,
-    maxFileSize: MAX_UPLOAD_BYTES,
-  };
+  signature,
+  timestamp,
+  folder,
+  apiKey: cloudinaryApiKey.value(),
+  cloudName: cloudinaryCloudName.value(),
+  draftId,
+  allowedFormats: ALLOWED_UPLOAD_FORMATS,
+};
 });
 
 /**
