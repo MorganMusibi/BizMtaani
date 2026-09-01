@@ -100,9 +100,7 @@
     <link rel="preconnect" href="https://firestore.googleapis.com" />
     <link rel="preconnect" href="https://res.cloudinary.com" />
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
-    <!-- reCAPTCHA Enterprise -->
-   <script src="https://www.google.com/recaptcha/enterprise.js?render=6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8"></script>
-
+    
     <link
       href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
       rel="stylesheet"
@@ -124,7 +122,13 @@
       type="module"
       src="/src/main.tsx"
     ></script>
-    <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
+    <script>
+      if (location.search.includes('debug=1')) {
+        var erudaScript = document.createElement('script');
+        erudaScript.src = 'https://cdn.jsdelivr.net/npm/eruda';
+        erudaScript.onload = function () { eruda.init(); };
+        document.body.appendChild(erudaScript);
+      }
+    </script>
   </body>
 </html>
