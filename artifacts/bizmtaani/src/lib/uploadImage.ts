@@ -114,18 +114,20 @@ export async function uploadImage(
   // allowed_formats, and max_file_size are all signed on the backend
   // (getCloudinarySignature), so all three must be included here
   // exactly as signed.
-  const form = new FormData();
+  const params = new URLSearchParams();
+params.append("allowed_formats", sig.allowedFormats);
+params.append("api_key", sig.apiKey);
+params.append("folder", sig.folder);
+params.append("max_file_size", String(sig.maxFileSize));
+params.append("signature", sig.signature);
+params.append("timestamp", String(sig.timestamp));
+
+const form = new FormData();
 form.append("file", compressedFile);
-form.append("allowed_formats", sig.allowedFormats);  // ✅ Alphabetical
-form.append("api_key", sig.apiKey);                 // ✅ Alphabetical
-form.append("folder", sig.folder);                  // ✅ Alphabetical
-form.append("max_file_size", String(sig.maxFileSize)); // ✅ Add this in alphabetical position
-form.append("signature", sig.signature);            // ✅ Alphabetical
-form.append("timestamp", String(sig.timestamp));    // ✅ Alphabetical
   
   
   const res = await fetchWithRetry(
-  `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload`,
+  `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload?${params.toString()}`,
   { method: "POST", body: form }
 );
 
