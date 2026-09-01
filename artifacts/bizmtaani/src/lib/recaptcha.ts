@@ -27,8 +27,28 @@ function loadRecaptchaScript(): Promise<void> {
     script.src = `https://www.google.com/recaptcha/enterprise.js?render=${RECAPTCHA_SITE_KEY}`;
     script.async = true;
     script.onload = () => {
-      // Wait for enterprise to initialize
-      setTimeout(resolve, 200);
+      // Poll for window.grecaptcha.enterprise to actually attach —
+      // onload only means the script file downloaded and started
+      // executing, not that the SDK finished initializing. A fixed
+      // delay can fire too early on a slow connection/device.
+      const POLL_INTERVAL_MS = 50;
+      const POLL_TIMEOUT_MS = 5000;
+      const startedAt = Date.now();
+
+      const checkReady = () => {
+        if (window.grecaptcha?.enterprise) {
+          resolve();
+          return;
+        }
+        if (Date.now() - startedAt > POLL_TIMEOUT_MS) {
+          recaptchaLoadPromise = null;
+          reject(new Error("reCAPTCHA Enterprise did not initialize in time"));
+          return;
+        }
+        setTimeout(checkReady, POLL_INTERVAL_MS);
+      };
+
+      checkReady();
     };
     script.onerror = () => {
       recaptchaLoadPromise = null;
