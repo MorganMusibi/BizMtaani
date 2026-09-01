@@ -1,5 +1,7 @@
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
+import { appCheck } from "@/lib/firebase";
+import { getToken } from "firebase/app-check";
 
 export type ImageUploadType = "avatar" | "product" | "community";
 
@@ -102,16 +104,22 @@ export async function uploadImage(
   
   const compressedFile = await compressImageBeforeUpload(file, type);
 
-  const functions = getFunctions(app, "us-central1");
-  const getSignature = httpsCallable<
-    { uploadType: string; draftId?: string },
-    CloudinarySignatureResult & { draftId: string }
-  >(functions, "getCloudinarySignature");
+  // Ensure the reCAPTCHA Enterprise script finishes loading before making the function call
+await getToken(appCheck, false).catch((err) => {
+  console.warn("App Check pre-fetch warning:", err);
+});
 
-  const { data: sig } = await getSignature({
-    uploadType: type,
-    draftId: draftId ?? undefined,
-  });
+const functions = getFunctions(app, "us-central1");
+const getSignature = httpsCallable<
+  { uploadType: string; draftId?: string },
+  CloudinarySignatureResult & { draftId: string }
+>(functions, "getCloudinarySignature");
+
+const { data: sig } = await getSignature({
+  uploadType: type,
+  draftId: draftId ?? undefined,
+});
+
   // Only send the params that are covered by the signature.
   // Adding extra params here (or omitting one that's signed) would
   // cause Cloudinary to reject with "Invalid Signature" — folder,
