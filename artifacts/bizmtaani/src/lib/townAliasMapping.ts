@@ -1,5 +1,9 @@
 import { resolveCanonicalLocation } from './locationHierarchy';
 
+function toTitleCase(str: string): string {
+  return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // Single ward towns (1:1 mapping)
 export const TOWN_ALIASES = [
   { 
@@ -33,6 +37,27 @@ export const MULTI_WARD_TOWNS = {
 
 export type TownAlias = keyof typeof MULTI_WARD_TOWNS;
 
+/**
+ * Resolve an alias entry to a canonical location, falling back to the
+ * alias table's own ward/constituency/county (title-cased) if the ward
+ * hasn't been added to MasterHierarchy.json yet. Without this fallback,
+ * a known alias whose ward is missing from the hierarchy silently
+ * resolves to nothing instead of a usable location.
+ */
+async function resolveWithFallback(ward: string, constituency: string, county: string) {
+  const canonical = await resolveCanonicalLocation(ward, constituency, county);
+  if (canonical) return canonical;
+
+  const wardName = toTitleCase(ward);
+  const constituencyName = toTitleCase(constituency);
+  return {
+    wardName,
+    constituencyName,
+    countyName: toTitleCase(county),
+    displayName: `${wardName}, ${constituencyName}`,
+  };
+}
+
 // Check if a search term is a known town
 export async function resolveWardFromAlias(searchTerm: string) {
   const normalized = searchTerm.trim().toLowerCase();
@@ -40,7 +65,7 @@ export async function resolveWardFromAlias(searchTerm: string) {
   // 1. Check single ward match first
   const singleMatch = TOWN_ALIASES.find(a => a.alias === normalized);
   if (singleMatch) {
-    return await resolveCanonicalLocation(
+    return await resolveWithFallback(
       singleMatch.ward,
       singleMatch.constituency,
       singleMatch.county
@@ -51,7 +76,7 @@ export async function resolveWardFromAlias(searchTerm: string) {
   const multiWards = MULTI_WARD_TOWNS[normalized as TownAlias];
   if (multiWards && multiWards.length > 0) {
     const primary = multiWards[0]; // Hospital ward for Kitale
-    return await resolveCanonicalLocation(
+    return await resolveWithFallback(
       primary.ward,
       primary.constituency,
       primary.county
@@ -68,13 +93,14 @@ export async function getAllWardsForTown(searchTerm: string) {
   if (!multiWards) return null;
   
   const results = await Promise.all(
-    multiWards.map(async ({ ward, constituency, county }) => {
-      const resolved = await resolveCanonicalLocation(ward, constituency, county);
-      return resolved;
-    })
+    multiWards.map(({ ward, constituency, county }) =>
+      resolveWithFallback(ward, constituency, county)
+    )
   );
   
-  return results.filter(r => r !== null);
+  // Every entry now resolves to something (canonical or fallback),
+  // so there's nothing to filter out anymore.
+  return results;
 }
 
 // Check if a search term is a multi-ward town
