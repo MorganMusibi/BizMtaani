@@ -10,7 +10,7 @@ import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, Copy, Check, X } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, X } from "lucide-react";
 import { Link } from "wouter";
 import imageCompression from "browser-image-compression";
 import { getFullSizeUrl } from "@/lib/cloudinaryUrl";
@@ -27,7 +27,7 @@ export default function Profile() {
   const [showPhotoViewer, setShowPhotoViewer] = useState(false);
   const hasPhoto = !!user?.photoURL;
 
-  const [codeCopied, setCodeCopied] = useState(false);
+
   const [isMarketer, setIsMarketer] = useState(false);
   const [marketerData, setMarketerData] = useState<any>(null);
   
@@ -136,26 +136,6 @@ export default function Profile() {
   }
 }
 
-  function handleCopyReferralCode() {
-    const code = userProfile?.myReferralCode;
-    if (!code) return;
-    navigator.clipboard.writeText(code);
-    setCodeCopied(true);
-    setTimeout(() => setCodeCopied(false), 2000);
-  }
-
-  function handleShareReferralCode() {
-    const code = userProfile?.myReferralCode;
-    if (!code) return;
-    const message = `Join BizMtaani using my referral code ${code} and let's both get rewarded! ${window.location.origin}`;
-    if (navigator.share) {
-      navigator.share({ title: "Join BizMtaani", text: message });
-    } else {
-      navigator.clipboard.writeText(message);
-      toast({ title: "Referral message copied!" });
-    }
-  }
-  
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -506,27 +486,6 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
     </p>
   </div>
 )}
-
-          {userProfile?.myReferralCode && (
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-muted-foreground">Your referral code</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-11 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center font-black text-base tracking-wider">
-                  {userProfile.myReferralCode}
-                </div>
-                <button
-                  onClick={handleCopyReferralCode}
-                  className="h-11 w-11 rounded-xl border border-border flex items-center justify-center flex-shrink-0"
-                >
-                  {codeCopied ? <Check size={18} className="text-[#00A651]" /> : <Copy size={18} />}
-                </button>
-              </div>
-              <Button onClick={handleShareReferralCode} variant="outline" className="w-full gap-2">
-                <Gift size={15} />
-                Share with friends
-              </Button>
-            </div>
-          )}
 
           {isMarketer ? (
           <button
