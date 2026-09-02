@@ -10,6 +10,7 @@ import {
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { getRecaptchaToken } from "@/lib/recaptcha";
+import { resolveWardFromAlias, getAllWardsForTown, isMultiWardTown } from "./townAliasMapping";
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -161,6 +162,54 @@ export async function forwardGeocodePlace(query: string): Promise<{ lat: number;
     console.warn("[location] forward geocode failed:", e);
     return null;
   }
+}
+
+/**
+ * Search location with support for multi-ward towns (like Kitale)
+ * Returns all possible wards for multi-ward towns, or single ward for others
+ */
+export async function searchLocationWithWardPicker(
+  query: string
+): Promise<{ 
+  type: 'single' | 'multi' | 'none';
+  locations?: ResolvedLocation[];
+  defaultLocation?: ResolvedLocation;
+}> {
+  const trimmed = query.trim();
+  if (!trimmed) return { type: 'none' };
+
+  // Check if it's a multi-ward town (e.g., Kitale)
+  if (isMultiWardTown(trimmed)) {
+    const wards = await getAllWardsForTown(trimmed);
+    if (wards && wards.length > 0) {
+      return {
+        type: 'multi',
+        locations: wards,
+        defaultLocation: wards[0],
+      };
+    }
+  }
+
+  // Check single ward alias (e.g., Ruaka → Ndenderu)
+  const singleMatch = await resolveWardFromAlias(trimmed);
+  if (singleMatch) {
+    return {
+      type: 'single',
+      defaultLocation: singleMatch,
+    };
+  }
+
+  // Fallback to geocoding
+  const coords = await forwardGeocodePlace(trimmed);
+  if (coords) {
+    const info = await getWardInfo(coords.lat, coords.lng);
+    return {
+      type: 'single',
+      defaultLocation: info,
+    };
+  }
+
+  return { type: 'none' };
 }
 
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
