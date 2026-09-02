@@ -558,6 +558,19 @@ export const processCompletedPayment = onDocumentUpdated(
     const paymentData = after;
     const checkoutRequestId = event.params.paymentId;
 
+    // Idempotency guard — Firestore triggers are at-least-once, so this
+    // function can fire more than once for the same completed payment.
+    // Claim it atomically before doing any non-idempotent work below
+    // (subscription extension, ad reactivation).
+    const paymentRef = db.collection("payments").doc(checkoutRequestId);
+    const claimed = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(paymentRef);
+      if (snap.data()?.postProcessed === true) return false;
+      tx.update(paymentRef, { postProcessed: true });
+      return true;
+    });
+    if (!claimed) return;
+
     const plan = paymentData.plan ?? "free";
     const durationDays = LISTING_DURATIONS[plan] ?? 7;
 
