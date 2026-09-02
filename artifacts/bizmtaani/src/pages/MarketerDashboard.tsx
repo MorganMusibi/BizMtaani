@@ -106,23 +106,24 @@ export function clearMarketerDashboardCache() {
 }
 
 // Helper to get user profiles with persistent sessionStorage caching
-async function getUserProfiles(uids: string[]): Promise<Map<string, UserProfile>> {
+async function getUserProfiles(uids: string[], force = false): Promise<Map<string, UserProfile>> {
   const result = new Map<string, UserProfile>();
   const uncachedUids: string[] = [];
 
-  // 1. Check sessionStorage cache first (survives page reloads)
   for (const uid of uids) {
-    try {
-      const cachedStr = sessionStorage.getItem(`bizmtaani_user_profile_${uid}`);
-      if (cachedStr) {
-        const cached: UserProfile = JSON.parse(cachedStr);
-        if (Date.now() - cached.timestamp < USER_CACHE_TTL_MS) {
-          result.set(uid, cached);
-          continue;
+    if (!force) {
+      try {
+        const cachedStr = sessionStorage.getItem(`bizmtaani_user_profile_${uid}`);
+        if (cachedStr) {
+          const cached: UserProfile = JSON.parse(cachedStr);
+          if (Date.now() - cached.timestamp < USER_CACHE_TTL_MS) {
+            result.set(uid, cached);
+            continue;
+          }
         }
+      } catch {
+        // fall through to fetch
       }
-    } catch {
-      // Ignore parse errors, fall through to fetch
     }
     uncachedUids.push(uid);
   }
@@ -271,8 +272,8 @@ try {
       // ✅ Use cached user profiles
       const userUids = referralsSnap.docs.map((d) => d.id);
       const userProfileMap = userUids.length > 0 
-        ? await getUserProfiles(userUids) 
-        : new Map();
+  ? await getUserProfiles(userUids, force) 
+  : new Map();
 
       const referralsData: ReferredUser[] = referralsSnap.docs.map((d) => {
         const data = d.data();
