@@ -64,9 +64,9 @@ async function compressImageBeforeUpload(file: File, type: ImageUploadType): Pro
   }
 
   const options =
-    type === "avatar"
-      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
-      : { maxSizeMB: 0.8, maxWidthOrHeight: 1600, useWebWorker: true };
+  type === "avatar"
+    ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
+    : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: true };
 
   try {
     const { default: imageCompression } = await import("browser-image-compression");
