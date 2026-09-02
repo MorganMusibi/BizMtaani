@@ -474,7 +474,7 @@ async function revokeAdmin(targetUser: AdminUser) {
   }
 
   async function approveApplication(application: MarketerApplication) {
-    if (!confirm(`Approve "${application.displayName || application.id}" as a marketer?`)) return;
+  if (!confirm(`Approve "${application.fullName || application.id}" as a marketer?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
@@ -493,7 +493,7 @@ async function revokeAdmin(targetUser: AdminUser) {
   }
 
   async function rejectApplication(application: MarketerApplication) {
-    if (!confirm(`Reject "${application.displayName || application.id}"'s application?`)) return;
+  if (!confirm(`Reject "${application.fullName || application.id}"'s application?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const rejectMarketerApplication = httpsCallable(functions, "rejectMarketerApplication");
