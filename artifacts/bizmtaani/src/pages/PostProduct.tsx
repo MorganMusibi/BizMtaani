@@ -122,9 +122,9 @@ export default function PostProduct() {
 
   // Shared across all photos uploaded during this posting session, so
   // every image (and eventually the advert itself) claims the same
-  // draft record. Generated once, lazily, on first upload.
-  const draftIdRef = useRef<string | null>(null);
+  // draft record. Generated once, lazily, on first upload. const draftIdRef = useRef<string | null>(null);
 const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+const isPublishingRef = useRef(false);
 const [, navigate] = useLocation();
 const { toast } = useToast();
 const [step, setStep] = useState<Step>(1);
@@ -1508,7 +1508,12 @@ try {
  * Corrected handlePublishFree
  */
 async function handlePublishFree() {
+  if (isPublishingRef.current) return;
+  isPublishingRef.current = true;
+  try {
+
   if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+    
     toast({
       title: "Too many photos for Free plan",
       description: "Please upgrade your plan or remove extra photos before publishing.",
@@ -1714,12 +1719,18 @@ toast({
         variant: "destructive",
       });
     }
-  } finally {
+  } } finally {
     setPublishingFree(false);
   }
 
+  } finally {
+    isPublishingRef.current = false;
+  }
 }
   async function handlePublishPremiumSubscriber() {
+  if (isPublishingRef.current) return;
+  isPublishingRef.current = true;
+
   setPublishingFree(true);
 
   try {
@@ -1746,6 +1757,7 @@ toast({
     }
    finally {
     setPublishingFree(false);
+    isPublishingRef.current = false;
   }
 }
 const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
