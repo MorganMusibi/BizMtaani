@@ -309,7 +309,7 @@ export function AuthProvider({
         reloadUser,
       }}
     >
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
   }
