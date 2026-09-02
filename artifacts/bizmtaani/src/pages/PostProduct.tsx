@@ -27,7 +27,7 @@ import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type 
 async function uploadImagesLimited(
   files: File[],
   draftId: string,
-  concurrency = 2
+  concurrency = 1
 ): Promise<Awaited<ReturnType<typeof uploadImage>>[]> {
   const results: Awaited<ReturnType<typeof uploadImage>>[] = new Array(files.length);
   let next = 0;
