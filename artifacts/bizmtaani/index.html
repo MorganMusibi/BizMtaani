@@ -102,9 +102,22 @@
     <link rel="preconnect" href="https://identitytoolkit.googleapis.com" />
     
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
+  rel="preload"
+  as="style"
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
+/>
+<link
+  rel="stylesheet"
+  href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
+  media="print"
+  onload="this.media='all'"
+/>
+<noscript>
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap"
+  />
+</noscript>
 
     <style>
       html,
@@ -162,7 +175,6 @@
 </div>
 
 <div id="root"></div>
-    <div id="root"></div>
 
     <script
       type="module"
