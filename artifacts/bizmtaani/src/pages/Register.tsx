@@ -25,7 +25,7 @@ const googleProvider = new GoogleAuthProvider();
 type Step = 1 | 2;
 
 interface HomeLocation {
-  lat: number; lng: number;
+  lat: number | null; lng: number | null;
   areaName: string; constituency: string; county: string;
 }
 
@@ -171,8 +171,8 @@ const [resolvingArea, setResolvingArea] = useState(false);
   selectedWard.countyName
 );
 const homeLocation: HomeLocation = {
-  lat: coords?.lat ?? 0,
-  lng: coords?.lng ?? 0,
+  lat: coords?.lat ?? null,
+  lng: coords?.lng ?? null,
   areaName: selectedWard.wardName,
   constituency: selectedWard.constituencyName,
   county: selectedWard.countyName,
@@ -229,8 +229,8 @@ try {
     selectedWard.countyName
   );
   const homeLocation: HomeLocation = {
-    lat: coords?.lat ?? 0,
-    lng: coords?.lng ?? 0,
+  lat: coords?.lat ?? null,
+  lng: coords?.lng ?? null,
     areaName: selectedWard.wardName,
     constituency: selectedWard.constituencyName,
     county: selectedWard.countyName,
