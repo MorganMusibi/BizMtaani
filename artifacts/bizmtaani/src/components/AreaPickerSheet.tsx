@@ -5,6 +5,7 @@ import {
   searchCountiesByName,
   type Constituency,
 } from "@/lib/locationHierarchy";
+import { searchLocationWithWardPicker, type ResolvedLocation } from "@/lib/location";
 import { MapPin, Search, Loader2, ChevronLeft } from "lucide-react";
 
 interface WardMatch {
@@ -45,41 +46,78 @@ export function AreaPickerSheet({
   >([]);
   const [searching, setSearching] = useState(false);
   const [step, setStep] = useState<Step>({ type: "search" });
+  const [townAliasResults, setTownAliasResults] = useState<ResolvedLocation[]>([]);
+  const [isMultiWardTown, setIsMultiWardTown] = useState(false);
+  const [searchingAlias, setSearchingAlias] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (step.type !== "search") return; // only live-search at the top level
+  if (step.type !== "search") return; // only live-search at the top level
 
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+  if (debounceRef.current) clearTimeout(debounceRef.current);
 
-    const trimmed = searchText.trim();
-    if (!trimmed) {
+  const trimmed = searchText.trim();
+  if (!trimmed) {
+    setWardResults([]);
+    setConstituencyResults([]);
+    setCountyResults([]);
+    setTownAliasResults([]);
+    setIsMultiWardTown(false);
+    setSearching(false);
+    setSearchingAlias(false);
+    return;
+  }
+
+  setSearching(true);
+  setSearchingAlias(true);
+  
+  debounceRef.current = setTimeout(async () => {
+    // 1. First check if it's a known town alias (Ruaka, Kitale, etc.)
+    const aliasResult = await searchLocationWithWardPicker(trimmed);
+    
+    if (aliasResult.type === 'multi' && aliasResult.locations) {
+      // Multi-ward town (e.g., Kitale)
+      setTownAliasResults(aliasResult.locations);
+      setIsMultiWardTown(true);
       setWardResults([]);
       setConstituencyResults([]);
       setCountyResults([]);
       setSearching(false);
+      setSearchingAlias(false);
+      return;
+    } else if (aliasResult.type === 'single' && aliasResult.defaultLocation) {
+      // Single ward town (e.g., Ruaka → Ndenderu)
+      setTownAliasResults([aliasResult.defaultLocation]);
+      setIsMultiWardTown(false);
+      setWardResults([]);
+      setConstituencyResults([]);
+      setCountyResults([]);
+      setSearching(false);
+      setSearchingAlias(false);
       return;
     }
+    
+    // 2. If no alias match, fallback to regular search
+    const [wards, constituencies, counties] = await Promise.all([
+      searchWardsByName(trimmed, 8),
+      searchConstituenciesByName(trimmed, 8),
+      searchCountiesByName(trimmed, 5),
+    ]);
+    setWardResults(wards.map((w) => ({ wardName: w.wardName, constituencyName: w.constituencyName, countyName: w.countyName })));
+    setConstituencyResults(constituencies);
+    setCountyResults(counties);
+    setTownAliasResults([]);
+    setIsMultiWardTown(false);
+    setSearching(false);
+    setSearchingAlias(false);
+  }, 250);
 
-    setSearching(true);
-    debounceRef.current = setTimeout(async () => {
-      const [wards, constituencies, counties] = await Promise.all([
-        searchWardsByName(trimmed, 8),
-        searchConstituenciesByName(trimmed, 8),
-        searchCountiesByName(trimmed, 5),
-      ]);
-      setWardResults(wards.map((w) => ({ wardName: w.wardName, constituencyName: w.constituencyName, countyName: w.countyName })));
-      setConstituencyResults(constituencies);
-      setCountyResults(counties);
-      setSearching(false);
-    }, 250);
+  return () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  };
+}, [searchText, step.type]);
 
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [searchText, step.type]);
-
-  const hasAnyResults = wardResults.length > 0 || constituencyResults.length > 0 || countyResults.length > 0;
+  const hasAnyResults = wardResults.length > 0 || constituencyResults.length > 0 || countyResults.length > 0 || townAliasResults.length > 0;
   const showEmptyState = step.type === "search" && searchText.trim() && !searching && !hasAnyResults;
 
   return (
@@ -134,9 +172,9 @@ export function AreaPickerSheet({
               disabled={resolving}
               className="w-full h-11 pl-10 pr-4 rounded-xl bg-muted text-sm outline-none border border-transparent focus:border-primary transition-colors disabled:opacity-50"
             />
-            {searching && (
-              <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
-            )}
+            {(searching || searchingAlias) && (
+           <Loader2 size={16} className="absolute right-3.5 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground" />
+           )}
           </div>
         )}
 
@@ -180,7 +218,77 @@ export function AreaPickerSheet({
           )}
 
           {step.type === "search" && (
-            <>
+  <>
+    {/* ===== NEW: Town Alias Results ===== */}
+    {townAliasResults.length > 0 && (
+      <div>
+        <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
+          {isMultiWardTown ? `📍 ${searchText} spans multiple areas` : "📍 Known Area"}
+        </p>
+        <div className="space-y-2">
+          {townAliasResults.map((loc, index) => {
+            const key = `${loc.wardName}-${loc.constituency}-${index}`;
+            const isThisResolving = resolving && resolvingKey === key;
+            return (
+              <button
+                key={key}
+                onClick={() => {
+                  setResolvingKey(key);
+                  onSearchSelect({
+                    wardName: loc.wardName,
+                    constituencyName: loc.constituency,
+                    countyName: loc.county,
+                  });
+                }}
+                disabled={resolving}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 text-left transition-all active:scale-[0.98] disabled:opacity-50 ${
+                  isMultiWardTown 
+                    ? "border-amber-400/40 bg-amber-50/50 hover:border-amber-500/60" 
+                    : "border-emerald-400/40 bg-emerald-50/50 hover:border-emerald-500/60"
+                }`}
+              >
+                <div className="flex-1">
+                  <p className="font-bold text-sm">
+                    {isMultiWardTown ? loc.wardName : loc.displayName}
+                    {isMultiWardTown && (
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {loc.constituency}, {loc.county}
+                      </span>
+                    )}
+                  </p>
+                  {isMultiWardTown ? (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {loc.constituency}, {loc.county}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {loc.constituency}, {loc.county}
+                    </p>
+                  )}
+                  {isMultiWardTown && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      🏙️ Part of {searchText} town
+                    </p>
+                  )}
+                </div>
+                {isThisResolving && <Loader2 size={16} className="animate-spin text-primary flex-shrink-0" />}
+                {!isThisResolving && isMultiWardTown && (
+                  <span className="text-xs text-amber-600">Select</span>
+                )}
+              </button>
+            );
+          })}
+          {isMultiWardTown && (
+            <p className="text-xs text-muted-foreground px-2 py-1">
+              {searchText} spans multiple wards. Please choose your specific area above.
+            </p>
+          )}
+        </div>
+      </div>
+    )}
+
+    {/* ===== Existing Ward Results ===== */}
+    
               {wardResults.length > 0 && (
                 <div>
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">Wards</p>
