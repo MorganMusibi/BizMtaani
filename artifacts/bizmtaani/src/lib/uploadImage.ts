@@ -64,9 +64,9 @@ async function compressImageBeforeUpload(file: File, type: ImageUploadType): Pro
   }
 
   const options =
-  type === "avatar"
-    ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
-    : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: true };
+    type === "avatar"
+      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
+      : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: true };
 
   try {
     const { default: imageCompression } = await import("browser-image-compression");
@@ -78,21 +78,62 @@ async function compressImageBeforeUpload(file: File, type: ImageUploadType): Pro
 }
 
 /**
+ * Fetch a Cloudinary signature for a given upload type + draft.
+ * Callers should fetch this ONCE per draft/session and reuse it
+ * across every image in that batch, instead of fetching a fresh
+ * signature per file — the folder/timestamp/allowed_formats are the
+ * same for every image in the same draft, so one round-trip covers
+ * the whole batch instead of one per photo.
+ */
+export async function getCloudinaryUploadSignature(
+  type: ImageUploadType,
+  draftId?: string | null
+): Promise<CloudinarySignatureResult & { draftId: string }> {
+  // Ensure the reCAPTCHA Enterprise script finishes loading before making the function call
+  await getToken(appCheck, false).catch((err) => {
+    console.warn("App Check pre-fetch warning:", err);
+  });
+
+  const functions = getFunctions(app, "us-central1");
+  const getSignature = httpsCallable<
+    { uploadType: string; draftId?: string },
+    CloudinarySignatureResult & { draftId: string }
+  >(functions, "getCloudinarySignature");
+
+  const { data: sig } = await getSignature({
+    uploadType: type,
+    draftId: draftId ?? undefined,
+  });
+
+  return sig;
+}
+
+/**
  * Upload an image via Firebase Cloud Functions + Cloudinary direct upload.
  *
+ * Accepts an optional pre-fetched signature (`sig`) so multiple images
+ * in the same draft can share a single signature round-trip instead of
+ * each fetching their own. If no signature is passed, one is fetched
+ * for this single image (kept for backward compatibility with any
+ * other callers).
+ *
  * Flow:
- *   1. Call `getCloudinarySignature` Cloud Function — returns a signed
- *      timestamp + folder so the browser can upload directly to Cloudinary
- *      without the API secret ever leaving Firebase.
- *   2. POST the file directly to Cloudinary using exactly the signed params
- *      (folder + timestamp). No extra params are added to the FormData so
- *      the signature always matches.
- *   3. Return the secure_url from Cloudinary's response.
+ *   1. Get a signed timestamp + folder (either passed in, or fetched
+ *      here) so the browser can upload directly to Cloudinary without
+ *      the API secret ever leaving Firebase.
+ *   2. Compression and signature-fetching run in parallel when a
+ *      signature isn't already provided, since neither depends on
+ *      the other.
+ *   3. POST the file directly to Cloudinary using exactly the signed
+ *      params (folder + timestamp). No extra params are added to the
+ *      FormData so the signature always matches.
+ *   4. Return the secure_url from Cloudinary's response.
  */
 export async function uploadImage(
   file: File,
   type: ImageUploadType,
-  draftId?: string | null
+  draftId?: string | null,
+  sig?: CloudinarySignatureResult & { draftId: string }
 ): Promise<{
   url: string;
   public_id: string;
@@ -101,24 +142,14 @@ export async function uploadImage(
   if (file.size > 8 * 1024 * 1024) {
     throw new Error("File too large. Maximum size is 8MB.");
   }
-  
-  const compressedFile = await compressImageBeforeUpload(file, type);
 
-  // Ensure the reCAPTCHA Enterprise script finishes loading before making the function call
-await getToken(appCheck, false).catch((err) => {
-  console.warn("App Check pre-fetch warning:", err);
-});
-
-const functions = getFunctions(app, "us-central1");
-const getSignature = httpsCallable<
-  { uploadType: string; draftId?: string },
-  CloudinarySignatureResult & { draftId: string }
->(functions, "getCloudinarySignature");
-
-const { data: sig } = await getSignature({
-  uploadType: type,
-  draftId: draftId ?? undefined,
-});
+  // Compression and signature-fetch are independent — run them
+  // together instead of one after the other. If a signature was
+  // already passed in (shared across a batch), skip fetching again.
+  const [compressedFile, resolvedSig] = await Promise.all([
+    compressImageBeforeUpload(file, type),
+    sig ? Promise.resolve(sig) : getCloudinaryUploadSignature(type, draftId),
+  ]);
 
   // Only send the params that are covered by the signature.
   // Adding extra params here (or omitting one that's signed) would
@@ -127,51 +158,51 @@ const { data: sig } = await getSignature({
   // (getCloudinarySignature), so all three must be included here
   // exactly as signed.
   const params = new URLSearchParams();
-params.append("allowed_formats", sig.allowedFormats);
-params.append("api_key", sig.apiKey);
-params.append("folder", sig.folder);
-params.append("signature", sig.signature);
-params.append("timestamp", String(sig.timestamp));
+  params.append("allowed_formats", resolvedSig.allowedFormats);
+  params.append("api_key", resolvedSig.apiKey);
+  params.append("folder", resolvedSig.folder);
+  params.append("signature", resolvedSig.signature);
+  params.append("timestamp", String(resolvedSig.timestamp));
 
-const form = new FormData(); // ✅ MAKE SURE THIS EXISTS
-form.append("file", compressedFile);
+  const form = new FormData();
+  form.append("file", compressedFile);
 
-const res = await fetchWithRetry(
-  `https://api.cloudinary.com/v1_1/${sig.cloudName}/image/upload?${params.toString()}`,
-  { method: "POST", body: form }
-);
+  const res = await fetchWithRetry(
+    `https://api.cloudinary.com/v1_1/${resolvedSig.cloudName}/image/upload?${params.toString()}`,
+    { method: "POST", body: form }
+  );
 
   if (!res.ok) {
-  const data = await res.json().catch(() => null);
-  console.log("=== CLOUDINARY ERROR ===");
-  console.log("Status:", res.status);
-  console.log("Response:", data);
-  throw new Error(
-    data?.error?.message ?? `Upload failed (HTTP ${res.status})`
-  );
-}
-const data = (await res.json()) as {
-  secure_url: string;
-  public_id: string;
-};
+    const data = await res.json().catch(() => null);
+    console.log("=== CLOUDINARY ERROR ===");
+    console.log("Status:", res.status);
+    console.log("Response:", data);
+    throw new Error(
+      data?.error?.message ?? `Upload failed (HTTP ${res.status})`
+    );
+  }
+  const data = (await res.json()) as {
+    secure_url: string;
+    public_id: string;
+  };
 
-if (!data.secure_url || !data.public_id) {
-  throw new Error("Cloudinary response missing image data");
-}
+  if (!data.secure_url || !data.public_id) {
+    throw new Error("Cloudinary response missing image data");
+  }
 
-// Report the uploaded image back to the draft record so it can be
-// cleaned up automatically if the advert is never published.
-const claimId = draftId ?? sig.draftId;
-if (claimId) {
-  const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
-  attachDraftUploadImage({ draftId: claimId, publicId: data.public_id }).catch((error) => {
-    console.warn("Failed to attach draft upload record:", error);
-  });
-}
+  // Report the uploaded image back to the draft record so it can be
+  // cleaned up automatically if the advert is never published.
+  const functions = getFunctions(app, "us-central1");
+  const claimId = draftId ?? resolvedSig.draftId;
+  if (claimId) {
+    const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
+    attachDraftUploadImage({ draftId: claimId, publicId: data.public_id }).catch((error) => {
+      console.warn("Failed to attach draft upload record:", error);
+    });
+  }
 
-return {
-  url: data.secure_url,
-  public_id: data.public_id,
-};
+  return {
+    url: data.secure_url,
+    public_id: data.public_id,
+  };
 }
-  
