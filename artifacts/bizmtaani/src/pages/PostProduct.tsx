@@ -125,6 +125,7 @@ export default function PostProduct() {
   // draft record. Generated once, lazily, on first upload.
   const draftIdRef = useRef<string | null>(null);
 const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
+const isPublishingRef = useRef(false);
 const [, navigate] = useLocation();
 const { toast } = useToast();
 const [step, setStep] = useState<Step>(1);
@@ -1508,7 +1509,14 @@ try {
  * Corrected handlePublishFree
  */
 async function handlePublishFree() {
+  if (isPublishingRef.current) return;
+  isPublishingRef.current = true;
+  try {
+
   if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+    // ... everything that was already inside handlePublishFree stays exactly as-is,
+    // all the way down to the closing of the try/catch/finally block that already
+    // exists inside this function (the one with setPublishingFree(true/false))
     toast({
       title: "Too many photos for Free plan",
       description: "Please upgrade your plan or remove extra photos before publishing.",
@@ -1718,8 +1726,15 @@ toast({
     setPublishingFree(false);
   }
 
+  } finally {
+    isPublishingRef.current = false;
+  }
 }
+  
   async function handlePublishPremiumSubscriber() {
+  if (isPublishingRef.current) return;
+  isPublishingRef.current = true;
+
   setPublishingFree(true);
 
   try {
@@ -1746,6 +1761,7 @@ toast({
     }
    finally {
     setPublishingFree(false);
+    isPublishingRef.current = false;
   }
 }
 const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
