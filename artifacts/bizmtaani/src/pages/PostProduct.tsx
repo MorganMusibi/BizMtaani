@@ -3,7 +3,7 @@ import { functions } from "@/lib/firebase";
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
-import { uploadImage } from "@/lib/uploadImage";
+import { uploadImage, getCloudinaryUploadSignature } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { Button } from "@/components/ui/button";
@@ -22,15 +22,40 @@ import { getRecaptchaToken } from "@/lib/recaptcha";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
 
+// Picks a safe upload concurrency based on the device's reported
+// connection quality. Falls back to 1 (safest) when the Network
+// Information API isn't available — this covers iOS/Safari, which
+// doesn't support navigator.connection at all.
+function getAdaptiveConcurrency(): number {
+  const conn = (navigator as any).connection;
+  if (!conn || !conn.effectiveType) return 1;
+
+  switch (conn.effectiveType) {
+    case "4g":
+      return 2;
+    case "3g":
+    case "2g":
+    case "slow-2g":
+    default:
+      return 1;
+  }
+}
+
 // Uploads files with limited concurrency instead of all-at-once, so a
 // weak connection isn't asked to push several images in parallel.
+// Fetches ONE Cloudinary signature for the whole batch up front and
+// reuses it for every image, instead of each image fetching its own
+// signature — cuts one Cloud Function round-trip per extra photo.
 async function uploadImagesLimited(
   files: File[],
   draftId: string,
-  concurrency = 1
+  concurrency: number = getAdaptiveConcurrency()
 ): Promise<Awaited<ReturnType<typeof uploadImage>>[]> {
   const results: Awaited<ReturnType<typeof uploadImage>>[] = new Array(files.length);
   let next = 0;
+
+  // One shared signature for every image in this batch.
+  const sig = await getCloudinaryUploadSignature("product", draftId);
 
   async function worker() {
     while (next < files.length) {
