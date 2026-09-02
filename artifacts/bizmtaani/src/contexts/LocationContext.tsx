@@ -120,7 +120,11 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         lat: savedArea.lat,
         lng: savedArea.lng,
       } as ResolvedLocation);
-      setUserCoords([savedArea.lat, savedArea.lng]);
+      setUserCoords(
+  savedArea.lat != null && savedArea.lng != null
+    ? [savedArea.lat, savedArea.lng]
+    : null
+);
       setGpsReady(true);
       settle("resolved");
       return;
