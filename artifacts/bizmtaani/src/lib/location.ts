@@ -4,12 +4,15 @@
  *  2. Module-level result cache   (avoids repeated work)
  *  3. OSM Nominatim               (fallback, also used for border detection)
  */
+// Existing imports
 import {
   resolveCanonicalLocation,
 } from "@/lib/locationHierarchy";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { getRecaptchaToken } from "@/lib/recaptcha";
+
+import { resolveWardFromAlias } from "./townAliasMapping";
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -139,6 +142,23 @@ export async function forwardGeocodePlace(query: string): Promise<{ lat: number;
   const trimmed = query.trim();
   if (!trimmed) return null;
 
+  // ========== NEW CODE: Check aliases FIRST ==========
+  const aliasMatch = await resolveWardFromAlias(trimmed);
+  if (aliasMatch) {
+    // Get coordinates for this ward
+    const coords = await getWardCoordinates(
+      aliasMatch.wardName,
+      aliasMatch.constituency,
+      aliasMatch.county
+    );
+    if (coords) {
+      console.log(`[location] Alias match: "${trimmed}" → ${aliasMatch.wardName} ward`);
+      return coords;
+    }
+  }
+  // ========== END NEW CODE ==========
+
+  // Existing Nominatim fallback (unchanged)
   try {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 6000);
