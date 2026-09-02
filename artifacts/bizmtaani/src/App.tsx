@@ -9,7 +9,6 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { SplashScreen } from "@/components/SplashScreen";
 import { RecaptchaDisclosure } from "@/components/RecaptchaDisclosure";
 import { lazy, Suspense } from "react";
 import { useLocation } from "wouter";
@@ -48,9 +47,6 @@ import { setBaseUrl } from "../../../lib/api-client-react/src/custom-fetch";
 setBaseUrl('https://us-central1-bizmtaani-f50d5.cloudfunctions.net');
 
 const queryClient = new QueryClient();
-
-// Show splash once per browser session (not on every SPA navigation)
-const splashAlreadyShown = sessionStorage.getItem("bm_splash") === "1";
 
 function NotificationSetup() {
   useAuth();
@@ -116,13 +112,7 @@ function Router() {
 }
 
 function App() {
-  const [showSplash, setShowSplash] = useState(!splashAlreadyShown);
   const showBottomNav = useShouldShowBottomNav();
-
-  const handleSplashDone = useCallback(() => {
-    sessionStorage.setItem("bm_splash", "1");
-    setShowSplash(false);
-  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -139,7 +129,6 @@ function App() {
             <InstallPrompt />
             <RecaptchaDisclosure />
             <Toaster />
-            {showSplash && <SplashScreen onDone={handleSplashDone} />}
           </LocationProvider> {/* <-- CLOSE LocationProvider HERE */}
         </AuthProvider>
       </TooltipProvider>
