@@ -26,15 +26,34 @@ export interface County {
 // Cache the hierarchy so we only fetch the JSON once
 let hierarchyCache: County[] | null = null;
 const HIERARCHY_SESSION_KEY = "bizmtaani_master_hierarchy";
+
 /**
  * Normalize a location name for comparison.
  *
  * Strips whitespace differences and casing so that variants like
  * "Baba Dogo" (JSON) and "Babadogo" (Google reverse geocoding)
  * are treated as the same ward.
+ *
+ * Also strips apostrophes/hyphens/slashes, since ward names in
+ * MasterHierarchy.json use these inconsistently across near-duplicate
+ * spellings — e.g. "Trans-Nzoia" vs "Trans Nzoia", "Ng'Ararii" vs
+ * "Ngararii", "Chuka/Igambang'Ombe". Without stripping these, two
+ * strings that are clearly "the same place" to a human fail to match
+ * because of a punctuation difference alone (this is exactly what
+ * caused Kitale's alias entries to fail validation — "Trans Nzoia"
+ * vs the JSON's "Trans-Nzoia").
+ *
+ * Exported so every consumer (this file, location.ts, etc.) uses the
+ * same normalization instead of each maintaining its own copy that
+ * can silently drift out of sync.
  */
-function normalize(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, "");
+export function normalize(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['''`]/g, "")   // apostrophes: straight, curly (both directions), backtick
+    .replace(/[\/\-]/g, " ")  // slashes and hyphens -> space, so word boundaries survive
+    .replace(/\s+/g, "");     // collapse/strip all whitespace
 }
 
 /**
@@ -93,6 +112,7 @@ export async function getLocationHierarchy(): Promise<County[]> {
     clearTimeout(timeoutId);
   }
 }
+
 /**
  * Find a ward in the already-loaded hierarchy.
  *
@@ -128,7 +148,7 @@ export function findWardLocationSync(
   ) {
     for (const county of hierarchyCache) {
       if (
-        county.county_name.trim().toLowerCase() !==
+        normalize(county.county_name) !==
         normalizedCounty
       ) {
         continue;
@@ -136,9 +156,7 @@ export function findWardLocationSync(
 
       for (const constituency of county.constituencies) {
         if (
-          constituency.constituency_name
-            .trim()
-            .toLowerCase() !==
+          normalize(constituency.constituency_name) !==
           normalizedConstituency
         ) {
           continue;
@@ -147,7 +165,7 @@ export function findWardLocationSync(
         const matchingWard =
           constituency.wards.find(
             (ward) =>
-              ward.trim().toLowerCase() ===
+              normalize(ward) ===
               normalizedWard
           );
 
@@ -172,9 +190,7 @@ export function findWardLocationSync(
     for (const county of hierarchyCache) {
       for (const constituency of county.constituencies) {
         if (
-          constituency.constituency_name
-            .trim()
-            .toLowerCase() !==
+          normalize(constituency.constituency_name) !==
           normalizedConstituency
         ) {
           continue;
@@ -183,7 +199,7 @@ export function findWardLocationSync(
         const matchingWard =
           constituency.wards.find(
             (ward) =>
-              ward.trim().toLowerCase() ===
+              normalize(ward) ===
               normalizedWard
           );
 
@@ -209,7 +225,7 @@ export function findWardLocationSync(
       const matchingWard =
         constituency.wards.find(
           (ward) =>
-            ward.trim().toLowerCase() ===
+            normalize(ward) ===
             normalizedWard
         );
 
@@ -244,11 +260,11 @@ export async function getCountyByName(
 ): Promise<County | undefined> {
   const counties = await getLocationHierarchy();
 
-  const normalizedName = countyName.trim().toLowerCase();
+  const normalizedName = normalize(countyName);
 
   return counties.find(
     (county) =>
-      county.county_name.trim().toLowerCase() === normalizedName
+      normalize(county.county_name) === normalizedName
   );
 }
 
@@ -289,11 +305,11 @@ export async function getConstituencyByName(
     return undefined;
   }
 
-  const normalizedName = constituencyName.trim().toLowerCase();
+  const normalizedName = normalize(constituencyName);
 
   return county.constituencies.find(
     (constituency) =>
-      constituency.constituency_name.trim().toLowerCase() ===
+      normalize(constituency.constituency_name) ===
       normalizedName
   );
 }
@@ -321,12 +337,12 @@ export async function findCountyByConstituency(
 ): Promise<County | undefined> {
   const counties = await getLocationHierarchy();
 
-  const normalizedName = constituencyName.trim().toLowerCase();
+  const normalizedName = normalize(constituencyName);
 
   return counties.find((county) =>
     county.constituencies.some(
       (constituency) =>
-        constituency.constituency_name.trim().toLowerCase() ===
+        normalize(constituency.constituency_name) ===
         normalizedName
     )
   );
@@ -344,13 +360,13 @@ export async function findWardLocation(
 } | undefined> {
   const counties = await getLocationHierarchy();
 
-  const normalizedWard = wardName.trim().toLowerCase();
+  const normalizedWard = normalize(wardName);
 
   for (const county of counties) {
     for (const constituency of county.constituencies) {
       const matchingWard = constituency.wards.find(
         (ward) =>
-          ward.trim().toLowerCase() === normalizedWard
+          normalize(ward) === normalizedWard
       );
 
       if (matchingWard) {
@@ -434,11 +450,11 @@ export async function resolveCanonicalLocation(
   const counties = await getLocationHierarchy();
   const normalizedWard = normalize(wardName);
 
-const normalizedConstituency =
-  constituencyName ? normalize(constituencyName) : "";
+  const normalizedConstituency =
+    constituencyName ? normalize(constituencyName) : "";
 
-const normalizedCounty =
-  countyName ? normalize(countyName) : "";
+  const normalizedCounty =
+    countyName ? normalize(countyName) : "";
 
   // ============================================================
   // 1. Exact full hierarchy match
@@ -446,8 +462,8 @@ const normalizedCounty =
 
   for (const county of counties) {
     const countyMatches =
-  !normalizedCounty ||
-  normalize(county.county_name) === normalizedCounty;
+      !normalizedCounty ||
+      normalize(county.county_name) === normalizedCounty;
 
     if (!countyMatches) {
       continue;
@@ -455,9 +471,9 @@ const normalizedCounty =
 
     for (const constituency of county.constituencies) {
       const constituencyMatches =
-  !normalizedConstituency ||
-  normalize(constituency.constituency_name) ===
-    normalizedConstituency;
+        !normalizedConstituency ||
+        normalize(constituency.constituency_name) ===
+          normalizedConstituency;
 
       if (!constituencyMatches) {
         continue;
@@ -493,11 +509,11 @@ const normalizedCounty =
   for (const county of counties) {
     for (const constituency of county.constituencies) {
       const matchingWard =
-  constituency.wards.find(
-    (ward) =>
-      normalize(ward) ===
-      normalizedWard
-  );
+        constituency.wards.find(
+          (ward) =>
+            normalize(ward) ===
+            normalizedWard
+        );
 
       if (matchingWard) {
         return {
@@ -643,4 +659,5 @@ export async function searchCountiesByName(
     .filter((c) => normalize(c.county_name).includes(normalizedQuery))
     .map((c) => ({ countyCode: c.county_code, countyName: c.county_name, constituencies: c.constituencies }))
     .slice(0, limit);
-      }
+}
+
