@@ -2,12 +2,31 @@ import { resolveCanonicalLocation } from './locationHierarchy';
 
 // Single ward towns (1:1 mapping)
 export const TOWN_ALIASES = [
-  { 
-    alias: "ruaka", 
-    ward: "Ndenderu", 
-    constituency: "Kiambaa", 
-    county: "Kiambu" 
-  },
+  { alias: "ruaka", ward: "Ndenderu", constituency: "Kiambaa", county: "Kiambu" },
+  // Nairobi Estates/Areas with non-matching ward names
+  { alias: "buruburu", ward: "Harambee", constituency: "Makadara", county: "Nairobi" },
+  { alias: "south b", ward: "Nairobi South", constituency: "Starehe", county: "Nairobi" },
+  { alias: "madaraka", ward: "Nairobi West", constituency: "Lang'ata", county: "Nairobi" },
+  { alias: "donholm", ward: "Upper Savanna", constituency: "Embakasi East", county: "Nairobi" },
+  { alias: "nyayo estate", ward: "Embakasi", constituency: "Embakasi East", county: "Nairobi" },
+  { alias: "runda", ward: "Karura", constituency: "Westlands", county: "Nairobi" },
+  { alias: "muthaiga", ward: "Karura", constituency: "Westlands", county: "Nairobi" },
+  { alias: "gigiri", ward: "Karura", constituency: "Westlands", county: "Nairobi" },
+  { alias: "hurlingham", ward: "Kilimani", constituency: "Dagoretti North", county: "Nairobi" },
+  { alias: "adams arcade", ward: "Kilimani", constituency: "Dagoretti North", county: "Nairobi" },
+  { alias: "otiende", ward: "Lang'ata", constituency: "Lang'ata", county: "Nairobi" },
+  { alias: "tena", ward: "Harambee", constituency: "Makadara", county: "Nairobi" },
+  { alias: "jericho", ward: "Makongeni", constituency: "Makadara", county: "Nairobi" },
+  { alias: "fedha", ward: "Kware", constituency: "Embakasi South", county: "Nairobi" },
+  { alias: "tassia", ward: "Embakasi", constituency: "Embakasi East", county: "Nairobi" },
+  { alias: "satellite", ward: "Riruta", constituency: "Dagoretti South", county: "Nairobi" },
+  { alias: "mirema", ward: "Roysambu", constituency: "Roysambu", county: "Nairobi" },
+  { alias: "kahawa sukari", ward: "Kahawa", constituency: "Roysambu", county: "Nairobi" },
+  { alias: "industrial area", ward: "Viwandani", constituency: "Makadara", county: "Nairobi" },
+  { alias: "shauri moyo", ward: "Pumwani", constituency: "Kamukunji", county: "Nairobi" },
+  { alias: "greenfields", ward: "Savanna", constituency: "Embakasi East", county: "Nairobi" },
+  { alias: "jacaranda", ward: "Kayole Central", constituency: "Embakasi Central", county: "Nairobi" },
+
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
@@ -24,6 +43,16 @@ export const MULTI_WARD_TOWNS = {
     { ward: "Bidii", constituency: "Kwanza", county: "Trans-Nzoia" },
     { ward: "Kapomboi", constituency: "Kwanza", county: "Trans-Nzoia" },
   ],
+  
+  "lavington": [
+    { ward: "Kileleshwa", constituency: "Dagoretti North", county: "Nairobi" },
+    { ward: "Kitisuru", constituency: "Westlands", county: "Nairobi" },
+  ],
+  "loresho": [
+    { ward: "Mountain View", constituency: "Westlands", county: "Nairobi" },
+    { ward: "Kitisuru", constituency: "Westlands", county: "Nairobi" },
+  ],
+
   // Add more multi-ward towns here
   // "nakuru": [
   //   { ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },
