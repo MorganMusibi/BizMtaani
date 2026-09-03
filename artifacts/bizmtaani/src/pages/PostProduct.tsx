@@ -124,6 +124,7 @@ export default function PostProduct() {
   // every image (and eventually the advert itself) claims the same
   // draft record. Generated once, lazily, on first upload.
   const draftIdRef = useRef<string | null>(null);
+  const pendingProductIdRef = useRef<string | null>(null);
 const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 const isPublishingRef = useRef(false);
 const [, navigate] = useLocation();
@@ -1368,6 +1369,7 @@ county: wardInfo?.county?.trim() || "",
     plan,
     phone: cleanedPhone,
     draftId: draftIdRef.current,
+    productId: pendingProductIdRef.current ?? undefined,
     // Category-specific details
 jobDetails: isJobSeeking
   ? {
@@ -1491,6 +1493,11 @@ try {
       productId: data.productId,
     };
   }
+
+  // Remember this product so a retry (e.g. after the M-Pesa modal's
+  // timeout screen) updates the same pending product instead of
+  // creating a duplicate.
+  pendingProductIdRef.current = data.productId;
 
   // 5. Backend says payment is required
   const stkResult = await initiateStkPush({
