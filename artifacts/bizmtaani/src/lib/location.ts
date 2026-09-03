@@ -6,6 +6,7 @@
  */
 import {
   resolveCanonicalLocation,
+  normalize,
 } from "@/lib/locationHierarchy";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
@@ -265,36 +266,34 @@ export async function getWardCoordinates(
   const features = await loadWards();
   if (!features) return null;
 
-  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "");
-
   const centerOf = (f: WardFeature) => {
     const [minLng, minLat, maxLng, maxLat] = f._bbox;
     return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
   };
 
   // 1. Exact match: ward + constituency + county
-  let matches = features.filter(
-    (f) =>
-      norm(f.properties.ward) === norm(wardName) &&
-      norm(f.properties.constituency) === norm(constituencyName) &&
-      norm(f.properties.county) === norm(countyName)
-  );
-  if (matches.length === 1) return centerOf(matches[0]);
+let matches = features.filter(
+  (f) =>
+    normalize(f.properties.ward) === normalize(wardName) &&
+    normalize(f.properties.constituency) === normalize(constituencyName) &&
+    normalize(f.properties.county) === normalize(countyName)
+);
+if (matches.length === 1) return centerOf(matches[0]);
 
-  // 2. Ward + county only (constituency naming can drift between
-  //    MasterHierarchy.json and the GeoJSON source)
-  matches = features.filter(
-    (f) =>
-      norm(f.properties.ward) === norm(wardName) &&
-      norm(f.properties.county) === norm(countyName)
-  );
-  if (matches.length === 1) return centerOf(matches[0]);
+// 2. Ward + county only (constituency naming can drift between
+//    MasterHierarchy.json and the GeoJSON source)
+matches = features.filter(
+  (f) =>
+    normalize(f.properties.ward) === normalize(wardName) &&
+    normalize(f.properties.county) === normalize(countyName)
+);
+if (matches.length === 1) return centerOf(matches[0]);
 
-  // 3. Ward-only — ONLY safe to use if it's unambiguous (a single
-  //    physical ward with this name in the whole country). If there
-  //    are duplicates, refuse rather than silently picking the wrong one.
-  matches = features.filter((f) => norm(f.properties.ward) === norm(wardName));
-  if (matches.length === 1) return centerOf(matches[0]);
+// 3. Ward-only — ONLY safe to use if it's unambiguous (a single
+//    physical ward with this name in the whole country). If there
+//    are duplicates, refuse rather than silently picking the wrong one.
+matches = features.filter((f) => normalize(f.properties.ward) === normalize(wardName));
+if (matches.length === 1) return centerOf(matches[0]);
 
   return null;
 }
