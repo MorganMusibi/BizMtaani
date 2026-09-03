@@ -38,7 +38,7 @@ export default defineConfig({
     tailwindcss(),
     runtimeErrorOverlay(),
     VitePWA({
-      registerType: "autoUpdate",
+      registerType: "prompt",
       injectRegister: "auto",
       // We manage manifest.json ourselves in public/
       manifest: false,
