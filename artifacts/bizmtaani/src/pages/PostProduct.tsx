@@ -60,7 +60,7 @@ async function uploadImagesLimited(
   async function worker() {
     while (next < files.length) {
       const i = next++;
-      results[i] = await uploadImage(files[i], "product", draftId);
+      results[i] = await uploadImage(files[i], "product", draftId, sig);
     }
   }
 
