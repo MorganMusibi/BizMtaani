@@ -5,7 +5,12 @@ import {
   searchCountiesByName,
   type Constituency,
 } from "@/lib/locationHierarchy";
-import { searchLocationWithWardPicker, type ResolvedLocation } from "@/lib/location";
+import { type ResolvedLocation } from "@/lib/location";
+import {
+  isMultiWardTown as checkIsMultiWardTown,
+  getAllWardsForTown,
+  resolveWardFromAlias,
+} from "@/lib/townAliasMapping";
 import { MapPin, Search, Loader2, ChevronLeft } from "lucide-react";
 
 interface WardMatch {
@@ -73,21 +78,25 @@ export function AreaPickerSheet({
   
   debounceRef.current = setTimeout(async () => {
     // 1. First check if it's a known town alias (Ruaka, Kitale, etc.)
-    const aliasResult = await searchLocationWithWardPicker(trimmed);
-    
-    if (aliasResult.type === 'multi' && aliasResult.locations) {
-      // Multi-ward town (e.g., Kitale)
-      setTownAliasResults(aliasResult.locations);
-      setIsMultiWardTown(true);
-      setWardResults([]);
-      setConstituencyResults([]);
-      setCountyResults([]);
-      setSearching(false);
-      setSearchingAlias(false);
-      return;
-    } else if (aliasResult.type === 'single' && aliasResult.defaultLocation) {
+    if (checkIsMultiWardTown(trimmed)) {
+      const wards = await getAllWardsForTown(trimmed);
+      if (wards && wards.length > 0) {
+        // Multi-ward town (e.g., Kitale)
+        setTownAliasResults(wards);
+        setIsMultiWardTown(true);
+        setWardResults([]);
+        setConstituencyResults([]);
+        setCountyResults([]);
+        setSearching(false);
+        setSearchingAlias(false);
+        return;
+      }
+    }
+
+    const singleMatch = await resolveWardFromAlias(trimmed);
+    if (singleMatch) {
       // Single ward town (e.g., Ruaka → Ndenderu)
-      setTownAliasResults([aliasResult.defaultLocation]);
+      setTownAliasResults([singleMatch]);
       setIsMultiWardTown(false);
       setWardResults([]);
       setConstituencyResults([]);
@@ -96,7 +105,7 @@ export function AreaPickerSheet({
       setSearchingAlias(false);
       return;
     }
-    
+
     // 2. If no alias match, fallback to regular search
     const [wards, constituencies, counties] = await Promise.all([
       searchWardsByName(trimmed, 8),
