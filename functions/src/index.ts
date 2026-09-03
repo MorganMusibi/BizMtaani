@@ -458,6 +458,21 @@ const plan = productData.plan;
 if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
   throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
 }
+  // Supersede any still-pending payment for this same product before
+  // starting a fresh STK push — stops an earlier attempt's callback
+  // (if it lands late, e.g. after a client-side timeout retry) from
+  // also triggering processCompletedPayment.
+  const stalePayments = await db.collection("payments")
+    .where("productId", "==", productId)
+    .where("status", "==", "pending")
+    .get();
+
+  const supersedeBatch = db.batch();
+  stalePayments.docs.forEach((doc) => {
+    supersedeBatch.update(doc.ref, { status: "cancelled" });
+  });
+  if (!stalePayments.empty) await supersedeBatch.commit();
+
   const formattedPhone = normalizePhone(phone);
   const token = await getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
   const ts = mpesaTimestamp();
@@ -516,7 +531,7 @@ export const mpesaCallback = onRequest({ maxInstances: 20 }, async (req, res) =>
         return;
       }
       const existingStatus = snap.data()?.status;
-      if (existingStatus === "completed" || existingStatus === "failed") {
+      if (existingStatus === "completed" || existingStatus === "failed" || existingStatus === "cancelled") {
         return;
       }
 
@@ -1487,7 +1502,7 @@ export const reverseGeocode = onCall(
 export const publishAdvert = onCall({ cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, title, price, imageUrls, draftId, recaptchaToken, ...otherData } = request.data;
+  const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
   await verifyRecaptcha(recaptchaToken, "publish_advert");
   const uid = request.auth.uid;
   
@@ -1592,10 +1607,24 @@ if (activeCountSnap.data().count >= activeAdLimit) {
   // 7. Save Ad — explicitly allowlist every field instead of
   // spreading otherData, so a malicious client can't inject
   // unexpected fields (e.g. verified, isPremium, visibilityScope).
-  let newProductRef;
+  let newProductRef: FirebaseFirestore.DocumentReference | null = null;
+  let reusingExisting = false;
+
+  if (typeof existingProductId === "string" && existingProductId.trim()) {
+    const existingRef = db.collection("products").doc(existingProductId);
+    const existingSnap = await existingRef.get();
+    if (
+      existingSnap.exists &&
+      existingSnap.data()?.sellerId === uid &&
+      existingSnap.data()?.status === "pending_payment"
+    ) {
+      newProductRef = existingRef;
+      reusingExisting = true;
+    }
+  }
 
 try {
-  newProductRef = await db.collection("products").add({
+  const productPayload = {
     title,
     description: typeof otherData.description === "string" ? otherData.description : "",
     price,
@@ -1643,7 +1672,13 @@ try {
     expiringNotified: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
-  });
+  };
+
+  if (reusingExisting && newProductRef) {
+    await newProductRef.update(productPayload);
+  } else {
+    newProductRef = await db.collection("products").add(productPayload);
+  }
 
   } catch (error) {
 
