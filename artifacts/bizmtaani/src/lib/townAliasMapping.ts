@@ -1,4 +1,4 @@
-import { resolveCanonicalLocation } from './locationHierarchy';
+import { resolveCanonicalLocation, normalize } from './locationHierarchy';
 
 // Single ward towns (1:1 mapping)
 export const TOWN_ALIASES = [
@@ -43,7 +43,6 @@ export const MULTI_WARD_TOWNS = {
     { ward: "Bidii", constituency: "Kwanza", county: "Trans-Nzoia" },
     { ward: "Kapomboi", constituency: "Kwanza", county: "Trans-Nzoia" },
   ],
-  
   "lavington": [
     { ward: "Kileleshwa", constituency: "Dagoretti North", county: "Nairobi" },
     { ward: "Kitisuru", constituency: "Westlands", county: "Nairobi" },
@@ -61,6 +60,11 @@ export const MULTI_WARD_TOWNS = {
 } as const;
 
 export type TownAlias = keyof typeof MULTI_WARD_TOWNS;
+
+// All multi-ward town keys, typed. Used instead of direct bracket
+// access (MULTI_WARD_TOWNS[x as TownAlias]) now that lookups go
+// through normalize() rather than an exact object-key match.
+const MULTI_WARD_TOWN_KEYS = Object.keys(MULTI_WARD_TOWNS) as TownAlias[];
 
 // Shape consumed by AreaPickerSheet / location.ts. NOTE: constituency/
 // county here (not constituencyName/countyName) — AreaPickerSheet maps
@@ -113,12 +117,17 @@ async function resolveAndValidate(
   };
 }
 
-// Check if a search term is a known town
+// Check if a search term is a known town — exact match, using the
+// same normalize() as locationHierarchy.ts (strips spaces, apostrophes,
+// hyphens, slashes), so "buru buru" and "buruburu" resolve identically,
+// same as "Trans Nzoia"/"Trans-Nzoia" or "babadogo"/"Baba Dogo" do
+// against MasterHierarchy.
 export async function resolveWardFromAlias(searchTerm: string): Promise<ResolvedLocation | null> {
-  const normalized = searchTerm.trim().toLowerCase();
-  
+  const normalizedQuery = normalize(searchTerm);
+  if (!normalizedQuery) return null;
+
   // 1. Check single ward match first
-  const singleMatch = TOWN_ALIASES.find(a => a.alias === normalized);
+  const singleMatch = TOWN_ALIASES.find(a => normalize(a.alias) === normalizedQuery);
   if (singleMatch) {
     return await resolveAndValidate(
       singleMatch.alias,
@@ -127,41 +136,80 @@ export async function resolveWardFromAlias(searchTerm: string): Promise<Resolved
       singleMatch.county
     );
   }
-  
+
   // 2. Check multi-ward town - return first (central) ward as default
-  const multiWards = MULTI_WARD_TOWNS[normalized as TownAlias];
-  if (multiWards && multiWards.length > 0) {
-    const primary = multiWards[0]; // Hospital ward for Kitale
+  const townKey = MULTI_WARD_TOWN_KEYS.find(k => normalize(k) === normalizedQuery);
+  if (townKey) {
+    const primary = MULTI_WARD_TOWNS[townKey][0]; // Hospital ward for Kitale
     return await resolveAndValidate(
-      normalized,
+      townKey,
       primary.ward,
       primary.constituency,
       primary.county
     );
   }
-  
+
   return null;
 }
 
-// Get ALL wards for a multi-ward town (for the picker UI)
+// Get ALL wards for a multi-ward town (for the picker UI) — exact
+// match via normalize(), same as resolveWardFromAlias above.
 export async function getAllWardsForTown(searchTerm: string): Promise<ResolvedLocation[] | null> {
-  const normalized = searchTerm.trim().toLowerCase();
-  const multiWards = MULTI_WARD_TOWNS[normalized as TownAlias];
-  if (!multiWards) return null;
-  
+  const normalizedQuery = normalize(searchTerm);
+  if (!normalizedQuery) return null;
+
+  const townKey = MULTI_WARD_TOWN_KEYS.find(k => normalize(k) === normalizedQuery);
+  if (!townKey) return null;
+
   const results = await Promise.all(
-    multiWards.map(({ ward, constituency, county }) =>
-      resolveAndValidate(normalized, ward, constituency, county)
+    MULTI_WARD_TOWNS[townKey].map(({ ward, constituency, county }) =>
+      resolveAndValidate(townKey, ward, constituency, county)
     )
   );
-  
+
   // Drop entries that failed validation (typo'd alias data) rather
   // than showing an unverified location in the picker.
   return results.filter((r): r is ResolvedLocation => r !== null);
 }
 
-// Check if a search term is a multi-ward town
+// Check if a search term is a multi-ward town — exact match via normalize().
 export function isMultiWardTown(searchTerm: string): boolean {
-  const normalized = searchTerm.trim().toLowerCase();
-  return normalized in MULTI_WARD_TOWNS;
+  const normalizedQuery = normalize(searchTerm);
+  if (!normalizedQuery) return false;
+  return MULTI_WARD_TOWN_KEYS.some(k => normalize(k) === normalizedQuery);
+}
+
+export interface TownAliasMatch {
+  /** The alias text as stored, for display (e.g. "buruburu", "kitale") */
+  alias: string;
+  isMultiWard: boolean;
+}
+
+/**
+ * Search town aliases by a typed, partial name — for search-as-you-type
+ * autocomplete in the area picker. Same substring + normalize()
+ * approach as searchWardsByName/searchConstituenciesByName in
+ * locationHierarchy.ts, so typing "buru" surfaces "buruburu" as a
+ * suggestion before the full name is typed, and "trans" would surface
+ * "kitale" (matched loosely) the same way "babadogo" partial-matches
+ * "Baba Dogo" in the ward search.
+ *
+ * Returns alias names only — callers resolve each one individually
+ * with resolveWardFromAlias/getAllWardsForTown once the person picks
+ * a suggestion, same as the ward-search flow resolves a picked ward.
+ */
+export function searchTownAliases(queryText: string, limit = 8): TownAliasMatch[] {
+  const trimmed = queryText.trim();
+  if (!trimmed) return [];
+  const normalizedQuery = normalize(trimmed);
+
+  const singleMatches: TownAliasMatch[] = TOWN_ALIASES
+    .filter(a => normalize(a.alias).includes(normalizedQuery))
+    .map(a => ({ alias: a.alias, isMultiWard: false }));
+
+  const multiMatches: TownAliasMatch[] = MULTI_WARD_TOWN_KEYS
+    .filter(k => normalize(k).includes(normalizedQuery))
+    .map(k => ({ alias: k, isMultiWard: true }));
+
+  return [...singleMatches, ...multiMatches].slice(0, limit);
 }
