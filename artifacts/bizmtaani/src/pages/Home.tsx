@@ -207,17 +207,18 @@ export default function Home() {
   const { toast } = useToast();
   
   const { 
-    locationInfo,
-    userCoords,
-    gpsGranted,
-    gpsReady,
-    setLocationInfo,
-    setUserCoords,
-    setGpsGranted,
-    setGpsReady,
-    refreshLocation,
-    isLocationLoading
-  } = useLocationContext();
+  locationInfo,
+  userCoords,
+  gpsGranted,
+  gpsReady,
+  setLocationInfo,
+  setUserCoords,
+  setGpsGranted,
+  setGpsReady,
+  refreshLocation,
+  isLocationLoading,
+  needsLocationPrompt, 
+} = useLocationContext();
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
   
@@ -339,7 +340,14 @@ useEffect(() => {
   return () => { cancelled = true; };
 }, []);
 
-  const [activeKey, setActiveKey] = useState("All");
+useEffect(() => {
+  if (needsLocationPrompt && !hasPromptedArea.current) {
+    hasPromptedArea.current = true;
+    setShowAreaPicker(true);
+  }
+}, [needsLocationPrompt]);
+
+const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
