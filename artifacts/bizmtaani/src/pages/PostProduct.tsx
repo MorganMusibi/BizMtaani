@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield } from "lucide-react";
+import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield, Phone } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { clearFeedCache } from "@/hooks/useHomeFeed";
 import { encodeGeohash } from "@/lib/geohash";
@@ -1285,7 +1285,7 @@ async function handleInitiate(
 
 const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
 
-  if (!isValidKenyanPhone(cleanedPhone)) {
+  if (cleanedPhone && !isValidKenyanPhone(cleanedPhone)) {
     toast({
       title: "Invalid phone number",
       description: "Enter a valid Kenyan mobile number.",
@@ -1551,7 +1551,7 @@ async function handlePublishFree() {
 
   const cleanedPhone = phone.replace(/\s+/g, "").trim();
 
-  if (!isValidKenyanPhone(cleanedPhone)) {
+  if (cleanedPhone && !isValidKenyanPhone(cleanedPhone)) {
     toast({
       title: "Invalid phone number",
       description: "Enter a valid Kenyan mobile number.",
@@ -2042,15 +2042,24 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           />
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(Sio Lazima)</span>
+            </label>
+          </div>
           <Input
             type="tel"
             placeholder="e.g. 0712345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="h-12 text-base"
+            className="h-12 text-base bg-background"
           />
+          <p className="text-xs text-muted-foreground">
+            Customers wanaweza kucontact via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
+        
         </div>
 
       </div>
@@ -2216,15 +2225,24 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+          </div>
           <Input
             type="tel"
             placeholder="e.g. 0712345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="h-12 text-base"
+            className="h-12 text-base bg-background"
           />
+          <p className="text-xs text-muted-foreground">
+            Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
+        
         </div>
 
       </div>
@@ -2343,15 +2361,24 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         )}
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+          </div>
           <Input
             type="tel"
             placeholder="e.g. 0712345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="h-12 text-base"
+            className="h-12 text-base bg-background"
           />
+          <p className="text-xs text-muted-foreground">
+            Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
+        
         </div>
 
       </div>
@@ -2472,15 +2499,24 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+          </div>
           <Input
             type="tel"
             placeholder="e.g. 0712345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="h-12 text-base"
+            className="h-12 text-base bg-background"
           />
+          <p className="text-xs text-muted-foreground">
+            Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
+        
         </div>
 
       </div>
@@ -3266,18 +3302,23 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           </div>
         )}
 
-        <div className="space-y-1.5">
-
-          <label className="text-sm font-bold">Contact Phone (WhatsApp) *</label>
-
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+          </div>
           <Input
             type="tel"
             placeholder="e.g. 0712345678"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
-            className="h-12 text-base"
+            className="h-12 text-base bg-background"
           />
-
+          <p className="text-xs text-muted-foreground">
+            Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
         </div>
 
       </div>
