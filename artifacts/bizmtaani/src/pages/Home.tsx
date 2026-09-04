@@ -747,10 +747,12 @@ const handleAreaSearchSelect = useCallback(
 
             <div ref={sentinelRef} className="h-1" />
             {isLoadingMore && (
-              <div className="flex justify-center py-6">
-                <Loader2 size={22} className="animate-spin text-primary" />
-              </div>
-            )}
+          <div className="grid grid-cols-2 gap-3 mt-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+           <ProductCardSkeleton key={`more-${i}`} />
+          ))}
+        </div>
+        )}
 
             {allDone && totalVisible > 0 && (
               <p className="text-center text-xs text-muted-foreground py-6">
