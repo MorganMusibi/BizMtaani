@@ -92,6 +92,18 @@ interface Payout {
   paid: boolean;
 }
 
+interface Payment {
+  id: string;
+  checkoutRequestId?: string;
+  plan?: string;
+  productId?: string;
+  buyerId?: string;
+  status?: "pending" | "completed" | "failed" | "cancelled";
+  confirmedAmountKES?: number | null;
+  failureReason?: string;
+  createdAt?: { seconds: number } | null;
+}
+
 interface LeaderboardEntry {
   id: string;
   referralCode: string | null;
@@ -249,6 +261,16 @@ const [payouts, setPayouts] = useState<Payout[]>([]);
 const [payoutsLoading, setPayoutsLoading] = useState(false);
 const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
 
+  // Payments tab — lazily loaded, matches the pattern used elsewhere
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [paymentsLoaded, setPaymentsLoaded] = useState(false);
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<
+    "all" | "completed" | "pending" | "failed" | "cancelled"
+  >("all");
+
+  // Leaderboard tab — lazily loaded, matches the pattern used elsewhere
+
   // Leaderboard tab — lazily loaded, matches the pattern used elsewhere
 const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
 const [leaderboardLoading, setLeaderboardLoading] = useState(false);
@@ -334,6 +356,22 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
     setPayoutsLoading(false);
   }
 }
+
+  async function loadPayments(force = false) {
+    if (paymentsLoaded && !force) return;
+    setPaymentsLoading(true);
+    try {
+      const snap = await getDocs(
+        query(collection(db, "payments"), orderBy("createdAt", "desc"), limit(50))
+      );
+      setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
+      setPaymentsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load payments:", error);
+    } finally {
+      setPaymentsLoading(false);
+    }
+  }
 
   async function loadLeaderboard() {
   if (leaderboardLoaded) return;
@@ -808,10 +846,11 @@ async function revokeAdmin(targetUser: AdminUser) {
   if (tab === "jobs") loadJobs();
   if (tab === "marketers") loadMarketers();
   if (tab === "applications") loadApplications();
+  if (tab === "payments") loadPayments();
   if (tab === "payouts") loadPayouts(payoutMonth);
   if (tab === "leaderboard") loadLeaderboard();
   if (tab === "auditlog") loadAuditLog();
-}
+  }
 
   // -------------------------------------------------------
   // REPORT ACTIONS
