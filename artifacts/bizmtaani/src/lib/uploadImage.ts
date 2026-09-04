@@ -43,34 +43,8 @@ async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Pro
  *
  * Falls back to the original file if compression fails for any
  * reason (e.g. unsupported format) — never blocks a user's upload.
- *
- * useWebWorker is disabled: on low-RAM Android devices, sustained
- * form interaction (typing, re-renders) can push the tab close to
- * memory limits, and Android's low-memory killer can silently kill
- * background Web Workers — including this compression worker —
- * which can cascade into the upload never properly starting. Running
- * compression on the main thread avoids that failure mode, at the
- * cost of briefly blocking the UI during compression.
  */
-
-  async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
-  // Diagnostic: confirm the File object is still readable before we
-  // attempt anything else. If the underlying file handle has gone
-  // stale (e.g. after the tab was backgrounded for the camera/gallery
-  // picker, then sat unused through the rest of the form), reading
-  // even a tiny slice will throw here — distinctly, before
-  // compression or upload muddy the error.
-  try {
-    await file.slice(0, 1024).arrayBuffer();
-  } catch (err) {
-    console.error("STALE FILE DETECTED — could not read file bytes:", err, {
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-    });
-    throw new Error(`STALE_FILE: ${file.name} could not be read (${err instanceof Error ? err.message : "unknown error"})`);
-  }
-
+async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
   if (file.size < 150 * 1024) return file;
 
   let workingFile = file;
@@ -91,8 +65,8 @@ async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Pro
 
   const options =
     type === "avatar"
-      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: false }
-      : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: false };
+      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
+      : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: true };
 
   try {
     const { default: imageCompression } = await import("browser-image-compression");
