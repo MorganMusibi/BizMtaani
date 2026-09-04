@@ -9,6 +9,7 @@ import { useNotifications } from "@/hooks/useNotifications";
 import { ProfileSetupModal } from "@/components/ProfileSetupModal";
 import { EmailVerificationBanner } from "@/components/EmailVerificationBanner";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { UpdatePrompt } from "@/components/UpdatePrompt";
 import { RecaptchaDisclosure } from "@/components/RecaptchaDisclosure";
 import { lazy, Suspense } from "react";
 import { useLocation } from "wouter";
@@ -127,6 +128,7 @@ function App() {
             {showBottomNav && <BottomNav />}
             <ProfileSetupGate />
             <InstallPrompt />
+            <UpdatePrompt />
             <RecaptchaDisclosure />
             <Toaster />
           </LocationProvider> {/* <-- CLOSE LocationProvider HERE */}
