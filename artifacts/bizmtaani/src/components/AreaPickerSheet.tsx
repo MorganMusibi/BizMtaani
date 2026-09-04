@@ -10,6 +10,7 @@ import {
   isMultiWardTown as checkIsMultiWardTown,
   getAllWardsForTown,
   resolveWardFromAlias,
+  searchTownAliases,
 } from "@/lib/townAliasMapping";
 import { MapPin, Search, Loader2, ChevronLeft } from "lucide-react";
 
@@ -104,6 +105,28 @@ export function AreaPickerSheet({
       setSearching(false);
       setSearchingAlias(false);
       return;
+    }
+
+    // 1c. No exact alias match — try partial/autocomplete suggestions
+    // (e.g. "buru" -> "buruburu") via substring matching.
+    const aliasSuggestions = searchTownAliases(trimmed);
+    if (aliasSuggestions.length > 0) {
+      const resolvedSuggestions = await Promise.all(
+        aliasSuggestions.map((s) => resolveWardFromAlias(s.alias))
+      );
+      const validSuggestions = resolvedSuggestions.filter(
+        (r): r is ResolvedLocation => r !== null
+      );
+      if (validSuggestions.length > 0) {
+        setTownAliasResults(validSuggestions);
+        setIsMultiWardTown(false);
+        setWardResults([]);
+        setConstituencyResults([]);
+        setCountyResults([]);
+        setSearching(false);
+        setSearchingAlias(false);
+        return;
+      }
     }
 
     // 2. If no alias match, fallback to regular search
