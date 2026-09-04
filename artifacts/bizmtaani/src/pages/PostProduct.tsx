@@ -768,7 +768,7 @@ if (isEventListing) {
   ];
 }
   
-function handleImageFiles(files: FileList | null) {
+async function handleImageFiles(files: FileList | null) {
   if (!files) return;
 
   const currentLimit = maxPossiblePhotoLimit;
@@ -781,24 +781,41 @@ function handleImageFiles(files: FileList | null) {
     });
     return;
   }
-  
+
   const toAdd = Array.from(files).slice(0, remaining);
   const oversized = toAdd.filter((f) => f.size > 4 * 1024 * 1024);
-  
+
   if (oversized.length > 0) {
-    toast({ 
-      title: "Some images too large", 
-      description: "Max 4 MB per image.", 
-      variant: "destructive" 
+    toast({
+      title: "Some images too large",
+      description: "Max 4 MB per image.",
+      variant: "destructive"
     });
     return;
   }
-  
-  setImageFiles((prev) => [...prev, ...toAdd]);
-  const previews = toAdd.map((f) => URL.createObjectURL(f));
+
+  // Immediately read each file's bytes into memory and rebuild a new
+  // File from them, while the OS-provided file handle is guaranteed
+  // fresh (right after picking). This "locks in" the image data so
+  // it survives even if Android reclaims the original temp file
+  // later, during the rest of the form flow.
+  const lockedInFiles = await Promise.all(
+    toAdd.map(async (f) => {
+      try {
+        const buffer = await f.arrayBuffer();
+        return new File([buffer], f.name, { type: f.type });
+      } catch (err) {
+        console.error("Failed to lock in file immediately after selection:", err);
+        return f; // fall back to the original if this somehow fails
+      }
+    })
+  );
+
+  setImageFiles((prev) => [...prev, ...lockedInFiles]);
+  const previews = lockedInFiles.map((f) => URL.createObjectURL(f));
   setImagePreviews((prev) => [...prev, ...previews]);
 }
-
+  
   function removeImage(i: number) {
     URL.revokeObjectURL(imagePreviews[i]);
     setImageFiles((prev) => prev.filter((_, idx) => idx !== i));
