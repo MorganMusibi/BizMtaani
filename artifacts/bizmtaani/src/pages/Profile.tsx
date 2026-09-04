@@ -86,7 +86,6 @@ const [businessAddress, setBusinessAddress] = useState(userProfile?.businessAddr
 const [socialMediaLink, setSocialMediaLink] = useState(userProfile?.socialMediaLink ?? "");
 const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
 
-const [showBusinessDetailsForm, setShowBusinessDetailsForm] = useState(false);
   const [showMarketerForm, setShowMarketerForm] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
   const [marketerFullName, setMarketerFullName] = useState("");
