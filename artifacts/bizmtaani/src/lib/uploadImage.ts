@@ -52,7 +52,25 @@ async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Pro
  * compression on the main thread avoids that failure mode, at the
  * cost of briefly blocking the UI during compression.
  */
-async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
+
+  async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
+  // Diagnostic: confirm the File object is still readable before we
+  // attempt anything else. If the underlying file handle has gone
+  // stale (e.g. after the tab was backgrounded for the camera/gallery
+  // picker, then sat unused through the rest of the form), reading
+  // even a tiny slice will throw here — distinctly, before
+  // compression or upload muddy the error.
+  try {
+    await file.slice(0, 1024).arrayBuffer();
+  } catch (err) {
+    console.error("STALE FILE DETECTED — could not read file bytes:", err, {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+    });
+    throw new Error(`STALE_FILE: ${file.name} could not be read (${err instanceof Error ? err.message : "unknown error"})`);
+  }
+
   if (file.size < 150 * 1024) return file;
 
   let workingFile = file;
