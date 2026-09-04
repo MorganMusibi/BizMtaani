@@ -38,7 +38,7 @@ const PAGE_SIZE = 15;
 const PREFIX_FETCH_SIZE = 15; // per-prefix page size for the fan-out
 const JOBS_RADIUS_KM = 30;
 
-const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+export const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
 const MAX_CACHED_KEYS = 6;
 
