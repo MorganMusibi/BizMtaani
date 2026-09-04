@@ -70,19 +70,38 @@ export default function PostJob() {
     // job posting is worse than none, since it's shown to applicants
     // and never re-detected after posting.
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
+  async (pos) => {
+    try {
+      const info = await getWardInfo(pos.coords.latitude, pos.coords.longitude);
+      if (info) {
         setWard(info.wardName);
         setCounty(info.county);
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      () => {
+      } else {
+        // Coordinates didn't resolve to a known ward — still keep the
+        // raw coordinates so distance-based matching still works, but
+        // don't guess a ward/county name.
+        setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         setLocationFailed(true);
-      },
-      { timeout: 8000, maximumAge: 0 }
-    );
+      }
+    } catch (error) {
+      console.warn("Failed to resolve ward info:", error);
+      setLocationFailed(true);
+    }
+  },
+  () => {
+    setLocationFailed(true);
+  },
+  { timeout: 8000, maximumAge: 0 }
+);
   }
 }, [user, userProfile, navigate]);
+
+  useEffect(() => {
+  if (!company && userProfile) {
+    setCompany(userProfile.businessName || userProfile.displayName || "");
+  }
+}, [userProfile]);
 
   async function handleAreaPicked(area: {
     wardName: string;
