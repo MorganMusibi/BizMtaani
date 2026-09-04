@@ -78,7 +78,15 @@ export default function Profile() {
       });
     });
   }, [user]);
+  
+const [showBusinessDetailsForm, setShowBusinessDetailsForm] = useState(false);
+const [businessDescription, setBusinessDescription] = useState(userProfile?.businessDescription ?? "");
+const [openingHours, setOpeningHours] = useState(userProfile?.openingHours ?? "");
+const [businessAddress, setBusinessAddress] = useState(userProfile?.businessAddress ?? "");
+const [socialMediaLink, setSocialMediaLink] = useState(userProfile?.socialMediaLink ?? "");
+const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
 
+const [showBusinessDetailsForm, setShowBusinessDetailsForm] = useState(false);
   const [showMarketerForm, setShowMarketerForm] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
   const [marketerFullName, setMarketerFullName] = useState("");
@@ -136,6 +144,31 @@ export default function Profile() {
   }
 }
 
+  async function handleSaveBusinessDetails() {
+  if (!user) return;
+
+  setSavingBusinessDetails(true);
+
+  try {
+    await updateDoc(doc(db, "users", user.uid), {
+      businessDescription: businessDescription.trim(),
+      openingHours: openingHours.trim(),
+      businessAddress: businessAddress.trim(),
+      socialMediaLink: socialMediaLink.trim(),
+    });
+
+    toast({ title: "Business details updated" });
+    setShowBusinessDetailsForm(false);
+  } catch (error) {
+    toast({
+      title: "Could not save details",
+      description: "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setSavingBusinessDetails(false);
+  }
+  }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -533,6 +566,94 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           </button>
         )}
         </div>
+
+        {/* Business details — shown on the seller's shop catalogue */}
+{isBusinessOwner && (
+  <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <p className="font-black text-sm">Shop Details</p>
+      {!showBusinessDetailsForm && (
+        <button
+          onClick={() => setShowBusinessDetailsForm(true)}
+          className="text-xs font-semibold text-primary"
+        >
+          Edit
+        </button>
+      )}
+    </div>
+
+    {showBusinessDetailsForm ? (
+      <div className="space-y-3">
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">Shop Description</label>
+          <textarea
+            placeholder="e.g. Family-run electronics shop since 2019, specializing in phone repairs..."
+            value={businessDescription}
+            onChange={(e) => setBusinessDescription(e.target.value)}
+            maxLength={300}
+            className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[70px]"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">Opening Hours</label>
+          <input
+            type="text"
+            placeholder="e.g. Mon–Sat, 8am–6pm"
+            value={openingHours}
+            onChange={(e) => setOpeningHours(e.target.value)}
+            className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">Address / Landmark</label>
+          <input
+            type="text"
+            placeholder="e.g. Karibu na Mama watoto supermarket, Kasarani"
+            value={businessAddress}
+            onChange={(e) => setBusinessAddress(e.target.value)}
+            className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">Social Media Link (Optional)</label>
+          <input
+            type="text"
+            placeholder="e.g. instagram.com/yourshop"
+            value={socialMediaLink}
+            onChange={(e) => setSocialMediaLink(e.target.value)}
+            className="w-full h-11 mt-1 px-3 rounded-xl border border-border bg-background text-sm"
+          />
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBusinessDetailsForm(false)}
+            className="flex-1 h-9 rounded-xl border border-border text-sm font-semibold text-muted-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveBusinessDetails}
+            disabled={savingBusinessDetails}
+            className="flex-1 h-9 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-1"
+          >
+            {savingBusinessDetails ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <div className="text-xs text-muted-foreground space-y-1">
+        {businessDescription ? <p>{businessDescription}</p> : <p className="italic">No description added yet</p>}
+        {openingHours && <p>🕒 {openingHours}</p>}
+        {businessAddress && <p>📍 {businessAddress}</p>}
+      </div>
+    )}
+  </div>
+)}
+        
         {/* Business management — only for business owners */}
         {isBusinessOwner && (
           <button
