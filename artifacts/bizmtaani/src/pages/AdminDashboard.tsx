@@ -995,6 +995,11 @@ async function dismissSupportReport(reportId: string) {
     return null;
   }
 
+  const filteredPayments =
+    paymentStatusFilter === "all"
+      ? payments
+      : payments.filter((p) => p.status === paymentStatusFilter);
+
   const stats = [
     { title: "Total Users", value: totalUsers, icon: Users },
     { title: "Active Adverts", value: activeAdverts, icon: Package },
@@ -1950,9 +1955,112 @@ async function dismissSupportReport(reportId: string) {
 )}
           
            {activeTab === "payments" && (
-            <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-              Payment history view coming soon.
-            </div>
+            <>
+              <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h2 className="text-2xl font-bold">Payments</h2>
+                  <p className="mt-1 text-muted-foreground">Most recent 50 M-Pesa payment attempts.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => loadPayments(true)}
+                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+
+              <div className="mb-4 flex gap-2 flex-wrap">
+                {(["all", "completed", "pending", "failed", "cancelled"] as const).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setPaymentStatusFilter(status)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-colors ${
+                      paymentStatusFilter === status
+                        ? "bg-primary text-white"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
+
+              {paymentsLoading ? (
+                <div className="flex justify-center py-16">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                </div>
+              ) : filteredPayments.length === 0 ? (
+                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
+                  No payments found{paymentStatusFilter !== "all" ? ` with status "${paymentStatusFilter}"` : ""}.
+                </div>
+              ) : (
+                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Checkout ID</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Plan</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Amount</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Product</th>
+                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredPayments.map((p) => (
+                        <tr key={p.id} className="border-t border-border">
+                          <td className="px-4 py-2.5 font-mono text-xs">{p.id.slice(0, 14)}…</td>
+                          <td className="px-4 py-2.5 text-muted-foreground">{p.plan ?? "—"}</td>
+                          <td className="px-4 py-2.5 font-semibold">
+                            {p.confirmedAmountKES != null ? `KES ${p.confirmedAmountKES.toLocaleString()}` : "—"}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <span
+                              className={`text-xs font-semibold capitalize ${
+                                p.status === "completed"
+                                  ? "text-[#00A651]"
+                                  : p.status === "failed"
+                                  ? "text-destructive"
+                                  : p.status === "cancelled"
+                                  ? "text-muted-foreground"
+                                  : "text-amber-600"
+                              }`}
+                            >
+                              {p.status ?? "unknown"}
+                            </span>
+                            {p.status === "failed" && p.failureReason && (
+                              <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[160px] truncate" title={p.failureReason}>
+                                {p.failureReason}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {p.productId ? (
+                              <a
+                                href={`/product/${p.productId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs font-semibold text-primary hover:underline"
+                              >
+                                View
+                              </a>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{timeAgo(p.createdAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
 
           {activeTab === "auditlog" && isOwner && (
