@@ -90,6 +90,10 @@ priceList?: {
     displayName?: string;
     businessName?: string;
     isBusinessOwner?: boolean;
+    businessDescription?: string;
+    openingHours?: string;
+    businessAddress?: string;
+    socialMediaLink?: string;
     homeLocation?: { areaName?: string; county?: string };
   } | null;
   timestamp: number;
@@ -316,14 +320,18 @@ export default function ShopCatalogue() {
     lng: number;
   } | null>(null);
   const [sellerProfile, setSellerProfile] = useState<{
-    displayName?: string;
-    businessName?: string;
-    isBusinessOwner?: boolean;
-    homeLocation?: {
-      areaName?: string;
-      county?: string;
-    };
-  } | null>(null);
+  displayName?: string;
+  businessName?: string;
+  isBusinessOwner?: boolean;
+  businessDescription?: string;
+  openingHours?: string;
+  businessAddress?: string;
+  socialMediaLink?: string;
+  homeLocation?: {
+    areaName?: string;
+    county?: string;
+  };
+} | null>(null);
 
   const isOwn =
     user?.uid === userId;
@@ -840,6 +848,42 @@ useEffect(() => {
             )}
           </div>
         </div>
+
+        {sellerProfile?.businessDescription && (
+          <p className="text-sm text-muted-foreground">
+            {sellerProfile.businessDescription}
+          </p>
+        )}
+
+        {(sellerProfile?.openingHours || sellerProfile?.businessAddress || sellerProfile?.socialMediaLink) && (
+          <div className="bg-muted/40 rounded-xl px-3 py-2.5 space-y-1.5 text-xs">
+            {sellerProfile?.openingHours && (
+              <p className="flex items-center gap-1.5">
+                <span>🕒</span>
+                <span className="text-foreground font-medium">{sellerProfile.openingHours}</span>
+              </p>
+            )}
+            {sellerProfile?.businessAddress && (
+              <p className="flex items-center gap-1.5">
+                <MapPin size={12} className="flex-shrink-0" />
+                <span className="text-foreground font-medium">{sellerProfile.businessAddress}</span>
+              </p>
+            )}
+            {sellerProfile?.socialMediaLink && (
+              <p className="flex items-center gap-1.5">
+                <span>🔗</span>
+                <a
+                  href={sellerProfile.socialMediaLink.startsWith("http") ? sellerProfile.socialMediaLink : `https://${sellerProfile.socialMediaLink}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary font-medium underline underline-offset-2"
+                >
+                  {sellerProfile.socialMediaLink}
+                </a>
+              </p>
+            )}
+          </div>
+        )}
 
         {/* ------------------------------------------------------
             CONTACT BUTTONS
