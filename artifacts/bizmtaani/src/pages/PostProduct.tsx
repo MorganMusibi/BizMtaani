@@ -1778,7 +1778,7 @@ toast({
     title: "Failed to publish",
     description: getFirebaseErrorMessage(
       error,
-      "Unable to publish your advert using your Premium subscription. Please try again."
+      "Unable to publish your advert using your Premium subscription. please jaribu tena."
     ),
     variant: "destructive",
   });
@@ -2057,7 +2057,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             className="h-12 text-base bg-background"
           />
           <p className="text-xs text-muted-foreground">
-            Customers wanaweza kucontact via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+            Interested persons wanaweza waka kucontact via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
         
         </div>
@@ -3317,7 +3317,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             className="h-12 text-base bg-background"
           />
           <p className="text-xs text-muted-foreground">
-            Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+            Customers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
         </div>
 
@@ -3399,7 +3399,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               <div>
                 <label className="text-sm font-bold">Other Products / Services (Optional)</label>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Selling more than one thing? List other items with their prices — buyers will see a "View other items" option on this advert.
+                  Selling more than one item? List other items with their prices — buyers will see a "View other items" option on this advert.
                 </p>
               </div>
 
@@ -3407,7 +3407,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border">
                   {priceListItems.map((item, i) => (
                     <div key={i} className="flex items-center px-4 py-2.5 gap-2">
-                      <span className="flex-1 text-sm font-medium">{item.name}</span>
+                      <span className="flex-1 min-w-0 text-base font-bold truncate">{item.name}</span>
                       <span className="text-sm font-bold text-primary">
                         {item.priceType === "contact"
                           ? "Contact for Price"
@@ -3428,19 +3428,20 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               )}
 
               <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground">Item name</label>
                 <Input
-                  placeholder="Item name e.g. Bread, Haircut, T-shirt"
+                  placeholder="e.g. Bikini, T-shirt"
                   value={newPriceListItem.name}
                   onChange={(e) =>
                     setNewPriceListItem((prev) => ({ ...prev, name: e.target.value }))
                   }
-                  className="h-9 text-sm"
+                  className="h-11 text-sm font-semibold"
                 />
 
                 <div className="flex gap-2">
                   {[
                     { value: "fixed", label: "Fixed Price" },
-                    { value: "contact", label: "Contact for Price" },
+                    { value: "contact", label: "DM for Price" },
                     { value: "custom", label: "Custom label" },
                   ].map((option) => (
                     <button
@@ -3480,7 +3481,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   {newPriceListItem.priceType === "custom" && (
                     <Input
                       type="text"
-                      placeholder="e.g. 30 pekee, @20, 20/=, Mbao pekee"
+                      placeholder="e.g. Thatee, @20"
                       value={newPriceListItem.priceText}
                       onChange={(e) =>
                         setNewPriceListItem((prev) => ({ ...prev, priceText: e.target.value }))
@@ -3529,7 +3530,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
   onClick={() => setShowAreaPicker(true)}
   className="w-full h-10 text-sm"
 >
-  Search a different area
+  Search mtaa different
 </Button>
               {locationName && locationName !== wardInfo?.wardName && (
                 <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
@@ -3562,7 +3563,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             </p>
 
             <p className="text-sm text-muted-foreground">
-              Your subscription is active.
+              Your subscription iko active.
             </p>
           </div>
         </div>
@@ -3579,8 +3580,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
   onClick={() => {
     if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
       toast({
-        title: "Free plan allows only 1 photo per advert",
-        description: "Remove extra photos, or choose Weekly or Monthly Premium.",
+        title: "Bwerere plan allows only 1 pic per advert",
+        description: "Toa extra photos, au choose Weekly ama Monthly Premium.",
         variant: "destructive",
       });
       return;
@@ -3593,7 +3594,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Free</span>
   <p className="text-sm text-muted-foreground">Up to 3 adverts with maximum of 1 photo each · Live for 7 days</p>
-  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a shorter radius</p>
+  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a short radius (⚠️ WEAK Visibility)</p>
 </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
       </div>
@@ -3601,7 +3602,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       {plan === "free" && (
         <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-3">
           <p className="text-xs text-muted-foreground">
-            Upgrade to reach up to 30km radius Visibility and rank higher in the feed
+            Upgrade to reach up to 30km radius + boosted Visibility and rank higher in the feed
           </p>
           <button
             type="button"
@@ -3624,7 +3625,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Weekly Premium</span>
   <p className="text-sm text-muted-foreground">Up to 5 adverts with maximum of 3 photos each · Live for 7 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to a WIDE audience (boosted💪)</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 3x more photos build customer trust, reach more people within a short time, and rank higher — get noticed and sell chap chap</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
       </div>
@@ -3636,7 +3637,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         <div>
   <span className="font-black text-base">Monthly Premium</span>
   <p className="text-sm text-muted-foreground">Up to 8 adverts with maximum of 3 photos each · Live for 30 days</p>
-  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>Visible to a WIDE audience (boosted💪)</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 Sasa hii ndio BEST: stay live 4x longer with 3x more photos, wider 30KM+ reach, and top the ranking by reaching more people instantly</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
       </div>
@@ -3673,7 +3674,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               {/* ========== STEP 5: Review and Publish ========== */}
         {step === 5 && (
           <div className="space-y-6 py-2">
-            <h2 className="font-black text-lg">Review your advert</h2>
+            <h2 className="font-black text-lg">Review advert yako</h2>
             
             {/* Summary Card */}
             <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
@@ -3956,7 +3957,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               </button>
               <button type="button" onClick={() => { setShowImageMenu(false); fileRef.current?.click(); }}
                 className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
-                <Camera size={20} className="text-primary" />Choose from gallery
+                <Camera size={20} className="text-primary" />Chagua from gallery
               </button>
               <button type="button" onClick={() => setShowImageMenu(false)}
                 className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground">
@@ -3998,7 +3999,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             </div>
             
             <div className="text-center space-y-1">
-              <h3 className="font-black text-lg">Listing Limit Reached</h3>
+              <h3 className="font-black text-lg">Oops! Listing Limit Reached</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {limitModalMessage}
               </p>
