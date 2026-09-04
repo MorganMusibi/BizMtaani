@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocationContext } from "@/contexts/LocationContext";
 import { useToast } from "@/hooks/use-toast";
 import { LocationBanner } from "@/components/LocationBanner";
+import { getWardInfo } from "@/lib/location";
 import { findWardLocationSync } from "@/lib/locationHierarchy";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
@@ -32,6 +33,7 @@ export default function CategoryAds() {
   setLocationInfo,
   setUserCoords,
   setGpsReady,
+  setGpsGranted,
 } = useLocationContext();
 
   const catDef = categoryKey ? getCategoryDef(decodeURIComponent(categoryKey)) : undefined;
@@ -45,6 +47,10 @@ export default function CategoryAds() {
   const [showRefreshOptions, setShowRefreshOptions] = useState(false);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
+
+  const refreshFailureTimestampsRef = useRef<number[]>([]);
+  const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
+  const REFRESH_FAILURE_THRESHOLD = 3;
 
   // Hierarchy loading
   useEffect(() => {
@@ -118,19 +124,74 @@ const handleAreaSelect = useCallback(
     [handleAreaSelect, toast]
   );
 
-  // Refresh location handler with toast for same ward
-  const handleRefreshLocation = useCallback(async () => {
-    setRefreshingLocation(true);
-    try {
-      await refreshLocation();
-      // After refresh, check if location changed
-      // The toast is handled inside the context's refreshLocation
-    } catch (error) {
-      setLocationErrorMsg("Failed to refresh location. Please try again.");
-    } finally {
-      setRefreshingLocation(false);
+// Refresh location handler — calls the browser API directly (rather
+  // than the context's refreshLocation, whose error path never rejects)
+  // so a real permission/GPS failure actually reaches the user.
+  const handleRefreshLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationErrorMsg("Your browser doesn't support location. Please search your area manually.");
+      return;
     }
-  }, [refreshLocation]);
+    setRefreshingLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setGpsGranted(true);
+        setLocationErrorMsg(null);
+        const resolved = await getWardInfo(lat, lng);
+
+        if (resolved) {
+          setLocationInfo(resolved);
+          setUserCoords([lat, lng]);
+        } else {
+          setUserCoords([lat, lng]);
+        }
+
+        setRefreshingLocation(false);
+      },
+      (error) => {
+        console.warn("Manual location refresh failed:", error);
+        setRefreshingLocation(false);
+
+        const isGpsUnavailable =
+          error.code === error.PERMISSION_DENIED ||
+          error.code === error.POSITION_UNAVAILABLE;
+
+        if (isGpsUnavailable) {
+          const now = Date.now();
+          const recent = refreshFailureTimestampsRef.current.filter(
+            (t) => now - t < REFRESH_FAILURE_WINDOW_MS
+          );
+          recent.push(now);
+          refreshFailureTimestampsRef.current = recent;
+
+          if (recent.length >= REFRESH_FAILURE_THRESHOLD) {
+            refreshFailureTimestampsRef.current = [];
+            setLocationErrorMsg(null);
+            setShowAreaPicker(true);
+            setRefreshingLocation(false);
+            return;
+          }
+        }
+
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationErrorMsg(
+            "Location yako iko off. Enda browser settings uka i turn ON, kisha ujaribu tena."
+          );
+        } else if (error.code === error.POSITION_UNAVAILABLE) {
+          setLocationErrorMsg(
+            "GPS yako iko off msee. Iwashe kwa phone settings, kisha ujaribu tena."
+          );
+        } else {
+          setLocationErrorMsg(
+            "location yako haipatikani sahii. Jaribu tena in a fewww!."
+          );
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  }, [setGpsGranted, setLocationInfo, setUserCoords]);
 
   // Use the shared hook!
   const {
