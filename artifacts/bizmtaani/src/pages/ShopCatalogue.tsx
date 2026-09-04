@@ -796,6 +796,14 @@ useEffect(() => {
                   Business
                 </span>
               )}
+              {isOwn && (
+  <Link
+    href="/profile"
+    className="flex-shrink-0 text-[10px] font-bold text-primary underline underline-offset-2"
+  >
+    Edit
+  </Link>
+)}
             </div>
 
             {(sellerWard ||
