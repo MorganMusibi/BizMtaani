@@ -232,7 +232,10 @@ export default function Home() {
   const REFRESH_FAILURE_THRESHOLD = 3;
 
   const handleRefreshLocation = useCallback(() => {
-    if (!navigator.geolocation) return;
+    if (!navigator.geolocation) {
+      setLocationErrorMsg("Your browser doesn't support location. Please search your area manually.");
+      return;
+    }
     setRefreshingLocation(true);
     navigator.geolocation.getCurrentPosition(
       async (position) => {
@@ -605,7 +608,7 @@ const handleAreaSearchSelect = useCallback(
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="text-xs font-semibold text-amber-900 dark:text-amber-200">
-                Tunahitaji Location Yako 📍
+                We need Location Yako 📍
               </p>
               <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
                 {locationErrorMsg}
