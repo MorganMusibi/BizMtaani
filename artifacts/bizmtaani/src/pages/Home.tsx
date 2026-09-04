@@ -136,6 +136,7 @@ const ProductCard = memo(function ProductCard({
       data-testid={`product-card-${product.id}`}
       onClick={onClick}
       className="bg-card rounded-2xl border border-border overflow-hidden cursor-pointer active:scale-[0.98] transition-transform shadow-sm"
+      style={{ contentVisibility: "auto", containIntrinsicSize: "0 220px" }}
     >
       <div className="relative">
         {product.plan?.startsWith("premium") && (
