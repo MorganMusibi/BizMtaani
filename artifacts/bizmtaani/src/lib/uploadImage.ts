@@ -43,6 +43,14 @@ async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Pro
  *
  * Falls back to the original file if compression fails for any
  * reason (e.g. unsupported format) — never blocks a user's upload.
+ *
+ * useWebWorker is disabled: on low-RAM Android devices, sustained
+ * form interaction (typing, re-renders) can push the tab close to
+ * memory limits, and Android's low-memory killer can silently kill
+ * background Web Workers — including this compression worker —
+ * which can cascade into the upload never properly starting. Running
+ * compression on the main thread avoids that failure mode, at the
+ * cost of briefly blocking the UI during compression.
  */
 async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
   if (file.size < 150 * 1024) return file;
@@ -65,8 +73,8 @@ async function compressImageBeforeUpload(file: File, type: ImageUploadType): Pro
 
   const options =
     type === "avatar"
-      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: true }
-      : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: true };
+      ? { maxSizeMB: 0.3, maxWidthOrHeight: 512, useWebWorker: false }
+      : { maxSizeMB: 0.4, maxWidthOrHeight: 1280, useWebWorker: false };
 
   try {
     const { default: imageCompression } = await import("browser-image-compression");
