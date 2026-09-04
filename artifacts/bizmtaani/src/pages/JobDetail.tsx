@@ -17,7 +17,7 @@ import {
   startJobApplicationChat,
   type ChatParticipant,
 } from "@/lib/chatService";
-import { clearJobsCache, jobsCache, type JobPost } from "./Jobs";
+import { clearJobsCache, jobsCache, JOBS_CACHE_TTL_MS, type JobPost } from "./Jobs";
 
 // Helper function needed for your component
 function timeAgo(seconds: number): string {
@@ -53,8 +53,9 @@ useEffect(() => {
       // Reuse data already fetched by the Jobs feed instead of an
       // extra Firestore read, if it's sitting in the feed's cache.
       const cachedMatch = [...jobsCache.values()]
+        .filter((entry) => Date.now() - entry.timestamp < JOBS_CACHE_TTL_MS)
         .flatMap((entry) => entry.jobs)
-        .find((j) => j.id === params.id) as JobPost | undefined;
+        .find((j) => j.id === params.id);
 
       if (cachedMatch) {
         setJob(cachedMatch);
