@@ -34,6 +34,19 @@ const FILTER_CHIPS = [
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
 ];
 
+function ProductCardSkeleton() {
+  return (
+    <div className="bg-card rounded-2xl border border-border overflow-hidden animate-pulse">
+      <div className="w-full aspect-square bg-muted" />
+      <div className="px-3 py-2.5 space-y-2">
+        <div className="h-3.5 bg-muted rounded w-4/5" />
+        <div className="h-3.5 bg-muted rounded w-3/5" />
+        <div className="h-2.5 bg-muted rounded w-2/5" />
+      </div>
+    </div>
+  );
+}
+
 const ProductCard = memo(function ProductCard({
   product,
   userCoords,
@@ -644,11 +657,14 @@ const handleAreaSearchSelect = useCallback(
 
         {/* Show loading spinner while initial loading and no products yet */}
         {initialLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 gap-3">
-            <Loader2 size={28} className="animate-spin text-primary" />
-            <p className="text-sm text-muted-foreground">Finding nearby adverts...</p>
-          </div>
-        ) : totalVisible === 0 ? (
+  <div className="px-3 pt-3 pb-24">
+    <div className="grid grid-cols-2 gap-3">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <ProductCardSkeleton key={i} />
+      ))}
+    </div>
+  </div>
+) : totalVisible === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 px-6">
             <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center">
               <Package size={36} className="text-muted-foreground" />
