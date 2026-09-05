@@ -18,6 +18,7 @@ interface WardMatch {
   wardName: string;
   constituencyName: string;
   countyName: string;
+  label?: string;
 }
 
 interface Props {
