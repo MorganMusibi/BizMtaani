@@ -27,31 +27,10 @@ export async function registerForNotifications(uid: string): Promise<void> {
 
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
 
-    // Pass Firebase config into the service worker so it can
-    // initialize its own Firebase app instance for background messages.
-    registration.active?.postMessage({
-      type: "FIREBASE_CONFIG",
-      config: {
-        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-        appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      },
-    });
-
-    const token = await getToken(messaging, {
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: registration,
-    });
-
-    if (!token) return;
-
-    await setDoc(doc(db, "fcmTokens", uid), {
-      token,
-      updatedAt: new Date().toISOString(),
-    });
+const token = await getToken(messaging, {
+  vapidKey: VAPID_KEY,
+  serviceWorkerRegistration: registration,
+});
 
     // Foreground messages (app open, tab focused) — service worker's
     // onBackgroundMessage only fires when the tab isn't focused, so
