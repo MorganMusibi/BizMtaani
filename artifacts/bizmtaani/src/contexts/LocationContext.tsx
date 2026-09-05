@@ -17,6 +17,7 @@ interface LocationContextType {
   /** True once resolution has settled (profile/cache/GPS/5s cap) and
    * still found nothing — UI should prompt for GPS or manual entry. */
   needsLocationPrompt: boolean;
+  setNeedsLocationPrompt: (value: boolean) => void;
 }
 
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
@@ -222,6 +223,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       refreshLocation,
       isLocationLoading,
       needsLocationPrompt,
+      setNeedsLocationPrompt,
     }}>
       {children}
     </LocationContext.Provider>
