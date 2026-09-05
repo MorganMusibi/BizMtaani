@@ -712,14 +712,14 @@ const handleAreaSearchSelect = useCallback(
         </div>
         <p className="font-bold text-base">You're offline</p>
         <p className="text-sm text-muted-foreground">
-          Check your internet connection and try again.
+          Check your mneti connection and try again.
         </p>
       </div>
     ) : (
       <>
         {loadingTooLong && (
           <p className="text-center text-xs text-muted-foreground mb-3">
-            This is taking longer than usual — check your connection.
+            This is taking longer than usual — check your mnetii connection.
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -812,13 +812,22 @@ const handleAreaSearchSelect = useCallback(
             )}
 
             <div ref={sentinelRef} className="h-1" />
-            {isLoadingMore && (
-          <div className="grid grid-cols-2 gap-3 mt-3">
-          {Array.from({ length: 4 }).map((_, i) => (
-           <ProductCardSkeleton key={`more-${i}`} />
-          ))}
-        </div>
-        )}
+{isLoadingMore && (
+  isOffline ? (
+    <div className="flex flex-col items-center justify-center py-8 gap-2 text-center px-6">
+      <p className="text-sm font-semibold text-amber-700">You're offline</p>
+      <p className="text-xs text-muted-foreground">
+        Check your Mneti connection to load more.
+      </p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-2 gap-3 mt-3">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <ProductCardSkeleton key={`more-${i}`} />
+      ))}
+    </div>
+  )
+)}
 
             {allDone && totalVisible > 0 && (
               <p className="text-center text-xs text-muted-foreground py-6">
