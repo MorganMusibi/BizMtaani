@@ -36,14 +36,20 @@ const token = await getToken(messaging, {
     // onBackgroundMessage only fires when the tab isn't focused, so
     // this handles the case where the user is actively using the app.
     onMessage(messaging, (payload) => {
-      const { title, body } = payload.notification ?? {};
-      if (Notification.permission === "granted") {
-        new Notification(title ?? "BizMtaani", {
-          body: body ?? "",
-          icon: "/icon-192.png",
-        });
-      }
+  const { title, body } = payload.notification ?? {};
+  const clickUrl = payload.data?.clickUrl || "/";
+  if (Notification.permission === "granted") {
+    const notification = new Notification(title ?? "BizMtaani", {
+      body: body ?? "",
+      icon: "/icon-192.png",
     });
+    notification.onclick = () => {
+      window.focus();
+      window.location.href = clickUrl;
+      notification.close();
+    };
+  }
+});
   } catch (error) {
     console.warn("Failed to register for notifications:", error);
   }
