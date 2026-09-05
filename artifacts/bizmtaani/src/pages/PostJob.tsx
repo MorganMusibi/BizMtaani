@@ -49,6 +49,7 @@ export default function PostJob() {
 >("none");
   const [ward, setWard] = useState("");
   const [county, setCounty] = useState("");
+  const [areaLabel, setAreaLabel] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [locationFailed, setLocationFailed] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -107,6 +108,7 @@ export default function PostJob() {
     wardName: string;
     constituencyName: string;
     countyName: string;
+    label?: string;
   }) {
     setResolvingArea(true);
     try {
@@ -120,6 +122,7 @@ export default function PostJob() {
 
       setWard(area.wardName);
       setCounty(area.countyName);
+      setAreaLabel(area.label ?? "");
       setLocationFailed(false);
 
       toast({ title: "Location updated" });
@@ -182,6 +185,7 @@ export default function PostJob() {
   contactMethod,
   ward,
   county,
+  areaLabel: areaLabel || null,
   lat: coords?.lat ?? null,
   lng: coords?.lng ?? null,
   geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
@@ -381,7 +385,7 @@ export default function PostJob() {
     <span>📍</span>
     <span>
       Your job is visible to all job seekers, and will show first to those around and near{" "}
-      <strong>{ward ? `${ward} area` : county}</strong>
+      <strong>{areaLabel ? `${areaLabel} area` : ward ? `${ward} area` : county}</strong>
     </span>
   </div>
 )}
