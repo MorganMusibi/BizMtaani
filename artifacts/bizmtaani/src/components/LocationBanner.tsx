@@ -3,7 +3,7 @@ import { MapPin, Loader2 } from "lucide-react";
 interface LocationBannerProps {
   gpsReady: boolean;
   gpsGranted: boolean;
-  locationInfo: { wardName?: string } | null;
+  locationInfo: { wardName?: string; displayName?: string; label?: string } | null;
   isSearchMode: boolean;
   refreshingLocation: boolean;
   onRefresh: () => void;
@@ -25,10 +25,10 @@ export function LocationBanner({
 }: LocationBannerProps) {
   function bannerText() {
     if (isSearchMode) return "Searching across Kenya";
-    if (!locationInfo) return "Set your area to see nearby adverts";
-    const area = locationInfo.wardName;
+    if (!locationInfo) return "Set area yako to see nearby adverts";
+    const area = locationInfo.label ?? locationInfo.displayName ?? locationInfo.wardName;
     if (area) return `${area} area`;
-    return "Set your area to see nearby adverts";
+    return "Set area yako to see nearby adverts";
   }
 
   if (!gpsReady) return null;
