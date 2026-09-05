@@ -1752,6 +1752,66 @@ export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, clo
 
   return { success: true, message: "Advert and associated data removed." };
 });
+
+/**
+ * Renews an existing advert (active, expired, or archived) by moving
+ * it into pending_payment so initiateMpesaPayment's precondition
+ * passes, then recording the plan being paid for. On successful
+ * payment, processCompletedPayment reactivates it exactly as it
+ * would a fresh paid listing — same status/expiresAt/subscription
+ * logic, no special-casing needed there.
+ */
+export const renewAdvert = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { productId, plan, recaptchaToken } = request.data as {
+    productId?: string;
+    plan?: string;
+    recaptchaToken?: string;
+  };
+
+  await verifyRecaptcha(recaptchaToken, "renew_advert");
+
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "Product ID is required.");
+  }
+  if (plan !== "premium_weekly" && plan !== "premium_monthly") {
+    throw new HttpsError("invalid-argument", "Renewal requires a premium plan.");
+  }
+
+  const productRef = db.collection("products").doc(productId);
+  const productSnap = await productRef.get();
+
+  if (!productSnap.exists) {
+    throw new HttpsError(
+      "not-found",
+      "This listing has expired permanently and can no longer be renewed. Please post a new advert."
+    );
+  }
+
+  const productData = productSnap.data()!;
+
+  if (productData.sellerId !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "You can only renew your own adverts.");
+  }
+
+  // Already mid-payment for something else — don't let a second
+  // renewal attempt clobber an in-flight one.
+  if (productData.status === "pending_payment") {
+    throw new HttpsError(
+      "failed-precondition",
+      "A payment is already in progress for this advert."
+    );
+  }
+
+  await productRef.update({
+    status: "pending_payment",
+    plan,
+  });
+
+  return { success: true };
+});
+
 export const deleteJob = onCall({ cors: true }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in");
