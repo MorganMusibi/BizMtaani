@@ -863,6 +863,7 @@ async function handleImageFiles(files: FileList | null) {
   wardName: string;
   constituencyName: string;
   countyName: string;
+  label?: string;
 }) {
   setResolvingArea(true);
   try {
@@ -878,9 +879,10 @@ async function handleImageFiles(files: FileList | null) {
       wardName: ward.wardName,
       constituency: ward.constituencyName,
       county: ward.countyName,
-      displayName: `${ward.wardName}, ${ward.constituencyName}`,
+      displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
+      label: ward.label,
     });
-    setLocationName(ward.wardName);
+    setLocationName(ward.label ?? ward.wardName);
 
     toast({ title: "Location updated" });
     setShowAreaPicker(false);
@@ -888,6 +890,7 @@ async function handleImageFiles(files: FileList | null) {
     setResolvingArea(false);
   }
 }
+  
     async function validateStep(): Promise<boolean> {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
@@ -1116,14 +1119,19 @@ function isValidKenyanPhone(phone: string): boolean {
     const canonical = await resolveCanonicalLocation(ward, constituency, county);
 
     if (canonical) {
-      // Found a match (exact or ward-only) — correct spelling/constituency/county
+      // Found a match (exact or ward-only) — correct spelling/constituency/county,
+      // but keep whatever label (e.g. "Ruaka") is already set, if any.
       setWardInfo((prev) => ({
         ...(prev ?? { displayName: canonical.wardName }),
         wardName: canonical.wardName,
         constituency: canonical.constituencyName,
         county: canonical.countyName,
       }));
-      setLocationName(canonical.wardName);
+      // Don't overwrite locationName if it's currently showing the label,
+      // not the ward — only sync it when there's no label.
+      if (!wardInfo?.label) {
+        setLocationName(canonical.wardName);
+      }
     }
     // No match found anywhere in the hierarchy — keep the GPS/geocoded
     // guess as-is and let the user post anyway.
@@ -1343,6 +1351,7 @@ price:
     ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
 constituency: wardInfo?.constituency?.trim() || "",
 county: wardInfo?.county?.trim() || "",
+areaLabel: wardInfo?.label?.trim() || "",
 
     geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
 
@@ -1616,6 +1625,7 @@ price:
     ward: wardInfo?.wardName?.trim() || locationName.trim() || "",
 constituency: wardInfo?.constituency?.trim() || "",
 county: wardInfo?.county?.trim() || "",
+areaLabel: wardInfo?.label?.trim() || "",
 
     geohash: coords ? encodeGeohash(coords.lat, coords.lng) : "",
 
