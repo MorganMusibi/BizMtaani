@@ -27,6 +27,21 @@ export const TOWN_ALIASES = [
   { alias: "greenfields", ward: "Savanna", constituency: "Embakasi East", county: "Nairobi" },
   { alias: "jacaranda", ward: "Kayole Central", constituency: "Embakasi Central", county: "Nairobi" },
 
+  // Mombasa Estates/Areas with non-matching ward names
+  { alias: "old town", ward: "Mji wa Kale/Makadara", constituency: "Mvita", county: "Mombasa" },
+  { alias: "kizingo", ward: "Ganjoni/Shimanzi", constituency: "Mvita", county: "Mombasa" },
+  { alias: "buxton", ward: "Tononoka", constituency: "Mvita", county: "Mombasa" },
+  { alias: "saba saba", ward: "Tononoka", constituency: "Mvita", county: "Mombasa" },
+  { alias: "shimanzi", ward: "Ganjoni/Shimanzi", constituency: "Mvita", county: "Mombasa" },
+  { alias: "makupa", ward: "Tudor", constituency: "Mvita", county: "Mombasa" },
+  { alias: "bombolulu", ward: "Ziwa la Ng'ombe", constituency: "Nyali", county: "Mombasa" },
+  { alias: "lights", ward: "Mkomani", constituency: "Nyali", county: "Mombasa" },
+  { alias: "mamba village", ward: "Mkomani", constituency: "Nyali", county: "Mombasa" },
+  { alias: "sokoni", ward: "Kongowea", constituency: "Nyali", county: "Mombasa" },
+  { alias: "vescon", ward: "Bamburi", constituency: "Kisauni", county: "Mombasa" },
+  { alias: "mwandoni", ward: "Magogoni", constituency: "Kisauni", county: "Mombasa" },
+  { alias: "shelly beach", ward: "Timbwani", constituency: "Likoni", county: "Mombasa" },
+  { alias: "ferry", ward: "Bofu", constituency: "Likoni", county: "Mombasa" },
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
