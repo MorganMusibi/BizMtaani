@@ -6,6 +6,8 @@ import {
   rankProducts,
 } from "@/hooks/useHomeFeed";
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
+import { doc, updateDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { LocationBanner } from "@/components/LocationBanner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -232,6 +234,7 @@ export default function Home() {
   refreshLocation,
   isLocationLoading,
   needsLocationPrompt, 
+  setNeedsLocationPrompt,
 } = useLocationContext();
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
@@ -415,17 +418,37 @@ const [activeKey, setActiveKey] = useState("All");
   }, [loadMore]);
   
   const handleAreaSelect = useCallback(
-    (choice: ResolvedLocation) => {
-      setLocationInfo(choice);
-      if (choice.lat != null && choice.lng != null) {
-        setUserCoords([choice.lat, choice.lng]);
+  async (choice: ResolvedLocation) => {
+    setLocationInfo(choice);
+    if (choice.lat != null && choice.lng != null) {
+      setUserCoords([choice.lat, choice.lng]);
+    }
+    setGpsReady(true);
+    setNeedsLocationPrompt(false);
+    setShowAreaPicker(false);
+    localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
+
+    // Save permanently to the user's profile so this is never asked
+    // again — future sessions load it straight from homeLocation,
+    // same as a brand-new signup would.
+    if (user) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), {
+          homeLocation: {
+            areaName: choice.wardName,
+            constituency: choice.constituency,
+            county: choice.county,
+            lat: choice.lat,
+            lng: choice.lng,
+          },
+        });
+      } catch (error) {
+        console.warn("Failed to save home location to profile:", error);
       }
-      setGpsReady(true);
-      setShowAreaPicker(false);
-      localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
-    },
-    [setLocationInfo, setUserCoords, setGpsReady]
-  );
+    }
+  },
+  [setLocationInfo, setUserCoords, setGpsReady, setNeedsLocationPrompt, user]
+);
 
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
 
