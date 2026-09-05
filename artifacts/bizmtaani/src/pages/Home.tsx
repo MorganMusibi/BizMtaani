@@ -482,7 +482,7 @@ const handleProductClick = useCallback((productId: string) => {
 
 
 const handleAreaSearchSelect = useCallback(
-  async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+  async (ward: { wardName: string; constituencyName: string; countyName: string; label?: string }) => {
     setResolvingAreaSearch(true);
     try {
       const coords = await getWardCoordinates(
@@ -505,7 +505,7 @@ const handleAreaSearchSelect = useCallback(
         wardName: ward.wardName,
         constituency: ward.constituencyName,
         county: ward.countyName,
-        displayName: `${ward.wardName}, ${ward.constituencyName}`,
+        displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
       } as ResolvedLocation;
 
       handleAreaSelect(resolved);
