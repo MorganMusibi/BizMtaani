@@ -69,11 +69,9 @@ const ProductCard = memo(function ProductCard({
       : undefined;
 
   const displayWard =
-    product.areaLabel?.trim() ||
-    canonicalLocation?.wardName ??
+    (product.areaLabel?.trim() || canonicalLocation?.wardName) ??
     product.ward?.trim() ??
     "";
-
   const displayConstituency =
     canonicalLocation?.constituencyName ??
     product.constituency?.trim() ??
