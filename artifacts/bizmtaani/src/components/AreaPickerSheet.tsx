@@ -283,7 +283,7 @@ export function AreaPickerSheet({
                     wardName: loc.wardName,
                     constituencyName: loc.constituency,
                     countyName: loc.county,
-                    label: isMultiWardTown ? undefined : loc.label,
+                    label: loc.label,
                   });
                 }}
                 disabled={resolving}
