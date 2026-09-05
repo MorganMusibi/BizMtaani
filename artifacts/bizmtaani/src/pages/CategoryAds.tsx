@@ -83,7 +83,7 @@ const handleAreaSelect = useCallback(
 
   // Handle area search selection
   const handleAreaSearchSelect = useCallback(
-    async (ward: { wardName: string; constituencyName: string; countyName: string }) => {
+    async (ward: { wardName: string; constituencyName: string; countyName: string; label?: string }) => {
       setResolvingAreaSearch(true);
       try {
         const { getWardCoordinates } = await import("@/lib/location");
@@ -107,7 +107,7 @@ const handleAreaSelect = useCallback(
           wardName: ward.wardName,
           constituency: ward.constituencyName,
           county: ward.countyName,
-          displayName: `${ward.wardName}, ${ward.constituencyName}`,
+          displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
         };
 
         handleAreaSelect(resolved);
@@ -141,11 +141,20 @@ const handleAreaSelect = useCallback(
         setLocationErrorMsg(null);
         const resolved = await getWardInfo(lat, lng);
 
-        if (resolved) {
+        const wardChanged = resolved?.wardName
+          ? resolved.wardName !== locationInfo?.wardName
+          : false;
+
+        if (resolved && wardChanged) {
           setLocationInfo(resolved);
           setUserCoords([lat, lng]);
-        } else {
+        } else if (!resolved) {
           setUserCoords([lat, lng]);
+        } else {
+          toast({
+            title: "TULIAA! Uko",
+            description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
+          });
         }
 
         setRefreshingLocation(false);
@@ -191,7 +200,7 @@ const handleAreaSelect = useCallback(
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
-  }, [setGpsGranted, setLocationInfo, setUserCoords]);
+  }, [locationInfo?.wardName, toast, setGpsGranted, setLocationInfo, setUserCoords]);
 
   // Use the shared hook!
   const {
