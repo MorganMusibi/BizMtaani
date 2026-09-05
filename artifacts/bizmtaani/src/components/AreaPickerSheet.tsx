@@ -111,15 +111,27 @@ export function AreaPickerSheet({
     // (e.g. "buru" -> "buruburu") via substring matching.
     const aliasSuggestions = searchTownAliases(trimmed);
     if (aliasSuggestions.length > 0) {
-      const resolvedSuggestions = await Promise.all(
-        aliasSuggestions.map((s) => resolveWardFromAlias(s.alias))
+      const resolvedGroups = await Promise.all(
+        aliasSuggestions.map(async (s) =>
+          s.isMultiWard
+            ? await getAllWardsForTown(s.alias)
+            : [await resolveWardFromAlias(s.alias)]
+        )
       );
-      const validSuggestions = resolvedSuggestions.filter(
-        (r): r is ResolvedLocation => r !== null
-      );
+      const validSuggestions = resolvedGroups
+        .flat()
+        .filter((r): r is ResolvedLocation => r !== null);
+
+      // Only treat it as "spans multiple areas" styling if the partial
+      // query matched exactly one town and that town is multi-ward —
+      // e.g. "kita" -> "kitale". If several different aliases matched
+      // the partial query, keep the plain single-card styling.
+      const suggestionIsMultiWard =
+        aliasSuggestions.length === 1 && aliasSuggestions[0].isMultiWard;
+
       if (validSuggestions.length > 0) {
         setTownAliasResults(validSuggestions);
-        setIsMultiWardTown(false);
+        setIsMultiWardTown(suggestionIsMultiWard);
         setWardResults([]);
         setConstituencyResults([]);
         setCountyResults([]);
