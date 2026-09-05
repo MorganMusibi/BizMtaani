@@ -42,6 +42,21 @@ export const TOWN_ALIASES = [
   { alias: "mwandoni", ward: "Magogoni", constituency: "Kisauni", county: "Mombasa" },
   { alias: "shelly beach", ward: "Timbwani", constituency: "Likoni", county: "Mombasa" },
   { alias: "ferry", ward: "Bofu", constituency: "Likoni", county: "Mombasa" },
+
+  // Kisumu Towns/Estates with non-matching ward names
+  { alias: "mamboleo", ward: "Kajulu", constituency: "Kisumu East", county: "Kisumu" },
+  { alias: "car wash", ward: "Kajulu", constituency: "Kisumu East", county: "Kisumu" },
+  { alias: "patel", ward: "Kaloleni/Shauri Moyo", constituency: "Kisumu Central", county: "Kisumu" },
+  { alias: "tom mboya estate", ward: "Migosi", constituency: "Kisumu Central", county: "Kisumu" },
+  { alias: "dunga", ward: "Market Milimani", constituency: "Kisumu Central", county: "Kisumu" },
+  { alias: "milimani kisumu", ward: "Market Milimani", constituency: "Kisumu Central", county: "Kisumu" },
+  { alias: "kibos", ward: "Kolwa East", constituency: "Kisumu East", county: "Kisumu" },
+  { alias: "rabuor", ward: "Kobura", constituency: "Nyando", county: "Kisumu" },
+  { alias: "ahero", ward: "Boya", constituency: "Nyando", county: "Kisumu" },
+  { alias: "otonglo", ward: "North West Kisumu", constituency: "Kisumu West", county: "Kisumu" },
+  { alias: "rianjunya", ward: "Central Kisumu", constituency: "Kisumu West", county: "Kisumu" },
+  { alias: "kiboswa", ward: "South West Kisumu", constituency: "Kisumu West", county: "Kisumu" },
+
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
@@ -65,6 +80,12 @@ export const MULTI_WARD_TOWNS = {
   "loresho": [
     { ward: "Mountain View", constituency: "Westlands", county: "Nairobi" },
     { ward: "Kitisuru", constituency: "Westlands", county: "Nairobi" },
+  ],
+  // Optional: Add to MULTI_WARD_TOWNS if you handle sprawling Kisumu hubs with multi-ward coverage:
+
+  "maseno": [
+    { ward: "North West Kisumu", constituency: "Kisumu West", county: "Kisumu" },
+    { ward: "West Seme", constituency: "Seme", county: "Kisumu" },
   ],
 
   // Add more multi-ward towns here
