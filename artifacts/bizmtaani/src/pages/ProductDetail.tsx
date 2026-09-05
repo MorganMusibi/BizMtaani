@@ -62,6 +62,7 @@ interface Product {
   priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free" | "custom";
   priceText?: string;
   ward?: string;
+  areaLabel?: string;
   county?: string;
   pricingBasis?: string;
   hotelMenu?: HotelMenu;
@@ -964,7 +965,7 @@ async function saveMenuChanges() {
       <MapPin size={16} />
       <span>
         {product.ward
-          ? `${product.ward}, ${product.county ?? ""}`
+          ? `${product.areaLabel ?? product.ward}, ${product.county ?? ""}`
           : distance !== null
           ? `${distance.toFixed(1)} km away`
           : ""}
@@ -1287,7 +1288,7 @@ const itemDistance =
                   <MapPin size={12} />
 
                   <span className="truncate">
-                    {item.ward}
+                    {item.areaLabel ?? item.ward}
                   </span>
                 </div>
               )}
