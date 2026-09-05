@@ -282,7 +282,7 @@ useEffect(() => {
         {(job.ward || job.county) && (
           <div className="flex items-center gap-2">
             <MapPin size={18} />
-            <span>{job.ward || job.county}</span>
+            <span>{job.ward ? (job.areaLabel ?? job.ward) : job.county}</span>
           </div>
         )}
 
