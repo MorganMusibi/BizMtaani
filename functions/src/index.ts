@@ -1779,6 +1779,7 @@ export const renewAdvert = onCall({ cors: true }, async (request) => {
     throw new HttpsError("invalid-argument", "Renewal requires a premium plan.");
   }
 
+  const uid = request.auth.uid;
   const productRef = db.collection("products").doc(productId);
   const productSnap = await productRef.get();
 
@@ -1791,12 +1792,10 @@ export const renewAdvert = onCall({ cors: true }, async (request) => {
 
   const productData = productSnap.data()!;
 
-  if (productData.sellerId !== request.auth.uid) {
+  if (productData.sellerId !== uid) {
     throw new HttpsError("permission-denied", "You can only renew your own adverts.");
   }
 
-  // Already mid-payment for something else — don't let a second
-  // renewal attempt clobber an in-flight one.
   if (productData.status === "pending_payment") {
     throw new HttpsError(
       "failed-precondition",
@@ -1804,12 +1803,37 @@ export const renewAdvert = onCall({ cors: true }, async (request) => {
     );
   }
 
+  // If the seller already has an active premium subscription, this
+  // specific listing is covered by it — reactivate directly, no
+  // payment, no STK push. Never reactivate anything else; this only
+  // touches the one product the user explicitly chose to renew.
+  const userSnap = await db.collection("users").doc(uid).get();
+  const userData = userSnap.exists ? userSnap.data() : null;
+  const hasActiveSubscription =
+    !!userData?.subscriptionPlan &&
+    !!userData?.premiumEndsAt &&
+    userData.premiumEndsAt.toDate() > new Date();
+
+  if (hasActiveSubscription) {
+    const durationDays = LISTING_DURATIONS[userData!.subscriptionPlan] ?? 7;
+    await productRef.update({
+      status: "active",
+      plan: userData!.subscriptionPlan,
+      paidAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: admin.firestore.Timestamp.fromDate(
+        new Date(Date.now() + durationDays * 86_400_000)
+      ),
+    });
+    return { success: true, requiresPayment: false };
+  }
+
+  // No active subscription — proceed to payment as before.
   await productRef.update({
     status: "pending_payment",
     plan,
   });
 
-  return { success: true };
+  return { success: true, requiresPayment: true };
 });
 
 export const deleteJob = onCall({ cors: true }, async (request) => {
