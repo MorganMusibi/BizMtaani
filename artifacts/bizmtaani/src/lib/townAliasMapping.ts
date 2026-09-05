@@ -127,6 +127,9 @@ async function resolveAndValidate(
     displayName: `${canonical.wardName}, ${canonical.constituencyName}`,
     label: toTitleCase(alias),
   };
+}
+
+// Check if a search term is a known town — exact match, using the
 
 // Check if a search term is a known town — exact match, using the
 // same normalize() as locationHierarchy.ts (strips spaces, apostrophes,
