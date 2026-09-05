@@ -196,8 +196,22 @@ export function AuthProvider({
           setProfileLoading(true);
 
           // Register for push notifications — fire and forget, never
-          // block auth state resolution on this.
-          registerForNotifications(currentUser.uid).catch(() => {});
+// block auth state resolution on this. Only once per browser
+// session/tab, not on every reload/auth-state re-fire, to avoid
+// unnecessary repeated token fetches and Firestore writes for a
+// user who's already registered this session.
+const notifRegisteredKey = `bizmtaani_notif_registered_${currentUser.uid}`;
+if (!sessionStorage.getItem(notifRegisteredKey)) {
+  registerForNotifications(currentUser.uid)
+    .then(() => {
+      try {
+        sessionStorage.setItem(notifRegisteredKey, "1");
+      } catch {
+        // sessionStorage unavailable — safe to ignore, will just retry next reload
+      }
+    })
+    .catch(() => {});
+}
 
           // --------------------------------------------------
           // ADMIN CLAIM CHECK
