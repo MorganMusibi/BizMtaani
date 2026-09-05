@@ -248,6 +248,7 @@ export interface Product {
 lng: number;
 
 ward?: string;
+areaLabel?: string;
 constituency?: string;
 county?: string;
 
