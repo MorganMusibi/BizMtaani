@@ -170,6 +170,7 @@ export interface JobPost {
   salary?: string;
   deadline?: string;
   ward?: string;
+  areaLabel?: string;
   county?: string;
   geohash?: string;
   lat?: number | null;
@@ -401,7 +402,7 @@ function JobCard({ job, onClick }: { job: JobPost; onClick: () => void }) {
             {(job.ward || job.county) && (
               <div className="flex items-center gap-1">
                 <MapPin size={10} />
-                <span>{job.ward ? `${job.ward} area` : job.county}</span>
+                <span>{job.ward ? `${job.areaLabel ?? job.ward} area` : job.county}</span>
               </div>
             )}
             {job.salary && (
