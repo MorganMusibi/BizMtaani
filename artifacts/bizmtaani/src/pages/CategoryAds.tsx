@@ -366,8 +366,7 @@ const handleAreaSelect = useCallback(
                     : undefined;
 
                 const displayWard =
-                  canonicalLocation?.wardName ?? p.ward?.trim() ?? "";
-
+                  (p.areaLabel?.trim() || canonicalLocation?.wardName) ?? p.ward?.trim() ?? "";
                 return (
                   <button
                     key={p.id}
