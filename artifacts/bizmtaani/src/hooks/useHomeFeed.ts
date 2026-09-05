@@ -484,7 +484,7 @@ function toProducts(docs: QueryDocumentSnapshot<DocumentData>[]): Product[] {
         return false;
       }
 
-      // Do not load/use expired products
+      
       if (p.expiresAt && p.expiresAt.seconds <= nowSec) {
         return false;
       }
