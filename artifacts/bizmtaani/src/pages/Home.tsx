@@ -238,12 +238,26 @@ export default function Home() {
 } = useLocationContext();
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
-  
-  const [showAreaPicker, setShowAreaPicker] = useState(false);
-  const hasPromptedArea = useRef(false);
-  const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
-  const [refreshingLocation, setRefreshingLocation] = useState(false);
-  const [showRefreshOptions, setShowRefreshOptions] = useState(false);
+
+const [showAreaPicker, setShowAreaPicker] = useState(false);
+const hasPromptedArea = useRef(false);
+const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
+const [refreshingLocation, setRefreshingLocation] = useState(false);
+const [showRefreshOptions, setShowRefreshOptions] = useState(false);
+
+const [isOffline, setIsOffline] = useState(!navigator.onLine);
+const [loadingTooLong, setLoadingTooLong] = useState(false);
+
+useEffect(() => {
+  function handleOnline() { setIsOffline(false); }
+  function handleOffline() { setIsOffline(true); }
+  window.addEventListener("online", handleOnline);
+  window.addEventListener("offline", handleOffline);
+  return () => {
+    window.removeEventListener("online", handleOnline);
+    window.removeEventListener("offline", handleOffline);
+  };
+}, []);
   
   const refreshFailureTimestampsRef = useRef<number[]>([]);
   const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
@@ -389,6 +403,15 @@ const [activeKey, setActiveKey] = useState("All");
     isSearchMode,
     locationInfo,
   });
+
+  useEffect(() => {
+  if (!initialLoading) {
+    setLoadingTooLong(false);
+    return;
+  }
+  const timer = setTimeout(() => setLoadingTooLong(true), 6000);
+  return () => clearTimeout(timer);
+}, [initialLoading]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -682,11 +705,30 @@ const handleAreaSearchSelect = useCallback(
         {/* Show loading spinner while initial loading and no products yet */}
         {initialLoading ? (
   <div className="px-3 pt-3 pb-24">
-    <div className="grid grid-cols-2 gap-3">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <ProductCardSkeleton key={i} />
-      ))}
-    </div>
+    {isOffline ? (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-6">
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center">
+          <X size={28} className="text-amber-600" />
+        </div>
+        <p className="font-bold text-base">You're offline</p>
+        <p className="text-sm text-muted-foreground">
+          Check your internet connection and try again.
+        </p>
+      </div>
+    ) : (
+      <>
+        {loadingTooLong && (
+          <p className="text-center text-xs text-muted-foreground mb-3">
+            This is taking longer than usual — check your connection.
+          </p>
+        )}
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <ProductCardSkeleton key={i} />
+          ))}
+        </div>
+      </>
+    )}
   </div>
 ) : totalVisible === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 px-6">
