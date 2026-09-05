@@ -75,6 +75,17 @@ export interface ResolvedLocation {
   constituency: string;
   county: string;
   displayName: string;
+  /**
+   * The alias text as searched (e.g. "Ruaka"), title-cased — set only
+   * when this result came from the alias table. Callers that want to
+   * show the town name the user actually typed, instead of the
+   * canonical ward it maps to, should prefer this over displayName.
+   */
+  label?: string;
+}
+
+function toTitleCase(str: string): string {
+  return str.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 /**
@@ -114,8 +125,8 @@ async function resolveAndValidate(
     constituency: canonical.constituencyName,
     county: canonical.countyName,
     displayName: `${canonical.wardName}, ${canonical.constituencyName}`,
+    label: toTitleCase(alias),
   };
-}
 
 // Check if a search term is a known town — exact match, using the
 // same normalize() as locationHierarchy.ts (strips spaces, apostrophes,
