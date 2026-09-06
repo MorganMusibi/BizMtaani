@@ -2992,181 +2992,182 @@
         ]
     },
     {
-                            {
-    "county_code": 47,
-    "county_name": "Nairobi",
-    "constituencies": [
-        {
-            "constituency_name": "Westlands",
-            "wards": [
-                "Kitisuru",
-                "Parklands/Highridge",
-                "Karura",
-                "Kangemi",
-                "Mountain View"
-            ]
-        },
-        {
-            "constituency_name": "Dagoretti North",
-            "wards": [
-                "Kilimani",
-                "Kawangware",
-                "Gatina",
-                "Kileleshwa",
-                "Kabiro"
-            ]
-        },
-        {
-            "constituency_name": "Dagoretti South",
-            "wards": [
-                "Mutu-Ini",
-                "Ngando",
-                "Riruta",
-                "Uthiru/Ruthimitu",
-                "Waithaka"
-            ]
-        },
-        {
-            "constituency_name": "Lang'Ata",
-            "wards": [
-                "Karen",
-                "Nairobi West",
-                "Mugumu-Ini",
-                "South C",
-                "Nyayo Highrise"
-            ]
-        },
-        {
-            "constituency_name": "Kibra",
-            "wards": [
-                "Woodley/Kenyatta Golf Course",
-                "Sarang'Ombe",
-                "Makina",
-                "Lindi",
-                "Laini Saba"
-            ]
-        },
-        {
-            "constituency_name": "Roysambu",
-            "wards": [
-                "Kahawa West",
-                "Roysambu",
-                "Githurai",
-                "Kahawa",
-                "Zimmerman"
-            ]
-        },
-        {
-            "constituency_name": "Kasarani",
-            "wards": [
-                "Kasarani",
-                "Njiru",
-                "Clay City",
-                "Mwiki",
-                "Ruai"
-            ]
-        },
-        {
-            "constituency_name": "Ruaraka",
-            "wards": [
-                "Utalii",
-                "Korogocho",
-                "Lucky Summer",
-                "Mathare North",
-                "Baba Dogo"
-            ]
-        },
-        {
-            "constituency_name": "Embakasi South",
-            "wards": [
-                "Kwa Njenga",
-                "Imara Daima",
-                "Kware",
-                "Kwa Reuben",
-                "Pipeline"
-            ]
-        },
-        {
-            "constituency_name": "Embakasi North",
-            "wards": [
-                "Dandora Area I",
-                "Dandora Area Ii",
-                "Dandora Area Iii",
-                "Dandora Area Iv",
-                "Kariobangi North"
-            ]
-        },
-        {
-            "constituency_name": "Embakasi Central",
-            "wards": [
-                "Kayole North",
-                "Kayole Central",
-                "Kayole South",
-                "Komarock",
-                "Matopeni/Spring Valley"
-            ]
-        },
-        {
-            "constituency_name": "Embakasi East",
-            "wards": [
-                "Utawala",
-                "Upper Savanna",
-                "Lower Savanna",
-                "Embakasi",
-                "Mihango"
-            ]
-        },
-        {
-            "constituency_name": "Embakasi West",
-            "wards": [
-                "Umoja 1",
-                "Umoja 2",
-                "Mowlem",
-                "Kariobangi South",
-                "Maringo/Hamza"
-            ]
-        },
-        {
-            "constituency_name": "Makadara",
-            "wards": [
-                "Viwandani",
-                "Harambee",
-                "Makongeni",
-                "Mbururutu/Doonholm"
-            ]
-        },
-        {
-            "constituency_name": "Kamukunji",
-            "wards": [
-                "Pumwani",
-                "Eastleigh North",
-                "Eastleigh South",
-                "Airbase",
-                "California"
-            ]
-        },
-        {
-            "constituency_name": "Starehe",
-            "wards": [
-                "Nairobi Central",
-                "Nairobi South",
-                "Ngara",
-                "Pangani",
-                "Landimawe",
-                "Ziwani/Kariokor"
-            ]
-        },
-        {
-            "constituency_name": "Mathare",
-            "wards": [
-                "Hospital",
-                "Mlango Kubwa",
-                "Kiamaiko",
-                "Ngei",
-                "Huruma",
-                "Mabatini"
-            ]
-        }
-    ]
-}
+        "county_code": 47,
+        "county_name": "Nairobi",
+        "constituencies": [
+            {
+                "constituency_name": "Westlands",
+                "wards": [
+                    "Kitisuru",
+                    "Parklands/Highridge",
+                    "Karura",
+                    "Kangemi",
+                    "Mountain View"
+                ]
+            },
+            {
+                "constituency_name": "Dagoretti North",
+                "wards": [
+                    "Kilimani",
+                    "Kawangware",
+                    "Gatina",
+                    "Kileleshwa",
+                    "Kabiro"
+                ]
+            },
+            {
+                "constituency_name": "Dagoretti South",
+                "wards": [
+                    "Mutu-Ini",
+                    "Ngando",
+                    "Riruta",
+                    "Uthiru/Ruthimitu",
+                    "Waithaka"
+                ]
+            },
+            {
+                "constituency_name": "Lang'Ata",
+                "wards": [
+                    "Karen",
+                    "Nairobi West",
+                    "Mugumu-Ini",
+                    "South C",
+                    "Nyayo Highrise"
+                ]
+            },
+            {
+                "constituency_name": "Kibra",
+                "wards": [
+                    "Woodley/Kenyatta Golf Course",
+                    "Sarang'Ombe",
+                    "Makina",
+                    "Lindi",
+                    "Laini Saba"
+                ]
+            },
+            {
+                "constituency_name": "Roysambu",
+                "wards": [
+                    "Kahawa West",
+                    "Roysambu",
+                    "Githurai",
+                    "Kahawa",
+                    "Zimmerman"
+                ]
+            },
+            {
+                "constituency_name": "Kasarani",
+                "wards": [
+                    "Kasarani",
+                    "Njiru",
+                    "Clay City",
+                    "Mwiki",
+                    "Ruai"
+                ]
+            },
+            {
+                "constituency_name": "Ruaraka",
+                "wards": [
+                    "Utalii",
+                    "Korogocho",
+                    "Lucky Summer",
+                    "Mathare North",
+                    "Baba Dogo"
+                ]
+            },
+            {
+                "constituency_name": "Embakasi South",
+                "wards": [
+                    "Kwa Njenga",
+                    "Imara Daima",
+                    "Kware",
+                    "Kwa Reuben",
+                    "Pipeline"
+                ]
+            },
+            {
+                "constituency_name": "Embakasi North",
+                "wards": [
+                    "Dandora Area I",
+                    "Dandora Area Ii",
+                    "Dandora Area Iii",
+                    "Dandora Area Iv",
+                    "Kariobangi North"
+                ]
+            },
+            {
+                "constituency_name": "Embakasi Central",
+                "wards": [
+                    "Kayole North",
+                    "Kayole Central",
+                    "Komarock",
+                    "Matopeni / Spring Valley"
+                ]
+            },
+            {
+                "constituency_name": "Embakasi East",
+                "wards": [
+                    "Utawala",
+                    "Upper Savanna",
+                    "Lower Savanna",
+                    "Embakasi",
+                    "Mihango"
+                ]
+            },
+            {
+                "constituency_name": "Embakasi West",
+                "wards": [
+                    "Umoja 1",
+                    "Umoja 2",
+                    "Mowlem",
+                    "Kariobangi South",
+                ]
+            },
+            {
+                "constituency_name": "Makadara",
+                "wards": [
+                    "Viwandani",
+                    "Harambee",
+                    "Makongeni",
+                    "Pumwani",
+                    "Maringo/ Hamza"
+                    
+                ]
+            },
+            {
+                "constituency_name": "Kamukunji",
+                "wards": [
+                    "Eastleigh South",
+                    "Airbase",
+                    "Pumwani",
+                    "California",
+                    "Mgara",
+                    "Eastleigh North"
+                ]
+            },
+            {
+                "constituency_name": "Starehe",
+                "wards": [
+                    "Nairobi South",
+                    "Nairobi Central",
+                    "Hospital",
+                    "Ngara",
+                    "Pangani",
+                    "Landimawe",
+                    "Ziwani / Kariokor"
+                ]
+            },
+            {
+                "constituency_name": "Mathare",
+                "wards": [
+                    "Mlango Kubwa",
+                    "Kiamaiko",
+                    "Ngei",
+                    "Hospital",
+                    "Huruma",
+                    "Mabatini"
+                ]
+            }
         ]
+    }
+                ]
