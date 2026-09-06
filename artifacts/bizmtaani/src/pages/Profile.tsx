@@ -18,7 +18,7 @@ import { clearMarketerDashboardCache } from "@/pages/MarketerDashboard";
 
 export default function Profile() {
   const [, setLocation] = useLocation();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const { toast } = useToast();
   const fileRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
@@ -321,19 +321,27 @@ const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
     setLocation("/");
   }
 
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background pb-20 flex flex-col items-center justify-center gap-4 px-6">
-        <div className="text-center">
-          <h2 className="font-black text-2xl">Your Profile</h2>
-          <p className="text-muted-foreground mt-1">Sign in to manage your account</p>
-        </div>
-        <Button data-testid="button-signin" onClick={() => setLocation("/login")} className="w-full max-w-xs">
-          Sign In
-        </Button>
+  if (loading) {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <Loader2 size={28} className="animate-spin text-primary" />
+    </div>
+  );
+}
+
+if (!user) {
+  return (
+    <div className="min-h-screen bg-background pb-20 flex flex-col items-center justify-center gap-4 px-6">
+      <div className="text-center">
+        <h2 className="font-black text-2xl">Your Profile</h2>
+        <p className="text-muted-foreground mt-1">Sign in ndio umanage account yako</p>
       </div>
-    );
-  }
+      <Button data-testid="button-signin" onClick={() => setLocation("/login")} className="w-full max-w-xs">
+        Sign In
+      </Button>
+    </div>
+  );
+}
 
 const now = new Date();
 const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
