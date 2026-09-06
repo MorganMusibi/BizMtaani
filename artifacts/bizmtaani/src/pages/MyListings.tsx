@@ -104,7 +104,7 @@ function getExpiryInfo(p: Product): { label: string; color: string; isExpired: b
 
 export default function MyListings() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,10 +140,11 @@ export default function MyListings() {
   }
 
   useEffect(() => {
-    if (!user) { setLocation("/login"); return; }
-    setLoading(true);
-    fetchProducts().finally(() => setLoading(false));
-  }, [user, setLocation]);
+  if (authLoading) return; // wait for auth to actually resolve before deciding
+  if (!user) { setLocation("/login"); return; }
+  setLoading(true);
+  fetchProducts().finally(() => setLoading(false));
+}, [user, authLoading, setLocation]);
 
   async function confirmDelete() {
     if (!confirmProduct) return;
