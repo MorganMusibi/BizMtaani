@@ -2201,7 +2201,7 @@
                     "Marama West",
                     "Marama Central",
                     "Marenyo-Shianda",
-                    "Maram North",
+                    "Marama North",
                     "Marama South"
                 ]
             },
@@ -2290,7 +2290,7 @@
                     "Shinoyi-Shikomari",
                     "Esumeyia",
                     "Bunyala West",
-                    "Bunyal East",
+                    "Bunyala East",
                     "Bunyala Central"
                 ]
             },
@@ -2510,14 +2510,14 @@
                 "wards": [
                     "Bukhayo West",
                     "Mayenje",
-                    "Matayos Southbusibwabo",
+                    "Matayos South / busibwabo",
                     "Burumba"
                 ]
             },
             {
                 "constituency_name": "Butula",
                 "wards": [
-                    "Marachi Westkingandole",
+                    "Marachi West / kingandole",
                     "Marachi Central",
                     "Marachi East",
                     "Marachi North",
@@ -2594,10 +2594,10 @@
             {
                 "constituency_name": "Ugunja",
                 "wards": [
-                    "Sidindi",
-                    "Sigomere",
-                    "Ugunja"
-                ]
+    "Bunyala",
+    "Sigomere",
+    "Ugunja"
+]
             }
         ]
     },
@@ -2630,7 +2630,7 @@
                 "constituency_name": "Kisumu West",
                 "wards": [
                     "South West Kisumu",
-                    "Cetral Kisumu",
+                    "Central Kisumu",
                     "Kisumu North",
                     "West Kisumu",
                     "North West Kisumu"
@@ -2912,7 +2912,7 @@
                 "constituency_name": "Bobasi",
                 "wards": [
                     "Masige West",
-                    "Masig East",
+                    "Masige East",
                     "Basi Central",
                     "Nyacheki",
                     "Bassi Bogetaorio",
