@@ -182,13 +182,14 @@ const STATUS_COLORS: Record<
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Business() {
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  useEffect(() => {
-    if (!user) {
-      navigate("/login");
-    }
-  }, [user, navigate]);
+useEffect(() => {
+  if (authLoading) return;
+  if (!user) {
+    navigate("/login");
+  }
+}, [user, authLoading, navigate]);
 
   return (
     <div className="flex flex-col h-screen bg-background">
