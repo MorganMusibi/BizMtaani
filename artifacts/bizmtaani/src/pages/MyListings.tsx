@@ -15,6 +15,9 @@ import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
+import { getRecaptchaToken } from "@/lib/recaptcha";
 interface Product {
   id: string;
   title: string;
@@ -158,10 +161,23 @@ export default function MyListings() {
   }
 
   async function handleRenewInitiate(phone: string): Promise<{ checkoutRequestId: string; productId: string }> {
-    if (!renewProduct) throw new Error("No product selected");
-    const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id });
-    return { checkoutRequestId: result.checkoutRequestId, productId: renewProduct.id };
+  if (!renewProduct) throw new Error("No product selected");
+
+  const recaptchaToken = await getRecaptchaToken("renew_advert");
+  const renewAdvert = httpsCallable<
+    { productId: string; plan: string; recaptchaToken: string },
+    { success: boolean; requiresPayment: boolean }
+  >(functions, "renewAdvert");
+
+  const { data } = await renewAdvert({ productId: renewProduct.id, plan: renewPlan, recaptchaToken });
+
+  if (!data.requiresPayment) {
+    return { checkoutRequestId: "", productId: renewProduct.id };
   }
+
+  const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id });
+  return { checkoutRequestId: result.checkoutRequestId, productId: renewProduct.id };
+}
 
   // Separate active vs expired
   const activeProducts = products.filter((p) => p.status !== "pending_payment");
