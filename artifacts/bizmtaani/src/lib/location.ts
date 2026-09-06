@@ -12,6 +12,41 @@ import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
 import { getRecaptchaToken } from "@/lib/recaptcha";
 import { resolveWardFromAlias, getAllWardsForTown, isMultiWardTown } from "./townAliasMapping";
+
+/**
+ * Manual coordinate overrides for wards that GeoJSON can't resolve —
+ * either missing entirely from the boundary file, or genuinely
+ * ambiguous (same ward name existing as a real, distinct physical
+ * place in more than one county). Checked before any GeoJSON lookup.
+ *
+ * Key format: `${normalize(ward)}|${normalize(constituency)}|${normalize(county)}`
+ * using the same normalize() as locationHierarchy.ts, so lookups here
+ * are punctuation/casing-insensitive like everywhere else.
+ *
+ * COORDINATES ARE APPROXIMATE unless noted otherwise — verify/refine
+ * locally before relying on these for anything precision-sensitive.
+ */
+const WARD_COORDINATE_OVERRIDES: Record<string, { lat: number; lng: number }> = {
+  // Mwiki straddles a river between Nairobi (Kasarani side) and
+  // Kiambu (Ruiru/Githurai side) — two real, distinct wards with the
+  // identical name. kenya-wards.geojson only has geometry for the
+  // Kasarani/Nairobi side, so the Ruiru/Kiambu side has no polygon to
+  // resolve to at all. This coordinate is the general "Mwiki" area
+  // pin (~1.22361°S, 36.93111°E per Wikipedia) — approximate, since
+  // the Githurai-Mwiki side specifically sits just across the river
+  // from this point, not centered exactly on it.
+  "mwiki|ruiru|kiambu": { lat: -1.22361, lng: 36.93111 },
+};
+
+function getWardCoordinateOverride(
+  wardName: string,
+  constituencyName: string,
+  countyName: string
+): { lat: number; lng: number } | null {
+  const key = `${normalize(wardName)}|${normalize(constituencyName)}|${normalize(countyName)}`;
+  return WARD_COORDINATE_OVERRIDES[key] ?? null;
+}
+
 interface WardFeature {
   type: "Feature";
   properties: { ward: string; constituency: string; county: string };
@@ -263,6 +298,9 @@ export async function getWardCoordinates(
   constituencyName: string,
   countyName: string
 ): Promise<{ lat: number; lng: number } | null> {
+  const override = getWardCoordinateOverride(wardName, constituencyName, countyName);
+  if (override) return override;
+
   const features = await loadWards();
   if (!features) return null;
 
@@ -292,8 +330,22 @@ if (matches.length === 1) return centerOf(matches[0]);
 // 3. Ward-only — ONLY safe to use if it's unambiguous (a single
   //    physical ward with this name in the whole country). If there
   //    are duplicates, refuse rather than silently picking the wrong one.
+  //
+  //    First, collapse duplicate GeoJSON features that describe the
+  //    SAME administrative ward (identical ward+constituency+county) —
+  //    likely a MultiPolygon split into multiple Features on export.
+  //    Without this, a ward that's simply duplicated in the source
+  //    file gets wrongly treated as "colliding with a different place
+  //    of the same name" and refused even though there's no real
+  //    ambiguity.
   matches = features.filter((f) => normalize(f.properties.ward) === normalize(wardName));
-  if (matches.length === 1) return centerOf(matches[0]);
+  const distinctWards = new Map<string, WardFeature>();
+  for (const f of matches) {
+    const key = `${normalize(f.properties.ward)}|${normalize(f.properties.constituency)}|${normalize(f.properties.county)}`;
+    if (!distinctWards.has(key)) distinctWards.set(key, f);
+  }
+  const distinctMatches = [...distinctWards.values()];
+  if (distinctMatches.length === 1) return centerOf(distinctMatches[0]);
 
   if (matches.length > 1) {
     console.warn(
