@@ -2575,29 +2575,29 @@
             {
                 "constituency_name": "Rarieda",
                 "wards": [
-                    "Gem Rae",
-                    "East Asembo",
-                    "West Asembo",
-                    "Central Asembo",
-                    "South West Asembo",
-                    "North West Asembo",
-                    "North East Asembo",
-                    "South East Asembo",
-                    "Nyang'Oma Kogelo",
-                    "West Uyoma",
-                    "Central Uyoma",
-                    "North Uyoma"
-                ]
+    "Gem Rae",
+    "East Asembo",
+    "West Asembo",
+    "Central Asembo",
+    "South West Asembo",
+    "North East Asembo",
+    "South East Asembo",
+    "Nyang'Oma Kogelo",
+    "West Uyoma",
+    "Central Uyoma",
+    "North Uyoma"
+]
             },
             {
                 "constituency_name": "Ugenya",
                 "wards": [
-                    "East Asembo",
-                    "West Asembo",
-                    "North Uyoma",
-                    "South Uyoma",
-                    "West Uyoma"
-                ]
+    "Kadenge",
+    "Ukwala",
+    "Nyamninia",
+    "Dienya",
+    "Sega",
+    "South Uyoma"
+]
             },
             {
                 "constituency_name": "Ugunja",
