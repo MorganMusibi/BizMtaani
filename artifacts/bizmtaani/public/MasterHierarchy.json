@@ -9,8 +9,8 @@
                     "Port Reitz",
                     "Kipevu",
                     "Airport",
-                    "Miritini",
-                    "Chaani"
+                    "Chaani",
+                    "Changamwe"
                 ]
             },
             {
@@ -18,7 +18,8 @@
                 "wards": [
                     "Jomvu Kuu",
                     "Magongo",
-                    "Mikindani"
+                    "Mikindani",
+                    "Miritini",
                 ]
             },
             {
@@ -3099,7 +3100,6 @@
                 "wards": [
                     "Kayole North",
                     "Kayole Central",
-                    "Kariobangi South",
                     "Komarock",
                     "Matopeni / Spring Valley"
                 ]
@@ -3121,7 +3121,6 @@
                     "Umoja 2",
                     "Mowlem",
                     "Kariobangi South",
-                    "Maringo/ Hamza"
                 ]
             },
             {
@@ -3131,23 +3130,26 @@
                     "Harambee",
                     "Makongeni",
                     "Pumwani",
-                    "Eastleigh North"
+                    "Maringo/ Hamza"
+                    
                 ]
             },
             {
                 "constituency_name": "Kamukunji",
                 "wards": [
                     "Eastleigh South",
-                    "Nairobi Central",
                     "Airbase",
+                    "Pumwani",
                     "California",
-                    "Mgara"
+                    "Mgara",
+                    "Eastleigh North"
                 ]
             },
             {
                 "constituency_name": "Starehe",
                 "wards": [
                     "Nairobi South",
+                    "Nairobi Central",
                     "Hospital",
                     "Ngara",
                     "Pangani",
@@ -3161,6 +3163,7 @@
                     "Mlango Kubwa",
                     "Kiamaiko",
                     "Ngei",
+                    "Hospital",
                     "Huruma",
                     "Mabatini"
                 ]
