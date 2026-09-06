@@ -290,10 +290,19 @@ matches = features.filter(
 if (matches.length === 1) return centerOf(matches[0]);
 
 // 3. Ward-only — ONLY safe to use if it's unambiguous (a single
-//    physical ward with this name in the whole country). If there
-//    are duplicates, refuse rather than silently picking the wrong one.
-matches = features.filter((f) => normalize(f.properties.ward) === normalize(wardName));
-if (matches.length === 1) return centerOf(matches[0]);
+  //    physical ward with this name in the whole country). If there
+  //    are duplicates, refuse rather than silently picking the wrong one.
+  matches = features.filter((f) => normalize(f.properties.ward) === normalize(wardName));
+  if (matches.length === 1) return centerOf(matches[0]);
+
+  if (matches.length > 1) {
+    console.warn(
+      `[location] Ambiguous ward "${wardName}" (constituency="${constituencyName}", county="${countyName}") ` +
+      `matched ${matches.length} physical wards in GeoJSON, none of which matched the requested ` +
+      `constituency/county exactly:`,
+      matches.map((f) => f.properties)
+    );
+  }
 
   return null;
 }
