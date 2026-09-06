@@ -2658,11 +2658,12 @@
             {
                 "constituency_name": "Muhoroni",
                 "wards": [
-                    "Miwani",
-                    "Ombeyi",
-                    "Masogo/Nyag’Oma",
-                    "Chemeli/Muhoroni/Koru"
-                ]
+                  "Miwani",
+                  "Ombeyi",
+                  "Masogo/Nyang'oma",
+                  "Chemelil/Tamu",
+                  "Muhoroni/Koru"
+            ]
             },
             {
                 "constituency_name": "Nyakach",
