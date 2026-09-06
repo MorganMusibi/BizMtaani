@@ -51,7 +51,7 @@ interface Props {
 
 type Stage = "idle" | "initiating" | "awaiting_pin" | "success" | "failed" | "cancelled" | "timeout";
 
-const PIN_TIMEOUT_SECS = 120;
+const PIN_TIMEOUT_SECS = 60;
 
 interface PaymentDoc {
   status: "pending" | "completed" | "failed" | "cancelled";
@@ -237,10 +237,20 @@ setStage("awaiting_pin");
         style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}>
 
         <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
-        <button onClick={onClose} disabled={stage === "initiating" || stage === "awaiting_pin"}
-          className="absolute top-4 right-4 p-2 rounded-xl hover:bg-muted transition-colors">
-          <X size={18} className="text-muted-foreground" />
-        </button>
+        <button
+  onClick={() => {
+    if (stage === "awaiting_pin") {
+      if (window.confirm("Your M-Pesa prompt may still be pending on your phone. Close anyway?")) {
+        onClose();
+      }
+      return;
+    }
+    onClose();
+  }}
+  disabled={stage === "initiating"}
+  className="absolute top-4 right-4 p-2 rounded-xl hover:bg-muted transition-colors">
+  <X size={18} className="text-muted-foreground" />
+</button>>
 
         {/* ---- IDLE: phone input ---- */}
         {stage === "idle" && (
@@ -252,7 +262,7 @@ setStage("awaiting_pin");
               <div>
                 <p className="font-black text-base">Activate Listing</p>
                 <p className="text-xs text-muted-foreground">
-  Pay to post your advert for {duration} days
+  use premium to reactivate and post more adverts for {duration} days
 </p>
               </div>
             </div>
