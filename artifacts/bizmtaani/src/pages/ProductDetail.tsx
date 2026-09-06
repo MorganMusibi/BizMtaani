@@ -523,7 +523,7 @@ const handleReply = () => {
 
   const { id } = useParams<{ id: string }>();
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   // Synchronous cache read at mount time — avoids the empty-then-refill
@@ -791,11 +791,11 @@ useEffect(() => {
   }
 }
 
-  if (loading) return (
-    <div className="min-h-screen flex items-center justify-center">
-      <Loader2 size={32} className="animate-spin text-primary" />
-    </div>
-  );
+  if (loading || authLoading) return (
+  <div className="min-h-screen flex items-center justify-center">
+    <Loader2 size={32} className="animate-spin text-primary" />
+  </div>
+);
   if (!product) return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4">
       <p className="text-muted-foreground">Product not found.</p>
@@ -989,14 +989,15 @@ async function saveMenuChanges() {
   </div>
 
 </div>
+{(!isEatery || product.eateryPayment?.method) && (
 <Card className={`mt-5 p-4 ${isEatery ? "bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-900" : "bg-primary/5 border-primary/10"}`}>
 
 {isEatery ? (
-  <div className="select-none">
+  <div>
     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
       Payment
     </p>
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-text">
       {product.eateryPayment?.method === "mpesa"
         ? `M-Pesa: ${product.eateryPayment.number}`
         : product.eateryPayment?.method === "till"
@@ -1005,9 +1006,7 @@ async function saveMenuChanges() {
         ? `Pochi la Biashara: ${product.eateryPayment.number}`
         : product.eateryPayment?.method === "paybill"
         ? `Paybill: ${product.eateryPayment.number} (Acc: ${product.eateryPayment.accountNumber})`
-        : product.eateryPayment?.method === "other"
-        ? product.eateryPayment.otherDescription || "Contact for payment details"
-        : "Contact for payment details"}
+        : product.eateryPayment.otherDescription || ""}
     </h2>
   </div>
 ) : isAccommodation ? (
@@ -1050,6 +1049,7 @@ async function saveMenuChanges() {
   )}
 
 </Card>
+)}
 
         
         {product.description && (
