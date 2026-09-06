@@ -39,7 +39,7 @@ const TYPE_COLORS: Record<string, string> = {
 export default function JobDetail() {
   const [, params] = useRoute("/jobs/:id");
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   
   const [job, setJob] = useState<JobPost | null>(null);
@@ -189,13 +189,13 @@ useEffect(() => {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="flex flex-col h-screen items-center justify-center gap-3">
-        <Loader2 size={28} className="animate-spin text-primary" />
-      </div>
-    );
-  }
+  if (loading || authLoading) {
+  return (
+    <div className="flex flex-col h-screen items-center justify-center gap-3">
+      <Loader2 size={28} className="animate-spin text-primary" />
+    </div>
+  );
+}
 
   if (!job) {
     return (
