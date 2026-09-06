@@ -191,20 +191,23 @@ const duration = LISTING_DURATION_DAYS[plan];
 
   try {
     const {
-      checkoutRequestId,
-      productId: pid,
-    } = await onInitiate(phone);
+  checkoutRequestId,
+  productId: pid,
+} = await onInitiate(phone);
 
-    setCheckoutId(checkoutRequestId);
-    setProductId(pid);
+setProductId(pid);
 
-    // Free/subscription-based publishing may not create an STK request.
-    // For this modal, paid listings should always have a checkout ID.
-    if (!checkoutRequestId) {
-      throw new Error("Payment request was not created.");
-    }
+// An empty checkoutRequestId means the listing was already
+// reactivated directly (e.g. covered by an active subscription) —
+// no STK push was needed, so skip straight to success instead of
+// waiting on a payment that was never created.
+if (!checkoutRequestId) {
+  setStage("success");
+  return;
+}
 
-    setStage("awaiting_pin");
+setCheckoutId(checkoutRequestId);
+setStage("awaiting_pin");
   } catch (error: unknown) {
     console.error("M-Pesa payment initiation failed:", error);
 
