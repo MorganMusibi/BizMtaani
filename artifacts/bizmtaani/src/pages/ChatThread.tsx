@@ -76,7 +76,7 @@ export default function ChatThread() {
   |--------------------------------------------------------------------------
   */
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   /*
   |--------------------------------------------------------------------------
@@ -135,17 +135,18 @@ export default function ChatThread() {
   */
 
   useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  if (authLoading) return; // wait for auth to actually resolve
 
-    if (!chatId) {
-      setError("Invalid conversation.");
-      setLoading(false);
-      return;
-    }
+  if (!user) {
+    setLoading(false);
+    return;
+  }
 
+  if (!chatId) {
+    setError("Invalid conversation.");
+    setLoading(false);
+    return;
+  }
     setLoading(true);
     setError("");
     setInitialMessagesLoaded(false);
