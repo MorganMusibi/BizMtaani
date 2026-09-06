@@ -250,7 +250,7 @@ setStage("awaiting_pin");
   disabled={stage === "initiating"}
   className="absolute top-4 right-4 p-2 rounded-xl hover:bg-muted transition-colors">
   <X size={18} className="text-muted-foreground" />
-</button>>
+</button>
 
         {/* ---- IDLE: phone input ---- */}
         {stage === "idle" && (
