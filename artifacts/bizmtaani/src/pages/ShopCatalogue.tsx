@@ -288,8 +288,7 @@ export default function ShopCatalogue() {
   const { userId } =
     useParams<{ userId: string }>();
 
-  const { user, userProfile } =
-    useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
 
   const { toast } =
     useToast();
@@ -675,9 +674,9 @@ useEffect(() => {
    * ------------------------------------------------------------
    */
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background pb-24 animate-pulse">
+  if (loading || authLoading) {
+  return (
+    <div className="min-h-screen bg-background pb-24 animate-pulse">
         <div className="sticky top-0 z-40 bg-card border-b border-border flex items-center gap-3 px-4 h-14">
           <div className="w-6 h-6 rounded-full bg-muted" />
           <div className="h-4 w-32 rounded bg-muted" />
