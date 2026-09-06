@@ -101,7 +101,7 @@ const PRICING_BASIS_OPTIONS = [
 ];
 type Step = 1 | 2 | 3 | 4 | 5;
 export default function PostProduct() {
-  const { user, userProfile, subscriptionPlan, hasActivePremium,
+  const { user, userProfile, subscriptionPlan, hasActivePremium, loading: authLoading,
 } = useAuth();
 
   // Invalidate this seller's own cached advert lists (My Listings +
@@ -263,8 +263,9 @@ const [eventOrganizer, setEventOrganizer] = useState("");
 const [ticketPrice, setTicketPrice] = useState("");
 
   useEffect(() => {
-    if (!user) { navigate("/login"); return; }
-    if (user.phoneNumber) setPhone(user.phoneNumber);
+  if (authLoading) return;
+  if (!user) { navigate("/login"); return; }
+  if (user.phoneNumber) setPhone(user.phoneNumber);
 
     // Show profile's saved area immediately so the field isn't blank
     // while we wait for GPS to resolve (GPS will override this if it succeeds).
