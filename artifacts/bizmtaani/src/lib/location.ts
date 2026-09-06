@@ -300,7 +300,7 @@ if (matches.length === 1) return centerOf(matches[0]);
       `[location] Ambiguous ward "${wardName}" (constituency="${constituencyName}", county="${countyName}") ` +
       `matched ${matches.length} physical wards in GeoJSON, none of which matched the requested ` +
       `constituency/county exactly:`,
-      matches.map((f) => f.properties)
+      JSON.stringify(matches.map((f) => f.properties), null, 2)
     );
   }
 
