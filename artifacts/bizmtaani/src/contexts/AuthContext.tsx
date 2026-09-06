@@ -212,35 +212,35 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
     })
     .catch(() => {});
 }
-
-          // --------------------------------------------------
+// --------------------------------------------------
           // ADMIN CLAIM CHECK
+          // Runs in parallel with the profile listener below, not
+          // before it — the admin check is a network round-trip that
+          // only matters for one account, and it was previously
+          // blocking every regular user's own profile from loading
+          // until it finished.
           // --------------------------------------------------
 
           setAdminLoading(true);
 
-          try {
-            const tokenResult =
-              await getIdTokenResult(currentUser);
-
-            setIsAdmin(
-              tokenResult.claims.admin === true
-            );
-          } catch (error) {
-            console.error(
-              "Failed to check administrator access:",
-              error
-            );
-
-            setIsAdmin(false);
-          } finally {
-            setAdminLoading(false);
-          }
+          getIdTokenResult(currentUser)
+            .then((tokenResult) => {
+              setIsAdmin(tokenResult.claims.admin === true);
+            })
+            .catch((error) => {
+              console.error(
+                "Failed to check administrator access:",
+                error
+              );
+              setIsAdmin(false);
+            })
+            .finally(() => {
+              setAdminLoading(false);
+            });
 
           // --------------------------------------------------
           // USER PROFILE
           // --------------------------------------------------
-
 
           const docRef = doc(
             db,
@@ -276,6 +276,7 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
               setProfileLoading(false);
             }
           );
+
         }
       );
 
