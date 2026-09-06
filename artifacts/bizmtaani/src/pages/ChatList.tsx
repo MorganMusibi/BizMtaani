@@ -324,7 +324,7 @@ export default function ChatList() {
   const [, setLocation] =
     useLocation();
 
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
   const [chats, setChats] =
     useState<ChatListItem[]>([]);
@@ -372,30 +372,32 @@ export default function ChatList() {
   | LOAD USER CHATS
   |--------------------------------------------------------------------------
   */
+useEffect(() => {
+  if (authLoading) return; // wait for auth to actually resolve
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      setLocation("/login");
-      return;
-    }
+  if (!user) {
+    setLoading(false);
+    setLocation("/login");
+    return;
+  }
 
-    setLoading(true);
-    setError("");
+  setLoading(true);
+  setError("");
 
-    const chatsQuery = query(
-      collection(db, "chats"),
-      where(
-        "participants",
-        "array-contains",
-        user.uid
-      ),
-      orderBy(
-        "lastMessageAt",
-        "desc"
-      ),
-      limit(20)
-    );
+  const chatsQuery = query(
+    collection(db, "chats"),
+    where(
+      "participants",
+      "array-contains",
+      user.uid
+    ),
+    orderBy(
+      "lastMessageAt",
+      "desc"
+    ),
+    limit(20)
+  );
+  
 
     const unsubscribe =
       onSnapshot(
@@ -435,7 +437,7 @@ export default function ChatList() {
       );
 
     return unsubscribe;
-  }, [user, setLocation]);
+  }, [user, authLoading, setLocation]);
 
   /*
   |--------------------------------------------------------------------------
