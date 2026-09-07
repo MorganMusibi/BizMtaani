@@ -575,6 +575,7 @@
                 "constituency_name": "Buuri",
                 "wards": [
                     "Timau",
+                    "Kibirichia",
                     "Kisima",
                     "Kiirua/Naari",
                     "Ruiri/Rwarera"
@@ -586,17 +587,16 @@
                     "Mwanganthia",
                     "Abothuguchi Central",
                     "Abothuguchi West",
-                    "Kiagu",
-                    "Kibirichia"
+                    "Kiagu"
                 ]
             },
             {
                 "constituency_name": "Igembe Central",
                 "wards": [
                     "Akirang'Ondu",
-                    "Athiru",
-                    "Ruujine",
-                    "Igembe East Njia",
+                    "Athiru Ruujine",
+                    "Igembe East",
+                    "Njia",
                     "Kangeta"
                 ]
             },
@@ -738,7 +738,7 @@
                 "constituency_name": "Mbeere South",
                 "wards": [
                     "Mwea",
-                    "Amakim",
+                    "Makima",
                     "Mbeti South",
                     "Mavuria",
                     "Kiambere"
@@ -763,7 +763,8 @@
                 "constituency_name": "Kitui Central",
                 "wards": [
                     "Miambani",
-                    "Township Kyangwithya West",
+                    "Township",
+                    "Kyangwithya West",
                     "Mulango",
                     "Kyangwithya East"
                 ]
@@ -780,7 +781,7 @@
             {
                 "constituency_name": "Kitui South",
                 "wards": [
-                    "Ikana/Kyantune",
+                    "Ikana/Kyatune",
                     "Mutomo",
                     "Mutha",
                     "Ikutha",
@@ -821,7 +822,7 @@
             {
                 "constituency_name": "Mwingi Central",
                 "wards": [
-                    "Central",
+                    "Mwingi Central",
                     "Kivou",
                     "Nguni",
                     "Mui",
