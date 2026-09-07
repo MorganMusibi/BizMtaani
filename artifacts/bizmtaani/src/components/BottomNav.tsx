@@ -62,6 +62,7 @@ export function BottomNav() {
           <Link
             key={path}
             href={path}
+            replace
             data-testid={`nav-${label.toLowerCase()}`}
             onMouseEnter={() => {
               const load = prefetchMap[path];
