@@ -85,6 +85,9 @@ const [openingHours, setOpeningHours] = useState(userProfile?.openingHours ?? ""
 const [businessAddress, setBusinessAddress] = useState(userProfile?.businessAddress ?? "");
 const [socialMediaLink, setSocialMediaLink] = useState(userProfile?.socialMediaLink ?? "");
 const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
+const [showNameForm, setShowNameForm] = useState(false);
+const [nameInput, setNameInput] = useState("");
+const [savingName, setSavingName] = useState(false);
 
   const [showMarketerForm, setShowMarketerForm] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
@@ -166,6 +169,36 @@ const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
     });
   } finally {
     setSavingBusinessDetails(false);
+  }
+  }
+
+  async function handleSaveName() {
+  if (!user || !nameInput.trim()) return;
+
+  setSavingName(true);
+  const updatedName = nameInput.trim();
+
+  try {
+    // 1. Update Firebase Auth display name
+    await updateProfile(user, { displayName: updatedName });
+
+    // 2. Update Firestore document (sets businessName if business owner, otherwise displayName)
+    const updatePayload = isBusinessOwner
+      ? { businessName: updatedName }
+      : { displayName: updatedName };
+
+    await updateDoc(doc(db, "users", user.uid), updatePayload);
+
+    toast({ title: "Name updated successfully" });
+    setShowNameForm(false);
+  } catch (error) {
+    toast({
+      title: "Could not update name",
+      description: "Please try again.",
+      variant: "destructive",
+    });
+  } finally {
+    setSavingName(false);
   }
   }
 
@@ -409,22 +442,64 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} />
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleAvatarChange} />
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p data-testid="text-display-name" className="font-black text-xl truncate">
-                {displayName}
-              </p>
-              {isBusinessOwner && (
-                <span className="flex-shrink-0 text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full">
-                  BIZ
-                </span>
-              )}
-            </div>
-            <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Tap photo to view • Tap camera to change
-            </p>
-          </div>
+          <div className="min-w-0 flex-1">
+  {showNameForm ? (
+    <div className="space-y-2 mt-1">
+      <input
+        type="text"
+        placeholder={isBusinessOwner ? "Business Name" : "Profile Name"}
+        value={nameInput}
+        onChange={(e) => setNameInput(e.target.value)}
+        className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
+      />
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => setShowNameForm(false)}
+          className="h-8 px-3 rounded-lg border border-border text-xs font-semibold text-muted-foreground"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={handleSaveName}
+          disabled={savingName || !nameInput.trim()}
+          className="h-8 px-3 rounded-lg bg-primary text-white text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+        >
+          {savingName ? <Loader2 size={12} className="animate-spin" /> : "Save"}
+        </button>
+      </div>
+    </div>
+  ) : (
+    <>
+      <div className="flex items-center gap-2">
+        <p data-testid="text-display-name" className="font-black text-xl truncate">
+          {displayName}
+        </p>
+        {isBusinessOwner && (
+          <span className="flex-shrink-0 text-[10px] font-black bg-primary/10 text-primary px-2 py-0.5 rounded-full">
+            BIZ
+          </span>
+        )}
+        <button
+          type="button"
+          onClick={() => {
+            setNameInput(displayName);
+            setShowNameForm(true);
+          }}
+          className="text-xs font-semibold text-primary hover:underline ml-1"
+        >
+          Edit
+        </button>
+      </div>
+      <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
+      <p className="text-xs text-muted-foreground mt-0.5">
+        Tap photo to view • Tap camera to change
+      </p>
+    </>
+  )}
+</div>
+
         </div>
 
          {showAvatarMenu && (
@@ -441,7 +516,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
                 <X size={16} />
               </button>
               <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-              <p className="font-bold text-sm text-center mb-4">Change profile photo</p>
+              <p className="font-bold text-sm text-center mb-4">Badilisha profile photo</p>
 
               <div className="space-y-2">
                 <button
