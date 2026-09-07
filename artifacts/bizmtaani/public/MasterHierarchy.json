@@ -7,9 +7,9 @@
                 "constituency_name": "Changamwe",
                 "wards": [
                     "Port Reitz",
+                    "Changamwe",
                     "Kipevu",
                     "Airport",
-                    "Miritini",
                     "Chaani"
                 ]
             },
@@ -60,7 +60,7 @@
                     "Ziwa La Ng'Ombe",
                     "Mkomani",
                     "Kongowea",
-                    "Ziwani/Kadzandani"
+                    "Kadzandani"
                 ]
             }
         ]
@@ -149,7 +149,7 @@
             {
                 "constituency_name": "Ganze",
                 "wards": [
-                    "Dungicha",
+                    "Ganze",
                     "Bamba",
                     "Jaribuni",
                     "Sokoke"
@@ -158,7 +158,7 @@
             {
                 "constituency_name": "Magarini",
                 "wards": [
-                    "Maarafa",
+                    "Marafa",
                     "Magarini",
                     "Gongoni",
                     "Adu",
@@ -170,6 +170,7 @@
                 "constituency_name": "Rabai",
                 "wards": [
                     "Mwawesa",
+                    "Kambe/Ribe",
                     "Ruruma",
                     "Jibana",
                     "Rabai/Kisurutuni"
@@ -198,7 +199,7 @@
                     "Garsen East",
                     "Garsen North",
                     "Garsen South",
-                    "Kipini East",
+                    "Garsen West",
                     "Kipini West"
                 ]
             },
