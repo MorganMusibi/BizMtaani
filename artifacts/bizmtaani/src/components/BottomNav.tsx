@@ -11,7 +11,7 @@ interface Chat {
 }
 
 export function BottomNav() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
   const { user } = useAuth();
   const [unreadTotal, setUnreadTotal] = useState(0);
 
@@ -47,6 +47,17 @@ export function BottomNav() {
     { path: "/about", label: "About", icon: Info, badge: 0 },
     { path: "/profile", label: "Profile", icon: User, badge: 0 },
   ];
+const handleTabClick = (path: string) => {
+  if (location === path) return;
+
+  if (path === "/") {
+    setLocation("/", { replace: true });
+  } else if (location === "/") {
+    setLocation(path);
+  } else {
+    setLocation(path, { replace: true });
+  }
+};
 
   return (
   <nav
@@ -59,25 +70,26 @@ export function BottomNav() {
         const isActive =
           path === "/" ? location === "/" : location.startsWith(path);
         return (
-          <Link
-            key={path}
-            href={path}
-            replace
-            data-testid={`nav-${label.toLowerCase()}`}
-            onMouseEnter={() => {
-              const load = prefetchMap[path];
-              if (load) prefetchRoute(path, load);
-            }}
-            onTouchStart={() => {
-              const load = prefetchMap[path];
-              if (load) prefetchRoute(path, load);
-            }}
-            className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
-              isActive
-                ? "text-primary"
-                : "text-slate-400 hover:text-slate-100"
-            }`}
-          >
+          <button
+  key={path}
+  type="button"
+  onClick={() => handleTabClick(path)}
+  data-testid={`nav-${label.toLowerCase()}`}
+  onMouseEnter={() => {
+    const load = prefetchMap[path];
+    if (load) prefetchRoute(path, load);
+  }}
+  onTouchStart={() => {
+    const load = prefetchMap[path];
+    if (load) prefetchRoute(path, load);
+  }}
+  className={`flex-1 flex flex-col items-center justify-center gap-0.5 transition-colors relative ${
+    isActive
+      ? "text-primary"
+      : "text-slate-400 hover:text-slate-100"
+  }`}
+>
+
             <div className="relative">
               <Icon size={22} strokeWidth={isActive ? 2.5 : 1.8} />
               {badge > 0 && (
@@ -94,7 +106,7 @@ export function BottomNav() {
             {isActive && (
               <span className="absolute bottom-0 w-6 h-0.5 rounded-t-full bg-primary" />
             )}
-          </Link>
+          </button>
         );
       })}
     </div>
