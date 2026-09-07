@@ -782,36 +782,38 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
       </div>
 
       {showPhotoViewer && (
-        <div
-          className="fixed inset-0 z-50 bg-black flex items-center justify-center"
-          onClick={() => setShowPhotoViewer(false)}
-        >
-          <img
-  src={getFullSizeUrl(user.photoURL!)}
-  alt={displayName}
-  className="max-w-full max-h-full object-contain"
-  onClick={(e) => e.stopPropagation()}
-/>
+  <div
+    className="fixed inset-0 z-[60] bg-black flex items-center justify-center"
+    onClick={() => setShowPhotoViewer(false)}
+  >
+    <img
+      src={getFullSizeUrl(user.photoURL!)}
+      alt={displayName}
+      className="max-w-full max-h-full object-contain"
+      onClick={(e) => e.stopPropagation()}
+    />
 
-          <button
-            className="absolute top-5 right-5 text-white text-4xl"
-            onClick={() => setShowPhotoViewer(false)}
-          >
-            ✕
-          </button>
+    <button
+      className="absolute top-5 right-5 text-white text-4xl"
+      onClick={() => setShowPhotoViewer(false)}
+    >
+      ✕
+    </button>
 
-          <button
-            className="absolute bottom-8 left-1/2 -translate-x-1/2 bg-primary text-white px-6 py-3 rounded-xl"
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowPhotoViewer(false);
-              setShowAvatarMenu(true);
-            }}
-          >
-            Change Photo
-          </button>
-        </div>
-      )}
+    <button
+      style={{ bottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+      className="absolute left-1/2 -translate-x-1/2 bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg"
+      onClick={(e) => {
+        e.stopPropagation();
+        setShowPhotoViewer(false);
+        setShowAvatarMenu(true);
+      }}
+    >
+      Change Photo
+    </button>
+  </div>
+)}
+
       {showMarketerForm && (
         <>
           <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setShowMarketerForm(false)} />
