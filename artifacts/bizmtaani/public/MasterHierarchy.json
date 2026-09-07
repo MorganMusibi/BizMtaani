@@ -9,8 +9,8 @@
                     "Port Reitz",
                     "Kipevu",
                     "Airport",
-                    "Chaani",
-                    "Changamwe"
+                    "Miritini",
+                    "Chaani"
                 ]
             },
             {
@@ -18,8 +18,7 @@
                 "wards": [
                     "Jomvu Kuu",
                     "Magongo",
-                    "Mikindani",
-                    "Miritini",
+                    "Mikindani"
                 ]
             },
             {
@@ -2202,7 +2201,7 @@
                     "Marama West",
                     "Marama Central",
                     "Marenyo-Shianda",
-                    "Marama North",
+                    "Maram North",
                     "Marama South"
                 ]
             },
@@ -2291,7 +2290,7 @@
                     "Shinoyi-Shikomari",
                     "Esumeyia",
                     "Bunyala West",
-                    "Bunyala East",
+                    "Bunyal East",
                     "Bunyala Central"
                 ]
             },
@@ -2511,14 +2510,14 @@
                 "wards": [
                     "Bukhayo West",
                     "Mayenje",
-                    "Matayos South / busibwabo",
+                    "Matayos Southbusibwabo",
                     "Burumba"
                 ]
             },
             {
                 "constituency_name": "Butula",
                 "wards": [
-                    "Marachi West / kingandole",
+                    "Marachi Westkingandole",
                     "Marachi Central",
                     "Marachi East",
                     "Marachi North",
@@ -2576,6 +2575,23 @@
             {
                 "constituency_name": "Rarieda",
                 "wards": [
+                    "Gem Rae",
+                    "East Asembo",
+                    "West Asembo",
+                    "Central Asembo",
+                    "South West Asembo",
+                    "North West Asembo",
+                    "North East Asembo",
+                    "South East Asembo",
+                    "Nyang'Oma Kogelo",
+                    "West Uyoma",
+                    "Central Uyoma",
+                    "North Uyoma"
+                ]
+            },
+            {
+                "constituency_name": "Ugenya",
+                "wards": [
                     "East Asembo",
                     "West Asembo",
                     "North Uyoma",
@@ -2583,22 +2599,13 @@
                     "West Uyoma"
                 ]
             },
-           {
-                "constituency_name": "Ugenya",
-                "wards": [
-                    "East Ugenya",
-                    "West Ugenya",
-                    "North Ugenya",
-                    "Ukwala"
-                ]
-            },
             {
                 "constituency_name": "Ugunja",
                 "wards": [
-    "Bunyala",
-    "Sigomere",
-    "Ugunja"
-]
+                    "Sidindi",
+                    "Sigomere",
+                    "Ugunja"
+                ]
             }
         ]
     },
@@ -2631,7 +2638,7 @@
                 "constituency_name": "Kisumu West",
                 "wards": [
                     "South West Kisumu",
-                    "Central Kisumu",
+                    "Cetral Kisumu",
                     "Kisumu North",
                     "West Kisumu",
                     "North West Kisumu"
@@ -2659,12 +2666,11 @@
             {
                 "constituency_name": "Muhoroni",
                 "wards": [
-                  "Miwani",
-                  "Ombeyi",
-                  "Masogo/Nyang'oma",
-                  "Chemelil/Tamu",
-                  "Muhoroni/Koru"
-            ]
+                    "Miwani",
+                    "Ombeyi",
+                    "Masogo/Nyag’Oma",
+                    "Chemeli/Muhoroni/Koru"
+                ]
             },
             {
                 "constituency_name": "Nyakach",
@@ -2914,7 +2920,7 @@
                 "constituency_name": "Bobasi",
                 "wards": [
                     "Masige West",
-                    "Masige East",
+                    "Masig East",
                     "Basi Central",
                     "Nyacheki",
                     "Bassi Bogetaorio",
@@ -3100,6 +3106,7 @@
                 "wards": [
                     "Kayole North",
                     "Kayole Central",
+                    "Kariobangi South",
                     "Komarock",
                     "Matopeni / Spring Valley"
                 ]
@@ -3121,6 +3128,7 @@
                     "Umoja 2",
                     "Mowlem",
                     "Kariobangi South",
+                    "Maringo/ Hamza"
                 ]
             },
             {
@@ -3130,26 +3138,23 @@
                     "Harambee",
                     "Makongeni",
                     "Pumwani",
-                    "Maringo/ Hamza"
-                    
+                    "Eastleigh North"
                 ]
             },
             {
                 "constituency_name": "Kamukunji",
                 "wards": [
                     "Eastleigh South",
+                    "Nairobi Central",
                     "Airbase",
-                    "Pumwani",
                     "California",
-                    "Mgara",
-                    "Eastleigh North"
+                    "Mgara"
                 ]
             },
             {
                 "constituency_name": "Starehe",
                 "wards": [
                     "Nairobi South",
-                    "Nairobi Central",
                     "Hospital",
                     "Ngara",
                     "Pangani",
@@ -3163,11 +3168,10 @@
                     "Mlango Kubwa",
                     "Kiamaiko",
                     "Ngei",
-                    "Hospital",
                     "Huruma",
                     "Mabatini"
                 ]
             }
         ]
     }
-                ]
+        ]
