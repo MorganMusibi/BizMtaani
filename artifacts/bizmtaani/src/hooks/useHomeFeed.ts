@@ -1249,7 +1249,7 @@ const queries = areaQueries(
   currentRadius,
   currentCursors,
   currentDonePrefixes,
-  false
+  true
 );
 
     if (queries.length === 0) {
