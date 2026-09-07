@@ -290,7 +290,7 @@
                     "Kaloleni",
                     "Sagala",
                     "Marungu",
-                    "Kaigau",
+                    "Kasigau",
                     "Ngolia"
                 ]
             }
@@ -301,7 +301,7 @@
         "county_name": "Garissa",
         "constituencies": [
             {
-                "constituency_name": "Dujis",
+                "constituency_name": "Garissa Township",
                 "wards": [
                     "Waberi",
                     "Galbet",
@@ -353,7 +353,7 @@
                 "constituency_name": "Lagdera",
                 "wards": [
                     "Modogashe",
-                    "Bename",
+                    "Bananey",
                     "Goreale",
                     "Maalamin",
                     "Sabena",
@@ -369,7 +369,7 @@
             {
                 "constituency_name": "Wajir East",
                 "wards": [
-                    "Wagbri",
+                    "Wagberi",
                     "Township",
                     "Barwago",
                     "Khorof/Harar"
@@ -391,6 +391,7 @@
                 "constituency_name": "Wajir South",
                 "wards": [
                     "Benane",
+                    "Diif",
                     "Burder",
                     "Dadaja Bulla",
                     "Habaswein",
@@ -465,7 +466,7 @@
             {
                 "constituency_name": "Mandera South",
                 "wards": [
-                    "Wargadud",
+                    "Wargadoub",
                     "Kutulo",
                     "Elwak South",
                     "Elwak North",
@@ -521,7 +522,7 @@
             {
                 "constituency_name": "Saku",
                 "wards": [
-                    "Sagate/Jaldesa",
+                    "Sagante/Jaldesa",
                     "Karare",
                     "Marsabit Central"
                 ]
@@ -531,7 +532,7 @@
                 "wards": [
                     "Butiye",
                     "Sololo",
-                    "Heillu/Manyatta",
+                    "Hellu/Manyatta",
                     "Golbo",
                     "Moyale Township",
                     "Uran",
