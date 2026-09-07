@@ -839,8 +839,7 @@
                 "constituency_name": "Masinga",
                 "wards": [
                     "Kivaa",
-                    "Masinga",
-                    "Central",
+                    "Masinga Central",
                     "Ekalakala",
                     "Muthesya",
                     "Ndithini"
@@ -977,7 +976,7 @@
                     "Makindu",
                     "Nguumo",
                     "Kikumbulyu North",
-                    "Kimumbulyu South",
+                    "Kikumbulyu South",
                     "Nguu/Masumba",
                     "Emali/Mulala"
                 ]
@@ -1014,7 +1013,7 @@
                 "constituency_name": "Ol Joro Orok",
                 "wards": [
                     "Gathanji",
-                    "Gatima",
+                    "Gatimu",
                     "Weru",
                     "Charagita"
                 ]
@@ -1095,11 +1094,11 @@
                 "constituency_name": "Kieni",
                 "wards": [
                     "Mweiga",
-                    "Naromoro Kiamthaga",
-                    "Mwiyogo/Endara Sha",
+                    "Narumoru Kiamathaga",
+                    "Mwiyogo/Endarasha",
                     "Mugunda",
                     "Gatarakwa",
-                    "Thegu River",
+                    "Thigu",
                     "Kabaru",
                     "Gakawa"
                 ]
@@ -1128,14 +1127,15 @@
                     "Nyangati",
                     "Murindiko",
                     "Gathigiriri",
-                    "Teberer",
+                    "Tebere",
                     "Thiba"
                 ]
             },
             {
                 "constituency_name": "Gichugu",
                 "wards": [
-                    "Kabare Baragwi",
+                    "Kabare",
+                    "Baragwi",
                     "Njukiini",
                     "Ngariama",
                     "Karumandi"
