@@ -235,7 +235,14 @@ const handleAreaSelect = useCallback(
       return true;
     });
     
-    return rankProducts(visibleProducts, userCoords);
+    // Stronger premium bias on category pages specifically — premium ads
+// both sort as if closer (0.3x vs Home's 0.5x) and win same-area ties
+// roughly twice as often (weight 6 vs Home's 3).
+return rankProducts(visibleProducts, userCoords, {
+  premiumWeight: 6,
+  premiumDiscount: 0.3,
+  premiumAlwaysFirst: true,
+});
   }, [areaProducts, userCoords, locationInfo?.wardName]);
 
   // Infinite scroll
