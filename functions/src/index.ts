@@ -53,6 +53,13 @@ const PLAN_AMOUNTS: Record<string, number> = {
   premium_monthly: 400 
 };
 
+const PREMIUM_ONLY_CATEGORIES = [
+  "Accommodation",
+  "Commercial Property",
+  "Entertainment & Events",
+  "Leisure & Activities",
+];
+
 // If you are using limits in your backend, update them here:
 const MAX_PHOTO_LIMIT: Record<string, number> = {
   free: 1,
@@ -1532,6 +1539,15 @@ if (userSnap.exists) {
     hasActiveSubscription = true;
   }
 }
+
+  // 0. Validation: Category requires Premium
+  const category = typeof otherData.category === "string" ? otherData.category : "";
+  if (PREMIUM_ONLY_CATEGORIES.includes(category) && effectivePlan === "free") {
+    throw new HttpsError(
+      "failed-precondition",
+      `${category} adverts require an active Premium plan.`
+    );
+  }
 
   // 1. Validation: Plan Existence
   if (!PLAN_AMOUNTS.hasOwnProperty(effectivePlan)) {
