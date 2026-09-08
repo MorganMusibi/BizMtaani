@@ -2592,28 +2592,20 @@
             {
                 "constituency_name": "Rarieda",
                 "wards": [
-                    "Gem Rae",
                     "East Asembo",
                     "West Asembo",
-                    "Central Asembo",
-                    "South West Asembo",
-                    "North West Asembo",
-                    "North East Asembo",
-                    "South East Asembo",
-                    "Nyang'Oma Kogelo",
-                    "West Uyoma",
-                    "Central Uyoma",
+                    "North Uyoma",
+                    "South Uyoma",
                     "North Uyoma"
                 ]
             },
             {
                 "constituency_name": "Ugenya",
                 "wards": [
-                    "East Asembo",
-                    "West Asembo",
-                    "North Uyoma",
-                    "South Uyoma",
-                    "West Uyoma"
+                    "West Ugenya",
+                    "Ukwala",
+                    "North Ugenya",
+                    "East Ugenya"
                 ]
             },
             {
@@ -2655,7 +2647,7 @@
                 "constituency_name": "Kisumu West",
                 "wards": [
                     "South West Kisumu",
-                    "Cetral Kisumu",
+                    "Central Kisumu",
                     "Kisumu North",
                     "West Kisumu",
                     "North West Kisumu"
@@ -2685,8 +2677,9 @@
                 "wards": [
                     "Miwani",
                     "Ombeyi",
-                    "Masogo/Nyag’Oma",
-                    "Chemeli/Muhoroni/Koru"
+                    "Masogo/Nyag’oma",
+                    "Chemeli/Koru",
+                    "Muhoroni"
                 ]
             },
             {
@@ -2771,7 +2764,7 @@
                     "Mfangano Island",
                     "Rusinga Island",
                     "Kasgunga",
-                    "Gember",
+                    "Gembe",
                     "Lambwe"
                 ]
             },
@@ -2781,7 +2774,7 @@
                     "Gwassi South",
                     "Gwassi North",
                     "Kaksingri West",
-                    "Ruma-Kakshingri"
+                    "Ruma-Kaksingri"
                 ]
             }
         ]
@@ -2814,15 +2807,15 @@
                     "God Jope",
                     "Suna Central",
                     "Kakrao",
-                    "Kwa"
+                    "Kwa Srba"
                 ]
             },
             {
                 "constituency_name": "Suna West",
                 "wards": [
                     "Wiga",
-                    "Wasweta Ii",
-                    "Ragan-Oruba",
+                    "Wasweta II",
+                    "Ragana-Oruba",
                     "Wasimbete"
                 ]
             },
@@ -2831,7 +2824,7 @@
                 "wards": [
                     "West Kanyamkago",
                     "North Kanyamkago",
-                    "Central Kanyam Kago",
+                    "Central Kanyamkago",
                     "South Kanyamkago",
                     "East Kanyamkago"
                 ]
@@ -2839,10 +2832,10 @@
             {
                 "constituency_name": "Nyatike",
                 "wards": [
-                    "Kachien’G",
+                    "Kachien’g",
                     "Kanyasa",
                     "North Kadem",
-                    "Macalder/ Kanyarwanda",
+                    "Macalder/Kanyarwanda",
                     "Kaler",
                     "Got Kachola",
                     "Muhuru"
@@ -2862,12 +2855,12 @@
                 "constituency_name": "Kuria West",
                 "wards": [
                     "Bukira East",
-                    "Bukira Central/ Ikerege",
+                    "Bukira Central/Ikerege",
                     "Isibania",
                     "Makerero",
                     "Masaba",
                     "Tagare",
-                    "Nyamosense/Ko Mosoko"
+                    "Nyamosense/Komosoko"
                 ]
             }
         ]
@@ -2937,13 +2930,13 @@
                 "constituency_name": "Bobasi",
                 "wards": [
                     "Masige West",
-                    "Masig East",
+                    "Masige East",
                     "Basi Central",
                     "Nyacheki",
                     "Bassi Bogetaorio",
                     "Bobasi Chache",
-                    "Sameta/ Mokwerero",
-                    "Bobasi/ Boitangare"
+                    "Sameta/Mokwerero",
+                    "Bobasi/Boitangare"
                 ]
             },
             {
@@ -2962,7 +2955,7 @@
                 "wards": [
                     "Bomariba",
                     "Bogiakumu",
-                    "Bokeira",
+                    "Bomokeira",
                     "Riana"
                 ]
             }
@@ -2999,7 +2992,7 @@
                     "Bogichora",
                     "Bosamaro",
                     "Bonyamatuta",
-                    "Township"
+                    "Nyamira Township"
                 ]
             },
             {
