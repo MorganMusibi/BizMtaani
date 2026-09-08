@@ -104,8 +104,7 @@ export function AuthProvider({
   const [userProfile, setUserProfile] =
     useState<UserProfile | null>(null);
 
-  const [profileLoading, setProfileLoading] =
-    useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
 
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
