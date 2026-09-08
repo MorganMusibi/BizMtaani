@@ -215,6 +215,12 @@ const [priceDisplay, setPriceDisplay] =
     setPlan(subscriptionPlan);
   }
 }, [hasActivePremium, subscriptionPlan]);
+
+useEffect(() => {
+  if (isPremiumOnlyCategory && !hasActivePremium && plan === "free") {
+    setPlan("premium_weekly");
+  }
+}, [isPremiumOnlyCategory, hasActivePremium]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [publishingFree, setPublishingFree] = useState(false);
   const [limitModalMessage, setLimitModalMessage] = useState<string | null>(null);
@@ -1547,6 +1553,15 @@ async function handlePublishFree() {
   isPublishingRef.current = true;
   try {
 
+  if (PREMIUM_ONLY_CATEGORIES.includes(selectedCategory)) {
+    toast({
+      title: "Premium required",
+      description: `${selectedCategory} adverts require a Premium plan.`,
+      variant: "destructive",
+    });
+    return;
+  }
+
   if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
     // ... everything that was already inside handlePublishFree stays exactly as-is,
     // all the way down to the closing of the try/catch/finally block that already
@@ -1799,6 +1814,14 @@ toast({
     isPublishingRef.current = false;
   }
 }
+const PREMIUM_ONLY_CATEGORIES = [
+  "Accommodation",
+  "Commercial Property",
+  "Entertainment & Events",
+  "Leisure & Activities",
+];
+const isPremiumOnlyCategory = PREMIUM_ONLY_CATEGORIES.includes(selectedCategory);
+
 const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
   return (
@@ -1879,6 +1902,11 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                         <p className="font-bold text-sm">{cat.displayShort}</p>
                         <p className="text-xs text-muted-foreground">{cat.tagline}</p>
                       </div>
+                      {PREMIUM_ONLY_CATEGORIES.includes(cat.key) && (
+                        <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#00A651]/10 text-[#00A651] flex-shrink-0 mr-1">
+                          Premium
+                        </span>
+                      )}
                       {isSelected ? (
                         <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                           <Check size={11} className="text-white" />
@@ -3586,7 +3614,20 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <h2 className="font-black text-lg">Choose Your Plan</h2>
       <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
     </div>
-{/* Free plan */}
+
+    {/* Free plan */}
+{isPremiumOnlyCategory ? (
+  <div className="w-full text-left p-4 rounded-2xl border-2 border-border bg-muted/30 opacity-60">
+    <div className="flex justify-between items-center">
+      <div>
+        <span className="font-black text-base">Free</span>
+        <p className="text-sm text-muted-foreground">Not available for {selectedCategory}</p>
+        <p className="text-xs text-amber-600 font-semibold mt-1">This category requires Premium</p>
+      </div>
+      <span className="font-black text-xl text-muted-foreground">—</span>
+    </div>
+  </div>
+) : (
     <button
   onClick={() => {
     if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
@@ -3629,6 +3670,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </div>
       )}
     </button>
+)}
 
     {/* Weekly Premium */}
     <button onClick={() => setPlan("premium_weekly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_weekly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
