@@ -1829,10 +1829,11 @@
                 "wards": [
                     "Ol-Moran",
                     "Rumuruti",
-                    "Township",
+                    "Rumuruti Township",
                     "Githiga",
                     "Marmanet",
                     "Igwamiti Salama"
+                    
                 ]
             }
         ]
@@ -1858,8 +1859,8 @@
                     "London",
                     "Kaptembwo",
                     "Kapkures",
-                    "Rhoda",
-                    "Shaabab"
+                    "Rhonda",
+                    "Shabab"
                 ]
             },
             {
@@ -1963,15 +1964,16 @@
                     "Olpusimoru",
                     "Olokurto",
                     "Narok Town",
-                    "Nkareta'Olorropil",
+                    "Nkareta",
+                    "Olorropil",
                     "Melili"
                 ]
             },
             {
                 "constituency_name": "Narok South",
                 "wards": [
-                    "Majimoto/Naroos",
-                    "Uraololulung’A",
+                    "Majimoto/Naroosura",
+                    "Ololulunga",
                     "Melelo",
                     "Loita",
                     "Sogoo",
@@ -2065,7 +2067,7 @@
             {
                 "constituency_name": "Kajiado South",
                 "wards": [
-                    "Entonet/Lenkisi",
+                    "Entonet/Lenkisim",
                     "Mbirikani/Eselen",
                     "Keikuku",
                     "Rombo",
@@ -2150,8 +2152,8 @@
                     "Ndanai/Abosi",
                     "Chemagel",
                     "Kipsonoi",
-                    "Apletundo",
-                    "Rongena/Manare T"
+                    "Kapletundo",
+                    "Rongena/Manaret"
                 ]
             },
             {
@@ -2206,7 +2208,7 @@
                     "Marama West",
                     "Marama Central",
                     "Marenyo-Shianda",
-                    "Maram North",
+                    "Marama North",
                     "Marama South"
                 ]
             },
@@ -2253,8 +2255,8 @@
                 "constituency_name": "Malava",
                 "wards": [
                     "West Kabras",
-                    "Chemuche East",
-                    "Kabras",
+                    "Chemuche",
+                    "East Kabras",
                     "Butali/Chegulo",
                     "Manda-Shivanga",
                     "Shirugu-Mugai",
@@ -2291,9 +2293,8 @@
             {
                 "constituency_name": "Navakholo",
                 "wards": [
-                    "Ingostse-Mathia",
+                    "Ingostse-Matiha",
                     "Shinoyi-Shikomari",
-                    "Esumeyia",
                     "Bunyala West",
                     "Bunyal East",
                     "Bunyala Central"
@@ -2342,8 +2343,8 @@
                     "Gisambai",
                     "Shamakhokho",
                     "Banja",
-                    "Muhudi",
-                    "Tambaa",
+                    "Muhudu",
+                    "Tambua",
                     "Jepkoyai"
                 ]
             },
@@ -2374,7 +2375,7 @@
                     "Wemilabi",
                     "Mwibona",
                     "Luanda South",
-                    "Emabungo"
+                    "Mabungo"
                 ]
             }
         ]
@@ -2390,6 +2391,7 @@
                     "Khasoko",
                     "Kabula",
                     "Kimaeti",
+                    "West Bukusu",
                     "South Bukusu",
                     "Siboti"
                 ]
@@ -2402,9 +2404,8 @@
                     "Township",
                     "Khalaba",
                     "Musikoma",
-                    "East Snag’Alo",
-                    "Marakatu",
-                    "Tuuti",
+                    "East Snag’alo",
+                    "Marakaru/Tuuti",
                     "West Sang’Alo"
                 ]
             },
@@ -2494,9 +2495,9 @@
                 "constituency_name": "Teso South",
                 "wards": [
                     "Ang'Orom",
-                    "Chakoi South",
+                    "Chakai South",
                     "Amukura Central",
-                    "Chakoi North",
+                    "Chakai North",
                     "Amukura East",
                     "Amukura West"
                 ]
@@ -2505,7 +2506,7 @@
                 "constituency_name": "Nambale",
                 "wards": [
                     "Nambale Township",
-                    "Bukhayo North/Waltsi",
+                    "Bukhayo North/Walatsi",
                     "Bukhayo East",
                     "Bukhayo Central"
                 ]
@@ -2515,14 +2516,16 @@
                 "wards": [
                     "Bukhayo West",
                     "Mayenje",
-                    "Matayos Southbusibwabo",
+                    "Matayos South",
+                    "Busibwabo",
                     "Burumba"
                 ]
             },
             {
                 "constituency_name": "Butula",
                 "wards": [
-                    "Marachi Westkingandole",
+                    "Marachi West",
+                    "Kingandole",
                     "Marachi Central",
                     "Marachi East",
                     "Marachi North",
@@ -2530,11 +2533,20 @@
                 ]
             },
             {
+              "constituency_name": "Bunyala",
+              "wards": [
+                 "Northern Bunyala",
+                 "Central Bunyala",
+                 "Bunyala West",
+                 "Bunyala South"
+               ]
+            },
+            {
                 "constituency_name": "Funyula",
                 "wards": [
                     "Namboboto Nambuku",
                     "Nangina",
-                    "Ageng'A Nanguba",
+                    "Ageng'a Nanguba",
                     "Bwiri"
                 ]
             }
