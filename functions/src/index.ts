@@ -410,13 +410,34 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
 export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
-  await verifyRecaptcha(recaptchaToken, "initiate_payment");
+
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "Product ID is required.");
+  }
+
+  // Kicked off immediately and awaited later, right before we need it —
+  // runs in parallel with reCAPTCHA verification and the Firestore reads
+  // below instead of waiting for everything else to finish first. On a
+  // warm instance this resolves instantly from the in-memory cache
+  // anyway; on a cold instance, this is where the real time is saved.
+  const darajaTokenPromise = getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
 
   // Cooldown guard — stops repeated STK push spam (accidental double-taps
   // or a script) from hammering Daraja and annoying the buyer's phone
   // with duplicate prompts.
   const cooldownRef = db.collection("paymentCooldowns").doc(request.auth.uid);
-  const cooldownSnap = await cooldownRef.get();
+
+  // reCAPTCHA verification (network call to Google) and the two Firestore
+  // reads below don't depend on each other's results, so they run
+  // concurrently instead of one after another. Writes (cooldown write,
+  // stale-payment cancellation) still happen only AFTER this resolves
+  // successfully — so a failed reCAPTCHA check never burns a write.
+  const [, cooldownSnap, productSnap] = await Promise.all([
+    verifyRecaptcha(recaptchaToken, "initiate_payment"),
+    cooldownRef.get(),
+    db.collection("products").doc(productId).get(),
+  ]);
+
   const lastInitiatedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastInitiatedAt?.toMillis() : null;
 
   if (lastInitiatedAt && Date.now() - lastInitiatedAt < MPESA_INITIATION_COOLDOWN_MS) {
@@ -427,44 +448,39 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   }
 
   await cooldownRef.set({
-  lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
-});
-  
-if (typeof productId !== "string" || !productId.trim()) {
-  throw new HttpsError("invalid-argument", "Product ID is required.");
-}
+    lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+  });
 
-const productSnap = await db.collection("products").doc(productId).get();
+  if (!productSnap.exists) {
+    throw new HttpsError("not-found", "Advert not found.");
+  }
 
-if (!productSnap.exists) {
-  throw new HttpsError("not-found", "Advert not found.");
-}
+  const productData = productSnap.data()!;
 
-const productData = productSnap.data()!;
+  if (productData.sellerId !== request.auth.uid) {
+    throw new HttpsError(
+      "permission-denied",
+      "You can only initiate payment for your own adverts."
+    );
+  }
 
-if (productData.sellerId !== request.auth.uid) {
-  throw new HttpsError(
-    "permission-denied",
-    "You can only initiate payment for your own adverts."
-  );
-}
+  if (productData.status !== "pending_payment") {
+    throw new HttpsError(
+      "failed-precondition",
+      "This advert is not awaiting payment."
+    );
+  }
 
-if (productData.status !== "pending_payment") {
-  throw new HttpsError(
-    "failed-precondition",
-    "This advert is not awaiting payment."
-  );
-}
+  // Use the plan already verified and stored on the product at
+  // publish time — never trust a plan value supplied by the client,
+  // since that directly determines the amount charged.
+  const plan = productData.plan;
 
-// Use the plan already verified and stored on the product at
-// publish time — never trust a plan value supplied by the client,
-// since that directly determines the amount charged.
-const plan = productData.plan;
+  if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
+    throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
+  }
 
-if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
-  throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
-}
   // Supersede any still-pending payment for this same product before
   // starting a fresh STK push — stops an earlier attempt's callback
   // (if it lands late, e.g. after a client-side timeout retry) from
@@ -481,7 +497,7 @@ if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
   if (!stalePayments.empty) await supersedeBatch.commit();
 
   const formattedPhone = normalizePhone(phone);
-  const token = await getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
+  const token = await darajaTokenPromise;
   const ts = mpesaTimestamp();
   const callbackToken = crypto.randomBytes(24).toString("hex");
   const projectId = process.env.GCLOUD_PROJECT ?? "";
