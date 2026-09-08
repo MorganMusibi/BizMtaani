@@ -354,18 +354,24 @@ function getViewSessionSeed(): string {
 // (0,1]. Sorting descending by this key gives each item a probability
 // of ranking first proportional to its weight — premium wins more
 // often, but never deterministically.
-function getViewPriorityKey(product: Product, sessionSeed: string): number {
-  const weight = isPremiumProduct(product) ? PREMIUM_VIEW_WEIGHT : FREE_VIEW_WEIGHT;
+function getViewPriorityKey(
+  product: Product,
+  sessionSeed: string,
+  premiumWeight: number = PREMIUM_VIEW_WEIGHT,
+  freeWeight: number = FREE_VIEW_WEIGHT
+): number {
+  const weight = isPremiumProduct(product) ? premiumWeight : freeWeight;
   const u = Math.max(seededRandom01(`${sessionSeed}_${product.id}`), 0.0001);
   return Math.pow(u, 1 / weight);
 }
 
 function getEffectiveSortDistanceKm(
   userCoords: [number, number],
-  product: Product
+  product: Product,
+  premiumDiscount: number = PREMIUM_SORT_DISTANCE_DISCOUNT
 ): number {
   const distance = getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng);
-  return isPremiumProduct(product) ? distance * PREMIUM_SORT_DISTANCE_DISCOUNT : distance;
+  return isPremiumProduct(product) ? distance * premiumDiscount : distance;
 }
 
 function getProductVisibilityScope(product: Product) {
@@ -513,15 +519,16 @@ export function dedupe(existing: Product[], incoming: Product[]): Product[] {
 function buildSortKeys(
   products: Product[],
   userCoords: [number, number],
-  sessionSeed: string
+  sessionSeed: string,
+  options?: { premiumWeight?: number; freeWeight?: number; premiumDiscount?: number }
 ): Map<string, { bucket: number; distance: number; viewKey: number; created: number }> {
   const keys = new Map<string, { bucket: number; distance: number; viewKey: number; created: number }>();
   for (const product of products) {
-    const distance = getEffectiveSortDistanceKm(userCoords, product);
+    const distance = getEffectiveSortDistanceKm(userCoords, product, options?.premiumDiscount);
     keys.set(product.id, {
       distance,
       bucket: Math.floor(distance / SAME_AREA_BUCKET_KM),
-      viewKey: getViewPriorityKey(product, sessionSeed),
+      viewKey: getViewPriorityKey(product, sessionSeed, options?.premiumWeight, options?.freeWeight),
       created: product.createdAt?.seconds ?? 0,
     });
   }
@@ -559,14 +566,29 @@ function sortNearbyProducts(
 
 export function rankProducts(
   products: Product[],
-  userCoords: [number, number]
+  userCoords: [number, number],
+  options?: { premiumWeight?: number; freeWeight?: number; premiumDiscount?: number; premiumAlwaysFirst?: boolean }
 ): Product[] {
   const sessionSeed = getViewSessionSeed();
-  const keys = buildSortKeys(products, userCoords, sessionSeed);
+  const keys = buildSortKeys(products, userCoords, sessionSeed, options);
 
   return [...products].sort((a, b) => {
     const ka = keys.get(a.id)!;
     const kb = keys.get(b.id)!;
+
+    // ============================================================
+    // OPTIONAL — HARD PREMIUM-FIRST TIER
+    // When enabled, every premium ad ranks above every free ad,
+    // unconditionally — no lottery, no distance override. Distance/
+    // weighting below then only decides order WITHIN each tier.
+    // ============================================================
+    if (options?.premiumAlwaysFirst) {
+      const aPremium = isPremiumProduct(a);
+      const bPremium = isPremiumProduct(b);
+      if (aPremium !== bPremium) {
+        return aPremium ? -1 : 1;
+      }
+    }
 
     // ============================================================
     // PRIMARY FACTOR — DISTANCE (bucketed)
