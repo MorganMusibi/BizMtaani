@@ -188,13 +188,30 @@ export function LocationProvider({ children }: { children: ReactNode }) {
           const lng = position.coords.longitude;
           setGpsGranted(true);
 
-          const resolved = await getWardInfo(lat, lng);
-          setGpsReady(true);
-          if (resolved) {
-            setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
+          try {
+            // getWardInfo has no internal timeout of its own — once a
+            // GPS fix is obtained, the 15s geolocation timeout above
+            // no longer applies. Race it against a cap here so a
+            // stalled fetch (weak connection) can never leave
+            // isLocationLoading stuck true forever.
+            const resolved = await Promise.race([
+              getWardInfo(lat, lng),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("ward-resolve-timeout")), 8000)
+              ),
+            ]);
+            setGpsReady(true);
+            if (resolved) {
+              setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
+              setUserCoords([lat, lng]);
+              settle("resolved");
+            } else {
+              settle("unresolved");
+            }
+          } catch (err) {
+            console.warn("Ward resolution timed out or failed:", err);
+            setGpsReady(true);
             setUserCoords([lat, lng]);
-            settle("resolved");
-          } else {
             settle("unresolved");
           }
           resolve();
