@@ -106,6 +106,10 @@ const [newPriceListItem, setNewPriceListItem] = useState<{
   priceText: string;
 }>({ name: "", priceType: "fixed", price: "", priceText: "" });
 const [savingPriceList, setSavingPriceList] = useState(false);
+
+const [showBecomeBusinessForm, setShowBecomeBusinessForm] = useState(false);
+const [businessNameInput, setBusinessNameInput] = useState("");
+const [savingBecomeBusiness, setSavingBecomeBusiness] = useState(false);
 const [showNameForm, setShowNameForm] = useState(false);
 const [nameInput, setNameInput] = useState("");
 const [savingName, setSavingName] = useState(false);
@@ -317,6 +321,29 @@ const [selectedWard, setSelectedWard] = useState<{
       setShowAreaPicker(false);
     } finally {
       setResolvingArea(false);
+    }
+  }
+
+  async function handleBecomeBusinessOwner() {
+    if (!user || !businessNameInput.trim()) return;
+
+    setSavingBecomeBusiness(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        isBusinessOwner: true,
+        businessName: businessNameInput.trim(),
+      });
+
+      toast({ title: "You're now a business owner!", description: "Shop details, price list, and a Business badge are now available on your Profile." });
+      setShowBecomeBusinessForm(false);
+    } catch (error) {
+      toast({
+        title: "Could not update your account",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingBecomeBusiness(false);
     }
   }
 
@@ -794,6 +821,60 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           </button>
         )}
         </div>
+
+       {!isBusinessOwner && (
+  <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+    <div className="flex items-center gap-3">
+      <div className="w-11 h-11 rounded-xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+        <Store size={20} className="text-primary" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-sm">Start Selling as a Business</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Get shop details, a price list, and a Business badge on your listings.
+        </p>
+      </div>
+    </div>
+
+    {showBecomeBusinessForm ? (
+      <div className="space-y-2">
+        <input
+          type="text"
+          placeholder="e.g. Mama Njeri Groceries"
+          value={businessNameInput}
+          onChange={(e) => setBusinessNameInput(e.target.value)}
+          className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm font-medium"
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowBecomeBusinessForm(false)}
+            className="flex-1 h-9 rounded-xl border border-border text-sm font-semibold text-muted-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleBecomeBusinessOwner}
+            disabled={savingBecomeBusiness || !businessNameInput.trim()}
+            className="flex-1 h-9 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-1 disabled:opacity-50"
+          >
+            {savingBecomeBusiness ? <Loader2 size={14} className="animate-spin" /> : "Confirm"}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <button
+        onClick={() => {
+          setBusinessNameInput(displayName);
+          setShowBecomeBusinessForm(true);
+        }}
+        className="w-full h-10 rounded-xl bg-primary text-white text-sm font-bold"
+      >
+        Become a Business Owner
+      </button>
+    )}
+  </div>
+)}
 
         {/* Business details — shown on the seller's shop catalogue */}
 {isBusinessOwner && (
