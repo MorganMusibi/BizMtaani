@@ -347,12 +347,18 @@ if (matches.length === 1) return centerOf(matches[0]);
   const distinctMatches = [...distinctWards.values()];
   if (distinctMatches.length === 1) return centerOf(distinctMatches[0]);
 
-  if (matches.length > 1) {
+  if (distinctMatches.length === 0) {
     console.warn(
-      `[location] Ambiguous ward "${wardName}" (constituency="${constituencyName}", county="${countyName}") ` +
-      `matched ${matches.length} physical wards in GeoJSON, none of which matched the requested ` +
-      `constituency/county exactly:`,
-      JSON.stringify(matches.map((f) => f.properties), null, 2)
+      `[location] No GeoJSON match at all for ward "${wardName}" (constituency="${constituencyName}", county="${countyName}"). ` +
+      `Either this ward has no polygon in kenya-wards.geojson, or its spelling there doesn't match MasterHierarchy.json. ` +
+      `Wards actually present in that constituency (if any share the constituency name):`,
+      JSON.stringify(
+        features
+          .filter((f) => normalize(f.properties.constituency) === normalize(constituencyName))
+          .map((f) => f.properties.ward),
+        null,
+        2
+      )
     );
   }
 
