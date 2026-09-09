@@ -761,9 +761,7 @@ useEffect(() => {
           />
 
           <span className="font-black text-base truncate">
-            {isOwn
-              ? "My Shop"
-              : `${sellerName}'s Shop`}
+            {`${sellerName}'s Shop`}
           </span>
         </div>
       </div>
