@@ -133,6 +133,13 @@ const [step, setStep] = useState<Step>(1);
 
   // Step 1 — Category
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "">("");
+  const PREMIUM_ONLY_CATEGORIES = [
+  "Accommodation",
+  "Commercial Property",
+  "Entertainment & Events",
+  "Leisure & Activities",
+];
+const isPremiumOnlyCategory = PREMIUM_ONLY_CATEGORIES.includes(selectedCategory);
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
   const [customSubcategory, setCustomSubcategory] = useState("");
 
@@ -1814,13 +1821,7 @@ toast({
     isPublishingRef.current = false;
   }
 }
-const PREMIUM_ONLY_CATEGORIES = [
-  "Accommodation",
-  "Commercial Property",
-  "Entertainment & Events",
-  "Leisure & Activities",
-];
-const isPremiumOnlyCategory = PREMIUM_ONLY_CATEGORIES.includes(selectedCategory);
+
 
 const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
