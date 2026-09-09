@@ -63,6 +63,18 @@ request.auth != null
 "subscriptionPlan",
 "premiumEndsAt"
  ])
+// shopPriceList may only be written while the user's own existing
+// doc already shows active premium — subscriptionPlan/premiumEndsAt
+// are themselves Cloud-Function-only (see hasNone above), so
+// resource.data here can't be spoofed by the client.
+&& (
+  !request.resource.data.diff(resource.data).affectedKeys().hasAny(["shopPriceList"])
+  || (
+    resource.data.subscriptionPlan in ["premium_weekly", "premium_monthly"]
+    && resource.data.premiumEndsAt is timestamp
+    && resource.data.premiumEndsAt > request.time
+  )
+)
 );
 // Users can only delete their own profile.
 // Admins can delete any user.
