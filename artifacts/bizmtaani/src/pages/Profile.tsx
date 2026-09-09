@@ -10,7 +10,9 @@ import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, X, Plus } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, X, Plus, MapPin } from "lucide-react";
+import { AreaPickerSheet } from "@/components/AreaPickerSheet";
+import { getWardCoordinates } from "@/lib/location";
 import { Link } from "wouter";
 import imageCompression from "browser-image-compression";
 import { getFullSizeUrl } from "@/lib/cloudinaryUrl";
@@ -107,6 +109,16 @@ const [savingPriceList, setSavingPriceList] = useState(false);
 const [showNameForm, setShowNameForm] = useState(false);
 const [nameInput, setNameInput] = useState("");
 const [savingName, setSavingName] = useState(false);
+const [showAreaPicker, setShowAreaPicker] = useState(false);
+const [resolvingArea, setResolvingArea] = useState(false);
+const [selectedWard, setSelectedWard] = useState<{
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+  label?: string;
+  lat: number | null;
+  lng: number | null;
+} | null>(null);
 
   const [showMarketerForm, setShowMarketerForm] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
@@ -202,14 +214,26 @@ const [savingName, setSavingName] = useState(false);
     await updateProfile(user, { displayName: updatedName });
 
     // 2. Update Firestore document (sets businessName if business owner, otherwise displayName)
-    const updatePayload = isBusinessOwner
+    const updatePayload: Record<string, unknown> = isBusinessOwner
       ? { businessName: updatedName }
       : { displayName: updatedName };
 
+    // 3. Include the updated area, if the user changed it in this same form
+    if (selectedWard) {
+      updatePayload.homeLocation = {
+        lat: selectedWard.lat,
+        lng: selectedWard.lng,
+        areaName: selectedWard.wardName,
+        constituency: selectedWard.constituencyName,
+        county: selectedWard.countyName,
+      };
+    }
+
     await updateDoc(doc(db, "users", user.uid), updatePayload);
 
-    toast({ title: "Name updated successfully" });
+    toast({ title: "Profile updated successfully" });
     setShowNameForm(false);
+  
   } catch (error) {
     toast({
       title: "Could not update name",
@@ -264,6 +288,35 @@ const [savingName, setSavingName] = useState(false);
       });
     } finally {
       setSavingPriceList(false);
+    }
+  }
+
+  async function handleAreaPicked(ward: {
+    wardName: string;
+    constituencyName: string;
+    countyName: string;
+    label?: string;
+  }) {
+    setResolvingArea(true);
+    try {
+      const coords = await getWardCoordinates(
+        ward.wardName,
+        ward.constituencyName,
+        ward.countyName
+      );
+
+      setSelectedWard({
+        wardName: ward.wardName,
+        constituencyName: ward.constituencyName,
+        countyName: ward.countyName,
+        label: ward.label,
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
+      });
+
+      setShowAreaPicker(false);
+    } finally {
+      setResolvingArea(false);
     }
   }
 
@@ -517,6 +570,23 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
         onChange={(e) => setNameInput(e.target.value)}
         className="w-full h-9 px-3 rounded-xl border border-border bg-background text-sm font-medium focus:outline-none focus:border-primary"
       />
+      <button
+        type="button"
+        onClick={() => setShowAreaPicker(true)}
+        disabled={resolvingArea}
+        className="w-full h-9 px-3 rounded-xl border border-border bg-background text-left text-sm flex items-center gap-1.5 disabled:opacity-50"
+      >
+        <MapPin size={13} className="text-primary flex-shrink-0" />
+        {resolvingArea ? (
+          <span className="text-muted-foreground">Updating area...</span>
+        ) : selectedWard ? (
+          <span className="font-medium truncate">
+            {selectedWard.wardName}, {selectedWard.constituencyName}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">Tap to set your area</span>
+        )}
+      </button>
       <div className="flex gap-2">
         <button
           type="button"
@@ -550,6 +620,17 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           type="button"
           onClick={() => {
             setNameInput(displayName);
+            setSelectedWard(
+              userProfile?.homeLocation
+                ? {
+                    wardName: userProfile.homeLocation.areaName,
+                    constituencyName: userProfile.homeLocation.constituency,
+                    countyName: userProfile.homeLocation.county,
+                    lat: userProfile.homeLocation.lat ?? null,
+                    lng: userProfile.homeLocation.lng ?? null,
+                  }
+                : null
+            );
             setShowNameForm(true);
           }}
           className="text-xs font-semibold text-primary hover:underline ml-1"
@@ -1025,6 +1106,14 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
     </button>
   </div>
 )}
+
+      {showAreaPicker && (
+        <AreaPickerSheet
+          onSearchSelect={handleAreaPicked}
+          resolving={resolvingArea}
+          onDismiss={() => setShowAreaPicker(false)}
+        />
+      )}
 
       {showMarketerForm && (
         <>
