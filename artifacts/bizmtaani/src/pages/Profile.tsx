@@ -10,7 +10,7 @@ import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, X } from "lucide-react";
+import { LogOut, Package, MessageCircle, Camera, Loader2, Store, Briefcase, ChevronRight, Gift, X, Plus } from "lucide-react";
 import { Link } from "wouter";
 import imageCompression from "browser-image-compression";
 import { getFullSizeUrl } from "@/lib/cloudinaryUrl";
@@ -85,6 +85,25 @@ const [openingHours, setOpeningHours] = useState(userProfile?.openingHours ?? ""
 const [businessAddress, setBusinessAddress] = useState(userProfile?.businessAddress ?? "");
 const [socialMediaLink, setSocialMediaLink] = useState(userProfile?.socialMediaLink ?? "");
 const [savingBusinessDetails, setSavingBusinessDetails] = useState(false);
+
+const [showPriceListEditor, setShowPriceListEditor] = useState(false);
+const [priceListItems, setPriceListItems] = useState<
+  { name: string; priceType: "fixed" | "contact" | "custom"; price: string; priceText: string }[]
+>(
+  (userProfile?.shopPriceList ?? []).map((item: any) => ({
+    name: item.name ?? "",
+    priceType: item.priceType ?? "fixed",
+    price: item.price != null ? String(item.price) : "",
+    priceText: item.priceText ?? "",
+  }))
+);
+const [newPriceListItem, setNewPriceListItem] = useState<{
+  name: string;
+  priceType: "fixed" | "contact" | "custom";
+  price: string;
+  priceText: string;
+}>({ name: "", priceType: "fixed", price: "", priceText: "" });
+const [savingPriceList, setSavingPriceList] = useState(false);
 const [showNameForm, setShowNameForm] = useState(false);
 const [nameInput, setNameInput] = useState("");
 const [savingName, setSavingName] = useState(false);
@@ -200,6 +219,52 @@ const [savingName, setSavingName] = useState(false);
   } finally {
     setSavingName(false);
   }
+  }
+
+  function addShopPriceListItem() {
+    if (!newPriceListItem.name.trim()) return;
+    if (newPriceListItem.priceType === "fixed" && !newPriceListItem.price) return;
+    if (newPriceListItem.priceType === "custom" && !newPriceListItem.priceText.trim()) return;
+
+    setPriceListItems((prev) => [
+      ...prev,
+      {
+        name: newPriceListItem.name.trim(),
+        priceType: newPriceListItem.priceType,
+        price: newPriceListItem.price,
+        priceText: newPriceListItem.priceText.trim(),
+      },
+    ]);
+    setNewPriceListItem({ name: "", priceType: "fixed", price: "", priceText: "" });
+  }
+
+  function removeShopPriceListItem(i: number) {
+    setPriceListItems((prev) => prev.filter((_, idx) => idx !== i));
+  }
+
+  async function handleSaveShopPriceList() {
+    if (!user) return;
+    setSavingPriceList(true);
+    try {
+      await updateDoc(doc(db, "users", user.uid), {
+        shopPriceList: priceListItems.map((item) => ({
+          name: item.name,
+          priceType: item.priceType,
+          price: item.priceType === "fixed" ? parseFloat(item.price) || 0 : 0,
+          priceText: item.priceType === "custom" ? item.priceText : "",
+        })),
+      });
+      toast({ title: "Price list updated" });
+      setShowPriceListEditor(false);
+    } catch (error) {
+      toast({
+        title: "Could not save price list",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingPriceList(false);
+    }
   }
 
   async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -731,6 +796,153 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
         {businessDescription ? <p>{businessDescription}</p> : <p className="italic">No description added yet</p>}
         {openingHours && <p>🕒 {openingHours}</p>}
         {businessAddress && <p>📍 {businessAddress}</p>}
+      </div>
+    )}
+  </div>
+)}
+
+{isBusinessOwner && (
+  <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
+    <div className="flex items-center justify-between">
+      <p className="font-black text-sm">Shop Price List</p>
+      {!showPriceListEditor && (
+        <button
+          onClick={() => setShowPriceListEditor(true)}
+          className="text-xs font-semibold text-primary"
+        >
+          Edit
+        </button>
+      )}
+    </div>
+
+    {showPriceListEditor ? (
+      <div className="space-y-3">
+        {priceListItems.length > 0 && (
+          <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border">
+            {priceListItems.map((item, i) => (
+              <div key={i} className="flex items-center px-3 py-2 gap-2">
+                <span className="flex-1 min-w-0 text-sm font-bold truncate">{item.name}</span>
+                <span className="text-xs font-bold text-primary">
+                  {item.priceType === "contact"
+                    ? "Contact for Price"
+                    : item.priceType === "custom"
+                    ? item.priceText
+                    : `KES ${item.price}`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeShopPriceListItem(i)}
+                  className="ml-2 text-muted-foreground hover:text-destructive"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="e.g. Haircut, T-shirt"
+            value={newPriceListItem.name}
+            onChange={(e) =>
+              setNewPriceListItem((prev) => ({ ...prev, name: e.target.value }))
+            }
+            className="w-full h-11 px-3 rounded-xl border border-border bg-background text-sm font-semibold"
+          />
+
+          <div className="flex gap-2">
+            {[
+              { value: "fixed", label: "Fixed Price" },
+              { value: "contact", label: "DM for Price" },
+              { value: "custom", label: "Custom label" },
+            ].map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  setNewPriceListItem((prev) => ({
+                    ...prev,
+                    priceType: option.value as "fixed" | "contact" | "custom",
+                  }))
+                }
+                className={`flex-1 py-2 px-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
+                  newPriceListItem.priceType === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex gap-2">
+            {newPriceListItem.priceType === "fixed" && (
+              <input
+                type="number"
+                inputMode="numeric"
+                placeholder="KES"
+                value={newPriceListItem.price}
+                onChange={(e) =>
+                  setNewPriceListItem((prev) => ({ ...prev, price: e.target.value }))
+                }
+                className="flex-1 h-9 px-3 rounded-xl border border-border bg-background text-sm"
+              />
+            )}
+
+            {newPriceListItem.priceType === "custom" && (
+              <input
+                type="text"
+                placeholder="e.g. Starting from 500"
+                value={newPriceListItem.priceText}
+                onChange={(e) =>
+                  setNewPriceListItem((prev) => ({ ...prev, priceText: e.target.value }))
+                }
+                className="flex-1 h-9 px-3 rounded-xl border border-border bg-background text-sm"
+              />
+            )}
+
+            {newPriceListItem.priceType === "contact" && (
+              <div className="flex-1 h-9 flex items-center px-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
+                Buyers will be told to contact you for this item's price.
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={addShopPriceListItem}
+              className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+            >
+              <Plus size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={() => setShowPriceListEditor(false)}
+            className="flex-1 h-9 rounded-xl border border-border text-sm font-semibold text-muted-foreground"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSaveShopPriceList}
+            disabled={savingPriceList}
+            className="flex-1 h-9 rounded-xl bg-primary text-white text-sm font-bold flex items-center justify-center gap-1"
+          >
+            {savingPriceList ? <Loader2 size={14} className="animate-spin" /> : "Save"}
+          </button>
+        </div>
+      </div>
+    ) : (
+      <div className="text-xs text-muted-foreground">
+        {priceListItems.length > 0 ? (
+          <p>{priceListItems.length} item{priceListItems.length > 1 ? "s" : ""} listed</p>
+        ) : (
+          <p className="italic">No price list items added yet</p>
+        )}
       </div>
     )}
   </div>
