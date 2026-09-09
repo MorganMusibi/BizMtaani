@@ -139,26 +139,46 @@ const handleAreaSelect = useCallback(
         const lng = position.coords.longitude;
         setGpsGranted(true);
         setLocationErrorMsg(null);
-        const resolved = await getWardInfo(lat, lng);
 
-        const wardChanged = resolved?.wardName
-          ? resolved.wardName !== locationInfo?.wardName
-          : false;
+        try {
+          // getWardInfo has no internal timeout of its own — race it
+          // against one here so a stalled fetch (weak connection)
+          // can never leave "Updating..." stuck forever.
+          const resolved = await Promise.race([
+            getWardInfo(lat, lng),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("ward-resolve-timeout")), 8000)
+            ),
+          ]);
 
-        if (resolved && wardChanged) {
-          setLocationInfo(resolved);
+          const wardChanged = resolved?.wardName
+            ? resolved.wardName !== locationInfo?.wardName
+            : false;
+
+          if (resolved && wardChanged) {
+            setLocationInfo(resolved);
+            setUserCoords([lat, lng]);
+          } else if (!resolved) {
+            setUserCoords([lat, lng]);
+          } else {
+            toast({
+              title: "TULIAA! Uko",
+              description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
+            });
+          }
+        } catch (err) {
+          console.warn("Ward resolution timed out or failed:", err);
+          // Still keep the raw GPS coords even though ward lookup
+          // failed — better than leaving the user with nothing.
           setUserCoords([lat, lng]);
-        } else if (!resolved) {
-          setUserCoords([lat, lng]);
-        } else {
-          toast({
-            title: "TULIAA! Uko",
-            description: resolved.wardName ? `${resolved.wardName} 🎯` : undefined,
-          });
+          setLocationErrorMsg(
+            "Ilichukua muda mrefu kupata eneo lako. Jaribu tena, au search manually."
+          );
+        } finally {
+          setRefreshingLocation(false);
         }
-
-        setRefreshingLocation(false);
       },
+  
       (error) => {
         console.warn("Manual location refresh failed:", error);
         setRefreshingLocation(false);
