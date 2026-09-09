@@ -21,6 +21,8 @@ import {
   Store,
   MapPin,
   Loader2,
+  List,
+  X,
 } from "lucide-react";
 import { getCategoryBadgeColor } from "@/lib/categories";
 import {
@@ -95,6 +97,7 @@ priceList?: {
     businessAddress?: string;
     socialMediaLink?: string;
     homeLocation?: { areaName?: string; county?: string };
+    shopPriceList?: { name: string; priceType?: "fixed" | "contact" | "custom"; price?: number; priceText?: string }[];
   } | null;
   timestamp: number;
 }
@@ -330,7 +333,10 @@ export default function ShopCatalogue() {
     areaName?: string;
     county?: string;
   };
+  shopPriceList?: { name: string; priceType?: "fixed" | "contact" | "custom"; price?: number; priceText?: string }[];
 } | null>(null);
+
+  const [showPriceListSheet, setShowPriceListSheet] = useState(false);
 
   const isOwn =
     user?.uid === userId;
@@ -862,6 +868,22 @@ useEffect(() => {
           </p>
         )}
 
+        {sellerProfile?.shopPriceList && sellerProfile.shopPriceList.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowPriceListSheet(true)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-primary/5 border border-primary/20 text-left"
+          >
+            <span className="flex items-center gap-2 text-sm font-bold text-primary">
+              <List size={15} />
+              View Price List
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {sellerProfile.shopPriceList.length} item{sellerProfile.shopPriceList.length > 1 ? "s" : ""}
+            </span>
+          </button>
+        )}
+
         {(sellerProfile?.openingHours || sellerProfile?.businessAddress || sellerProfile?.socialMediaLink) && (
           <div className="bg-muted/40 rounded-xl px-3 py-2.5 space-y-1.5 text-xs">
             {sellerProfile?.openingHours && (
@@ -1221,6 +1243,40 @@ useEffect(() => {
             }
           )}
         </div>
+      )}
+
+      {showPriceListSheet && sellerProfile?.shopPriceList && (
+        <>
+          <div className="fixed inset-0 z-[60] bg-black/40" onClick={() => setShowPriceListSheet(false)} />
+          <div
+            className="fixed bottom-0 left-0 right-0 z-[60] bg-card rounded-t-3xl border-t border-border px-4 pb-6 pt-4 max-h-[70vh] flex flex-col"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+          >
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <p className="font-black text-base">Price List</p>
+              <button
+                onClick={() => setShowPriceListSheet(false)}
+                className="w-8 h-8 rounded-full bg-muted flex items-center justify-center"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="overflow-y-auto divide-y divide-border">
+              {sellerProfile.shopPriceList.map((item, i) => (
+                <div key={i} className="flex items-center justify-between gap-3 py-3">
+                  <span className="text-sm font-semibold flex-1 min-w-0 truncate">{item.name}</span>
+                  <span className="text-sm font-bold text-primary flex-shrink-0">
+                    {item.priceType === "contact"
+                      ? "Contact for Price"
+                      : item.priceType === "custom" && item.priceText
+                      ? item.priceText
+                      : `KES ${item.price?.toLocaleString?.() ?? item.price}`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   );
