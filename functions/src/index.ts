@@ -1612,6 +1612,43 @@ if (userSnap.exists) {
     throw new HttpsError("failed-precondition", `Your plan allows a maximum of ${limit} photos.`);
   }
 
+  // 3b. Validation: every image must have actually come through the
+  // signed upload flow (getCloudinarySignature -> attachDraftUploadImage,
+  // now awaited client-side), not be arbitrary client-supplied URLs/
+  // public_ids. Cross-check each public_id against the draft this
+  // session already recorded as belonging to this uploader.
+  if (imageUrls.length > 0) {
+    if (typeof draftId !== "string" || !draftId.trim()) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Missing upload session for the submitted photos."
+      );
+    }
+
+    const draftSnap = await db.collection("draftUploads").doc(draftId).get();
+    if (!draftSnap.exists || draftSnap.data()?.uid !== uid) {
+      throw new HttpsError(
+        "permission-denied",
+        "Invalid upload session for the submitted photos."
+      );
+    }
+
+    const verifiedPublicIds: string[] = Array.isArray(draftSnap.data()?.publicIds)
+      ? draftSnap.data()!.publicIds
+      : [];
+    const verifiedSet = new Set(verifiedPublicIds);
+
+    for (const image of imageUrls) {
+      const publicId = typeof image === "object" && image !== null ? image.public_id : undefined;
+      if (typeof publicId !== "string" || !verifiedSet.has(publicId)) {
+        throw new HttpsError(
+          "permission-denied",
+          "One or more photos were not uploaded through the app and cannot be used."
+        );
+      }
+    }
+  }
+
   // 4. Logic: Active Ad Limit Enforcement (applies to every plan)
   const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
