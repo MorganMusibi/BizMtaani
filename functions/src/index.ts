@@ -18,7 +18,7 @@ const db = admin.firestore();
 // abuse loop or traffic spike on any single function scales instances
 // unbounded, which is unbounded cost. Individual functions below can
 // still override these via their own options object (e.g. mpesaCallback).
-setGlobalOptions({ maxInstances: 10, memory: "256MiB", timeoutSeconds: 60 });
+setGlobalOptions({ maxInstances: 200, memory: "256MiB", timeoutSeconds: 60 });
 
 // ─── Secrets ───────────────────────────────────────────────────────────────
 const cloudinaryApiKey = defineSecret("CLOUDINARY_API_KEY");
@@ -307,7 +307,7 @@ const ALLOWED_UPLOAD_FORMATS = "jpg,jpeg,png,webp";
 
 const UPLOAD_SIGNATURE_COOLDOWN_MS = 3_000; // stops a script from minting signatures/draftUploads docs faster than a real user ever could
 
-export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true }, async (request) => {
+export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true, maxInstances: 300 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   // Per-user cooldown — each call writes a draftUploads doc, so an
@@ -381,7 +381,7 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
  * record, so it can be deleted automatically if the advert it was
  * meant for is never published.
  */
-export const attachDraftUploadImage = onCall({ cors: true }, async (request) => {
+export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 300 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { draftId, publicId } = request.data as { draftId?: string; publicId?: string };
@@ -407,7 +407,7 @@ export const attachDraftUploadImage = onCall({ cors: true }, async (request) => 
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
 
-export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true }, async (request) => {
+ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
 
@@ -1538,7 +1538,7 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ cors: true }, async (request) => {
+export const publishAdvert = onCall({ cors: true, maxInstances: 300 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
