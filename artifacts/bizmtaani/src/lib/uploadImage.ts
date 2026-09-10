@@ -195,10 +195,18 @@ export async function uploadImage(
   const functions = getFunctions(app, "us-central1");
   const claimId = draftId ?? resolvedSig.draftId;
   if (claimId) {
+    // Must be awaited, not fire-and-forget — publishAdvert validates
+    // every imageUrls entry's public_id against this draft's
+    // publicIds array server-side. If this call is still in flight
+    // (or silently failed) when publishAdvert runs, a completely
+    // legitimate upload would be wrongly rejected as unverified.
     const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
-    attachDraftUploadImage({ draftId: claimId, publicId: data.public_id }).catch((error) => {
-      console.warn("Failed to attach draft upload record:", error);
-    });
+    try {
+      await attachDraftUploadImage({ draftId: claimId, publicId: data.public_id });
+    } catch (error) {
+      console.error("Failed to attach draft upload record:", error);
+      throw new Error("Failed to finalize photo upload. Please try again.");
+    }
   }
 
   return {
