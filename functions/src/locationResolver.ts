@@ -1,6 +1,12 @@
-import wardsData from "./data/kenya-wards.geojson";
-import hierarchyData from "./data/MasterHierarchy.json";
+import * as fs from "fs";
+import * as path from "path";
 
+const wardsData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "kenya-wards.geojson"), "utf8")
+);
+const hierarchyData = JSON.parse(
+  fs.readFileSync(path.join(__dirname, "data", "MasterHierarchy.json"), "utf8")
+);
 // ─── Shared normalize() — identical to src/lib/locationHierarchy.ts ────────
 export function normalize(value: string): string {
   return value
