@@ -1828,11 +1828,11 @@
                 "constituency_name": "Laikipia West",
                 "wards": [
                     "Ol-Moran",
-                    "Rumuruti",
                     "Rumuruti Township",
                     "Githiga",
                     "Marmanet",
-                    "Igwamiti Salama"
+                    "Igwamiti", 
+                    "Salama"
                     
                 ]
             }
