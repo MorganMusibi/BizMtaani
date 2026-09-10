@@ -62,7 +62,7 @@ const handleTabClick = (path: string) => {
   return (
   <nav
     data-testid="bottom-nav"
-    className="fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800"
+    className="fixed bottom-0 left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl z-50 bg-slate-900 border-t border-slate-800 md:border-x"
     style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
   >
     <div className="flex items-stretch h-16">
