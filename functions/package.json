@@ -7,7 +7,7 @@
     "node": "22"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && mkdir -p lib/data && cp -r src/data/* lib/data/",
     "build:watch": "tsc --watch",
     "typecheck": "tsc --noEmit"
   },
