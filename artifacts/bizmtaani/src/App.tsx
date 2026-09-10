@@ -122,10 +122,12 @@ function App() {
           <LocationProvider> {/* <-- WRAP WITH LocationProvider HERE */}
             <NotificationSetup />
             <EmailVerificationBanner />
-            <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+            <div className="md:max-w-2xl md:mx-auto md:border-x md:border-border md:min-h-screen">
+             <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
               <Router />
-            </WouterRouter>
-            {showBottomNav && <BottomNav />}
+              </WouterRouter>
+              {showBottomNav && <BottomNav />}
+             </div>
             <ProfileSetupGate />
             <InstallPrompt />
             <UpdatePrompt />
