@@ -3913,7 +3913,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </div>
       {/* Bottom action */}
 <div
-  className="fixed left-0 right-0 z-[60] bg-card border-t border-border px-4 py-3"
+  className="fixed left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl z-[60] bg-card border-t border-border px-4 py-3 md:border-x"
   style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
 >
         {step < 5 ? (
