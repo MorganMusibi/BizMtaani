@@ -9,7 +9,7 @@ import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/fire
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
-
+import { resolveWardServerSide } from "./locationResolver";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -1528,6 +1528,29 @@ export const publishAdvert = onCall({ cors: true }, async (request) => {
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
   await verifyRecaptcha(recaptchaToken, "publish_advert");
   const uid = request.auth.uid;
+
+  // Location must be resolved SERVER-SIDE from coordinates — never
+  // trust ward/constituency/county/geohash strings supplied by the
+  // client, since those directly control who can see this advert
+  // (free = exact-ward match) and how far premium reach extends.
+  const submittedLat = typeof otherData.lat === "number" ? otherData.lat : null;
+  const submittedLng = typeof otherData.lng === "number" ? otherData.lng : null;
+
+  if (submittedLat === null || submittedLng === null) {
+    throw new HttpsError(
+      "invalid-argument",
+      "A location is required to publish an advert."
+    );
+  }
+
+  const resolvedLocation = resolveWardServerSide(submittedLat, submittedLng);
+
+  if (!resolvedLocation) {
+    throw new HttpsError(
+      "failed-precondition",
+      "We couldn't match this location to a known ward. Please pick your area manually and try again."
+    );
+  }
   
   // Check if the user has an active premium subscription
 const userSnap = await db.collection("users").doc(uid).get();
@@ -1670,14 +1693,14 @@ try {
     imageUrl: typeof otherData.imageUrl === "string" ? otherData.imageUrl : "",
     imageUrls,
 
-    lat: typeof otherData.lat === "number" ? otherData.lat : null,
-    lng: typeof otherData.lng === "number" ? otherData.lng : null,
+    lat: submittedLat,
+    lng: submittedLng,
 
-    ward: typeof otherData.ward === "string" ? otherData.ward : "",
-    constituency: typeof otherData.constituency === "string" ? otherData.constituency : "",
-    county: typeof otherData.county === "string" ? otherData.county : "",
+    ward: resolvedLocation.wardName,
+    constituency: resolvedLocation.constituency,
+    county: resolvedLocation.county,
 
-    geohash: typeof otherData.geohash === "string" ? otherData.geohash : "",
+    geohash: resolvedLocation.geohash,
 
     sellerName: typeof otherData.sellerName === "string" ? otherData.sellerName : "",
     sellerType: otherData.sellerType === "business" ? "business" : "individual",
