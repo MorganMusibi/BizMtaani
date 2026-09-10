@@ -1889,10 +1889,31 @@ export const renewAdvert = onCall({ cors: true }, async (request) => {
   }
 
   if (productData.status === "pending_payment") {
-    throw new HttpsError(
-      "failed-precondition",
-      "A payment is already in progress for this advert."
-    );
+    // Don't trust this status blindly — a previous attempt may have
+    // already failed, been cancelled, or never received a callback
+    // at all, none of which currently reverts this field. Check the
+    // most recent payment attempt for this product and only block if
+    // one is genuinely still in flight.
+    const latestPaymentSnap = await db.collection("payments")
+      .where("productId", "==", productId)
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+
+    const latestPayment = latestPaymentSnap.docs[0]?.data();
+    const STALE_PENDING_MS = 5 * 60 * 1000; // Safaricom's own STK window is far shorter than this
+    const stillGenuinelyPending =
+      latestPayment?.status === "pending" &&
+      latestPayment?.createdAt &&
+      Date.now() - latestPayment.createdAt.toMillis() < STALE_PENDING_MS;
+
+    if (stillGenuinelyPending) {
+      throw new HttpsError(
+        "failed-precondition",
+        "A payment is already in progress for this advert."
+      );
+    }
+    // Otherwise: safe to let the user try again below.
   }
 
   // If the seller already has an active premium subscription, this
@@ -1919,10 +1940,15 @@ export const renewAdvert = onCall({ cors: true }, async (request) => {
     return { success: true, requiresPayment: false };
   }
 
-  // No active subscription — proceed to payment as before.
+  // No active subscription — proceed to payment as before. Record
+  // what to revert to (and when this attempt started), so a stuck
+  // or abandoned renewal can be safely recovered by cleanup instead
+  // of being force-deleted.
   await productRef.update({
     status: "pending_payment",
     plan,
+    previousStatus: productData.status,
+    pendingPaymentStartedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
   return { success: true, requiresPayment: true };
