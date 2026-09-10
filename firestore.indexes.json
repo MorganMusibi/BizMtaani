@@ -19,6 +19,51 @@
       ]
     },
     {
+  "collectionGroup": "payments",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+  ]
+},
+{
+  "collectionGroup": "payments",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "productId", "order": "ASCENDING" },
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+  ]
+},
+{
+  "collectionGroup": "payments",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "productId", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+  ]
+},
+{
+  "collectionGroup": "products",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "pendingPaymentStartedAt", "order": "ASCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+  ]
+},
+{
+  "collectionGroup": "marketers",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "referralCode", "order": "ASCENDING" },
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+  ]
+},
+    {
       "collectionGroup": "jobs",
       "queryScope": "COLLECTION",
       "fields": [
