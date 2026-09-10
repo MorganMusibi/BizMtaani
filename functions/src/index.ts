@@ -846,7 +846,7 @@ async function runCleanup() {
 
   const expiredPending = await db.collection("products")
     .where("status", "==", "pending_payment")
-    .where("createdAt", "<", oneHourAgo)
+    .where("pendingPaymentStartedAt", "<", oneHourAgo)
     .limit(CLEANUP_LIMIT)
     .get();
 
@@ -882,9 +882,23 @@ async function runCleanup() {
     });
   });
 
-  // 2. Delete abandoned pending adverts and their Cloudinary images
+  // 2. Delete abandoned FRESH pending adverts — but a stalled
+  // RENEWAL (has previousStatus) must be reverted, never deleted,
+  // since the advert already existed before this pending attempt.
+  let revertedRenewals = 0;
   for (const doc of expiredPending.docs) {
     const data = doc.data();
+
+    if (data.previousStatus) {
+      committer.update(doc.ref, {
+        status: data.previousStatus,
+        previousStatus: admin.firestore.FieldValue.delete(),
+        pendingPaymentStartedAt: admin.firestore.FieldValue.delete(),
+      });
+      revertedRenewals++;
+      continue;
+    }
+
     if (Array.isArray(data.imageUrls)) {
       const publicIds = data.imageUrls
         .map((img: any) => (typeof img === "string" ? null : img.public_id))
@@ -962,7 +976,8 @@ async function runCleanup() {
 
   return {
     archived: expiredActive.size,
-    deletedPending: expiredPending.size,
+    deletedPending: expiredPending.size - revertedRenewals,
+    revertedRenewals,
     deletedPayments: expiredPayments.size,
     purgedArchived: staleArchived.size,
     purgedChatsFromPurgedAds: purgedChats,
@@ -987,6 +1002,7 @@ export const scheduledCleanup = onSchedule(
        console.log(
 `Cleanup complete. Archived: ${result.archived}, ` +
 `Deleted pending adverts: ${result.deletedPending}, ` +
+`Reverted stalled renewals: ${result.revertedRenewals}, ` +
 `Deleted pending payments: ${result.deletedPayments}, ` +
 `Purged old archived adverts: ${result.purgedArchived}, ` +
 `Chats removed with purged adverts: ${result.purgedChatsFromPurgedAds}, ` +
@@ -1764,6 +1780,9 @@ try {
     expiringNotified: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
+    pendingPaymentStartedAt: status === "pending_payment"
+      ? admin.firestore.FieldValue.serverTimestamp()
+      : null,
   };
 
   if (reusingExisting && newProductRef) {
