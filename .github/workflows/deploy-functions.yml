@@ -47,25 +47,7 @@ jobs:
           PROJECT_ID=$(python3 -c "import json; print(json.load(open('/tmp/sa.json'))['project_id'])")
           echo "id=$PROJECT_ID" >> "$GITHUB_OUTPUT"
 
-      - name: Set Firebase secrets
-        continue-on-error: true
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
-        run: |
-          PROJECT="${{ steps.project.outputs.id }}"
-
-          set_secret() {
-            printf '%s' "$2" | pnpm dlx firebase-tools functions:secrets:set "$1" --data-file=- --project "$PROJECT" --force
-          }
-
-          set_secret CLOUDINARY_API_KEY      "${{ secrets.CLOUDINARY_API_KEY }}"
-          set_secret CLOUDINARY_API_SECRET   "${{ secrets.CLOUDINARY_API_SECRET }}"
-          set_secret CLOUDINARY_CLOUD_NAME   "${{ secrets.CLOUDINARY_CLOUD_NAME }}"
-          set_secret MPESA_CONSUMER_KEY      "${{ secrets.MPESA_CONSUMER_KEY }}"
-          set_secret MPESA_CONSUMER_SECRET   "${{ secrets.MPESA_CONSUMER_SECRET }}"
-          set_secret MPESA_PASSKEY           "${{ secrets.MPESA_PASSKEY }}"
-          set_secret RECAPTCHA_SECRET_KEY    "${{ secrets.RECAPTCHA_SECRET_KEY }}"
-          set_secret BACKFILL_ADMIN_KEY      "${{ secrets.BACKFILL_ADMIN_KEY }}"
+      
 
       - name: Deploy Firebase Functions
         env:
