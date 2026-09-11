@@ -1526,7 +1526,6 @@ export const reverseGeocode = onCall(
     cors: true,
     maxInstances: 1,
     concurrency: 1,
-      secrets: ["RECAPTCHA_SECRET_KEY"],
   },
   async (request) => {
     const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
@@ -1588,7 +1587,7 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ cors: true, maxInstances: 200,   secrets: ["RECAPTCHA_SECRET_KEY"], }, async (request) => {
+export const publishAdvert = onCall({ cors: true, maxInstances: 200, }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
@@ -2599,7 +2598,7 @@ export const setMarketerStatus = onCall({ cors: true }, async (request) => {
  * Determines whether it's a marketer code or another user's own code,
  * and records the relationship. A user can only be referred once, ever.
  */
-export const submitReferralCode = onCall({ cors: true,   secrets: ["RECAPTCHA_SECRET_KEY"], }, async (request) => {
+export const submitReferralCode = onCall({ cors: true, }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { code } = request.data as { code?: string };
@@ -2652,7 +2651,7 @@ export const submitReferralCode = onCall({ cors: true,   secrets: ["RECAPTCHA_SE
  * application doc — cheap, and prevents duplicate applications by
  * using the user's own uid as the document ID (upsert, not append).
  */
-export const applyForMarketer = onCall({ cors: true,  secrets: ["RECAPTCHA_SECRET_KEY"], }, async (request) => {
+export const applyForMarketer = onCall({ cors: true, }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const uid = request.auth.uid;
