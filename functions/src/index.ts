@@ -518,7 +518,7 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
 });
 
-export const mpesaCallback = onRequest({ maxInstances: 20 }, async (req, res) => {
+export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) => {
   try {
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
