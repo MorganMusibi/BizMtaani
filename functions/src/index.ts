@@ -786,6 +786,55 @@ export const processCompletedPayment = onDocumentUpdated(
     }
   }
 );
+/**
+ * Fires when a payment doc's status changes to "failed" or
+ * "cancelled" (set by mpesaCallback when Safaricom reports a
+ * non-zero ResultCode — e.g. the user cancelled the STK prompt).
+ * Immediately reverts a RENEWAL's product status back to what it
+ * was before the renewal attempt, instead of leaving it stuck in
+ * "pending_payment" until the next scheduledCleanup run (up to ~6
+ * hours later) — during which the advert is invisible both to the
+ * seller (wrong tab) and to buyers (not active).
+ *
+ * Fresh adverts (publishAdvert path, no previousStatus set) are
+ * deliberately left untouched here — an abandoned brand-new pending
+ * advert is correctly handled by the existing cleanup-delete path,
+ * since nothing was previously live to restore.
+ */
+export const revertProductOnPaymentFailure = onDocumentUpdated(
+  "payments/{paymentId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!after) return;
+    if (before?.status === after.status) return;
+    if (after.status !== "failed" && after.status !== "cancelled") return;
+
+    const productId = after.productId;
+    if (typeof productId !== "string" || !productId.trim()) return;
+
+    const productRef = db.collection("products").doc(productId);
+
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(productRef);
+      if (!snap.exists) return;
+      const data = snap.data()!;
+
+      // Only act if this product is still sitting in the exact
+      // pending state this payment attempt put it in — if the user
+      // already retried (new pending attempt) or it resolved some
+      // other way, leave it alone.
+      if (data.status !== "pending_payment") return;
+      if (!data.previousStatus) return;
+
+      tx.update(productRef, {
+        status: data.previousStatus,
+        previousStatus: admin.firestore.FieldValue.delete(),
+        pendingPaymentStartedAt: admin.firestore.FieldValue.delete(),
+      });
+    });
+  }
+);
 
 async function deleteCloudinaryImage(publicId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
