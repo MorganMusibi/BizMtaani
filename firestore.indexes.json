@@ -249,9 +249,6 @@
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-          "collectionGroup": "products",
-  "queryScope": "COLLECTION",
-  "fields": [
     { "fieldPath": "category", "order": "ASCENDING" },
     { "fieldPath": "status", "order": "ASCENDING" },
     { "fieldPath": "subcategory", "order": "ASCENDING" },
