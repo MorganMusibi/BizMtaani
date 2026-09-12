@@ -14,6 +14,24 @@ export function UpdatePrompt() {
 
   if (!needRefresh) return null;
 
+  // Aggressive reload handler to ensure the update actually happens
+  const handleReload = () => {
+    try {
+      // 1. Tell the service worker to skip waiting and activate
+      updateServiceWorker(true);
+      
+      // 2. Force a hard reload of the page to bypass any stuck cache
+      // We use a tiny timeout to ensure the skip-waiting message is sent first
+      setTimeout(() => {
+        window.location.reload();
+      }, 100);
+    } catch (error) {
+      console.error("Failed to update service worker:", error);
+      // Fallback: just hard reload anyway
+      window.location.reload();
+    }
+  };
+
   return (
     <div
       className="fixed bottom-20 left-4 right-4 z-[100] mx-auto max-w-sm rounded-2xl border border-border bg-card px-4 py-3.5 shadow-xl flex items-center gap-3"
@@ -29,7 +47,7 @@ export function UpdatePrompt() {
       <Button
         size="sm"
         className="h-8 px-3 text-xs font-bold flex-shrink-0"
-        onClick={() => updateServiceWorker(true)}
+        onClick={handleReload}
       >
         Reload
       </Button>
