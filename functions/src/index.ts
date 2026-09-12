@@ -493,16 +493,23 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   const ts = mpesaTimestamp();
   const callbackToken = crypto.randomBytes(24).toString("hex");
   const projectId = process.env.GCLOUD_PROJECT ?? "";
+  const shortcode = process.env.MPESA_SHORTCODE;
+  const tillNumber = process.env.MPESA_TILL_NUMBER;
+
   const stkBody = {
-    BusinessShortCode: process.env.MPESA_SHORTCODE ?? "174379",
-    Password: Buffer.from(`${process.env.MPESA_SHORTCODE ?? "174379"}${mpesaPasskey.value()}${ts}`).toString("base64"),
+    BusinessShortCode: shortcode,
+    Password: Buffer.from(`${shortcode}${mpesaPasskey.value()}${ts}`).toString("base64"),
     Timestamp: ts,
     TransactionType: "CustomerBuyGoodsOnline",
     Amount: PLAN_AMOUNTS[plan],
-    PartyA: formattedPhone, PartyB: process.env.MPESA_TILL_NUMBER ?? process.env.MPESA_SHORTCODE ?? "174379", PhoneNumber: formattedPhone,
+    PartyA: formattedPhone,
+    PartyB: tillNumber,
+    PhoneNumber: formattedPhone,
     CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`}?cbtoken=${callbackToken}`,
-    AccountReference: productId.slice(0, 12), TransactionDesc: `BizMtaani ${plan} listing`,
+    AccountReference: productId.slice(0, 12),
+    TransactionDesc: `BizMtaani ${plan} listing`,
   };
+
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "env:", process.env.MPESA_ENVIRONMENT);
   const stkController = new AbortController();
