@@ -406,8 +406,8 @@ export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 200 }, 
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-
- export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150 }, async (request) => {
+export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150 }, async (request) => {
+  console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
 
@@ -415,36 +415,23 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
     throw new HttpsError("invalid-argument", "Product ID is required.");
   }
 
-  // Kicked off immediately and awaited later, right before we need it —
-  // runs in parallel with reCAPTCHA verification and the Firestore reads
-  // below instead of waiting for everything else to finish first. On a
-  // warm instance this resolves instantly from the in-memory cache
-  // anyway; on a cold instance, this is where the real time is saved.
+  console.log("STEP 2: kicking off daraja token fetch");
   const darajaTokenPromise = getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
 
-  // Cooldown guard — stops repeated STK push spam (accidental double-taps
-  // or a script) from hammering Daraja and annoying the buyer's phone
-  // with duplicate prompts.
   const cooldownRef = db.collection("paymentCooldowns").doc(request.auth.uid);
 
-  // reCAPTCHA verification (network call to Google) and the two Firestore
-  // reads below don't depend on each other's results, so they run
-  // concurrently instead of one after another. Writes (cooldown write,
-  // stale-payment cancellation) still happen only AFTER this resolves
-  // successfully — so a failed reCAPTCHA check never burns a write.
+  console.log("STEP 3: starting recaptcha + firestore reads");
   const [, cooldownSnap, productSnap] = await Promise.all([
     verifyRecaptcha(recaptchaToken, "initiate_payment"),
     cooldownRef.get(),
     db.collection("products").doc(productId).get(),
   ]);
+  console.log("STEP 4: recaptcha + firestore reads done");
 
   const lastInitiatedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastInitiatedAt?.toMillis() : null;
 
   if (lastInitiatedAt && Date.now() - lastInitiatedAt < MPESA_INITIATION_COOLDOWN_MS) {
-    throw new HttpsError(
-      "resource-exhausted",
-      "Please wait a moment before trying to pay again."
-    );
+    throw new HttpsError("resource-exhausted", "Please wait a moment before trying to pay again.");
   }
 
   await cooldownRef.set({
@@ -452,39 +439,21 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
     expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
   });
 
-  if (!productSnap.exists) {
-    throw new HttpsError("not-found", "Advert not found.");
-  }
-
+  if (!productSnap.exists) throw new HttpsError("not-found", "Advert not found.");
   const productData = productSnap.data()!;
-
   if (productData.sellerId !== request.auth.uid) {
-    throw new HttpsError(
-      "permission-denied",
-      "You can only initiate payment for your own adverts."
-    );
+    throw new HttpsError("permission-denied", "You can only initiate payment for your own adverts.");
   }
-
   if (productData.status !== "pending_payment") {
-    throw new HttpsError(
-      "failed-precondition",
-      "This advert is not awaiting payment."
-    );
+    throw new HttpsError("failed-precondition", "This advert is not awaiting payment.");
   }
 
-  // Use the plan already verified and stored on the product at
-  // publish time — never trust a plan value supplied by the client,
-  // since that directly determines the amount charged.
   const plan = productData.plan;
-
   if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
     throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
   }
 
-  // Supersede any still-pending payment for this same product before
-  // starting a fresh STK push — stops an earlier attempt's callback
-  // (if it lands late, e.g. after a client-side timeout retry) from
-  // also triggering processCompletedPayment.
+  console.log("STEP 5: checking stale payments");
   const stalePayments = await db.collection("payments")
     .where("productId", "==", productId)
     .where("status", "==", "pending")
@@ -495,9 +464,15 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
     supersedeBatch.update(doc.ref, { status: "cancelled" });
   });
   if (!stalePayments.empty) await supersedeBatch.commit();
+  console.log("STEP 6: stale payments handled");
 
   const formattedPhone = normalizePhone(phone);
+  console.log("STEP 7: phone normalized:", formattedPhone);
+
+  console.log("STEP 8: awaiting daraja token");
   const token = await darajaTokenPromise;
+  console.log("STEP 9: daraja token received");
+
   const ts = mpesaTimestamp();
   const callbackToken = crypto.randomBytes(24).toString("hex");
   const projectId = process.env.GCLOUD_PROJECT ?? "";
@@ -511,12 +486,22 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
     CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`}?cbtoken=${callbackToken}`,
     AccountReference: productId.slice(0, 12), TransactionDesc: `BizMtaani ${plan} listing`,
   };
+
+  console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "env:", process.env.MPESA_ENVIRONMENT);
   const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(stkBody) });
+  console.log("STEP 11: STK push responded, status:", darajaRes.status);
+
   const darajaData = await darajaRes.json() as any;
+  console.log("STEP 12: daraja response body:", JSON.stringify(darajaData));
+
   if (!darajaRes.ok || darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
   await db.collection("payments").doc(darajaData.CheckoutRequestID).set({ checkoutRequestId: darajaData.CheckoutRequestID, callbackTokenHash: crypto.createHash("sha256").update(callbackToken).digest("hex"), plan, productId, buyerId: request.auth.uid, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp() });
+  console.log("STEP 13: payment doc saved, returning success");
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
 });
+ 
+  
+  
 
 export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) => {
   try {
