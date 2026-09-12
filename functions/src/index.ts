@@ -423,7 +423,7 @@ export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 200 }, 
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150 }, async (request) => {
+export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
   console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -506,7 +506,7 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "env:", process.env.MPESA_ENVIRONMENT);
   const stkController = new AbortController();
-  const stkTimeoutId = setTimeout(() => stkController.abort(), 15_000);
+  const stkTimeoutId = setTimeout(() => stkController.abort(), 45_000);
   let darajaRes: Response;
   try {
     darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
