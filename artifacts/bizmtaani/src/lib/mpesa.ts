@@ -127,7 +127,7 @@ export async function initiateStkPush(
   params: StkPushParams
 ): Promise<StkPushResult> {
 
-  const functions = getFunctions(app);
+  const functions = getFunctions(app, "europe-west1");
 
   const normalizedPhone = normalizePhone(params.phone);
   const recaptchaToken = await getRecaptchaToken("initiate_payment");
