@@ -505,7 +505,7 @@ const MPESA_INITIATION_COOLDOWN_MS = 30_000;
     BusinessShortCode: process.env.MPESA_SHORTCODE ?? "174379",
     Password: Buffer.from(`${process.env.MPESA_SHORTCODE ?? "174379"}${mpesaPasskey.value()}${ts}`).toString("base64"),
     Timestamp: ts,
-    TransactionType: "CustomerPayBillOnline",
+    TransactionType: "CustomerBuyGoodsOnline",
     Amount: PLAN_AMOUNTS[plan],
     PartyA: formattedPhone, PartyB: process.env.MPESA_SHORTCODE ?? "174379", PhoneNumber: formattedPhone,
     CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`}?cbtoken=${callbackToken}`,
