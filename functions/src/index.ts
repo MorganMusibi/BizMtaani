@@ -423,7 +423,8 @@ export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 200 }, 
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
+export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
+
   console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -502,9 +503,20 @@ try {
   console.error("DIAGNOSTIC RESULT: FAILED! Cannot reach Safaricom:", pingErr);
 }
 
-  console.log("STEP 8: awaiting daraja token");
-  const token = await darajaTokenPromise;
-  console.log("STEP 9: daraja token received");
+    console.log("STEP 8: fetching fresh token");
+  const authHeader = Buffer.from(
+    `${mpesaConsumerKey.value()}:${mpesaConsumerSecret.value()}`
+  ).toString("base64");
+
+  const tokenRes = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
+    method: "GET",
+    headers: { Authorization: `Basic ${authHeader}` },
+  });
+  
+  const tokenData = (await tokenRes.json()) as any;
+  const token = tokenData.access_token;
+  console.log("STEP 9: token received successfully");
+
 
   const ts = mpesaTimestamp();
   const callbackToken = crypto.randomBytes(24).toString("hex");
