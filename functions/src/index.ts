@@ -486,6 +486,22 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   const formattedPhone = normalizePhone(phone);
   console.log("STEP 7: phone normalized:", formattedPhone);
 
+  // DIAGNOSTIC TEST: Check basic connectivity to Safaricom
+try {
+  console.log("DIAGNOSTIC: Testing TCP reachability to Safaricom...");
+  const pingController = new AbortController();
+  const pingTimeout = setTimeout(() => pingController.abort(), 5000); // 5s timeout
+  
+  const pingRes = await fetch("https://api.safaricom.co.ke", { 
+    method: "GET",
+    signal: pingController.signal 
+  });
+  clearTimeout(pingTimeout);
+  console.log("DIAGNOSTIC RESULT: Reachable! HTTP Status:", pingRes.status);
+} catch (pingErr) {
+  console.error("DIAGNOSTIC RESULT: FAILED! Cannot reach Safaricom:", pingErr);
+}
+
   console.log("STEP 8: awaiting daraja token");
   const token = await darajaTokenPromise;
   console.log("STEP 9: daraja token received");
