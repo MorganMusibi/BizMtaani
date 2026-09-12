@@ -53,7 +53,7 @@ jobs:
         env:
           GOOGLE_APPLICATION_CREDENTIALS: /tmp/sa.json
         run: |
-          pnpm dlx firebase-tools deploy --only functions,firestore:indexes \
+          pnpm dlx firebase-tools deploy --only functions \
             --project "${{ steps.project.outputs.id }}" \
             --non-interactive \
             --force
