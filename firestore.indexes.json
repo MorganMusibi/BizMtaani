@@ -249,12 +249,15 @@
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "category", "order": "ASCENDING" },
-        { "fieldPath": "subcategory", "order": "ASCENDING" },
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "ward", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "ASCENDING" }
+          "collectionGroup": "products",
+  "queryScope": "COLLECTION",
+  "fields": [
+    { "fieldPath": "category", "order": "ASCENDING" },
+    { "fieldPath": "status", "order": "ASCENDING" },
+    { "fieldPath": "subcategory", "order": "ASCENDING" },
+    { "fieldPath": "ward", "order": "ASCENDING" },
+    { "fieldPath": "createdAt", "order": "DESCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
       ]
     },
     {
@@ -373,14 +376,14 @@
       ]
     },
     {
-      "collectionGroup": "chats",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "participants", "order": "ASCENDING" },
-        { "fieldPath": "lastMessageAt", "order": "DESCENDING" },
-        { "fieldPath": "__name__", "order": "DESCENDING" }
-      ]
-    },
+  "collectionGroup": "chats",
+  "queryScope": "COLLECTION_GROUP",
+  "fields": [
+    { "fieldPath": "participants", "order": "ASCENDING" },
+    { "fieldPath": "lastMessageAt", "order": "DESCENDING" },
+    { "fieldPath": "__name__", "order": "ASCENDING" }
+   ]
+ },
     {
       "collectionGroup": "products",
       "queryScope": "COLLECTION",
