@@ -242,8 +242,25 @@ let _darajaToken: { token: string; expiresAt: number } | null = null;
 async function getDarajaToken(key: string, secret: string): Promise<string> {
   if (_darajaToken && Date.now() < _darajaToken.expiresAt - 60_000) return _darajaToken.token;
   const creds = Buffer.from(`${key}:${secret}`).toString("base64");
-  const res = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, { headers: { Authorization: `Basic ${creds}` } });
-  if (!res.ok) { const text = await res.text(); throw new Error(`Daraja token failed: ${text.slice(0, 200)}`); }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
+  let res: Response;
+  try {
+    console.log(`Daraja token request starting: ${darajaBase()}/oauth/v1/generate`);
+    res = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
+      headers: { Authorization: `Basic ${creds}` },
+      signal: controller.signal,
+    });
+    console.log("Daraja token request completed, status:", res.status);
+  } catch (err) {
+    console.error("Daraja token request FAILED or timed out:", err);
+    throw new Error(`Daraja token request failed or timed out: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) { const text = await res.text(); throw new Error(`Daraja token failed (${res.status}): ${text.slice(0, 200)}`); }
   const data = (await res.json()) as { access_token: string; expires_in: string };
   _darajaToken = { token: data.access_token, expiresAt: Date.now() + parseInt(data.expires_in) * 1000 };
   return _darajaToken.token;
@@ -488,8 +505,23 @@ export const initiateMpesaPayment = onCall({ secrets: [mpesaConsumerKey, mpesaCo
   };
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "env:", process.env.MPESA_ENVIRONMENT);
-  const darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, { method: "POST", headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, body: JSON.stringify(stkBody) });
-  console.log("STEP 11: STK push responded, status:", darajaRes.status);
+  const stkController = new AbortController();
+  const stkTimeoutId = setTimeout(() => stkController.abort(), 15_000);
+  let darajaRes: Response;
+  try {
+    darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(stkBody),
+      signal: stkController.signal,
+    });
+    console.log("STEP 11: STK push responded, status:", darajaRes.status);
+  } catch (err) {
+    console.error("STEP 11 FAILED: STK push request timed out or errored:", err);
+    throw new HttpsError("internal", `STK push request failed or timed out: ${err instanceof Error ? err.message : String(err)}`);
+  } finally {
+    clearTimeout(stkTimeoutId);
+  }
 
   const darajaData = await darajaRes.json() as any;
   console.log("STEP 12: daraja response body:", JSON.stringify(darajaData));
