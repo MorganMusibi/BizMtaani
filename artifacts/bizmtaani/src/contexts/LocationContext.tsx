@@ -120,6 +120,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         county: savedArea.county,
         lat: savedArea.lat,
         lng: savedArea.lng,
+        label: savedArea.label ?? undefined,
       } as ResolvedLocation);
       setUserCoords(
   savedArea.lat != null && savedArea.lng != null
