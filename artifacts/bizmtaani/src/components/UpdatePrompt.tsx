@@ -1,63 +1,27 @@
-import { useRegisterSW } from "virtual:pwa-register/react";
-import { Button } from "@/components/ui/button";
-import { RefreshCw, X } from "lucide-react";
+import { useEffect } from "react";
 
+// Silently reloads the page exactly once when a new service worker
+// takes control — no banner, no user interaction. The sessionStorage
+// guard stops this from ever looping: once this tab has reloaded for
+// a controllerchange, it won't reload again for the rest of this
+// session even if another controllerchange fires.
 export function UpdatePrompt() {
-  const {
-    needRefresh: [needRefresh, setNeedRefresh],
-    updateServiceWorker,
-  } = useRegisterSW({
-    onRegisterError(error) {
-      console.error("Service worker registration error:", error);
-    },
-  });
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
 
-  if (!needRefresh) return null;
+    const RELOAD_GUARD_KEY = "bizmtaani_sw_reloaded";
 
-  // Aggressive reload handler to ensure the update actually happens
-  const handleReload = () => {
-    try {
-      // 1. Tell the service worker to skip waiting and activate
-      updateServiceWorker(true);
-      
-      // 2. Force a hard reload of the page to bypass any stuck cache
-      // We use a tiny timeout to ensure the skip-waiting message is sent first
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    } catch (error) {
-      console.error("Failed to update service worker:", error);
-      // Fallback: just hard reload anyway
+    function handleControllerChange() {
+      if (sessionStorage.getItem(RELOAD_GUARD_KEY)) return;
+      sessionStorage.setItem(RELOAD_GUARD_KEY, "1");
       window.location.reload();
     }
-  };
 
-  return (
-    <div
-      className="fixed bottom-20 left-4 right-4 z-[100] mx-auto max-w-sm rounded-2xl border border-border bg-card px-4 py-3.5 shadow-xl flex items-center gap-3"
-      style={{ paddingBottom: "calc(0.875rem + env(safe-area-inset-bottom))" }}
-    >
-      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-        <RefreshCw size={16} className="text-primary" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold">Update available</p>
-        <p className="text-xs text-muted-foreground">Reload to get the latest version.</p>
-      </div>
-      <Button
-        size="sm"
-        className="h-8 px-3 text-xs font-bold flex-shrink-0"
-        onClick={handleReload}
-      >
-        Reload
-      </Button>
-      <button
-        onClick={() => setNeedRefresh(false)}
-        className="w-7 h-7 rounded-full hover:bg-muted flex items-center justify-center flex-shrink-0 text-muted-foreground"
-        aria-label="Dismiss"
-      >
-        <X size={14} />
-      </button>
-    </div>
-  );
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
+    return () => {
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+    };
+  }, []);
+
+  return null;
 }
