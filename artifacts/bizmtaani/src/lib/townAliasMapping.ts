@@ -56,6 +56,53 @@ export const TOWN_ALIASES = [
   { alias: "rianjunya", ward: "Central Kisumu", constituency: "Kisumu West", county: "Kisumu" },
   { alias: "kiboswa", ward: "South West Kisumu", constituency: "Kisumu West", county: "Kisumu" },
 
+  // ─── Nakuru County — corrected towns/estates ───
+
+// Nakuru Town East
+{ alias: "bondeni", ward: "Biashara", constituency: "Nakuru Town East", county: "Nakuru" },       // high
+{ alias: "free area", ward: "Biashara", constituency: "Nakuru Town East", county: "Nakuru" },      // med
+{ alias: "langalanga", ward: "Flamingo", constituency: "Nakuru Town East", county: "Nakuru" },     // high
+{ alias: "shauri yako", ward: "Flamingo", constituency: "Nakuru Town East", county: "Nakuru" },    // med
+{ alias: "section 58", ward: "Menengai", constituency: "Nakuru Town East", county: "Nakuru" },     // high
+{ alias: "milimani nakuru", ward: "Menengai", constituency: "Nakuru Town East", county: "Nakuru" },// med
+{ alias: "naka", ward: "Menengai", constituency: "Nakuru Town East", county: "Nakuru" },           // med
+{ alias: "whitehouse", ward: "Menengai", constituency: "Nakuru Town East", county: "Nakuru" },     // med
+{ alias: "racecourse", ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },  // high
+{ alias: "satellite", ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },   // high
+{ alias: "kiamunyi", ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },
+{ alias: "ngata", ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },
+// Nakuru Town West
+{ alias: "mwariki", ward: "Kaptembwo", constituency: "Nakuru Town West", county: "Nakuru" },       // high
+{ alias: "london hilton", ward: "London", constituency: "Nakuru Town West", county: "Nakuru" },    // med
+{ alias: "kwa rhoda", ward: "Rhonda", constituency: "Nakuru Town West", county: "Nakuru" },        // high
+
+// Naivasha
+{ alias: "kihoto", ward: "Naivasha East", constituency: "Naivasha", county: "Nakuru" },            // high
+{ alias: "karagita", ward: "Naivasha East", constituency: "Naivasha", county: "Nakuru" },          // high
+{ alias: "mirera", ward: "Naivasha East", constituency: "Naivasha", county: "Nakuru" },            // high
+{ alias: "karati", ward: "Naivasha East", constituency: "Naivasha", county: "Nakuru" },            // med (border area / Naivasha East)
+{ alias: "kedong", ward: "Maiella", constituency: "Naivasha", county: "Nakuru" },                  // med
+
+// Gilgil
+{ alias: "kampi somali", ward: "Gilgil", constituency: "Gilgil", county: "Nakuru" },               // high
+{ alias: "makaburi", ward: "Gilgil", constituency: "Gilgil", county: "Nakuru" },                   // med
+{ alias: "kekopey", ward: "Gilgil", constituency: "Gilgil", county: "Nakuru" },                    // med
+{ alias: "kiungururia", ward: "Gilgil", constituency: "Gilgil", county: "Nakuru" },                // med
+{ alias: "oljorai", ward: "Mbaruk/Eburu", constituency: "Gilgil", county: "Nakuru" },              // med
+
+// Molo
+{ alias: "sachangwan", ward: "Molo", constituency: "Molo", county: "Nakuru" },                     // high
+{ alias: "casino", ward: "Molo", constituency: "Molo", county: "Nakuru" },                         // med
+
+// Njoro
+{ alias: "jewathu", ward: "Njoro", constituency: "Njoro", county: "Nakuru" },                      // med
+{ alias: "juaikali", ward: "Njoro", constituency: "Njoro", county: "Nakuru" },                     // med
+
+// Rongai / Kuresoi South
+                  
+{ alias: "salgaa", ward: "Visoi", constituency: "Rongai", county: "Nakuru" },                      // med  (Ward fixed from Mosop)
+{ alias: "olenguruone", ward: "Kiptagich", constituency: "Kuresoi South", county: "Nakuru" },      // med
+
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
