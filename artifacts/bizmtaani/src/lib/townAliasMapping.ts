@@ -161,6 +161,59 @@ export const TOWN_ALIASES = [
 { alias: "shikhutse", ward: "West Kabras", constituency: "Malava", county: "Kakamega" },
 { alias: "kimangeti", ward: "Chemuche", constituency: "Malava", county: "Kakamega" },
 { alias: "ikuywa", ward: "Isukha East", constituency: "Shinyalu", county: "Kakamega" },
+
+ // ─── Kiambu County — towns/estates whose names aren't ward names ───
+
+// Thika Town
+{ alias: "Makongeni Thika", ward: "Hospital", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Kiandutu", ward: "Hospital", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Section 9", ward: "Thika Township", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Section 22", ward: "Thika Township", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Golf Course Thika", ward: "Thika Township", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Ngoingwa", ward: "Kamenu", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Kenyatta Road", ward: "Kamenu", constituency: "Thika Town", county: "Kiambu" },
+{ alias: "Landless", ward: "Kamenu", constituency: "Thika Town", county: "Kiambu" },
+
+// Ruiru
+{ alias: "Kamakis", ward: "Biashara", constituency: "Ruiru", county: "Kiambu" },
+{ alias: "Kihunguro", ward: "Biashara", constituency: "Ruiru", county: "Kiambu" },
+{ alias: "Membley", ward: "Gitothua", constituency: "Ruiru", county: "Kiambu" },
+{ alias: "Mugutha", ward: "Gatongora", constituency: "Ruiru", county: "Kiambu" },
+{ alias: "Githurai 45", ward: "Kahawa Wendani", constituency: "Ruiru", county: "Kiambu" },
+
+// Juja
+{ alias: "Kimbo", ward: "Juja", constituency: "Juja", county: "Kiambu" },
+{ alias: "High Point", ward: "Juja", constituency: "Juja", county: "Kiambu" },
+{ alias: "Juja Farm", ward: "Murera", constituency: "Juja", county: "Kiambu" },
+
+// Kikuyu
+{ alias: "Ondiri", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+{ alias: "Kidfarmaco", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+{ alias: "Thogoto", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+{ alias: "Kerwa", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+{ alias: "Gikambura", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+{ alias: "Kamangu", ward: "Kikuyu", constituency: "Kikuyu", county: "Kiambu" },
+
+// Kabete
+{ alias: "Wangige", ward: "Kabete", constituency: "Kabete", county: "Kiambu" },
+
+// Kiambaa
+{ alias: "Banana", ward: "Kihara", constituency: "Kiambaa", county: "Kiambu" },
+
+// Kiambu Town
+{ alias: "Kirigiti", ward: "Kiambu Township", constituency: "Kiambu", county: "Kiambu" },
+
+// Limuru
+{ alias: "Tigoni", ward: "Ngecha Tigoni", constituency: "Limuru", county: "Kiambu" },
+{ alias: "Ngecha", ward: "Ngecha Tigoni", constituency: "Limuru", county: "Kiambu" },
+{ alias: "Kamirithu", ward: "Limuru Central", constituency: "Limuru", county: "Kiambu" },
+
+// Gatundu South
+{ alias: "Gatundu Town", ward: "Kiganjo", constituency: "Gatundu South", county: "Kiambu" },
+
+// Lari
+{ alias: "Lari Town", ward: "Lari/Kirenga", constituency: "Lari", county: "Kiambu" }, 
+  
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
@@ -191,6 +244,17 @@ export const MULTI_WARD_TOWNS = {
     { ward: "North West Kisumu", constituency: "Kisumu West", county: "Kisumu" },
     { ward: "West Seme", constituency: "Seme", county: "Kisumu" },
   ],
+
+  "Thika": [
+  { ward: "Thika Township", constituency: "Thika Town", county: "Kiambu" },
+  { ward: "Hospital", constituency: "Thika Town", county: "Kiambu" },
+  { ward: "Kamenu", constituency: "Thika Town", county: "Kiambu" },
+],
+"Ruiru": [
+  { ward: "Biashara", constituency: "Ruiru", county: "Kiambu" },
+  { ward: "Gitothua", constituency: "Ruiru", county: "Kiambu" },
+  { ward: "Kahawa Wendani", constituency: "Ruiru", county: "Kiambu" },
+],
 
   // Add more multi-ward towns here
   // "nakuru": [
