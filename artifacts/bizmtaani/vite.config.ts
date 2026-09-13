@@ -47,21 +47,30 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,geojson}"],
         globIgnores: ["**/AdminDashboard-*.js", "**/MarketerDashboard-*.js", "**/charts-vendor-*.js", "**/leaflet-vendor-*.js"],
         navigateFallback: "/index.html",
         // Don't intercept the Firebase messaging SW or any non-SPA paths
         navigateFallbackDenylist: [/\/firebase-messaging-sw\.js/, /\/api\//],
         runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
-            handler: "CacheFirst",
-            options: {
-              cacheName: "google-fonts-stylesheets",
-              expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
-              cacheableResponse: { statuses: [0, 200] },
-            },
-          },
+  {
+    urlPattern: /kenya-wards\.geojson$/,
+    handler: "CacheFirst",
+    options: {
+      cacheName: "kenya-wards-geojson",
+      expiration: { maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 * 30 },
+      cacheableResponse: { statuses: [0, 200] },
+    },
+  },
+  {
+    urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
+    handler: "CacheFirst",
+    options: {
+      cacheName: "google-fonts-stylesheets",
+      expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+      cacheableResponse: { statuses: [0, 200] },
+    },
+  },
           {
             urlPattern: /^https:\/\/fonts\.gstatic\.com\/.*/i,
             handler: "CacheFirst",
