@@ -524,8 +524,8 @@ try {
   const tillNumber = process.env.MPESA_TILL_NUMBER;
 
   const stkBody = {
-    BusinessShortCode: shortcode,
-    Password: Buffer.from(`${shortcode}${mpesaPasskey.value()}${ts}`).toString("base64"),
+    BusinessShortCode: tillNumber,
+    Password: Buffer.from(`${tillNumber}${mpesaPasskey.value()}${ts}`).toString("base64"),
     Timestamp: ts,
     TransactionType: "CustomerBuyGoodsOnline",
     Amount: PLAN_AMOUNTS[plan],
