@@ -109,8 +109,15 @@ export function AreaPickerSheet({
     }
 
     // 1c. No exact alias match — try partial/autocomplete suggestions
-    // (e.g. "buru" -> "buruburu") via substring matching.
+    // (e.g. "buru" -> "buruburu") via substring matching. These are
+    // shown ALONGSIDE the regular hierarchy search below, never
+    // instead of it — a partial alias match (e.g. "githurai" ->
+    // "Githurai 45") must not hide a real, distinct ward of the same
+    // root name (e.g. the actual "Githurai" ward in Roysambu).
     const aliasSuggestions = searchTownAliases(trimmed);
+    let aliasResults: ResolvedLocation[] = [];
+    let aliasResultsAreMultiWard = false;
+
     if (aliasSuggestions.length > 0) {
       const resolvedGroups = await Promise.all(
         aliasSuggestions.map(async (s) =>
@@ -119,7 +126,7 @@ export function AreaPickerSheet({
             : [await resolveWardFromAlias(s.alias)]
         )
       );
-      const validSuggestions = resolvedGroups
+      aliasResults = resolvedGroups
         .flat()
         .filter((r): r is ResolvedLocation => r !== null);
 
@@ -127,32 +134,23 @@ export function AreaPickerSheet({
       // query matched exactly one town and that town is multi-ward —
       // e.g. "kita" -> "kitale". If several different aliases matched
       // the partial query, keep the plain single-card styling.
-      const suggestionIsMultiWard =
+      aliasResultsAreMultiWard =
         aliasSuggestions.length === 1 && aliasSuggestions[0].isMultiWard;
-
-      if (validSuggestions.length > 0) {
-        setTownAliasResults(validSuggestions);
-        setIsMultiWardTown(suggestionIsMultiWard);
-        setWardResults([]);
-        setConstituencyResults([]);
-        setCountyResults([]);
-        setSearching(false);
-        setSearchingAlias(false);
-        return;
-      }
     }
 
-    // 2. If no alias match, fallback to regular search
+    // 2. Always also run the regular hierarchy search — a partial
+    // alias suggestion above is additive, never a substitute for it.
     const [wards, constituencies, counties] = await Promise.all([
       searchWardsByName(trimmed, 8),
       searchConstituenciesByName(trimmed, 8),
       searchCountiesByName(trimmed, 5),
     ]);
+
+    setTownAliasResults(aliasResults);
+    setIsMultiWardTown(aliasResultsAreMultiWard);
     setWardResults(wards.map((w) => ({ wardName: w.wardName, constituencyName: w.constituencyName, countyName: w.countyName })));
     setConstituencyResults(constituencies);
     setCountyResults(counties);
-    setTownAliasResults([]);
-    setIsMultiWardTown(false);
     setSearching(false);
     setSearchingAlias(false);
   }, 250);
