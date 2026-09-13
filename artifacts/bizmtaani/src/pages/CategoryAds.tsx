@@ -108,6 +108,7 @@ const handleAreaSelect = useCallback(
           constituency: ward.constituencyName,
           county: ward.countyName,
           displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
+          label: ward.label,
         };
 
         handleAreaSelect(resolved);
