@@ -539,7 +539,7 @@ try {
   };
 
 
-  console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "env:", process.env.MPESA_ENVIRONMENT);
+  console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "till:", process.env.MPESA_TILL_NUMBER, "env:", process.env.MPESA_ENVIRONMENT);
   const stkController = new AbortController();
   const stkTimeoutId = setTimeout(() => stkController.abort(), 45_000);
   let darajaRes: Response;
