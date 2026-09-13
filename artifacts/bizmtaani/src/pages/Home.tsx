@@ -480,6 +480,7 @@ const [activeKey, setActiveKey] = useState("All");
             county: choice.county,
             lat: choice.lat,
             lng: choice.lng,
+            label: choice.label ?? null,
           },
         });
       } catch (error) {
