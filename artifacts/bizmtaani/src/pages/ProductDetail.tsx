@@ -1078,14 +1078,14 @@ async function saveMenuChanges() {
   </Button>
 )}
 
-{/* Other products / services list */}
+{/* Related items / services list */}
 {Array.isArray(product.priceList) && product.priceList.length > 0 && (
   <Button
     variant="outline"
     className="w-full gap-2"
     onClick={() => setShowPriceList(true)}
   >
-    View other items
+    View related items or services
   </Button>
 )}
         {/*Title, Price, Description, Menu) ... */}
@@ -1569,7 +1569,7 @@ const itemDistance =
            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 5rem)" }}
          >
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-lg">Other Items</h3>
+              <h3 className="font-black text-lg">Related Items or Services</h3>
               <button
                 onClick={() => setShowPriceList(false)}
                 className="text-muted-foreground hover:text-foreground text-sm font-bold"
