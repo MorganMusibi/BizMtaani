@@ -3,7 +3,7 @@ import { MapPin, Loader2 } from "lucide-react";
 interface LocationBannerProps {
   gpsReady: boolean;
   gpsGranted: boolean;
-  locationInfo: { wardName?: string; displayName?: string; label?: string } | null;
+  locationInfo: { wardName?: string; displayName?: string; label?: string; constituency?: string } | null;
   isSearchMode: boolean;
   refreshingLocation: boolean;
   onRefresh: () => void;
@@ -26,9 +26,17 @@ export function LocationBanner({
   function bannerText() {
     if (isSearchMode) return "Searching across Kenya";
     if (!locationInfo) return "Set area yako to see nearby adverts";
-    const area = locationInfo.label ?? locationInfo.displayName ?? locationInfo.wardName;
+
+    // Prefer the alias label (e.g. "Ruaka") over the canonical ward
+    // name (e.g. "Ndenderu") when set, but always pair it with the
+    // constituency — "Ruaka, Kiambaa area", same shape as an
+    // unlabeled ward's "Baba Dogo, Ruaraka area".
+    const area = locationInfo.label ?? locationInfo.wardName;
+    if (area && locationInfo.constituency) {
+      return `${area}, ${locationInfo.constituency} area`;
+    }
     if (area) return `${area} area`;
-    return "Set area yako to see nearby adverts";
+    return "Set Mtaa yako to see nearby adverts";
   }
 
   if (!gpsReady) return null;
