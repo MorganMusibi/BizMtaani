@@ -213,6 +213,25 @@ export const TOWN_ALIASES = [
 
 // Lari
 { alias: "Lari Town", ward: "Lari/Kirenga", constituency: "Lari", county: "Kiambu" }, 
+
+// Msambweni
+{ alias: "Diani", ward: "Ukunda", constituency: "Msambweni", county: "Kwale" },
+{ alias: "Diani Beach", ward: "Ukunda", constituency: "Msambweni", county: "Kwale" },
+{ alias: "Galu", ward: "Kinondo", constituency: "Msambweni", county: "Kwale" },
+{ alias: "Galu Beach", ward: "Kinondo", constituency: "Msambweni", county: "Kwale" },
+{ alias: "Msambweni Town", ward: "Ramisi", constituency: "Msambweni", county: "Kwale" },
+
+// Lunga Lunga
+{ alias: "Shimoni", ward: "Vanga", constituency: "Lunga Lunga", county: "Kwale" },
+
+// Matuga
+{ alias: "Mwaluphamba", ward: "Mkongani", constituency: "Matuga", county: "Kwale" },
+{ alias: "Kwale Town", ward: "Tsimba Golini", constituency: "Matuga", county: "Kwale" },
+
+
+// { alias: "Mackinnon Road", ward: "Mackinnon Road", constituency: "Kinango", county: "Kwale" }, // Option B — if you fix master
+{ alias: "Maji ya Chumvi", ward: "Chengoni/Samburu", constituency: "Kinango", county: "Kwale" },
+{ alias: "Samburu Kwale", ward: "Chengoni/Samburu", constituency: "Kinango", county: "Kwale" },
   
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
@@ -256,6 +275,11 @@ export const MULTI_WARD_TOWNS = {
   { ward: "Kahawa Wendani", constituency: "Ruiru", county: "Kiambu" },
 ],
 
+  "Diani Municipality": [
+  { ward: "Ukunda", constituency: "Msambweni", county: "Kwale" },
+  { ward: "Gombato Bongwe", constituency: "Msambweni", county: "Kwale" },
+],
+  
   // Add more multi-ward towns here
   // "nakuru": [
   //   { ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },
