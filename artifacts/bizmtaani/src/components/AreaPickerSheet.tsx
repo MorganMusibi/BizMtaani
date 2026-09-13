@@ -295,7 +295,9 @@ export function AreaPickerSheet({
               >
                 <div className="flex-1">
                   <p className="font-bold text-sm">
-                    {isMultiWardTown ? loc.wardName : loc.displayName}
+                    {isMultiWardTown
+                      ? loc.wardName
+                      : `${loc.label ?? loc.wardName}, ${loc.constituency}`}
                     {isMultiWardTown && (
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         {loc.constituency}, {loc.county}
