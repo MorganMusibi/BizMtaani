@@ -24,7 +24,7 @@ export const TOWN_ALIASES = [
   { alias: "kahawa sukari", ward: "Kahawa", constituency: "Roysambu", county: "Nairobi" },
   { alias: "industrial area", ward: "Viwandani", constituency: "Makadara", county: "Nairobi" },
   { alias: "shauri moyo", ward: "Pumwani", constituency: "Kamukunji", county: "Nairobi" },
-  { alias: "greenfields", ward: "Savanna", constituency: "Embakasi East", county: "Nairobi" },
+  { alias: "greenfields", ward: "Upper Savanna", constituency: "Embakasi East", county: "Nairobi" },
   { alias: "jacaranda", ward: "Kayole Central", constituency: "Embakasi Central", county: "Nairobi" },
 
   // Mombasa Estates/Areas with non-matching ward names
@@ -63,7 +63,7 @@ export const TOWN_ALIASES = [
 // Multi-ward towns (1:many mapping)
 export const MULTI_WARD_TOWNS = {
   "kitale": [
-    { ward: "Tuwani", constituency: "Saboti", county: "Trans-Nzoia" },
+    { ward: "Tuwan", constituency: "Saboti", county: "Trans-Nzoia" },
     { ward: "Kinyoro", constituency: "Saboti", county: "Trans-Nzoia" },
     { ward: "Matisi", constituency: "Saboti", county: "Trans-Nzoia" },
     { ward: "Hospital", constituency: "Kiminini", county: "Trans-Nzoia" },
