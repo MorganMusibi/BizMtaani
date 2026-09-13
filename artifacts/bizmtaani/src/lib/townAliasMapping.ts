@@ -103,6 +103,64 @@ export const TOWN_ALIASES = [
 { alias: "salgaa", ward: "Visoi", constituency: "Rongai", county: "Nakuru" },                      // med  (Ward fixed from Mosop)
 { alias: "olenguruone", ward: "Kiptagich", constituency: "Kuresoi South", county: "Nakuru" },      // med
 
+
+  // ─── Kakamega County — towns/estates with non-matching ward names ───
+
+// Lurambi (Kakamega town estates)
+{ alias: "Amalemba", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Otiende", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Mudiri", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Joyland", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Shikangania", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Shikhambi", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Shitungu", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Sichirai", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Prison line", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "National housing", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "NHC kakamega", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "kaburini", ward: "Shirere", constituency: "Lurambi", county: "Kakamega" },
+
+{ alias: "Kefinco", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Koromatangi", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Nyayo tea zone", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Tea zone", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Maraba", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Jaggery", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Murram", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Matende", ward: "Sheywe", constituency: "Lurambi", county: "Kakamega" },
+
+{ alias: "Ikonyero", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Mwiyala", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Bukhungu", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Milimani kakamega", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Ebambwa", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "Jamindas", ward: "Mahiakalo", constituency: "Lurambi", county: "Kakamega" },
+
+// Mumias West (Mumias town estates)
+{ alias: "Ekama", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Mjini mumias", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Lumino", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Shitukhumi", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Manyatta mumias", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Lukoye", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Nubian mumias", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+{ alias: "Exe", ward: "Mumias Central", constituency: "Mumias West", county: "Kakamega" },
+
+// Mumias East
+{ alias: "buchinga", ward: "East Wanga", constituency: "Mumias East", county: "Kakamega" },
+
+// Other Kakamega towns
+{ alias: "bukura", ward: "Butsotso South", constituency: "Lurambi", county: "Kakamega" },
+{ alias: "khayega", ward: "Isukha Central", constituency: "Shinyalu", county: "Kakamega" },
+{ alias: "malava", ward: "Butali/Chegulo", constituency: "Malava", county: "Kakamega" },
+{ alias: "kaunda", ward: "Bunyala West", constituency: "Navakholo", county: "Kakamega" },
+{ alias: "mureku", ward: "Bunyala East", constituency: "Navakholo", county: "Kakamega" },
+{ alias: "musamba", ward: "Khalaba", constituency: "Matungu", county: "Kakamega" },
+{ alias: "ogalo", ward: "Koyonzo", constituency: "Matungu", county: "Kakamega" },
+{ alias: "manda", ward: "Manda-Shivanga", constituency: "Malava", county: "Kakamega" },
+{ alias: "shikhutse", ward: "West Kabras", constituency: "Malava", county: "Kakamega" },
+{ alias: "kimangeti", ward: "Chemuche", constituency: "Malava", county: "Kakamega" },
+{ alias: "ikuywa", ward: "Isukha East", constituency: "Shinyalu", county: "Kakamega" },
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
