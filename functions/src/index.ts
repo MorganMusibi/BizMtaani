@@ -173,8 +173,17 @@ function darajaBase(): string {
 }
 
 function mpesaTimestamp(): string {
-  const n = new Date();
-  return [n.getFullYear(), String(n.getMonth() + 1).padStart(2, "0"), String(n.getDate()).padStart(2, "0"), String(n.getHours()).padStart(2, "0"), String(n.getMinutes()).padStart(2, "0"), String(n.getSeconds()).padStart(2, "0")].join("");
+  const now = new Date();
+  const eat = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+
+  return [
+    eat.getUTCFullYear(),
+    String(eat.getUTCMonth() + 1).padStart(2, "0"),
+    String(eat.getUTCDate()).padStart(2, "0"),
+    String(eat.getUTCHours()).padStart(2, "0"),
+    String(eat.getUTCMinutes()).padStart(2, "0"),
+    String(eat.getUTCSeconds()).padStart(2, "0"),
+  ].join("");
 }
 
 function normalizePhone(raw: string): string {
@@ -503,19 +512,9 @@ try {
   console.error("DIAGNOSTIC RESULT: FAILED! Cannot reach Safaricom:", pingErr);
 }
 
-    console.log("STEP 8: fetching fresh token");
-  const authHeader = Buffer.from(
-    `${mpesaConsumerKey.value()}:${mpesaConsumerSecret.value()}`
-  ).toString("base64");
-
-  const tokenRes = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
-    method: "GET",
-    headers: { Authorization: `Basic ${authHeader}` },
-  });
-  
-  const tokenData = (await tokenRes.json()) as any;
-  const token = tokenData.access_token;
-  console.log("STEP 9: token received successfully");
+  console.log("STEP 8: fetching fresh token");
+  const token = await darajaTokenPromise;
+ console.log("STEP 9: token received successfully");
 
 
   const ts = mpesaTimestamp();
@@ -541,7 +540,16 @@ try {
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "till:", process.env.MPESA_TILL_NUMBER, "env:", process.env.MPESA_ENVIRONMENT);
   const stkController = new AbortController();
-  const stkTimeoutId = setTimeout(() => stkController.abort(), 45_000);
+  const stkStartedAt = Date.now();
+
+const stkTimeoutId = setTimeout(() => {
+  console.error(
+    `STEP 11 TIMEOUT: Safaricom STK endpoint did not respond within 45 seconds. ` +
+    `URL=${darajaBase()}/mpesa/stkpush/v1/processrequest ` +
+    `elapsedMs=${Date.now() - stkStartedAt}`
+  );
+  stkController.abort();
+}, 45_000);
   let darajaRes: Response;
   try {
     darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
