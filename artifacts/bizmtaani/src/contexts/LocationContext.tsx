@@ -95,21 +95,25 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // 3) GPS — spins, capped at 5s; stops the moment it resolves
   // 4) still nothing after the cap — prompt for GPS or manual entry
   useEffect(() => {
-    if (profileLoading) return; // keep spinner up while auth/profile resolves
-    if (resolutionStarted.current) return;
+  if (resolutionStarted.current) return;
+
+  // 1) Valid recent cache wins first — checked immediately, with no
+  // dependency on auth/profile having resolved yet. This is what
+  // makes a return visit feel instant instead of waiting on a full
+  // auth + Firestore profile round-trip just to read localStorage.
+  if (cached?.gpsReady && cached.locationInfo) {
     resolutionStarted.current = true;
+    setGpsReady(true);
+    settle("resolved");
+    return;
+  }
 
-    // 1) Valid recent cache wins first — this is what makes a manual
-    // area pick on Home "stick" across a reload/re-sign-in for the
-    // cache's TTL, instead of always reverting to the profile's saved
-    // area. Also the cheapest path: zero network/Firestore cost.
-    if (cached?.gpsReady && cached.locationInfo) {
-      setGpsReady(true);
-      settle("resolved");
-      return;
-    }
+  // Everything past this point genuinely needs userProfile, so it's
+  // still gated on profileLoading.
+  if (profileLoading) return;
+  resolutionStarted.current = true;
 
-    // 2) No valid cache — fall back to the profile's saved home area.
+  // 2) No valid cache — fall back to the profile's saved home area.
     // No extra Firestore read here: userProfile is already loaded via
     // AuthContext's existing onSnapshot subscription.
     const savedArea = userProfile?.homeLocation;
