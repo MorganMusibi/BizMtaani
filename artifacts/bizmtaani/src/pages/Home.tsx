@@ -524,6 +524,7 @@ const handleAreaSearchSelect = useCallback(
         constituency: ward.constituencyName,
         county: ward.countyName,
         displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
+        label: ward.label,
       } as ResolvedLocation;
 
       handleAreaSelect(resolved);
