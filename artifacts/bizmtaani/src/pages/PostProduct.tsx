@@ -3437,7 +3437,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             {/* Other products / services list */}
             <div className="space-y-3 mt-4">
               <div>
-                <label className="text-sm font-bold">Other Products / Services (Optional)</label>
+                <label className="text-sm font-bold">Related Items or Services (Optional)</label>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   Selling more than one item? List other items with their prices — buyers will see a "View other items" option on this advert.
                 </p>
@@ -3553,7 +3553,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 <MapPin size={16} className="text-primary flex-shrink-0" />
                 <div className="flex-1">
                   {wardInfo ? (
-                    <p className="text-sm font-semibold">{wardInfo.wardName || "Unknown ward"}</p>
+                    <p className="text-sm font-semibold">{wardInfo.label || wardInfo.wardName || "Unknown ward"}</p>
                   ) : (
                     <p className="text-sm text-muted-foreground">Detecting your location...</p>
                   )}
