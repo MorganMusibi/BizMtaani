@@ -44,10 +44,11 @@ export default defineConfig({
       manifest: false,
       includeAssets: ["favicon.svg", "icon-192.png", "icon-512.png", "icon-maskable-192.png", "icon-maskable-512.png", "robots.txt"],
       workbox: {
-        skipWaiting: true,
-        clientsClaim: true,
-        cleanupOutdatedCaches: true,
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,geojson}"],
+  skipWaiting: true,
+  clientsClaim: true,
+  cleanupOutdatedCaches: true,
+  maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB — kenya-wards.geojson (2.34 MB) exceeds Workbox's 2 MB default
+  globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2,geojson}"],
         globIgnores: ["**/AdminDashboard-*.js", "**/MarketerDashboard-*.js", "**/charts-vendor-*.js", "**/leaflet-vendor-*.js"],
         navigateFallback: "/index.html",
         // Don't intercept the Firebase messaging SW or any non-SPA paths
