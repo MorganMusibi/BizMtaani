@@ -536,7 +536,18 @@ try {
     AccountReference: productId.slice(0, 12),
     TransactionDesc: `BizMtaani ${plan} listing`,
   };
-
+  
+console.log(
+  "STEP 10 CONFIG:",
+  JSON.stringify({
+    base: darajaBase(),
+    environment: process.env.MPESA_ENVIRONMENT,
+    shortcode: process.env.MPESA_SHORTCODE,
+    till: process.env.MPESA_TILL_NUMBER,
+    callback: process.env.MPESA_CALLBACK_URL,
+    transactionType: stkBody.TransactionType,
+  })
+);
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "till:", process.env.MPESA_TILL_NUMBER, "env:", process.env.MPESA_ENVIRONMENT);
   const stkController = new AbortController();
