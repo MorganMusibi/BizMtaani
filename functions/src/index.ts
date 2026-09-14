@@ -1538,6 +1538,7 @@ async function throttleNominatim() {
   }
   lastNominatimCallAt = Date.now();
 }
+
 // Replace the existing throttleNominatim with this distributed version
 async function throttleNominatimWithLock(): Promise<void> {
   const lockDocId = "nominatim_throttle";
