@@ -176,10 +176,22 @@ function darajaBase(): string {
 
 async function fetchViaProxy(url: string, options: any = {}): Promise<Response> {
   const proxyUrl = daraProxyUrl.value();
+
+  console.log(
+    "DARaja network route:",
+    proxyUrl ? "PROXY" : "DIRECT",
+    "URL:",
+    url
+  );
+
   if (proxyUrl) {
     const agent = new ProxyAgent(proxyUrl);
-    return undiciFetch(url, { ...options, dispatcher: agent }) as unknown as Promise<Response>;
+    return undiciFetch(url, {
+      ...options,
+      dispatcher: agent,
+    }) as unknown as Promise<Response>;
   }
+
   return fetch(url, options);
 }
 
@@ -505,22 +517,6 @@ export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [m
 
   const formattedPhone = normalizePhone(phone);
   console.log("STEP 7: phone normalized:", formattedPhone);
-
-  // DIAGNOSTIC TEST: Check basic connectivity to Safaricom
-try {
-  console.log("DIAGNOSTIC: Testing TCP reachability to Safaricom...");
-  const pingController = new AbortController();
-  const pingTimeout = setTimeout(() => pingController.abort(), 5000); // 5s timeout
-  
-  const pingRes = await fetch("https://api.safaricom.co.ke", { 
-    method: "GET",
-    signal: pingController.signal 
-  });
-  clearTimeout(pingTimeout);
-  console.log("DIAGNOSTIC RESULT: Reachable! HTTP Status:", pingRes.status);
-} catch (pingErr) {
-  console.error("DIAGNOSTIC RESULT: FAILED! Cannot reach Safaricom:", pingErr);
-}
 
   console.log("STEP 8: fetching fresh token");
   const token = await darajaTokenPromise;
