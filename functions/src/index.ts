@@ -8,6 +8,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
+import { ProxyAgent, fetch as undiciFetch } from "undici";
 import * as admin from "firebase-admin";
 import { resolveWardServerSide } from "./locationResolver";
 
@@ -27,6 +28,7 @@ const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
 const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
+const daraProxyUrl = defineSecret("DARAJA_PROXY_URL");
 
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
@@ -172,6 +174,15 @@ function darajaBase(): string {
   return isSandbox() ? "https://sandbox.safaricom.co.ke" : "https://api.safaricom.co.ke";
 }
 
+async function fetchViaProxy(url: string, options: any = {}): Promise<Response> {
+  const proxyUrl = daraProxyUrl.value();
+  if (proxyUrl) {
+    const agent = new ProxyAgent(proxyUrl);
+    return undiciFetch(url, { ...options, dispatcher: agent }) as unknown as Promise<Response>;
+  }
+  return fetch(url, options);
+}
+
 function mpesaTimestamp(): string {
   const now = new Date();
   const eat = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -257,7 +268,7 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
   let res: Response;
   try {
     console.log(`Daraja token request starting: ${darajaBase()}/oauth/v1/generate`);
-    res = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
+    res = await fetchViaProxy(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
       headers: { Authorization: `Basic ${creds}` },
       signal: controller.signal,
     });
