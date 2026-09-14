@@ -175,23 +175,6 @@ function darajaBase(): string {
 }
 
 async function fetchViaProxy(url: string, options: any = {}): Promise<Response> {
-  const proxyUrl = daraProxyUrl.value();
-
-  console.log(
-    "DARaja network route:",
-    proxyUrl ? "PROXY" : "DIRECT",
-    "URL:",
-    url
-  );
-
-  if (proxyUrl) {
-    const agent = new ProxyAgent(proxyUrl);
-    return undiciFetch(url, {
-      ...options,
-      dispatcher: agent,
-    }) as unknown as Promise<Response>;
-  }
-
   return fetch(url, options);
 }
 
