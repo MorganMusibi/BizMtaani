@@ -443,8 +443,7 @@ export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 200 }, 
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
-
+export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, daraProxyUrl], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
   console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -574,7 +573,7 @@ const stkTimeoutId = setTimeout(() => {
 }, 45_000);
   let darajaRes: Response;
   try {
-    darajaRes = await fetch(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
+    darajaRes = await fetchViaProxy(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(stkBody),
