@@ -25,12 +25,31 @@ export async function registerForNotifications(uid: string): Promise<void> {
       if (permission !== "granted") return;
     }
 
-    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    console.log("[FCM debug] VAPID_KEY present:", !!VAPID_KEY, "prefix:", VAPID_KEY?.slice(0, 6));
 
-const token = await getToken(messaging, {
-  vapidKey: VAPID_KEY,
-  serviceWorkerRegistration: registration,
-});
+    const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+    await navigator.serviceWorker.ready; // ensure it's actually active, not just registering
+
+    console.log(
+      "[FCM debug] SW registration state:",
+      registration.active?.state,
+      "scope:",
+      registration.scope
+    );
+    console.log("[FCM debug] Notification.permission at getToken time:", Notification.permission);
+
+    let token: string;
+    try {
+      token = await getToken(messaging, {
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: registration,
+      });
+    } catch (tokenError) {
+      console.error("[FCM debug] getToken failed:", tokenError);
+      // Rethrow so the outer catch below still handles/logs it as before —
+      // this inner catch exists only to log state at the exact failure point.
+      throw tokenError;
+    }
 
     // Foreground messages (app open, tab focused) — service worker's
     // onBackgroundMessage only fires when the tab isn't focused, so
