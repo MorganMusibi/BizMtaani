@@ -17,6 +17,7 @@ import {
   Shield,
   Megaphone,
   TrendingUp,
+  RefreshCw,
 } from "lucide-react";
 import {
   collection, getCountFromServer, query,
@@ -35,7 +36,6 @@ import {
 import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-
 
 type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog";
 interface ProductReport {
@@ -180,6 +180,94 @@ interface DashboardStatsCache {
 let dashboardStatsCache: DashboardStatsCache | null = null;
 const DASHBOARD_STATS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
+// ---------------------------------------------------------------------------
+// DESIGN TOKENS
+// A pale-ledger palette + IBM Plex trio (Serif for headings, Sans for UI,
+// Mono for anything that's actually data). Defined once as CSS custom
+// properties on the page root, referenced via Tailwind's bg-[var(--x)]
+// arbitrary-value syntax everywhere below.
+// ---------------------------------------------------------------------------
+const rootVars = {
+  ["--pd-paper"]: "#EEF2E7",
+  ["--pd-surface"]: "#FBFCF9",
+  ["--pd-ink"]: "#1B2A20",
+  ["--pd-ink-soft"]: "#5A6A5D",
+  ["--pd-line"]: "#D6DECB",
+  ["--pd-green"]: "#2F8F52",
+  ["--pd-green-soft"]: "#E3EEDF",
+  ["--pd-rust"]: "#B1502E",
+  ["--pd-rust-soft"]: "#F4E4DC",
+  ["--pd-gold"]: "#B9822E",
+  ["--pd-gold-soft"]: "#F3E9D5",
+  ["--pd-font-serif"]: "'IBM Plex Serif', Georgia, serif",
+  ["--pd-font-sans"]: "'IBM Plex Sans', system-ui, sans-serif",
+  ["--pd-font-mono"]: "'IBM Plex Mono', ui-monospace, monospace",
+} as React.CSSProperties;
+
+const fontSerif = { fontFamily: "var(--pd-font-serif)" };
+const fontMono = { fontFamily: "var(--pd-font-mono)" };
+
+// Shared class fragments so the same visual language repeats exactly
+// everywhere instead of drifting tab to tab.
+const navItemBase =
+  "flex w-full items-center justify-between gap-3 px-4 py-2.5 text-sm border-l-2 transition-colors";
+const navItemActive = "border-[var(--pd-green)] bg-white/5 text-[var(--pd-paper)]";
+const navItemInactive =
+  "border-transparent text-[#AEBBA2] hover:text-[var(--pd-paper)] hover:bg-white/5";
+
+const panelCls = "border border-[var(--pd-line)] bg-[var(--pd-surface)]";
+const thCls = "text-left px-4 py-2.5 font-medium text-xs text-[var(--pd-ink-soft)]";
+const tdMuted = "px-4 py-3 text-[var(--pd-ink-soft)]";
+
+const btnPrimary =
+  "bg-[var(--pd-ink)] text-[var(--pd-paper)] hover:bg-[#2A3D2E] transition-colors px-4 py-2 text-xs font-medium disabled:opacity-50";
+const btnGhost =
+  "border border-[var(--pd-line)] text-[var(--pd-ink)] hover:bg-[var(--pd-ink)]/5 transition-colors px-4 py-2 text-xs font-medium disabled:opacity-50 flex items-center gap-2";
+const btnDanger =
+  "bg-[var(--pd-rust)] text-white hover:bg-[#96401F] transition-colors px-4 py-2 text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-1.5";
+const btnConfirm =
+  "bg-[var(--pd-green)] text-white hover:bg-[#256F3F] transition-colors px-4 py-2 text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-1.5";
+const btnGhostSmall =
+  "flex-1 border border-[var(--pd-line)] text-[var(--pd-ink)] hover:bg-[var(--pd-ink)]/5 transition-colors px-3 py-2 text-xs font-medium disabled:opacity-50 flex items-center justify-center gap-1.5";
+
+const linkGreen = "text-xs font-medium text-[var(--pd-green)] hover:underline disabled:opacity-50";
+const linkRust = "text-xs font-medium text-[var(--pd-rust)] hover:underline disabled:opacity-50";
+const linkInk = "text-xs font-medium text-[var(--pd-ink)] hover:underline disabled:opacity-50";
+
+function StatusDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs" style={fontMono}>
+      <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+      <span style={{ color }}>{label}</span>
+    </span>
+  );
+}
+
+function EmptyState({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={`${panelCls} p-10 text-center text-sm text-[var(--pd-ink-soft)]`}>
+      {children}
+    </div>
+  );
+}
+
+function Spinner() {
+  return (
+    <div className="flex justify-center py-16">
+      <Loader2 className="h-5 w-5 animate-spin text-[var(--pd-ink-soft)]" />
+    </div>
+  );
+}
+
+function RefreshButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className={btnGhost}>
+      <RefreshCw className="h-3.5 w-3.5" />
+      Refresh
+    </button>
+  );
+}
+
 export default function AdminDashboard() {
   const { user, isAdmin, adminLoading } = useAuth();
   const [, navigate] = useLocation();
@@ -201,7 +289,7 @@ export default function AdminDashboard() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState("");
   const [overviewRefreshKey, setOverviewRefreshKey] = useState(0);
-// Today's insights
+  // Today's insights
   const [todayActiveAdverts, setTodayActiveAdverts] = useState<number | null>(null);
   const [todayNewUsers, setTodayNewUsers] = useState<number | null>(null);
   const [expiredCount, setExpiredCount] = useState<number | null>(null);
@@ -213,11 +301,11 @@ export default function AdminDashboard() {
   const [reportsLoading, setReportsLoading] = useState(true);
   const [processingReportId, setProcessingReportId] = useState<string | null>(null);
   // Support reports tab
-const [supportReports, setSupportReports] = useState<SupportReport[]>([]);
-const [supportReportsLoading, setSupportReportsLoading] = useState(true);
-const [processingSupportReportId, setProcessingSupportReportId] = useState<string | null>(null);
+  const [supportReports, setSupportReports] = useState<SupportReport[]>([]);
+  const [supportReportsLoading, setSupportReportsLoading] = useState(true);
+  const [processingSupportReportId, setProcessingSupportReportId] = useState<string | null>(null);
 
-// Users tab
+  // Users tab
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [usersLoaded, setUsersLoaded] = useState(false);
@@ -226,7 +314,7 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userSearchResults, setUserSearchResults] = useState<AdminUser[] | null>(null);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
-  
+
   // Message modal — sending a direct notification to a specific user
   const [messageTarget, setMessageTarget] = useState<AdminUser | null>(null);
   const [messageTitle, setMessageTitle] = useState("");
@@ -245,7 +333,7 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
 
-// Marketers tab — lazily loaded, matches the pattern used elsewhere
+  // Marketers tab — lazily loaded, matches the pattern used elsewhere
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [marketersLoading, setMarketersLoading] = useState(false);
   const [marketersLoaded, setMarketersLoaded] = useState(false);
@@ -253,28 +341,24 @@ const [processingSupportReportId, setProcessingSupportReportId] = useState<strin
 
   // Payouts tab — lazily loaded per selected month
   const [payoutMonth, setPayoutMonth] = useState(() => {
-  const now = new Date();
-  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
-});
-const [payouts, setPayouts] = useState<Payout[]>([]);
-const [payoutsLoading, setPayoutsLoading] = useState(false);
-const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
+    const now = new Date();
+    const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [payouts, setPayouts] = useState<Payout[]>([]);
+  const [payoutsLoading, setPayoutsLoading] = useState(false);
+  const [processingPayoutId, setProcessingPayoutId] = useState<string | null>(null);
 
-  // Payments tab — lazily loaded, matches the pattern used elsewhere
+  // Payments tab — lazily loaded, matches the pattern used elsewhere.
+  // Only completed (successful) payments are ever fetched — see loadPayments.
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [paymentsLoaded, setPaymentsLoaded] = useState(false);
-  const [paymentStatusFilter, setPaymentStatusFilter] = useState<
-    "all" | "completed" | "pending" | "failed" | "cancelled"
-  >("all");
 
   // Leaderboard tab — lazily loaded, matches the pattern used elsewhere
-
-  // Leaderboard tab — lazily loaded, matches the pattern used elsewhere
-const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-const [leaderboardLoading, setLeaderboardLoading] = useState(false);
-const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
 
   // Marketer applications tab — lazily loaded, bounded, matches the pattern used elsewhere
   const [applications, setApplications] = useState<MarketerApplication[]>([]);
@@ -287,7 +371,7 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   const [auditLogLoading, setAuditLogLoading] = useState(false);
   const [auditLogLoaded, setAuditLogLoaded] = useState(false);
   const [adminNames, setAdminNames] = useState<Record<string, string>>({});
-  
+
   async function loadJobs(force = false) {
     if (jobsLoaded && !force) return;
     setJobsLoading(true);
@@ -305,24 +389,24 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
   }
 
   async function deleteJobDirect(jobId: string, title: string) {
-  if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
-  setProcessingJobId(jobId);
-  try {
-    const deleteJob = httpsCallable(functions, "deleteJob");
-    await deleteJob({ jobId });
-    setJobs((prev) => prev.filter((j) => j.id !== jobId));
-  } catch (error) {
-    console.error("Failed to delete job:", error);
-    alert("Failed to delete the job.");
-  } finally {
-    setProcessingJobId(null);
+    if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+    setProcessingJobId(jobId);
+    try {
+      const deleteJob = httpsCallable(functions, "deleteJob");
+      await deleteJob({ jobId });
+      setJobs((prev) => prev.filter((j) => j.id !== jobId));
+    } catch (error) {
+      console.error("Failed to delete job:", error);
+      alert("Failed to delete the job.");
+    } finally {
+      setProcessingJobId(null);
+    }
   }
-}
 
   function isJobExpired(deadline?: string) {
     if (!deadline) return false;
     return new Date(`${deadline}T23:59:59`) < new Date();
-      }
+  }
 
   // -------------------------------------------------------
   // MARKETERS — loaded lazily when tab is opened, bounded to 50
@@ -343,74 +427,76 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
     }
   }
   async function loadPayouts(monthKey: string) {
-  setPayoutsLoading(true);
-  try {
-    const getMonthlyPayouts = httpsCallable(functions, "getMonthlyPayouts");
-    const result = await getMonthlyPayouts({ monthKey });
-    const data = result.data as { payouts: Payout[] };
-    setPayouts(data.payouts ?? []);
-  } catch (error) {
-    console.error("Failed to load payouts:", error);
-    alert("Failed to load payouts for this month.");
-  } finally {
-    setPayoutsLoading(false);
+    setPayoutsLoading(true);
+    try {
+      const getMonthlyPayouts = httpsCallable(functions, "getMonthlyPayouts");
+      const result = await getMonthlyPayouts({ monthKey });
+      const data = result.data as { payouts: Payout[] };
+      setPayouts(data.payouts ?? []);
+    } catch (error) {
+      console.error("Failed to load payouts:", error);
+      alert("Failed to load payouts for this month.");
+    } finally {
+      setPayoutsLoading(false);
+    }
   }
-}
 
+  // Only completed (successful) payments are fetched — failed/cancelled/
+  // pending attempts never leave Firestore for this tab.
   async function loadPayments(force = false) {
-  if (paymentsLoaded && !force) return;
-  setPaymentsLoading(true);
-  try {
-    const snap = await getDocs(
-      query(
-        collection(db, "payments"),
-        where("status", "==", "completed"),
-        orderBy("createdAt", "desc"),
-        limit(50)
-      )
-    );
-    setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
-    setPaymentsLoaded(true);
-  } catch (error) {
-    console.error("Failed to load payments:", error);
-  } finally {
-    setPaymentsLoading(false);
+    if (paymentsLoaded && !force) return;
+    setPaymentsLoading(true);
+    try {
+      const snap = await getDocs(
+        query(
+          collection(db, "payments"),
+          where("status", "==", "completed"),
+          orderBy("createdAt", "desc"),
+          limit(50)
+        )
+      );
+      setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
+      setPaymentsLoaded(true);
+    } catch (error) {
+      console.error("Failed to load payments:", error);
+    } finally {
+      setPaymentsLoading(false);
+    }
   }
-}
 
   async function loadLeaderboard() {
-  if (leaderboardLoaded) return;
-  setLeaderboardLoading(true);
-  try {
-    const getTopMarketers = httpsCallable(functions, "getTopMarketers");
-    const result = await getTopMarketers({});
-    const data = result.data as { leaderboard: LeaderboardEntry[] };
-    setLeaderboard(data.leaderboard ?? []);
-    setLeaderboardLoaded(true);
-  } catch (error) {
-    console.error("Failed to load leaderboard:", error);
-    alert("Failed to load the leaderboard.");
-  } finally {
-    setLeaderboardLoading(false);
+    if (leaderboardLoaded) return;
+    setLeaderboardLoading(true);
+    try {
+      const getTopMarketers = httpsCallable(functions, "getTopMarketers");
+      const result = await getTopMarketers({});
+      const data = result.data as { leaderboard: LeaderboardEntry[] };
+      setLeaderboard(data.leaderboard ?? []);
+      setLeaderboardLoaded(true);
+    } catch (error) {
+      console.error("Failed to load leaderboard:", error);
+      alert("Failed to load the leaderboard.");
+    } finally {
+      setLeaderboardLoading(false);
+    }
   }
-      }
 
-async function markPaid(payout: Payout) {
-  if (!confirm(`Mark ${payout.referralCode ?? payout.marketerUid} as paid for ${payoutMonth}?`)) return;
-  setProcessingPayoutId(payout.id);
-  try {
-    const markPayoutPaid = httpsCallable(functions, "markPayoutPaid");
-    await markPayoutPaid({ monthKey: payoutMonth, marketerUid: payout.marketerUid });
-    setPayouts((prev) =>
-      prev.map((p) => (p.id === payout.id ? { ...p, paid: true } : p))
-    );
-  } catch (error) {
-    console.error("Failed to mark payout paid:", error);
-    alert("Failed to update payout status.");
-  } finally {
-    setProcessingPayoutId(null);
+  async function markPaid(payout: Payout) {
+    if (!confirm(`Mark ${payout.referralCode ?? payout.marketerUid} as paid for ${payoutMonth}?`)) return;
+    setProcessingPayoutId(payout.id);
+    try {
+      const markPayoutPaid = httpsCallable(functions, "markPayoutPaid");
+      await markPayoutPaid({ monthKey: payoutMonth, marketerUid: payout.marketerUid });
+      setPayouts((prev) =>
+        prev.map((p) => (p.id === payout.id ? { ...p, paid: true } : p))
+      );
+    } catch (error) {
+      console.error("Failed to mark payout paid:", error);
+      alert("Failed to update payout status.");
+    } finally {
+      setProcessingPayoutId(null);
+    }
   }
-}
 
   async function makeMarketer(targetUser: AdminUser) {
     if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a marketer?`)) return;
@@ -431,8 +517,8 @@ async function markPaid(payout: Payout) {
     }
   }
 
-  
-async function revokeAdmin(targetUser: AdminUser) {
+
+  async function revokeAdmin(targetUser: AdminUser) {
     if (!confirm(`Revoke admin access for "${targetUser.displayName || targetUser.id}"?`)) return;
     setProcessingUserId(targetUser.id);
     try {
@@ -467,7 +553,7 @@ async function revokeAdmin(targetUser: AdminUser) {
       setProcessingUserId(null);
     }
   }
-  
+
   async function toggleMarketerStatus(marketer: Marketer) {
     const willSuspend = marketer.status !== "suspended";
     setProcessingMarketerId(marketer.id);
@@ -517,7 +603,7 @@ async function revokeAdmin(targetUser: AdminUser) {
   }
 
   async function approveApplication(application: MarketerApplication) {
-  if (!confirm(`Approve "${application.fullName || application.id}" as a marketer?`)) return;
+    if (!confirm(`Approve "${application.fullName || application.id}" as a marketer?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
@@ -536,7 +622,7 @@ async function revokeAdmin(targetUser: AdminUser) {
   }
 
   async function rejectApplication(application: MarketerApplication) {
-  if (!confirm(`Reject "${application.fullName || application.id}"'s application?`)) return;
+    if (!confirm(`Reject "${application.fullName || application.id}"'s application?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const rejectMarketerApplication = httpsCallable(functions, "rejectMarketerApplication");
@@ -568,7 +654,7 @@ async function revokeAdmin(targetUser: AdminUser) {
       const uidsToResolve = Array.from(new Set(entries.map((e) => e.adminUid))).filter(
         (uid) => !adminNames[uid]
       );
-    if (uidsToResolve.length > 0) {
+      if (uidsToResolve.length > 0) {
         try {
           const resultsMap: Record<string, string> = {};
           for (let i = 0; i < uidsToResolve.length; i += 30) {
@@ -711,8 +797,8 @@ async function revokeAdmin(targetUser: AdminUser) {
 
     loadDashboardStats();
   }, [adminLoading, user, isAdmin, overviewRefreshKey]);
-  
-  
+
+
 
   // -------------------------------------------------------
   // REPORTS — live subscription, only once admin confirmed
@@ -749,7 +835,7 @@ async function revokeAdmin(targetUser: AdminUser) {
 
     return () => unsub();
   }, [adminLoading, user, isAdmin]);
-  
+
   // -------------------------------------------------------
   // SUPPORT REPORTS — live subscription, only once admin confirmed
   // ✅ KEPT REALTIME - needed for urgent support issues
@@ -845,16 +931,16 @@ async function revokeAdmin(targetUser: AdminUser) {
   }
 
   function selectTab(tab: Tab) {
-  setActiveTab(tab);
-  if (tab === "users") loadUsers();
-  if (tab === "adverts") loadAdverts();
-  if (tab === "jobs") loadJobs();
-  if (tab === "marketers") loadMarketers();
-  if (tab === "applications") loadApplications();
-  if (tab === "payments") loadPayments();
-  if (tab === "payouts") loadPayouts(payoutMonth);
-  if (tab === "leaderboard") loadLeaderboard();
-  if (tab === "auditlog") loadAuditLog();
+    setActiveTab(tab);
+    if (tab === "users") loadUsers();
+    if (tab === "adverts") loadAdverts();
+    if (tab === "jobs") loadJobs();
+    if (tab === "marketers") loadMarketers();
+    if (tab === "applications") loadApplications();
+    if (tab === "payments") loadPayments();
+    if (tab === "payouts") loadPayouts(payoutMonth);
+    if (tab === "leaderboard") loadLeaderboard();
+    if (tab === "auditlog") loadAuditLog();
   }
 
   // -------------------------------------------------------
@@ -871,26 +957,26 @@ async function revokeAdmin(targetUser: AdminUser) {
     }
   }
   async function resolveSupportReport(reportId: string) {
-  setProcessingSupportReportId(reportId);
-  try {
-    await updateDoc(doc(db, "supportReports", reportId), { status: "resolved" });
-  } catch (error) {
-    console.error("Failed to resolve support report:", error);
-  } finally {
-    setProcessingSupportReportId(null);
+    setProcessingSupportReportId(reportId);
+    try {
+      await updateDoc(doc(db, "supportReports", reportId), { status: "resolved" });
+    } catch (error) {
+      console.error("Failed to resolve support report:", error);
+    } finally {
+      setProcessingSupportReportId(null);
+    }
   }
-}
 
-async function dismissSupportReport(reportId: string) {
-  setProcessingSupportReportId(reportId);
-  try {
-    await updateDoc(doc(db, "supportReports", reportId), { status: "dismissed" });
-  } catch (error) {
-    console.error("Failed to dismiss support report:", error);
-  } finally {
-    setProcessingSupportReportId(null);
+  async function dismissSupportReport(reportId: string) {
+    setProcessingSupportReportId(reportId);
+    try {
+      await updateDoc(doc(db, "supportReports", reportId), { status: "dismissed" });
+    } catch (error) {
+      console.error("Failed to dismiss support report:", error);
+    } finally {
+      setProcessingSupportReportId(null);
+    }
   }
-}
 
   async function removeReportedAdvert(report: ProductReport) {
     if (!confirm(`Delete "${report.productTitle}"? This cannot be undone.`)) return;
@@ -906,7 +992,7 @@ async function dismissSupportReport(reportId: string) {
       setProcessingReportId(null);
     }
   }
-  
+
   async function toggleUserBlock(targetUser: AdminUser) {
     const willBlock = !targetUser.blocked;
     const reason = willBlock ? prompt("Reason for blocking this user (optional):") ?? "" : "";
@@ -984,8 +1070,13 @@ async function dismissSupportReport(reportId: string) {
   // Wait while Firebase checks the admin custom claim
   if (adminLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <p className="text-sm text-muted-foreground">Checking administrator access...</p>
+      <div
+        className="flex min-h-screen items-center justify-center"
+        style={{ ...rootVars, background: "var(--pd-paper)" }}
+      >
+        <p className="text-sm text-[var(--pd-ink-soft)]" style={fontMono}>
+          Checking administrator access…
+        </p>
       </div>
     );
   }
@@ -1000,17 +1091,20 @@ async function dismissSupportReport(reportId: string) {
     return null;
   }
 
-  const filteredPayments =
-    paymentStatusFilter === "all"
-      ? payments
-      : payments.filter((p) => p.status === paymentStatusFilter);
-
   const stats = [
-    { title: "Total Users", value: totalUsers, icon: Users },
-    { title: "Active Adverts", value: activeAdverts, icon: Package },
+    { title: "Total users", value: totalUsers, icon: Users },
+    { title: "Active adverts", value: activeAdverts, icon: Package },
     { title: "Jobs", value: totalJobs, icon: Briefcase },
     { title: "Payments", value: successfulPayments, icon: CreditCard },
-    { title: "Support Reports", value: pendingSupportCount, icon: Flag },
+    { title: "Support reports", value: pendingSupportCount, icon: Flag },
+  ];
+
+  const insightCards = [
+    { label: "Active adverts today", value: todayActiveAdverts, accent: "var(--pd-green)" },
+    { label: "New users today", value: todayNewUsers, accent: "var(--pd-ink)" },
+    { label: "Expired adverts & jobs", value: expiredCount, accent: "var(--pd-rust)" },
+    { label: "Premium expiring soon", value: premiumExpiringSoon, accent: "var(--pd-gold)" },
+    { label: "Failed M-Pesa payments", value: failedPayments, accent: "var(--pd-rust)" },
   ];
 
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
@@ -1025,7 +1119,7 @@ async function dismissSupportReport(reportId: string) {
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
     { title: "Payouts", icon: CreditCard, tab: "payouts" },
     { title: "Leaderboard", icon: TrendingUp, tab: "leaderboard" },
-    ...(isOwner ? [{ title: "Audit Log", icon: Shield, tab: "auditlog" as Tab }] : []),
+    ...(isOwner ? [{ title: "Audit log", icon: Shield, tab: "auditlog" as Tab }] : []),
   ];
 
   // Function to refresh overview stats
@@ -1035,25 +1129,40 @@ async function dismissSupportReport(reportId: string) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div
+      className="min-h-screen"
+      style={{ ...rootVars, background: "var(--pd-paper)", color: "var(--pd-ink)", fontFamily: "var(--pd-font-sans)" }}
+    >
+      {/*
+        Fonts: for production, move this @import into index.html as
+        preloaded <link> tags (matches the preconnect pattern already
+        used elsewhere) rather than an in-component @import.
+      */}
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');`}</style>
+
       {/* Header */}
-      <header className="border-b bg-background">
+      <header className="border-b" style={{ borderColor: "var(--pd-line)" }}>
         <div className="flex h-16 items-center justify-between px-4 md:px-8">
           <div>
-            <h1 className="text-xl font-bold">BizMtaani Admin</h1>
-            <p className="text-sm text-muted-foreground">Platform management dashboard</p>
+            <h1 className="text-xl" style={{ ...fontSerif, fontWeight: 600 }}>
+              BizMtaani
+            </h1>
+            <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">Admin console</p>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium">{user.displayName || "Administrator"}</p>
-              <p className="text-xs text-muted-foreground">{user.email || "Admin account"}</p>
+              <p className="text-xs text-[var(--pd-ink-soft)]" style={fontMono}>
+                {user.email || "Admin account"}
+              </p>
             </div>
 
             <button
               type="button"
               onClick={() => navigate("/")}
-              className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted"
+              className="flex items-center gap-2 border px-3 py-2 text-sm transition-colors hover:bg-[var(--pd-ink)]/5"
+              style={{ borderColor: "var(--pd-line)" }}
             >
               <LogOut className="h-4 w-4" />
               Exit
@@ -1064,8 +1173,11 @@ async function dismissSupportReport(reportId: string) {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden min-h-[calc(100vh-4rem)] w-64 border-r bg-background md:block">
-          <nav className="space-y-1 p-4">
+        <aside
+          className="hidden min-h-[calc(100vh-4rem)] w-64 md:block"
+          style={{ background: "var(--pd-ink)" }}
+        >
+          <nav className="py-4">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const active = activeTab === item.tab;
@@ -1074,18 +1186,17 @@ async function dismissSupportReport(reportId: string) {
                   key={item.title}
                   type="button"
                   onClick={() => selectTab(item.tab)}
-                  className={`flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                    active ? "bg-primary text-white" : "hover:bg-muted"
-                  }`}
+                  className={`${navItemBase} ${active ? navItemActive : navItemInactive}`}
                 >
                   <span className="flex items-center gap-3">
-                    <Icon className="h-5 w-5" />
+                    <Icon className="h-4 w-4" />
                     {item.title}
                   </span>
                   {!!item.badge && (
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
-                      active ? "bg-white/20" : "bg-destructive text-white"
-                    }`}>
+                    <span
+                      className="text-[10px] font-medium px-1.5 py-0.5"
+                      style={{ ...fontMono, background: "var(--pd-rust)", color: "#fff" }}
+                    >
                       {item.badge}
                     </span>
                   )}
@@ -1096,7 +1207,10 @@ async function dismissSupportReport(reportId: string) {
         </aside>
 
         {/* Mobile tab bar */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-card border-t border-border flex overflow-x-auto no-scrollbar">
+        <div
+          className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex overflow-x-auto no-scrollbar border-t"
+          style={{ background: "var(--pd-ink)", borderColor: "var(--pd-line)" }}
+        >
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.tab;
@@ -1104,14 +1218,16 @@ async function dismissSupportReport(reportId: string) {
               <button
                 key={item.title}
                 onClick={() => selectTab(item.tab)}
-                className={`flex-1 min-w-[70px] flex flex-col items-center gap-1 py-2.5 text-[10px] font-semibold relative ${
-                  active ? "text-primary" : "text-muted-foreground"
-                }`}
+                className="flex-1 min-w-[70px] flex flex-col items-center gap-1 py-2.5 text-[10px] font-medium relative"
+                style={{ color: active ? "var(--pd-paper)" : "#8C9A87" }}
               >
                 <Icon className="h-5 w-5" />
                 {item.title}
                 {!!item.badge && (
-                  <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-destructive" />
+                  <span
+                    className="absolute top-1 right-3 w-2 h-2 rounded-full"
+                    style={{ background: "var(--pd-rust)" }}
+                  />
                 )}
               </button>
             );
@@ -1124,65 +1240,59 @@ async function dismissSupportReport(reportId: string) {
             <>
               <div className="mb-8 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold">Dashboard Overview</h2>
-                  <p className="mt-1 text-muted-foreground">
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>
+                    Overview
+                  </h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
                     Monitor and manage the BizMtaani marketplace.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={refreshOverview}
-                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+                <RefreshButton onClick={refreshOverview} />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div
+                className={`grid grid-cols-2 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 ${panelCls}`}
+                style={{ borderColor: "var(--pd-line)" } as React.CSSProperties}
+              >
+                <style>{`.pd-divide > * { border-color: var(--pd-line); }`}</style>
                 {stats.map((stat) => {
                   const Icon = stat.icon;
                   return (
-                    <div key={stat.title} className="rounded-xl border bg-card p-6 shadow-sm">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm text-muted-foreground">{stat.title}</p>
-                          <p className="mt-2 text-3xl font-bold">
-                            {statsLoading ? "..." : stat.value ?? "—"}
-                          </p>
-                        </div>
-                        <div className="rounded-lg bg-muted p-3">
-                          <Icon className="h-6 w-6" />
-                        </div>
+                    <div key={stat.title} className="p-5" style={{ borderColor: "var(--pd-line)" }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-xs text-[var(--pd-ink-soft)]">{stat.title}</p>
+                        <Icon className="h-4 w-4 text-[var(--pd-ink-soft)]" />
                       </div>
+                      <p className="text-2xl" style={fontMono}>
+                        {statsLoading ? "…" : stat.value ?? "—"}
+                      </p>
                     </div>
                   );
                 })}
               </div>
 
               {statsError && (
-                <div className="mt-6 rounded-lg border border-destructive/50 bg-destructive/10 p-4">
-                  <p className="text-sm text-destructive">{statsError}</p>
+                <div
+                  className="mt-6 border p-4"
+                  style={{ borderColor: "var(--pd-rust)", background: "var(--pd-rust-soft)" }}
+                >
+                  <p className="text-sm" style={{ color: "var(--pd-rust)" }}>{statsError}</p>
                 </div>
               )}
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-4">Today's Insights</h3>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                  {[
-                    { label: "Active Adverts Today", value: todayActiveAdverts, emoji: "🟢" },
-                    { label: "New Users Today", value: todayNewUsers, emoji: "👤" },
-                    { label: "Expired Adverts & Jobs", value: expiredCount, emoji: "🔴" },
-                    { label: "Premium Expiring Soon", value: premiumExpiringSoon, emoji: "⭐" },
-                    { label: "Failed M-Pesa Payments", value: failedPayments, emoji: "💳" },
-                  ].map((card) => (
-                    <div key={card.label} className="rounded-xl border bg-card p-4">
-                      <p className="text-xl mb-1">{card.emoji}</p>
-                      <p className="text-2xl font-bold">
-                        {insightsLoading ? "..." : card.value ?? "—"}
+
+              <div className="mt-10">
+                <h3 className="text-sm text-[var(--pd-ink-soft)] mb-3">Today's insights</h3>
+                <div className={`grid grid-cols-2 sm:grid-cols-5 divide-x divide-y sm:divide-y-0 ${panelCls}`}>
+                  {insightCards.map((card) => (
+                    <div
+                      key={card.label}
+                      className="p-4 border-l-[3px]"
+                      style={{ borderLeftColor: card.accent, borderColor: "var(--pd-line)" }}
+                    >
+                      <p className="text-xl" style={fontMono}>
+                        {insightsLoading ? "…" : card.value ?? "—"}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">{card.label}</p>
+                      <p className="text-xs text-[var(--pd-ink-soft)] mt-1">{card.label}</p>
                     </div>
                   ))}
                 </div>
@@ -1191,68 +1301,66 @@ async function dismissSupportReport(reportId: string) {
               {!!pendingReportsCount && (
                 <button
                   onClick={() => selectTab("reports")}
-                  className="mt-6 w-full flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10 transition-colors"
+                  className="mt-6 w-full flex items-center justify-between border-l-[3px] p-4 text-left transition-colors hover:bg-[var(--pd-rust)]/5"
+                  style={{ borderLeftColor: "var(--pd-rust)", background: "var(--pd-rust-soft)" }}
                 >
                   <div className="flex items-center gap-3">
-                    <Flag className="h-5 w-5 text-destructive" />
+                    <Flag className="h-4 w-4" style={{ color: "var(--pd-rust)" }} />
                     <div>
-                      <p className="font-semibold text-sm">
+                      <p className="font-medium text-sm">
                         {pendingReportsCount} pending report{pendingReportsCount === 1 ? "" : "s"}
                       </p>
-                      <p className="text-xs text-muted-foreground">Needs your review</p>
+                      <p className="text-xs text-[var(--pd-ink-soft)]">Needs your review</p>
                     </div>
                   </div>
-                  <ExternalLink className="h-4 w-4 text-muted-foreground" />
+                  <ExternalLink className="h-4 w-4 text-[var(--pd-ink-soft)]" />
                 </button>
               )}
               {!!pendingSupportCount && (
-  <button
-    onClick={() => selectTab("support")}
-    className="mt-3 w-full flex items-center justify-between rounded-xl border border-destructive/40 bg-destructive/5 p-4 text-left hover:bg-destructive/10 transition-colors"
-  >
-    <div className="flex items-center gap-3">
-      <Flag className="h-5 w-5 text-destructive" />
-      <div>
-        <p className="font-semibold text-sm">
-          {pendingSupportCount} support report{pendingSupportCount === 1 ? "" : "s"}
-        </p>
-        <p className="text-xs text-muted-foreground">Needs your review</p>
-      </div>
-    </div>
-    <ExternalLink className="h-4 w-4 text-muted-foreground" />
-  </button>
-)}
+                <button
+                  onClick={() => selectTab("support")}
+                  className="mt-3 w-full flex items-center justify-between border-l-[3px] p-4 text-left transition-colors hover:bg-[var(--pd-rust)]/5"
+                  style={{ borderLeftColor: "var(--pd-rust)", background: "var(--pd-rust-soft)" }}
+                >
+                  <div className="flex items-center gap-3">
+                    <Flag className="h-4 w-4" style={{ color: "var(--pd-rust)" }} />
+                    <div>
+                      <p className="font-medium text-sm">
+                        {pendingSupportCount} support report{pendingSupportCount === 1 ? "" : "s"}
+                      </p>
+                      <p className="text-xs text-[var(--pd-ink-soft)]">Needs your review</p>
+                    </div>
+                  </div>
+                  <ExternalLink className="h-4 w-4 text-[var(--pd-ink-soft)]" />
+                </button>
+              )}
             </>
           )}
 
           {activeTab === "reports" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Reports</h2>
-                <p className="mt-1 text-muted-foreground">
-                  Adverts flagged by users, awaiting review. (Live updates)
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Reports</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
+                  Adverts flagged by users, awaiting review. Live updates.
                 </p>
               </div>
 
               {reportsLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : reports.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No pending reports. All clear.
-                </div>
+                <EmptyState>No pending reports. All clear.</EmptyState>
               ) : (
-                <div className="space-y-3">
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
                   {reports.map((report) => (
-                    <div key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
+                    <div key={report.id} className="p-4 space-y-3" style={{ borderColor: "var(--pd-line)" }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate">{report.productTitle}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Reason: <span className="font-medium text-foreground">{report.reason}</span>
+                          <p className="font-medium text-sm truncate">{report.productTitle}</p>
+                          <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">
+                            Reason: <span style={{ color: "var(--pd-ink)" }}>{report.reason}</span>
                           </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5" style={fontMono}>
                             {timeAgo(report.createdAt)}
                           </p>
                         </div>
@@ -1260,7 +1368,8 @@ async function dismissSupportReport(reportId: string) {
                           href={`/product/${report.productId}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex-shrink-0 flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+                          className="flex-shrink-0 flex items-center gap-1 text-xs font-medium hover:underline"
+                          style={{ color: "var(--pd-ink)" }}
                         >
                           View <ExternalLink className="h-3 w-3" />
                         </a>
@@ -1271,7 +1380,7 @@ async function dismissSupportReport(reportId: string) {
                           type="button"
                           onClick={() => dismissReport(report.id)}
                           disabled={processingReportId === report.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+                          className={btnGhostSmall}
                         >
                           <Check className="h-3.5 w-3.5" /> Dismiss
                         </button>
@@ -1279,13 +1388,13 @@ async function dismissSupportReport(reportId: string) {
                           type="button"
                           onClick={() => removeReportedAdvert(report)}
                           disabled={processingReportId === report.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-destructive text-white px-3 py-2 text-xs font-semibold hover:bg-destructive/90 transition-colors disabled:opacity-50"
+                          className={`flex-1 ${btnDanger}`}
                         >
                           {processingReportId === report.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                           ) : (
                             <>
-                              <Trash2 className="h-3.5 w-3.5" /> Delete Advert
+                              <Trash2 className="h-3.5 w-3.5" /> Delete advert
                             </>
                           )}
                         </button>
@@ -1298,104 +1407,94 @@ async function dismissSupportReport(reportId: string) {
           )}
 
           {activeTab === "support" && (
-  <>
-    <div className="mb-6">
-      <h2 className="text-2xl font-bold">Support Reports</h2>
-      <p className="mt-1 text-muted-foreground">
-        Problems reported directly by users. (Live updates)
-      </p>
-    </div>
-
-    {supportReportsLoading ? (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    ) : supportReports.length === 0 ? (
-      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-        No open support reports. All clear.
-      </div>
-    ) : (
-      <div className="space-y-3">
-        {supportReports.map((report) => (
-          <div key={report.id} className="rounded-xl border bg-card p-4 space-y-3">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm capitalize">{report.type}</span>
-                  {report.priority === "high" && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-destructive text-white">
-                      HIGH
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
-                  {report.description}
-                </p>
-                {report.advertId && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Advert ID: <span className="font-mono">{report.advertId}</span>
-                  </p>
-                )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  {report.userEmail || report.contact || "No contact provided"}
-                  {" • "}
-                  {timeAgo(report.createdAt)}
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Support reports</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
+                  Problems reported directly by users. Live updates.
                 </p>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => dismissSupportReport(report.id)}
-                disabled={processingSupportReportId === report.id}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
-              >
-                <X className="h-3.5 w-3.5" /> Dismiss
-              </button>
-              <button
-                type="button"
-                onClick={() => resolveSupportReport(report.id)}
-                disabled={processingSupportReportId === report.id}
-                className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white px-3 py-2 text-xs font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50"
-              >
-                {processingSupportReportId === report.id ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <>
-                    <Check className="h-3.5 w-3.5" /> Mark Resolved
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </>
-)}
+              {supportReportsLoading ? (
+                <Spinner />
+              ) : supportReports.length === 0 ? (
+                <EmptyState>No open support reports. All clear.</EmptyState>
+              ) : (
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
+                  {supportReports.map((report) => (
+                    <div key={report.id} className="p-4 space-y-3" style={{ borderColor: "var(--pd-line)" }}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm capitalize">{report.type}</span>
+                            {report.priority === "high" && (
+                              <span
+                                className="text-[10px] font-medium px-1.5 py-0.5"
+                                style={{ background: "var(--pd-rust)", color: "#fff" }}
+                              >
+                                high
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-[var(--pd-ink-soft)] mt-1 whitespace-pre-wrap">
+                            {report.description}
+                          </p>
+                          {report.advertId && (
+                            <p className="text-xs text-[var(--pd-ink-soft)] mt-1">
+                              Advert ID: <span style={fontMono}>{report.advertId}</span>
+                            </p>
+                          )}
+                          <p className="text-xs text-[var(--pd-ink-soft)] mt-1">
+                            {report.userEmail || report.contact || "No contact provided"}
+                            {" · "}
+                            <span style={fontMono}>{timeAgo(report.createdAt)}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => dismissSupportReport(report.id)}
+                          disabled={processingSupportReportId === report.id}
+                          className={btnGhostSmall}
+                        >
+                          <X className="h-3.5 w-3.5" /> Dismiss
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => resolveSupportReport(report.id)}
+                          disabled={processingSupportReportId === report.id}
+                          className={`flex-1 ${btnConfirm}`}
+                        >
+                          {processingSupportReportId === report.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            <>
+                              <Check className="h-3.5 w-3.5" /> Mark resolved
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
 
           {activeTab === "users" && (
             <>
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold">Users</h2>
-                  <p className="mt-1 text-muted-foreground">
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Users</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
                     {userSearchResults !== null
                       ? `${userSearchResults.length} result${userSearchResults.length === 1 ? "" : "s"} for "${userSearchQuery}"`
                       : "Most recent 50 users."}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => loadUsers(true)}
-                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+                <RefreshButton onClick={() => loadUsers(true)} />
               </div>
 
               <div className="mb-4 flex gap-2">
@@ -1405,20 +1504,17 @@ async function dismissSupportReport(reportId: string) {
                   onChange={(e) => setUserSearchQuery(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") searchUsers(userSearchQuery); }}
                   placeholder="Search by name (case-sensitive, matches start of name)…"
-                  className="flex-1 h-10 px-3 rounded-md border text-sm bg-background"
+                  className="flex-1 h-10 px-3 border text-sm bg-[var(--pd-surface)]"
+                  style={{ borderColor: "var(--pd-line)" }}
                 />
-                <button
-                  type="button"
-                  onClick={() => searchUsers(userSearchQuery)}
-                  className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
-                >
+                <button type="button" onClick={() => searchUsers(userSearchQuery)} className={btnGhost}>
                   Search
                 </button>
                 {userSearchResults !== null && (
                   <button
                     type="button"
                     onClick={() => { setUserSearchQuery(""); setUserSearchResults(null); }}
-                    className="rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted"
+                    className={btnGhost}
                   >
                     Clear
                   </button>
@@ -1426,74 +1522,64 @@ async function dismissSupportReport(reportId: string) {
               </div>
 
               {usersLoading || userSearchLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : (
-                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+                <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead style={{ borderBottom: "1px solid var(--pd-line)" }}>
                       <tr>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Name</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Plan</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Role</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
-                        <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
+                        <th className={thCls}>Name</th>
+                        <th className={thCls}>Plan</th>
+                        <th className={thCls}>Role</th>
+                        <th className={thCls}>Status</th>
+                        <th className={`${thCls} text-right`}>Action</th>
                       </tr>
                     </thead>
-                      
-                        <tbody>
+
+                    <tbody>
                       {(userSearchResults ?? users).map((u) => {
                         const reportCount = reportCountsBySeller[u.id] ?? 0;
                         return (
-                          <tr key={u.id} className="border-t border-border">
-                            <td className="px-4 py-2.5">
+                          <tr key={u.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
+                            <td className="px-4 py-3">
                               <div className="flex items-center gap-2">
                                 <div>
                                   <p>{u.displayName || "—"}</p>
                                   {(u as any).email && (
-                                    <p className="text-xs text-muted-foreground">{(u as any).email}</p>
+                                    <p className="text-xs text-[var(--pd-ink-soft)]">{(u as any).email}</p>
                                   )}
                                 </div>
                                 {reportCount > 0 && (
                                   <span
                                     title={`${reportCount} pending report(s)`}
-                                    className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700"
+                                    className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5"
+                                    style={{ background: "var(--pd-gold-soft)", color: "var(--pd-gold)" }}
                                   >
-                                    🚩 {reportCount}
+                                    {reportCount} flagged
                                   </span>
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-2.5 text-muted-foreground">{u.subscriptionPlan ?? "free"}</td>
-                            <td className="px-4 py-2.5">
+                            <td className={tdMuted}>{u.subscriptionPlan ?? "free"}</td>
+                            <td className="px-4 py-3">
                               {u.role === "admin" ? (
-                                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
+                                <span className="inline-flex items-center gap-1 text-xs font-medium">
                                   <Shield className="h-3 w-3" /> Admin
                                 </span>
                               ) : (
-                                <span className="text-xs text-muted-foreground">User</span>
+                                <span className="text-xs text-[var(--pd-ink-soft)]">User</span>
                               )}
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className="px-4 py-3">
                               {u.blocked ? (
-                                <span
-                                  title={u.blockReason || "Blocked"}
-                                  className="text-xs font-semibold text-destructive"
-                                >
-                                  Blocked
-                                </span>
+                                <StatusDot color="var(--pd-rust)" label={u.blockReason || "blocked"} />
                               ) : (
-                                <span className="text-xs text-muted-foreground">Active</span>
+                                <StatusDot color="var(--pd-green)" label="active" />
                               )}
                             </td>
-                            <td className="px-4 py-2.5 text-right">
+                            <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => setMessageTarget(u)}
-                                  className="text-xs font-semibold text-primary hover:underline"
-                                >
+                                <button type="button" onClick={() => setMessageTarget(u)} className={linkInk}>
                                   Message
                                 </button>
                                 {u.role !== "admin" && (
@@ -1501,9 +1587,9 @@ async function dismissSupportReport(reportId: string) {
                                     type="button"
                                     onClick={() => makeMarketer(u)}
                                     disabled={processingUserId === u.id}
-                                    className="text-xs font-semibold text-[#00A651] hover:underline disabled:opacity-50"
+                                    className={linkGreen}
                                   >
-                                    {processingUserId === u.id ? "..." : "Make Marketer"}
+                                    {processingUserId === u.id ? "…" : "Make marketer"}
                                   </button>
                                 )}
                                 {u.role !== "admin" && (
@@ -1511,15 +1597,9 @@ async function dismissSupportReport(reportId: string) {
                                     type="button"
                                     onClick={() => toggleUserBlock(u)}
                                     disabled={processingUserId === u.id}
-                                    className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
-                                      u.blocked ? "text-primary" : "text-destructive"
-                                    }`}
+                                    className={u.blocked ? linkGreen : linkRust}
                                   >
-                                    {processingUserId === u.id
-                                      ? "..."
-                                      : u.blocked
-                                      ? "Unblock"
-                                      : "Block"}
+                                    {processingUserId === u.id ? "…" : u.blocked ? "Unblock" : "Block"}
                                   </button>
                                 )}
                                 {u.role !== "admin" && isOwner && (
@@ -1527,9 +1607,9 @@ async function dismissSupportReport(reportId: string) {
                                     type="button"
                                     onClick={() => grantAdmin(u)}
                                     disabled={processingUserId === u.id}
-                                    className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                                    className={linkInk}
                                   >
-                                    {processingUserId === u.id ? "..." : "Grant Admin"}
+                                    {processingUserId === u.id ? "…" : "Grant admin"}
                                   </button>
                                 )}
                                 {u.role === "admin" && isOwner && u.id !== user?.uid && (
@@ -1537,23 +1617,20 @@ async function dismissSupportReport(reportId: string) {
                                     type="button"
                                     onClick={() => revokeAdmin(u)}
                                     disabled={processingUserId === u.id}
-                                    className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                                    className={linkRust}
                                   >
-                                    {processingUserId === u.id ? "..." : "Revoke Admin"}
+                                    {processingUserId === u.id ? "…" : "Revoke admin"}
                                   </button>
                                 )}
                               </div>
                             </td>
-                                  
                           </tr>
                         );
                       })}
                     </tbody>
-                                
                   </table>
                 </div>
               )}
-              
             </>
           )}
 
@@ -1561,44 +1638,34 @@ async function dismissSupportReport(reportId: string) {
             <>
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold">Adverts</h2>
-                  <p className="mt-1 text-muted-foreground">Most recent 50 adverts.</p>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Adverts</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Most recent 50 adverts.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => loadAdverts(true)}
-                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+                <RefreshButton onClick={() => loadAdverts(true)} />
               </div>
 
               {advertsLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : (
-                <div className="space-y-2">
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
                   {adverts.map((a) => (
                     <div
                       key={a.id}
-                      className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                      className="flex items-center justify-between gap-3 p-4"
+                      style={{ borderColor: "var(--pd-line)" }}
                     >
                       <div className="min-w-0">
-                        <p className="font-semibold text-sm truncate">{a.title}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {a.category} • {a.status} • {timeAgo(a.createdAt)}
+                        <p className="font-medium text-sm truncate">{a.title}</p>
+                        <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">
+                          {a.category} · {a.status} · <span style={fontMono}>{timeAgo(a.createdAt)}</span>
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-3 flex-shrink-0">
                         <a
                           href={`/product/${a.id}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-xs font-semibold text-primary hover:underline"
+                          className={linkInk}
                         >
                           View
                         </a>
@@ -1606,9 +1673,9 @@ async function dismissSupportReport(reportId: string) {
                           type="button"
                           onClick={() => deleteAdvertDirect(a.id, a.title)}
                           disabled={processingAdvertId === a.id}
-                          className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                          className={linkRust}
                         >
-                          {processingAdvertId === a.id ? "..." : "Delete"}
+                          {processingAdvertId === a.id ? "…" : "Delete"}
                         </button>
                       </div>
                     </div>
@@ -1622,64 +1689,48 @@ async function dismissSupportReport(reportId: string) {
             <>
               <div className="mb-6 flex items-center justify-between">
                 <div>
-                  <h2 className="text-2xl font-bold">Jobs</h2>
-                  <p className="mt-1 text-muted-foreground">Most recent 50 job posts.</p>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Jobs</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Most recent 50 job posts.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => loadJobs(true)}
-                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
+                <RefreshButton onClick={() => loadJobs(true)} />
               </div>
 
               {jobsLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : jobs.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No job posts yet.
-                </div>
+                <EmptyState>No job posts yet.</EmptyState>
               ) : (
-                <div className="space-y-2">
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
                   {jobs.map((j) => {
                     const expired = isJobExpired(j.deadline);
                     return (
                       <div
                         key={j.id}
-                        className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4"
+                        className="flex items-center justify-between gap-3 p-4"
+                        style={{ borderColor: "var(--pd-line)" }}
                       >
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm truncate">{j.title || "Untitled"}</p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {j.company || "—"} • {j.jobType || "—"}
+                          <p className="font-medium text-sm truncate">{j.title || "Untitled"}</p>
+                          <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">
+                            {j.company || "—"} · {j.jobType || "—"}
                             {expired && (
-                              <span className="ml-2 text-destructive font-semibold">Expired</span>
+                              <span className="ml-2 font-medium" style={{ color: "var(--pd-rust)" }}>Expired</span>
                             )}
-                            {" • "}{timeAgo(j.createdAt)}
+                            {" · "}
+                            <span style={fontMono}>{timeAgo(j.createdAt)}</span>
                           </p>
                         </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <a
-                            href={`/jobs/${j.id}`}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-xs font-semibold text-primary hover:underline"
-                          >
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <a href={`/jobs/${j.id}`} target="_blank" rel="noreferrer" className={linkInk}>
                             View
                           </a>
                           <button
                             type="button"
                             onClick={() => deleteJobDirect(j.id, j.title || "this job")}
                             disabled={processingJobId === j.id}
-                            className="text-xs font-semibold text-destructive hover:underline disabled:opacity-50"
+                            className={linkRust}
                           >
-                            {processingJobId === j.id ? "..." : "Delete"}
+                            {processingJobId === j.id ? "…" : "Delete"}
                           </button>
                         </div>
                       </div>
@@ -1693,35 +1744,33 @@ async function dismissSupportReport(reportId: string) {
           {activeTab === "applications" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Marketer Applications</h2>
-                <p className="mt-1 text-muted-foreground">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer applications</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
                   Pending applications from users wanting to become marketers.
                 </p>
               </div>
 
               {applicationsLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : applications.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No pending applications.
-                </div>
+                <EmptyState>No pending applications.</EmptyState>
               ) : (
-                <div className="space-y-3">
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
                   {applications.map((a) => (
-                    <div key={a.id} className="rounded-xl border bg-card p-4 space-y-3">
+                    <div key={a.id} className="p-4 space-y-3" style={{ borderColor: "var(--pd-line)" }}>
                       <div>
-                        <p className="font-semibold text-sm">{a.fullName || "Unnamed applicant"}</p>
-                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-muted-foreground">
+                        <p className="font-medium text-sm">{a.fullName || "Unnamed applicant"}</p>
+                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1 text-xs text-[var(--pd-ink-soft)]">
                           <span>Email: {a.email || "—"}</span>
                           <span>ID: {a.idNumber || "—"}</span>
                           <span>M-Pesa: {a.mpesaNumber || "—"}</span>
                         </div>
                         {a.reason && (
-                          <p className="text-sm text-muted-foreground mt-2 whitespace-pre-wrap">{a.reason}</p>
+                          <p className="text-sm text-[var(--pd-ink-soft)] mt-2 whitespace-pre-wrap">{a.reason}</p>
                         )}
-                        <p className="text-xs text-muted-foreground mt-2">{timeAgo(a.createdAt)}</p>
+                        <p className="text-xs text-[var(--pd-ink-soft)] mt-2" style={fontMono}>
+                          {timeAgo(a.createdAt)}
+                        </p>
                       </div>
 
                       <div className="flex gap-2">
@@ -1729,7 +1778,7 @@ async function dismissSupportReport(reportId: string) {
                           type="button"
                           onClick={() => rejectApplication(a)}
                           disabled={processingApplicationId === a.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted transition-colors disabled:opacity-50"
+                          className={btnGhostSmall}
                         >
                           <X className="h-3.5 w-3.5" /> Reject
                         </button>
@@ -1737,7 +1786,7 @@ async function dismissSupportReport(reportId: string) {
                           type="button"
                           onClick={() => approveApplication(a)}
                           disabled={processingApplicationId === a.id}
-                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-[#00A651] text-white px-3 py-2 text-xs font-semibold hover:bg-[#00A651]/90 transition-colors disabled:opacity-50"
+                          className={`flex-1 ${btnConfirm}`}
                         >
                           {processingApplicationId === a.id ? (
                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1758,32 +1807,28 @@ async function dismissSupportReport(reportId: string) {
           {activeTab === "marketers" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Marketers</h2>
-                <p className="mt-1 text-muted-foreground">
-                  Approved marketers and their commission earnings. To approve a new marketer, use "Make Marketer" on the Users tab.
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketers</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
+                  Approved marketers and their commission earnings. To approve a new marketer, use "Make marketer" on the Users tab.
                 </p>
               </div>
 
               {marketersLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : marketers.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No marketers approved yet.
-                </div>
+                <EmptyState>No marketers approved yet.</EmptyState>
               ) : (
-                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+                <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead style={{ borderBottom: "1px solid var(--pd-line)" }}>
                       <tr>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Name / Email</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earned</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Paid Out</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Balance</th>
-                        <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
+                        <th className={thCls}>Code</th>
+                        <th className={thCls}>Name / email</th>
+                        <th className={thCls}>Status</th>
+                        <th className={thCls}>Earned</th>
+                        <th className={thCls}>Paid out</th>
+                        <th className={thCls}>Balance</th>
+                        <th className={`${thCls} text-right`}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1791,35 +1836,33 @@ async function dismissSupportReport(reportId: string) {
                         const earned = m.totalEarnedKES ?? 0;
                         const paid = m.totalWithdrawnKES ?? 0;
                         return (
-                          <tr key={m.id} className="border-t border-border">
-                            <td className="px-4 py-2.5 font-mono font-semibold">{m.referralCode ?? "—"}</td>
-                            <td className="px-4 py-2.5">
+                          <tr key={m.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
+                            <td className="px-4 py-3" style={fontMono}>{m.referralCode ?? "—"}</td>
+                            <td className="px-4 py-3">
                               <p>{m.fullName || "—"}</p>
-                              <p className="text-xs text-muted-foreground">{m.email || "—"}</p>
+                              <p className="text-xs text-[var(--pd-ink-soft)]">{m.email || "—"}</p>
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className="px-4 py-3">
                               {m.status === "suspended" ? (
-                                <span className="text-xs font-semibold text-destructive">Suspended</span>
+                                <StatusDot color="var(--pd-rust)" label="suspended" />
                               ) : (
-                                <span className="text-xs font-semibold text-[#00A651]">Active</span>
+                                <StatusDot color="var(--pd-green)" label="active" />
                               )}
                             </td>
-                            <td className="px-4 py-2.5">KES {earned.toLocaleString("en-GB")}</td>
-                            <td className="px-4 py-2.5">KES {paid.toLocaleString("en-GB")}</td>
-                            <td className="px-4 py-2.5 font-semibold">
+                            <td className="px-4 py-3" style={fontMono}>KES {earned.toLocaleString("en-GB")}</td>
+                            <td className="px-4 py-3" style={fontMono}>KES {paid.toLocaleString("en-GB")}</td>
+                            <td className="px-4 py-3 font-medium" style={fontMono}>
                               KES {(earned - paid).toLocaleString("en-GB")}
                             </td>
-                            <td className="px-4 py-2.5 text-right">
+                            <td className="px-4 py-3 text-right">
                               <button
                                 type="button"
                                 onClick={() => toggleMarketerStatus(m)}
                                 disabled={processingMarketerId === m.id}
-                                className={`text-xs font-semibold hover:underline disabled:opacity-50 ${
-                                  m.status === "suspended" ? "text-primary" : "text-destructive"
-                                }`}
+                                className={m.status === "suspended" ? linkGreen : linkRust}
                               >
                                 {processingMarketerId === m.id
-                                  ? "..."
+                                  ? "…"
                                   : m.status === "suspended"
                                   ? "Reactivate"
                                   : "Suspend"}
@@ -1836,229 +1879,175 @@ async function dismissSupportReport(reportId: string) {
           )}
 
           {activeTab === "payouts" && (
-  <>
-    <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
-      <div>
-        <h2 className="text-2xl font-bold">Marketer Payouts</h2>
-        <p className="mt-1 text-muted-foreground">Monthly commission owed to each marketer.</p>
-      </div>
-      <div className="flex items-center gap-2">
-        <input
-          type="month"
-          value={payoutMonth}
-          onChange={(e) => setPayoutMonth(e.target.value)}
-          className="rounded-md border px-3 py-2 text-sm"
-        />
-        <button
-          type="button"
-          onClick={() => loadPayouts(payoutMonth)}
-          className="rounded-md border px-3 py-2 text-sm font-semibold hover:bg-muted"
-        >
-          Load
-        </button>
-      </div>
-    </div>
-
-    {payoutsLoading ? (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    ) : payouts.length === 0 ? (
-      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-        No payout data for {payoutMonth}. It may not have closed yet, or no marketers earned commissions.
-      </div>
-    ) : (
-      <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Sign-ups</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earned</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
-              <th className="text-right px-4 py-2.5 font-semibold text-xs text-muted-foreground">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {payouts.map((p) => (
-              <tr key={p.id} className="border-t border-border">
-                <td className="px-4 py-2.5 font-mono font-semibold">{p.referralCode ?? p.marketerUid}</td>
-                <td className="px-4 py-2.5">{p.signups}</td>
-                <td className="px-4 py-2.5 font-semibold">KES {p.earningsKES.toLocaleString("en-GB")}</td>
-                <td className="px-4 py-2.5">
-                  {p.paid ? (
-                    <span className="text-xs font-semibold text-[#00A651]">Paid</span>
-                  ) : (
-                    <span className="text-xs font-semibold text-destructive">Unpaid</span>
-                  )}
-                </td>
-                <td className="px-4 py-2.5 text-right">
-                  {!p.paid && (
-                    <button
-                      type="button"
-                      onClick={() => markPaid(p)}
-                      disabled={processingPayoutId === p.id}
-                      className="text-xs font-semibold text-primary hover:underline disabled:opacity-50"
-                    >
-                      {processingPayoutId === p.id ? "..." : "Mark Paid"}
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </>
-)}
-
-          {activeTab === "leaderboard" && (
-  <>
-    <div className="mb-6">
-      <h2 className="text-2xl font-bold">Top Marketers</h2>
-      <p className="mt-1 text-muted-foreground">
-        Ranked by earnings this month.
-      </p>
-    </div>
-
-    {leaderboardLoading ? (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-6 w-6 animate-spin text-primary" />
-      </div>
-    ) : leaderboard.length === 0 ? (
-      <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-        No marketer earnings recorded yet this month.
-      </div>
-    ) : (
-      <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead className="bg-muted/50">
-            <tr>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Rank</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Code</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Sign-ups</th>
-              <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Earnings</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leaderboard.map((entry, index) => (
-              <tr key={entry.id} className="border-t border-border">
-                <td className="px-4 py-2.5 font-semibold">#{index + 1}</td>
-                <td className="px-4 py-2.5 font-mono font-semibold">{entry.referralCode ?? entry.id}</td>
-                <td className="px-4 py-2.5">{entry.signupsThisMonth}</td>
-                <td className="px-4 py-2.5 font-semibold">
-                  KES {entry.earningsThisMonth.toLocaleString("en-GB")}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    )}
-  </>
-)}
-          
-           {activeTab === "payments" && (
             <>
               <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h2 className="text-2xl font-bold">Payments</h2>
-                  <p className="mt-1 text-muted-foreground">Most recent 50 M-Pesa payment attempts.</p>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer payouts</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Monthly commission owed to each marketer.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => loadPayments(true)}
-                  className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-semibold hover:bg-muted transition-colors"
-                >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Refresh
-                </button>
-              </div>
-
-              <div className="mb-4 flex gap-2 flex-wrap">
-                {(["all", "completed", "pending", "failed", "cancelled"] as const).map((status) => (
-                  <button
-                    key={status}
-                    type="button"
-                    onClick={() => setPaymentStatusFilter(status)}
-                    className={`px-3 py-1.5 rounded-full text-xs font-semibold capitalize transition-colors ${
-                      paymentStatusFilter === status
-                        ? "bg-primary text-white"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {status}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="month"
+                    value={payoutMonth}
+                    onChange={(e) => setPayoutMonth(e.target.value)}
+                    className="border px-3 py-2 text-sm bg-[var(--pd-surface)]"
+                    style={{ borderColor: "var(--pd-line)" }}
+                  />
+                  <button type="button" onClick={() => loadPayouts(payoutMonth)} className={btnGhost}>
+                    Load
                   </button>
-                ))}
+                </div>
               </div>
 
-              {paymentsLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
-              ) : filteredPayments.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No payments found{paymentStatusFilter !== "all" ? ` with status "${paymentStatusFilter}"` : ""}.
-                </div>
+              {payoutsLoading ? (
+                <Spinner />
+              ) : payouts.length === 0 ? (
+                <EmptyState>
+                  No payout data for {payoutMonth}. It may not have closed yet, or no marketers earned commissions.
+                </EmptyState>
               ) : (
-                <div className="rounded-xl border bg-card overflow-hidden overflow-x-auto">
+                <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
-                    <thead className="bg-muted/50">
+                    <thead style={{ borderBottom: "1px solid var(--pd-line)" }}>
                       <tr>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Checkout ID</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Plan</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Amount</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Status</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Product</th>
-                        <th className="text-left px-4 py-2.5 font-semibold text-xs text-muted-foreground">Date</th>
+                        <th className={thCls}>Code</th>
+                        <th className={thCls}>Sign-ups</th>
+                        <th className={thCls}>Earned</th>
+                        <th className={thCls}>Status</th>
+                        <th className={`${thCls} text-right`}>Action</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredPayments.map((p) => (
-                        <tr key={p.id} className="border-t border-border">
-                          <td className="px-4 py-2.5 font-mono text-xs">{p.id.slice(0, 14)}…</td>
-                          <td className="px-4 py-2.5 text-muted-foreground">{p.plan ?? "—"}</td>
-                          <td className="px-4 py-2.5 font-semibold">
-                            {p.confirmedAmountKES != null ? `KES ${p.confirmedAmountKES.toLocaleString()}` : "—"}
+                      {payouts.map((p) => (
+                        <tr key={p.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
+                          <td className="px-4 py-3" style={fontMono}>{p.referralCode ?? p.marketerUid}</td>
+                          <td className="px-4 py-3" style={fontMono}>{p.signups}</td>
+                          <td className="px-4 py-3 font-medium" style={fontMono}>
+                            KES {p.earningsKES.toLocaleString("en-GB")}
                           </td>
-                          <td className="px-4 py-2.5">
-                            <span
-                              className={`text-xs font-semibold capitalize ${
-                                p.status === "completed"
-                                  ? "text-[#00A651]"
-                                  : p.status === "failed"
-                                  ? "text-destructive"
-                                  : p.status === "cancelled"
-                                  ? "text-muted-foreground"
-                                  : "text-amber-600"
-                              }`}
-                            >
-                              {p.status ?? "unknown"}
-                            </span>
-                            {p.status === "failed" && p.failureReason && (
-                              <p className="text-[10px] text-muted-foreground mt-0.5 max-w-[160px] truncate" title={p.failureReason}>
-                                {p.failureReason}
-                              </p>
+                          <td className="px-4 py-3">
+                            {p.paid ? (
+                              <StatusDot color="var(--pd-green)" label="paid" />
+                            ) : (
+                              <StatusDot color="var(--pd-gold)" label="unpaid" />
                             )}
                           </td>
-                          <td className="px-4 py-2.5">
+                          <td className="px-4 py-3 text-right">
+                            {!p.paid && (
+                              <button
+                                type="button"
+                                onClick={() => markPaid(p)}
+                                disabled={processingPayoutId === p.id}
+                                className={linkInk}
+                              >
+                                {processingPayoutId === p.id ? "…" : "Mark paid"}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "leaderboard" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Top marketers</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Ranked by earnings this month.</p>
+              </div>
+
+              {leaderboardLoading ? (
+                <Spinner />
+              ) : leaderboard.length === 0 ? (
+                <EmptyState>No marketer earnings recorded yet this month.</EmptyState>
+              ) : (
+                <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
+                  <table className="w-full text-sm">
+                    <thead style={{ borderBottom: "1px solid var(--pd-line)" }}>
+                      <tr>
+                        <th className={thCls}>Rank</th>
+                        <th className={thCls}>Code</th>
+                        <th className={thCls}>Sign-ups</th>
+                        <th className={thCls}>Earnings</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {leaderboard.map((entry, index) => (
+                        <tr key={entry.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
+                          <td className="px-4 py-3 font-medium" style={fontMono}>#{index + 1}</td>
+                          <td className="px-4 py-3" style={fontMono}>{entry.referralCode ?? entry.id}</td>
+                          <td className="px-4 py-3" style={fontMono}>{entry.signupsThisMonth}</td>
+                          <td className="px-4 py-3 font-medium" style={fontMono}>
+                            KES {entry.earningsThisMonth.toLocaleString("en-GB")}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          )}
+
+          {activeTab === "payments" && (
+            <>
+              <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Payments</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Most recent 50 successful M-Pesa payments.</p>
+                </div>
+                <RefreshButton onClick={() => loadPayments(true)} />
+              </div>
+
+              {paymentsLoading ? (
+                <Spinner />
+              ) : payments.length === 0 ? (
+                <EmptyState>No completed payments found.</EmptyState>
+              ) : (
+                <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
+                  <table className="w-full text-sm">
+                    <thead style={{ borderBottom: "1px solid var(--pd-line)" }}>
+                      <tr>
+                        <th className={thCls}>Checkout ID</th>
+                        <th className={thCls}>Plan</th>
+                        <th className={thCls}>Amount</th>
+                        <th className={thCls}>Status</th>
+                        <th className={thCls}>Product</th>
+                        <th className={thCls}>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payments.map((p) => (
+                        <tr key={p.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
+                          <td className="px-4 py-3 text-xs" style={fontMono}>{p.id.slice(0, 14)}…</td>
+                          <td className={tdMuted}>{p.plan ?? "—"}</td>
+                          <td className="px-4 py-3 font-medium" style={fontMono}>
+                            {p.confirmedAmountKES != null ? `KES ${p.confirmedAmountKES.toLocaleString()}` : "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <StatusDot color="var(--pd-green)" label="completed" />
+                          </td>
+                          <td className="px-4 py-3">
                             {p.productId ? (
                               <a
                                 href={`/product/${p.productId}`}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="text-xs font-semibold text-primary hover:underline"
+                                className={linkInk}
                               >
                                 View
                               </a>
                             ) : (
-                              <span className="text-xs text-muted-foreground">—</span>
+                              <span className="text-xs text-[var(--pd-ink-soft)]">—</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-xs text-muted-foreground">{timeAgo(p.createdAt)}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--pd-ink-soft)]" style={fontMono}>
+                            {timeAgo(p.createdAt)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -2071,45 +2060,39 @@ async function dismissSupportReport(reportId: string) {
           {activeTab === "auditlog" && isOwner && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl font-bold">Audit Log</h2>
-                <p className="mt-1 text-muted-foreground">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Audit log</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
                   Most recent 50 admin actions. Permanent — cannot be edited or deleted.
                 </p>
               </div>
 
               {auditLogLoading ? (
-                <div className="flex justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                </div>
+                <Spinner />
               ) : auditLog.length === 0 ? (
-                <div className="rounded-xl border bg-card p-10 text-center text-sm text-muted-foreground">
-                  No admin actions recorded yet.
-                </div>
+                <EmptyState>No admin actions recorded yet.</EmptyState>
               ) : (
-                <div className="space-y-2">
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
                   {auditLog.map((entry) => (
-                    <div key={entry.id} className="rounded-xl border bg-card p-4">
+                    <div key={entry.id} className="p-4" style={{ borderColor: "var(--pd-line)" }}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-semibold text-sm capitalize">
+                          <p className="font-medium text-sm capitalize">
                             {entry.action.replace(/_/g, " ")}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">
                             By {adminNames[entry.adminUid] ?? entry.adminUid}
-                            {entry.targetUid && <> · Target: {entry.targetUid}</>}
+                            {entry.targetUid && <> · Target: <span style={fontMono}>{entry.targetUid}</span></>}
                           </p>
                           {entry.reason && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Reason: {entry.reason}
-                            </p>
+                            <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">Reason: {entry.reason}</p>
                           )}
                           {entry.referralCode && (
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              Code: <span className="font-mono">{entry.referralCode}</span>
+                            <p className="text-xs text-[var(--pd-ink-soft)] mt-0.5">
+                              Code: <span style={fontMono}>{entry.referralCode}</span>
                             </p>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground flex-shrink-0">
+                        <p className="text-xs text-[var(--pd-ink-soft)] flex-shrink-0" style={fontMono}>
                           {timeAgo(entry.createdAt)}
                         </p>
                       </div>
@@ -2123,35 +2106,39 @@ async function dismissSupportReport(reportId: string) {
       </div>
 
       {messageTarget && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl max-w-sm w-full p-6 shadow-xl space-y-4">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className={`${panelCls} max-w-sm w-full p-6 space-y-4`} style={{ background: "var(--pd-surface)" }}>
             <div>
-              <h3 className="font-bold text-lg">Message {messageTarget.displayName || messageTarget.id}</h3>
-              <p className="text-xs text-muted-foreground mt-1">
+              <h3 className="text-lg" style={{ ...fontSerif, fontWeight: 600 }}>
+                Message {messageTarget.displayName || messageTarget.id}
+              </h3>
+              <p className="text-xs text-[var(--pd-ink-soft)] mt-1">
                 Sent as a push notification, if they have notifications enabled.
               </p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Title</label>
+              <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Title</label>
               <input
                 type="text"
                 value={messageTitle}
                 onChange={(e) => setMessageTitle(e.target.value)}
                 maxLength={100}
                 placeholder="e.g. Regarding your advert"
-                className="w-full h-10 px-3 rounded-lg border border-border bg-background text-sm"
+                className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                style={{ borderColor: "var(--pd-line)" }}
               />
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-muted-foreground">Message</label>
+              <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Message</label>
               <textarea
                 value={messageBody}
                 onChange={(e) => setMessageBody(e.target.value)}
                 maxLength={500}
                 placeholder="Type your message..."
-                className="w-full min-h-[100px] px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                className="w-full min-h-[100px] px-3 py-2 border bg-[var(--pd-paper)] text-sm"
+                style={{ borderColor: "var(--pd-line)" }}
               />
             </div>
 
@@ -2164,7 +2151,7 @@ async function dismissSupportReport(reportId: string) {
                   setMessageBody("");
                 }}
                 disabled={sendingMessage}
-                className="flex-1 rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-muted disabled:opacity-50"
+                className={`flex-1 ${btnGhost} justify-center`}
               >
                 Cancel
               </button>
@@ -2172,9 +2159,9 @@ async function dismissSupportReport(reportId: string) {
                 type="button"
                 onClick={sendAdminMessage}
                 disabled={sendingMessage || !messageTitle.trim() || !messageBody.trim()}
-                className="flex-1 rounded-lg bg-primary text-white px-3 py-2 text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+                className={`flex-1 ${btnPrimary}`}
               >
-                {sendingMessage ? "Sending..." : "Send"}
+                {sendingMessage ? "Sending…" : "Send"}
               </button>
             </div>
           </div>
@@ -2182,4 +2169,4 @@ async function dismissSupportReport(reportId: string) {
       )}
     </div>
   );
-  }
+}
