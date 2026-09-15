@@ -358,20 +358,25 @@ const [leaderboardLoaded, setLeaderboardLoaded] = useState(false);
 }
 
   async function loadPayments(force = false) {
-    if (paymentsLoaded && !force) return;
-    setPaymentsLoading(true);
-    try {
-      const snap = await getDocs(
-        query(collection(db, "payments"), orderBy("createdAt", "desc"), limit(50))
-      );
-      setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
-      setPaymentsLoaded(true);
-    } catch (error) {
-      console.error("Failed to load payments:", error);
-    } finally {
-      setPaymentsLoading(false);
-    }
+  if (paymentsLoaded && !force) return;
+  setPaymentsLoading(true);
+  try {
+    const snap = await getDocs(
+      query(
+        collection(db, "payments"),
+        where("status", "==", "completed"),
+        orderBy("createdAt", "desc"),
+        limit(50)
+      )
+    );
+    setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Payment)));
+    setPaymentsLoaded(true);
+  } catch (error) {
+    console.error("Failed to load payments:", error);
+  } finally {
+    setPaymentsLoading(false);
   }
+}
 
   async function loadLeaderboard() {
   if (leaderboardLoaded) return;
