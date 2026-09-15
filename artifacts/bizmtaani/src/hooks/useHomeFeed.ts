@@ -922,6 +922,18 @@ const [previewProducts, setPreviewProducts] = useState<Product[]>(previewCache?.
 const [previewLoading, setPreviewLoading] = useState(!previewCache);
 
 useEffect(() => {
+  // Only worth fetching a nationwide fallback when the real,
+  // location-based feed hasn't already resolved synchronously
+  // (localStorage cache or saved profile location) — for a
+  // returning user, the real feed fires almost instantly and this
+  // would just be a wasted Firestore read for content nobody sees.
+  // gpsReady's value at mount time is what matters here, which is
+  // exactly what an empty dependency array captures.
+  if (gpsReady) {
+    setPreviewLoading(false);
+    return;
+  }
+
   if (previewCache && Date.now() - previewCache.timestamp < PREVIEW_CACHE_TTL_MS) {
     setPreviewProducts(previewCache.products);
     setPreviewLoading(false);
