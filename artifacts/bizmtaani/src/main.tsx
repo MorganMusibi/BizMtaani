@@ -2,7 +2,6 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 import { preloadWards } from "./lib/location";
-import { registerSW } from "virtual:pwa-register";
 
 window.addEventListener('vite:preloadError', () => {
   const key = 'bizmtaani_preload_reload_attempted';
@@ -15,14 +14,6 @@ window.addEventListener('vite:preloadError', () => {
   sessionStorage.setItem(key, '1');
   window.location.reload();
 });
-
-registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    window.location.reload();
-  },
-});
-
 preloadWards();
 
 createRoot(document.getElementById("root")!).render(<App />);
