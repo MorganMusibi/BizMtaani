@@ -20,6 +20,10 @@ createRoot(document.getElementById("root")!).render(<App />);
 
 requestAnimationFrame(() => {
   requestAnimationFrame(() => {
-    document.getElementById("boot-splash")?.remove();
+    const splash = document.getElementById("boot-splash");
+    if (splash) {
+      splash.classList.add("fade-out");
+      splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+    }
   });
 });
