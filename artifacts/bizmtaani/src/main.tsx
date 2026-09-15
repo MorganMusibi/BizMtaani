@@ -17,4 +17,9 @@ window.addEventListener('vite:preloadError', () => {
 preloadWards();
 
 createRoot(document.getElementById("root")!).render(<App />);
-document.getElementById("boot-splash")?.remove();
+
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    document.getElementById("boot-splash")?.remove();
+  });
+});
