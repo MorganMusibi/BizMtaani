@@ -187,12 +187,13 @@ const [selectedWard, setSelectedWard] = useState<{
   setSavingBusinessDetails(true);
 
   try {
-    await updateDoc(doc(db, "users", user.uid), {
-      businessDescription: businessDescription.trim(),
-      openingHours: openingHours.trim(),
-      businessAddress: businessAddress.trim(),
-      socialMediaLink: socialMediaLink.trim(),
-    });
+    await setDoc(doc(db, "users", user.uid), {
+  businessDescription: businessDescription.trim(),
+  openingHours: openingHours.trim(),
+  businessAddress: businessAddress.trim(),
+  socialMediaLink: socialMediaLink.trim(),
+}, { merge: true });
+
 
     toast({ title: "Business details updated" });
     setShowBusinessDetailsForm(false);
@@ -233,7 +234,8 @@ const [selectedWard, setSelectedWard] = useState<{
       };
     }
 
-    await updateDoc(doc(db, "users", user.uid), updatePayload);
+    await setDoc(doc(db, "users", user.uid), updatePayload, { merge: true });
+
 
     toast({ title: "Profile updated successfully" });
     setShowNameForm(false);
@@ -274,14 +276,15 @@ const [selectedWard, setSelectedWard] = useState<{
     if (!user) return;
     setSavingPriceList(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        shopPriceList: priceListItems.map((item) => ({
-          name: item.name,
-          priceType: item.priceType,
-          price: item.priceType === "fixed" ? parseFloat(item.price) || 0 : 0,
-          priceText: item.priceType === "custom" ? item.priceText : "",
-        })),
-      });
+      await setDoc(doc(db, "users", user.uid), {
+  shopPriceList: priceListItems.map((item) => ({
+    name: item.name,
+    priceType: item.priceType,
+    price: item.priceType === "fixed" ? parseFloat(item.price) || 0 : 0,
+    priceText: item.priceType === "custom" ? item.priceText : "",
+  })),
+}, { merge: true });
+
       toast({ title: "Price list updated" });
       setShowPriceListEditor(false);
     } catch (error) {
@@ -329,10 +332,11 @@ const [selectedWard, setSelectedWard] = useState<{
 
     setSavingBecomeBusiness(true);
     try {
-      await updateDoc(doc(db, "users", user.uid), {
-        isBusinessOwner: true,
-        businessName: businessNameInput.trim(),
-      });
+      await setDoc(doc(db, "users", user.uid), {
+  isBusinessOwner: true,
+  businessName: businessNameInput.trim(),
+}, { merge: true });
+
 
       toast({ title: "You're now a business owner!", description: "Shop details, price list, and a Business badge are now available on your Profile." });
       setShowBecomeBusinessForm(false);
