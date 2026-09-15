@@ -2841,3 +2841,26 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
 });
 
     export * from "./backfillVisibilityScope";
+
+export const backfillMissingCreatedAt = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const snap = await db.collection("products").get();
+  const batch = db.batch();
+  let fixedCount = 0;
+
+  snap.docs.forEach((doc) => {
+    const data = doc.data();
+    if (!data.createdAt) {
+      // No original timestamp to recover — best available fallback is
+      // "now", which is far better than the doc being invisible to
+      // any orderBy("createdAt") query forever.
+      batch.update(doc.ref, { createdAt: admin.firestore.FieldValue.serverTimestamp() });
+      fixedCount++;
+    }
+  });
+
+  if (fixedCount > 0) await batch.commit();
+
+  return { success: true, fixedCount, totalChecked: snap.size };
+});
