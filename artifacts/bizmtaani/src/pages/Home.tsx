@@ -729,16 +729,36 @@ const handleAreaSearchSelect = useCallback(
         <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center">
           <X size={28} className="text-amber-600" />
         </div>
-        <p className="font-bold text-base">You're offline</p>
+        <p className="font-bold text-base">Uko offline</p>
         <p className="text-sm text-muted-foreground">
-          Check your mneti connection and try again.
+          Cheki mneti connection yako and try again.
         </p>
       </div>
+    ) : previewProducts.length > 0 ? (
+      <>
+        <p className="text-center text-xs text-muted-foreground mb-3">
+          Finding listings near you...
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          {previewProducts.slice(0, 8).map((p) => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              userCoords={userCoords}
+              hierarchyReady={hierarchyReady}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleProductClick(p.id);
+              }}
+            />
+          ))}
+        </div>
+      </>
     ) : (
       <>
         {loadingTooLong && (
           <p className="text-center text-xs text-muted-foreground mb-3">
-            This is taking longer than usual — check your mnetii connection.
+            This is taking longer than usual — check mneti connection yako.
           </p>
         )}
         <div className="grid grid-cols-2 gap-3">
