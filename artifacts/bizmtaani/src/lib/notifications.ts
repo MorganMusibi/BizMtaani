@@ -26,6 +26,12 @@ export async function registerForNotifications(uid: string): Promise<void> {
     }
 
     console.log("[FCM debug] VAPID_KEY present:", !!VAPID_KEY, "prefix:", VAPID_KEY?.slice(0, 6));
+    console.log(
+      "[FCM debug] messagingSenderId:",
+      import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID
+    );
+    console.log("[FCM debug] appId:", import.meta.env.VITE_FIREBASE_APP_ID);
+    console.log("[FCM debug] projectId:", import.meta.env.VITE_FIREBASE_PROJECT_ID);
 
     const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
     await navigator.serviceWorker.ready; // ensure it's actually active, not just registering
