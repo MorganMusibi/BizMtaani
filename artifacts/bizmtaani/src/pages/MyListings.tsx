@@ -128,13 +128,14 @@ export default function MyListings() {
     }
 
     const q = query(
-      collection(db, "products"),
-      where("sellerId", "==", user.uid),
-      orderBy("createdAt", "desc"),
-      limit(20)
-    );
-    const snap = await getDocs(q);
-    const loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+  collection(db, "products"),
+  where("sellerId", "==", user.uid),
+  limit(20)
+);
+const snap = await getDocs(q);
+const loaded = snap.docs
+  .map((d) => ({ id: d.id, ...d.data() } as Product))
+  .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
     setProducts(loaded);
     writeListingsCache(user.uid, { products: loaded, timestamp: Date.now() });
   }
