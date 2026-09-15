@@ -550,26 +550,65 @@ const stkTimeoutId = setTimeout(() => {
   );
   stkController.abort();
 }, 45_000);
-  let darajaRes: Response;
+  let darajaData: any;
   try {
-    darajaRes = await fetchViaProxy(`${darajaBase()}/mpesa/stkpush/v1/processrequest`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-      body: JSON.stringify(stkBody),
-      signal: stkController.signal,
+    darajaData = await new Promise((resolve, reject) => {
+      const https = require("https");
+      const bodyStr = JSON.stringify(stkBody);
+      const url = new URL(`${darajaBase()}/mpesa/stkpush/v1/processrequest`);
+
+      const req = https.request({
+        hostname: url.hostname,
+        port: 443,
+        path: url.pathname,
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(bodyStr),
+        },
+        timeout: 40000,
+      }, (res: any) => {
+        console.log("STEP 11a: response headers received, status:", res.statusCode);
+        let data = "";
+        res.on("data", (chunk: any) => (data += chunk));
+        res.on("end", () => {
+          console.log("STEP 11b: response body fully received");
+          try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`Bad JSON: ${data.slice(0, 200)}`)); }
+        });
+      });
+
+      req.on("socket", (socket: any) => {
+        console.log("STEP 11-SOCKET: socket assigned");
+        socket.on("lookup", () => console.log("STEP 11-LOOKUP: DNS resolved"));
+        socket.on("connect", () => console.log("STEP 11-CONNECT: TCP connected"));
+        socket.on("secureConnect", () => console.log("STEP 11-TLS: TLS handshake complete"));
+      });
+
+      req.on("timeout", () => {
+        console.error("STEP 11-TIMEOUT: request timed out at the https module level");
+        req.destroy(new Error("Request timeout"));
+      });
+
+      req.on("error", (err: any) => {
+        console.error("STEP 11-ERROR:", err.code, err.message);
+        reject(err);
+      });
+
+      req.write(bodyStr);
+      req.end();
+      console.log("STEP 11-SENT: request written and ended, awaiting response");
     });
-    console.log("STEP 11: STK push responded, status:", darajaRes.status);
+    console.log("STEP 11: daraja response body:", JSON.stringify(darajaData));
   } catch (err) {
-    console.error("STEP 11 FAILED: STK push request timed out or errored:", err);
-    throw new HttpsError("internal", `STK push request failed or timed out: ${err instanceof Error ? err.message : String(err)}`);
+    console.error("STEP 11 FAILED:", err);
+    throw new HttpsError("internal", `STK push request failed: ${err instanceof Error ? err.message : String(err)}`);
   } finally {
     clearTimeout(stkTimeoutId);
   }
-
-  const darajaData = await darajaRes.json() as any;
   console.log("STEP 12: daraja response body:", JSON.stringify(darajaData));
 
-  if (!darajaRes.ok || darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
+  if (darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
   await db.collection("payments").doc(darajaData.CheckoutRequestID).set({ checkoutRequestId: darajaData.CheckoutRequestID, callbackTokenHash: crypto.createHash("sha256").update(callbackToken).digest("hex"), plan, productId, buyerId: request.auth.uid, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp() });
   console.log("STEP 13: payment doc saved, returning success");
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
