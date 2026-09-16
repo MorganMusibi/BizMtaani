@@ -1330,16 +1330,7 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
   if (!draftIdRef.current) {
     draftIdRef.current = crypto.randomUUID();
   }
-  // Kick off image upload and reCAPTCHA verification together —
-  // neither depends on the other, so there's no reason to wait for
-  // one before starting the other.
-  const uploadPromise = uploadImagesLimited(imageFiles, draftIdRef.current);
-  const recaptchaPromise = getRecaptchaToken("publish_advert").catch((error) => {
-    console.warn("reCAPTCHA not available, proceeding without token:", error);
-    return "";
-  });
-
-  const uploadedImages = await uploadPromise;
+  const uploadedImages = await uploadImagesLimited(imageFiles, draftIdRef.current);
 
   // 2. Prepare advert data
   const docData = {
@@ -1526,7 +1517,13 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
-  const recaptchaToken = await recaptchaPromise;
+  // Safely get reCAPTCHA token with fallback
+let recaptchaToken = "";
+try {
+  recaptchaToken = await getRecaptchaToken("publish_advert");
+} catch (error) {
+  console.warn("reCAPTCHA not available, proceeding without token:", error);
+}
 
   const publishAdvert = httpsCallable<
     typeof docData & { recaptchaToken: string },
