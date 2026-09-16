@@ -14,7 +14,7 @@ import {
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
+import { initiatePaystackCharge, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { getRecaptchaToken } from "@/lib/recaptcha";
