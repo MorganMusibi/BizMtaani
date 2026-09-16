@@ -1,5 +1,6 @@
-import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase"; 
+import { getFunctions, httpsCallable } from "firebase/functions";
+import { app } from "@/lib/firebase";
+const functions = getFunctions(app, "europe-west1");
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
