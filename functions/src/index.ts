@@ -2129,9 +2129,11 @@ try {
   );
 }
 
-// 8. Mark the draft upload as claimed, if one was tracked
+// 8. Mark the draft upload as claimed, if one was tracked — doesn't
+// need to complete before returning; the response to the user isn't
+// affected by whether this write has landed yet.
   if (typeof draftId === "string") {
-    await db.collection("draftUploads").doc(draftId).update({ claimed: true }).catch(() => {});
+    db.collection("draftUploads").doc(draftId).update({ claimed: true }).catch(() => {});
   }
 
   // 9. Return the generated productId
