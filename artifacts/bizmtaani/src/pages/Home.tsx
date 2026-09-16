@@ -176,11 +176,11 @@ const ProductCard = memo(function ProductCard({
         </div>
         
         {(product.verified || product.plan?.startsWith("premium")) && (
-          <div className="absolute top-2 left-14 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
-            <Check size={8} />
-            <span>Verified</span>
-          </div>
-        )}
+  <div className="absolute top-9 left-2 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
+    <Check size={8} />
+    <span>Verified</span>
+  </div>
+)}
         
         {isAccommodation &&
           Array.isArray(product.imageUrls) &&
