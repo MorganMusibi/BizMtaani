@@ -250,6 +250,7 @@ const [selectedWard, setSelectedWard] = useState<{
 } finally {
   setSavingName(false);
 }
+  }
 
   function addShopPriceListItem() {
     if (!newPriceListItem.name.trim()) return;
