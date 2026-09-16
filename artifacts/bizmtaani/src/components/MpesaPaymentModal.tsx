@@ -326,11 +326,11 @@ setStage("awaiting_pin");
               </div>
             </div>
             <div className="text-center">
-              <p className="font-black text-lg">Check your phone</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                Enter your M-Pesa PIN to pay <strong className="text-foreground">KES {amount}</strong>
-              </p>
-            </div>
+  <p className="font-black text-lg">Check your phone</p>
+  <p className="text-sm text-muted-foreground mt-1">
+    Confirm the OTP, then enter your M-Pesa PIN to pay <strong className="text-foreground">KES {amount}</strong>
+  </p>
+</div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <div className="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center">
                 <span className="text-xs font-bold text-primary">{countdown}</span>
