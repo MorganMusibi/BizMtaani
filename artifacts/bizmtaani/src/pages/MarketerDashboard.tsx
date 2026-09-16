@@ -207,7 +207,7 @@ const [referralsError, setReferralsError] = useState<string | null>(null);
   const [referralsLoading, setReferralsLoading] = useState(false);
   const [hasMoreReferrals, setHasMoreReferrals] = useState(true);
   const [lastReferralDoc, setLastReferralDoc] = useState<QueryDocumentSnapshot | null>(null);
-  const REFERRALS_PAGE_SIZE = 15;
+  const REFERRALS_PAGE_SIZE = 10;
 
   // ─── Load Data ─────────────────────────────────────────────────────
 
@@ -653,7 +653,7 @@ try {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Users size={17} className="text-primary" />
-            <p className="font-black text-sm">People You've Referred</p>
+            <p className="font-black text-sm">Recent Referrals</p>
           </div>
 
           {referrals.length === 0 ? (
