@@ -94,7 +94,7 @@ export async function getCloudinaryUploadSignature(
     console.warn("App Check pre-fetch warning:", err);
   });
 
-  const functions = getFunctions(app, "us-central1");
+  const functions = getFunctions(app, "europe-west1");
   const getSignature = httpsCallable<
     { uploadType: string; draftId?: string },
     CloudinarySignatureResult & { draftId: string }
@@ -192,7 +192,7 @@ export async function uploadImage(
 
   // Report the uploaded image back to the draft record so it can be
   // cleaned up automatically if the advert is never published.
-  const functions = getFunctions(app, "us-central1");
+  const functions = getFunctions(app, "europe-west1");
   const claimId = draftId ?? resolvedSig.draftId;
   if (claimId) {
     // Must be awaited, not fire-and-forget — publishAdvert validates
