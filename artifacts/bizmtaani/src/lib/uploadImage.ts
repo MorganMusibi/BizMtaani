@@ -44,7 +44,7 @@ async function fetchWithRetry(url: string, init: RequestInit, attempts = 3): Pro
  * Falls back to the original file if compression fails for any
  * reason (e.g. unsupported format) — never blocks a user's upload.
  */
-async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
+export async function compressImageBeforeUpload(file: File, type: ImageUploadType): Promise<File> {
   if (file.size < 150 * 1024) return file;
 
   let workingFile = file;
@@ -133,7 +133,8 @@ export async function uploadImage(
   file: File,
   type: ImageUploadType,
   draftId?: string | null,
-  sig?: CloudinarySignatureResult & { draftId: string }
+  sig?: CloudinarySignatureResult & { draftId: string },
+  preCompressedFile?: File
 ): Promise<{
   url: string;
   public_id: string;
@@ -143,11 +144,12 @@ export async function uploadImage(
     throw new Error("File too large. Maximum size is 8MB.");
   }
 
-  // Compression and signature-fetch are independent — run them
-  // together instead of one after the other. If a signature was
-  // already passed in (shared across a batch), skip fetching again.
+  // If the caller already compressed this file ahead of time (e.g.
+  // to run compression in parallel with the shared signature fetch
+  // across a whole batch), don't redo that work here. Same idea for
+  // the signature — skip re-fetching if one was already passed in.
   const [compressedFile, resolvedSig] = await Promise.all([
-    compressImageBeforeUpload(file, type),
+    preCompressedFile ? Promise.resolve(preCompressedFile) : compressImageBeforeUpload(file, type),
     sig ? Promise.resolve(sig) : getCloudinaryUploadSignature(type, draftId),
   ]);
 
