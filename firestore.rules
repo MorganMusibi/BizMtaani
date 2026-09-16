@@ -48,21 +48,9 @@ if request.auth != null
 allow update:
 if isAdmin()
 || (
-request.auth != null
-&& request.auth.uid == userId
-&& request.resource.data.diff(resource.data)
-.affectedKeys()
-.hasNone([
-"isAdmin",
-"role",
-"admin",
-"adminRole",
-"blocked",
-"blockReason",
-"blockedAt",
-"subscriptionPlan",
-"premiumEndsAt"
- ])
+  request.auth != null
+  && request.auth.uid == userId
+  && !request.resource.data.keys().hasAny(["isAdmin", "role", "admin", "adminRole", "blocked", "blockReason", "blockedAt", "subscriptionPlan", "premiumEndsAt"])
 );
 
 // Users can only delete their own profile.
