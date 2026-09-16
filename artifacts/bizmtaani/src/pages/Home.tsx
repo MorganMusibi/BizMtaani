@@ -25,7 +25,7 @@ import {
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, MapPin, Loader2, Package, X, Check } from "lucide-react";
+import { Search, Plus, MapPin, Loader2, Package, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
@@ -174,13 +174,6 @@ const ProductCard = memo(function ProductCard({
         <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor} z-[5]`}>
           {product.subcategory ?? product.category}
         </div>
-        
-        {(product.verified || product.plan?.startsWith("premium")) && (
-  <div className="absolute top-9 left-2 flex items-center gap-0.5 bg-blue-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded-full z-10">
-    <Check size={8} />
-    <span>Verified</span>
-  </div>
-)}
         
         {isAccommodation &&
           Array.isArray(product.imageUrls) &&
