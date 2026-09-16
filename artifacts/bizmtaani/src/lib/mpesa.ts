@@ -11,6 +11,7 @@
  */
 
 import { getFunctions, httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { app } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { getRecaptchaToken } from "@/lib/recaptcha";
