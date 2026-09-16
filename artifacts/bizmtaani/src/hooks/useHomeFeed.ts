@@ -1210,31 +1210,96 @@ setWardDone(localWardDone);
     // covered.
     const wardHadResults = localWardProducts.length > 0;
 
-    if (wardHadResults) {
-      setAreaProducts([]);
-      setAreaBuffer([]);
-      setAreaCursors({});
-      setAreaDonePrefixes({});
-      setAreaDone(false);
-      setAreaRadiusStage(1);
+if (wardHadResults) {
+  // Ward query already covers this viewer's most-local free+premium
+  // candidates THAT MATCH THEIR WARD NAME EXACTLY. But a premium ad
+  // within 2.5km whose stored `ward` field doesn't exactly match the
+  // viewer's currently-resolved wardName (GPS drift, boundary edge,
+  // slightly different geocode result) would never surface via
+  // wardQuery — and jumping straight to areaRadiusStage=1 below
+  // permanently excludes it too, since stage 1+ only accepts
+  // distance > 2.5km. Run one premium-only stage-0 (2.5km) geohash
+  // query here to close that gap before moving on to stage 1.
+  let stage0PremiumProducts: Product[] = [];
+  let stage0Cursors: Record<string, GeohashCursor | null> = {};
+  let stage0DonePrefixes: Record<string, boolean> = {};
 
-      feedCache.set(cacheKey, {
-  wardProducts: localWardProducts,
-  wardCursor: localWardCursor,
-  wardDone: localWardDone,
-  areaProducts: [],
-  areaBuffer: [],
-  areaCursors: {},
-  areaDonePrefixes: {},
-  areaDone: false,
-  areaRadiusStage: 1,
-  timestamp: Date.now(),
-});
-saveFeedCacheToStorage(feedCache);
+  try {
+    const stage0Queries = areaQueries(
+      userCoords,
+      HOME_FEED_RADIUS_STEPS[0],
+      {},
+      {},
+      true // premium-only — free ads are already fully covered by wardQuery
+    );
 
-setInitialLoading(false);
-return;
-    }
+    const stage0Snapshots = await Promise.all(stage0Queries.map((q) => getDocs(q)));
+    const stage0Prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      radiusKmToGeohashPrecision(HOME_FEED_RADIUS_STEPS[0])
+    );
+
+    const pageProducts = stage0Snapshots.flatMap((snap) => {
+      const products = toProducts(snap.docs);
+      return products.filter((product) => {
+        const distance = getDistanceKm(userCoords[0], userCoords[1], product.lat, product.lng);
+        return (
+          isProductVisibleToUser(product, userCoords, wardName) &&
+          isProductEligibleForFeedStage(product, distance, 0)
+        );
+      });
+    });
+
+    // Dedupe against what the ward query already found, so an ad that
+    // DID match by ward name isn't shown twice.
+    const wardIds = new Set(localWardProducts.map((p) => p.id));
+    stage0PremiumProducts = Array.from(
+      new Map(pageProducts.filter((p) => !wardIds.has(p.id)).map((p) => [p.id, p])).values()
+    );
+
+    let queryIndex = 0;
+    stage0Prefixes.forEach((prefix) => {
+      const snap = stage0Snapshots[queryIndex];
+      queryIndex++;
+      if (!snap) {
+        stage0DonePrefixes[prefix] = true;
+        return;
+      }
+      const lastDoc = snap.docs[snap.docs.length - 1];
+      if (lastDoc) stage0Cursors[prefix] = geohashCursorFromDoc(lastDoc);
+      if (snap.docs.length < AREA_BUFFER_FETCH) stage0DonePrefixes[prefix] = true;
+    });
+  } catch (error) {
+    console.error("Failed stage-0 premium gap-fill query:", error);
+  }
+
+  const sortedStage0 = sortNearbyProducts(stage0PremiumProducts, userCoords);
+
+  setAreaProducts(sortedStage0);
+  setAreaBuffer([]);
+  setAreaCursors(stage0Cursors);
+  setAreaDonePrefixes(stage0DonePrefixes);
+  setAreaDone(false);
+  setAreaRadiusStage(1);
+
+  feedCache.set(cacheKey, {
+    wardProducts: localWardProducts,
+    wardCursor: localWardCursor,
+    wardDone: localWardDone,
+    areaProducts: sortedStage0,
+    areaBuffer: [],
+    areaCursors: stage0Cursors,
+    areaDonePrefixes: stage0DonePrefixes,
+    areaDone: false,
+    areaRadiusStage: 1,
+    timestamp: Date.now(),
+  });
+  saveFeedCacheToStorage(feedCache);
+
+  setInitialLoading(false);
+  return;
+}
 // ============================================================
 // INITIAL NEARBY AREA LOAD — BUFFERED  
 //
