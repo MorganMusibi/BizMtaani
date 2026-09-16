@@ -240,16 +240,16 @@ const [selectedWard, setSelectedWard] = useState<{
     toast({ title: "Profile updated successfully" });
     setShowNameForm(false);
   
-  } catch (error) {
-    toast({
-      title: "Could not update name",
-      description: "Please try again.",
-      variant: "destructive",
-    });
-  } finally {
-    setSavingName(false);
-  }
-  }
+} catch (error) {
+  console.error("Failed to update name:", error);
+  toast({
+    title: "Could not update name",
+    description: "Please try again.",
+    variant: "destructive",
+  });
+} finally {
+  setSavingName(false);
+}
 
   function addShopPriceListItem() {
     if (!newPriceListItem.name.trim()) return;
