@@ -164,3 +164,14 @@ export async function initiateStkPush(
     );
   }
 }
+
+      export async function initiatePaystackCharge({ phone, plan, productId }: { phone: string; plan: PaidListingPlan; productId: string }) {
+  const recaptchaToken = await getRecaptchaToken("initiate_payment");
+  const initiatePaystackPayment = httpsCallable<
+    { phone: string; productId: string; recaptchaToken: string },
+    { checkoutRequestId: string; customerMessage: string }
+  >(functions, "initiatePaystackPayment");
+
+  const { data } = await initiatePaystackPayment({ phone, productId, recaptchaToken });
+  return data;
+      }
