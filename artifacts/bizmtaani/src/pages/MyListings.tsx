@@ -177,7 +177,7 @@ const loaded = snap.docs
     return { checkoutRequestId: "", productId: renewProduct.id };
   }
 
-  const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id });
+  const result = await initiatePaystackCharge({ phone, plan: renewPlan, productId: renewProduct.id });
   return { checkoutRequestId: result.checkoutRequestId, productId: renewProduct.id };
 }
 
