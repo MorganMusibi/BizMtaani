@@ -4,7 +4,7 @@ const functions = getFunctions(app, "europe-west1");
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
-import { uploadImage, getCloudinaryUploadSignature } from "@/lib/uploadImage";
+import { uploadImage, getCloudinaryUploadSignature, compressImageBeforeUpload } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { Button } from "@/components/ui/button";
@@ -55,13 +55,21 @@ async function uploadImagesLimited(
   const results: Awaited<ReturnType<typeof uploadImage>>[] = new Array(files.length);
   let next = 0;
 
-  // One shared signature for every image in this batch.
-  const sig = await getCloudinaryUploadSignature("product", draftId);
+  // Start compressing EVERY file and fetching the shared signature at
+  // the same time — compression is pure local CPU/webworker work with
+  // no dependency on the signature, so waiting for the signature
+  // before starting it (the old behavior) wasted that time entirely.
+  // By the time the signature round-trip completes, most or all
+  // files are already compressed and ready to upload immediately.
+  const [compressedFiles, sig] = await Promise.all([
+    Promise.all(files.map((f) => compressImageBeforeUpload(f, "product"))),
+    getCloudinaryUploadSignature("product", draftId),
+  ]);
 
   async function worker() {
     while (next < files.length) {
       const i = next++;
-      results[i] = await uploadImage(files[i], "product", draftId, sig);
+      results[i] = await uploadImage(files[i], "product", draftId, sig, compressedFiles[i]);
     }
   }
 
@@ -1322,7 +1330,16 @@ const cleanedPhone = mpesaPhone.replace(/\s+/g, "").trim();
   if (!draftIdRef.current) {
     draftIdRef.current = crypto.randomUUID();
   }
-  const uploadedImages = await uploadImagesLimited(imageFiles, draftIdRef.current);
+  // Kick off image upload and reCAPTCHA verification together —
+  // neither depends on the other, so there's no reason to wait for
+  // one before starting the other.
+  const uploadPromise = uploadImagesLimited(imageFiles, draftIdRef.current);
+  const recaptchaPromise = getRecaptchaToken("publish_advert").catch((error) => {
+    console.warn("reCAPTCHA not available, proceeding without token:", error);
+    return "";
+  });
+
+  const uploadedImages = await uploadPromise;
 
   // 2. Prepare advert data
   const docData = {
@@ -1509,15 +1526,7 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
-  // Safely get reCAPTCHA token with fallback
-let recaptchaToken = "";
-try {
-  recaptchaToken = await getRecaptchaToken("publish_advert");
-} catch (error) {
-  console.warn("reCAPTCHA not available, proceeding without token:", error);
-  // In production, you might want to show an error instead
-  // But for now, we'll proceed (your backend should handle missing token)
-}
+  const recaptchaToken = await recaptchaPromise;
 
   const publishAdvert = httpsCallable<
     typeof docData & { recaptchaToken: string },
