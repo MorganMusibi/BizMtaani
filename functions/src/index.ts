@@ -344,7 +344,7 @@ const ALLOWED_UPLOAD_FORMATS = "jpg,jpeg,png,webp";
 
 const UPLOAD_SIGNATURE_COOLDOWN_MS = 3_000; // stops a script from minting signatures/draftUploads docs faster than a real user ever could
 
-export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true, maxInstances: 200 }, async (request) => {
+export const getCloudinarySignature = onCall({ region: "europe-west1", secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName], cors: true, maxInstances: 200 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   // Per-user cooldown — each call writes a draftUploads doc, so an
@@ -418,7 +418,7 @@ export const getCloudinarySignature = onCall({ secrets: [cloudinaryApiKey, cloud
  * record, so it can be deleted automatically if the advert it was
  * meant for is never published.
  */
-export const attachDraftUploadImage = onCall({ cors: true, maxInstances: 200 }, async (request) => {
+export const attachDraftUploadImage = onCall({ region: "europe-west1", cors: true, maxInstances: 200 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { draftId, publicId } = request.data as { draftId?: string; publicId?: string };
@@ -618,8 +618,8 @@ const stkTimeoutId = setTimeout(() => {
   console.log("STEP 13: payment doc saved, returning success");
   return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
 });
- 
-  export const initiatePaystackPayment = onCall({ region: "europe-west1", secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
+
+ export const initiatePaystackPayment = onCall({ region: "europe-west1", minInstances: 1, secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
   console.log("PAYSTACK STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -660,13 +660,17 @@ const stkTimeoutId = setTimeout(() => {
     throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
   }
 
-  const stalePayments = await db.collection("payments")
+  db.collection("payments")
     .where("productId", "==", productId)
     .where("status", "==", "pending")
-    .get();
-  const supersedeBatch = db.batch();
-  stalePayments.docs.forEach((doc) => supersedeBatch.update(doc.ref, { status: "cancelled" }));
-  if (!stalePayments.empty) await supersedeBatch.commit();
+    .get()
+    .then((stalePayments) => {
+      if (stalePayments.empty) return;
+      const batch = db.batch();
+      stalePayments.docs.forEach((doc) => batch.update(doc.ref, { status: "cancelled" }));
+      return batch.commit();
+    })
+    .catch((err) => console.error("Stale payment cleanup failed:", err));
 
   const formattedPhone = normalizePhoneForPaystack(phone);
   const email = request.auth.token.email ?? `${request.auth.uid}@bizmtaani.site`;
@@ -1849,12 +1853,18 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ cors: true, maxInstances: 200, }, async (request) => {
+export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, cors: true, maxInstances: 200 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
-  await verifyRecaptcha(recaptchaToken, "publish_advert");
   const uid = request.auth.uid;
+
+  const draftSnapPromise =
+    typeof draftId === "string" && draftId.trim()
+      ? db.collection("draftUploads").doc(draftId).get()
+      : Promise.resolve(null);
+
+  await verifyRecaptcha(recaptchaToken, "publish_advert");
 
   // Location must be resolved SERVER-SIDE from coordinates — never
   // trust ward/constituency/county/geohash strings supplied by the
@@ -1952,8 +1962,8 @@ if (userSnap.exists) {
       );
     }
 
-    const draftSnap = await db.collection("draftUploads").doc(draftId).get();
-    if (!draftSnap.exists || draftSnap.data()?.uid !== uid) {
+    const draftSnap = await draftSnapPromise;
+    if (!draftSnap || !draftSnap.exists || draftSnap.data()?.uid !== uid) {
       throw new HttpsError(
         "permission-denied",
         "Invalid upload session for the submitted photos."
@@ -2135,7 +2145,7 @@ try {
   });
  
 
-export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
+export const deleteAdvert = onCall({ region: "europe-west1", cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Must be signed in");
   }
@@ -2183,7 +2193,7 @@ export const deleteAdvert = onCall({ cors: true, secrets: [cloudinaryApiKey, clo
  * would a fresh paid listing — same status/expiresAt/subscription
  * logic, no special-casing needed there.
  */
-export const renewAdvert = onCall({ cors: true }, async (request) => {
+export const renewAdvert = onCall({ region: "europe-west1", cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { productId, plan, recaptchaToken } = request.data as {
