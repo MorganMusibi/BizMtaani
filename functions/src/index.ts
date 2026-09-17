@@ -544,73 +544,61 @@ console.log(
 );
 
   console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "till:", process.env.MPESA_TILL_NUMBER, "env:", process.env.MPESA_ENVIRONMENT);
-  const stkController = new AbortController();
-  const stkStartedAt = Date.now();
-
-const stkTimeoutId = setTimeout(() => {
-  console.error(
-    `STEP 11 TIMEOUT: Safaricom STK endpoint did not respond within 90 seconds. ` +
-    `URL=${darajaBase()}/mpesa/stkpush/v1/processrequest ` +
-    `elapsedMs=${Date.now() - stkStartedAt}`
-  );
-  stkController.abort();
-}, 90_000);
   let darajaData: any;
+
+try {
+  const stkUrl = `${darajaBase()}/mpesa/stkpush/v1/processrequest`;
+  const bodyStr = JSON.stringify(stkBody);
+
+  console.log("STEP 11-FETCH: sending STK request to:", stkUrl);
+
+  const startedAt = Date.now();
+
+  const response = await fetch(stkUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: bodyStr,
+    signal: AbortSignal.timeout(90000),
+  });
+
+  console.log(
+    "STEP 11-FETCH: HTTP response received:",
+    response.status,
+    `after ${Date.now() - startedAt}ms`
+  );
+
+  const responseText = await response.text();
+
+  console.log(
+    "STEP 11-FETCH: response body:",
+    responseText.slice(0, 1000)
+  );
+
   try {
-    darajaData = await new Promise((resolve, reject) => {
-      const https = require("https");
-      const bodyStr = JSON.stringify(stkBody);
-      const url = new URL(`${darajaBase()}/mpesa/stkpush/v1/processrequest`);
-
-      const req = https.request({
-        hostname: url.hostname,
-        port: 443,
-        path: url.pathname,
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "Content-Length": Buffer.byteLength(bodyStr),
-        },
-        timeout: 85000,
-      }, (res: any) => {
-        console.log("STEP 11a: response headers received, status:", res.statusCode);
-        let data = "";
-        res.on("data", (chunk: any) => (data += chunk));
-        res.on("end", () => {
-          console.log("STEP 11b: response body fully received");
-          try { resolve(JSON.parse(data)); } catch (e) { reject(new Error(`Bad JSON: ${data.slice(0, 200)}`)); }
-        });
-      });
-
-      req.on("socket", (socket: any) => {
-        console.log("STEP 11-SOCKET: socket assigned");
-        socket.on("lookup", () => console.log("STEP 11-LOOKUP: DNS resolved"));
-        socket.on("connect", () => console.log("STEP 11-CONNECT: TCP connected"));
-        socket.on("secureConnect", () => console.log("STEP 11-TLS: TLS handshake complete"));
-      });
-
-      req.on("timeout", () => {
-        console.error("STEP 11-TIMEOUT: request timed out at the https module level");
-        req.destroy(new Error("Request timeout"));
-      });
-
-      req.on("error", (err: any) => {
-        console.error("STEP 11-ERROR:", err.code, err.message);
-        reject(err);
-      });
-
-      req.write(bodyStr);
-      req.end();
-      console.log("STEP 11-SENT: request written and ended, awaiting response");
-    });
-    console.log("STEP 11: daraja response body:", JSON.stringify(darajaData));
-  } catch (err) {
-    console.error("STEP 11 FAILED:", err);
-    throw new HttpsError("internal", `STK push request failed: ${err instanceof Error ? err.message : String(err)}`);
-  } finally {
-    clearTimeout(stkTimeoutId);
+    darajaData = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Safaricom returned non-JSON response: ${responseText.slice(0, 500)}`
+    );
   }
+
+} catch (err) {
+  console.error(
+    "STEP 11-FETCH ERROR:",
+    err instanceof Error ? err.name : typeof err,
+    err instanceof Error ? err.message : String(err)
+  );
+
+  throw new HttpsError(
+    "internal",
+    `STK push request failed: ${
+      err instanceof Error ? err.message : String(err)
+    }`
+  );
+}
   console.log("STEP 12: daraja response body:", JSON.stringify(darajaData));
 
   if (darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
