@@ -232,7 +232,119 @@ export const TOWN_ALIASES = [
 // { alias: "Mackinnon Road", ward: "Mackinnon Road", constituency: "Kinango", county: "Kwale" }, // Option B — if you fix master
 { alias: "Maji ya Chumvi", ward: "Chengoni/Samburu", constituency: "Kinango", county: "Kwale" },
 { alias: "Samburu Kwale", ward: "Chengoni/Samburu", constituency: "Kinango", county: "Kwale" },
+
+  // ─── Kilifi County (003) — towns/estates whose names aren't ward names ───
+
+// Kilifi South
+{ alias: "Mtwapa", ward: "Shimo La Tewa", constituency: "Kilifi South", county: "Kilifi" },
+{ alias: "Vipingo", ward: "Junju", constituency: "Kilifi South", county: "Kilifi" },
+{ alias: "Kikambala", ward: "Mtepeni", constituency: "Kilifi South", county: "Kilifi" },
+
+// Kilifi North
+{ alias: "Kilifi Town", ward: "Sokoni", constituency: "Kilifi North", county: "Kilifi" },
+{ alias: "Mtondia", ward: "Tezo", constituency: "Kilifi North", county: "Kilifi" },
+{ alias: "Mavueni", ward: "Mnarani", constituency: "Kilifi North", county: "Kilifi" },
+{ alias: "Takaungu", ward: "Mnarani", constituency: "Kilifi North", county: "Kilifi" },
+{ alias: "Bofa", ward: "Kibarani", constituency: "Kilifi North", county: "Kilifi" },
+
+// Malindi
+{ alias: "Gede", ward: "Ganda", constituency: "Malindi", county: "Kilifi" },
+
+// Magarini
+{ alias: "Mambrui", ward: "Sabaki", constituency: "Magarini", county: "Kilifi" },
+{ alias: "Marereni", ward: "Garashi", constituency: "Magarini", county: "Kilifi" },
+{ alias: "Ngomeni", ward: "Gongoni", constituency: "Magarini", county: "Kilifi" },
+
+// Kaloleni
+{ alias: "Mazeras", ward: "Mariakani", constituency: "Kaloleni", county: "Kilifi" },
+ 
+  // ─── Tana River County (004) — towns/areas whose names aren't ward names ───
+
+// Garsen
+{ alias: "Kipini", ward: "Kipini West", constituency: "Garsen", county: "Tana River" },
+{ alias: "Ozi", ward: "Kipini West", constituency: "Garsen", county: "Tana River" },
+
+// Galole
+{ alias: "Hola", ward: "Chewani", constituency: "Galole", county: "Tana River" },
+
+// Bura
+{ alias: "Bura Town", ward: "Chewele", constituency: "Bura", county: "Tana River" },
   
+  // ─── Lamu County (005) — towns/areas whose names aren't ward names ───
+
+// Lamu West
+{ alias: "Lamu Town", ward: "Mkomani", constituency: "Lamu West", county: "Lamu" },
+{ alias: "Lamu Old Town", ward: "Mkomani", constituency: "Lamu West", county: "Lamu" },
+{ alias: "Mokowe", ward: "Hindi", constituency: "Lamu West", county: "Lamu" },
+{ alias: "Mpeketoni", ward: "Bahari", constituency: "Lamu West", county: "Lamu" },
+
+// Lamu East
+{ alias: "Siyu", ward: "Faza", constituency: "Lamu East", county: "Lamu" },
+{ alias: "Pate", ward: "Faza", constituency: "Lamu East", county: "Lamu" },
+{ alias: "Kizingitini", ward: "Faza", constituency: "Lamu East", county: "Lamu" },
+{ alias: "Ndau", ward: "Kiunga", constituency: "Lamu East", county: "Lamu" },
+
+  // ─── Taita-Taveta County (006) — towns/areas whose names aren't ward names ───
+
+// Taveta
+{ alias: "Taveta Town", ward: "Mahoo", constituency: "Taveta", county: "Taita-Taveta" },
+
+// Wundanyi
+{ alias: "Mgange", ward: "Mwanda/Mgange", constituency: "Wundanyi", county: "Taita-Taveta" },
+{ alias: "Wumingu", ward: "Wumingu/Kishushe", constituency: "Wundanyi", county: "Taita-Taveta" },
+{ alias: "Kishushe", ward: "Wumingu/Kishushe", constituency: "Wundanyi", county: "Taita-Taveta" },
+
+// Mwatate
+{ alias: "Maktau", ward: "Mwatate", constituency: "Mwatate", county: "Taita-Taveta" },
+{ alias: "Bura Mission", ward: "Bura", constituency: "Mwatate", county: "Taita-Taveta" },
+
+// Voi
+{ alias: "Voi Town", ward: "Kaloleni", constituency: "Voi", county: "Taita-Taveta" },
+{ alias: "Ikanga", ward: "Kaloleni", constituency: "Voi", county: "Taita-Taveta" },
+{ alias: "Maungu", ward: "Marungu", constituency: "Voi", county: "Taita-Taveta" },
+{ alias: "Ndii", ward: "Ngolia", constituency: "Voi", county: "Taita-Taveta" },
+{ alias: "Mwakingali", ward: "Kaloleni", constituency: "Voi", county: "Taita-Taveta" },
+
+  // ─── Meru County (012) — towns/estates whose names aren't ward names ───
+
+// Imenti North
+{ alias: "Meru Town", ward: "Municipality", constituency: "Imenti North", county: "Meru" },
+{ alias: "Kaaga", ward: "Ntima East", constituency: "Imenti North", county: "Meru" },
+{ alias: "Kiorone", ward: "Ntima West", constituency: "Imenti North", county: "Meru" },
+{ alias: "Gitembene", ward: "Ntima West", constituency: "Imenti North", county: "Meru" },
+
+// Imenti South
+{ alias: "Nkubu", ward: "Nkuene", constituency: "Imenti South", county: "Meru" },
+{ alias: "Kanyekine", ward: "Abogeta West", constituency: "Imenti South", county: "Meru" },
+
+// Buuri
+{ alias: "Subuiga", ward: "Kiirua/Naari", constituency: "Buuri", county: "Meru" },
+
+// Tigania West
+{ alias: "Urru", ward: "Akithi", constituency: "Tigania West", county: "Meru" },
+
+// Igembe South
+{ alias: "Maua Town", ward: "Maua", constituency: "Igembe South", county: "Meru" },
+
+// Central Imenti
+{ alias: "Gaitu", ward: "Mwanganthia", constituency: "Central Imenti", county: "Meru" },
+{ alias: "Kariene", ward: "Abothuguchi Central", constituency: "Central Imenti", county: "Meru" },
+
+  // ─── Tharaka-Nithi County (013) — towns/estates whose names aren't ward names ───
+
+// Chuka/Igambang'ombe
+{ alias: "Chuka Town", ward: "Karingani", constituency: "Chuka/Igambang'ombe", county: "Tharaka-Nithi" },
+{ alias: "Chuka University", ward: "Karingani", constituency: "Chuka/Igambang'ombe", county: "Tharaka-Nithi" },
+{ alias: "Ndagani", ward: "Karingani", constituency: "Chuka/Igambang'ombe", county: "Tharaka-Nithi" },
+{ alias: "Rubate", ward: "Igambang'ombe", constituency: "Chuka/Igambang'ombe", county: "Tharaka-Nithi" },
+{ alias: "Kibugua", ward: "Magumoni", constituency: "Chuka/Igambang'ombe", county: "Tharaka-Nithi" },
+
+// Maara
+{ alias: "Kabeche", ward: "Mwimbi", constituency: "Maara", county: "Tharaka-Nithi" },
+
+// Tharaka
+{ alias: "Kathwana", ward: "Nkondi", constituency: "Tharaka", county: "Tharaka-Nithi" },
+ 
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
@@ -279,7 +391,19 @@ export const MULTI_WARD_TOWNS = {
   { ward: "Ukunda", constituency: "Msambweni", county: "Kwale" },
   { ward: "Gombato Bongwe", constituency: "Msambweni", county: "Kwale" },
 ],
-  
+
+  "Voi": [
+  { ward: "Kaloleni", constituency: "Voi", county: "Taita-Taveta" },
+  { ward: "Sagala", constituency: "Voi", county: "Taita-Taveta" },
+  { ward: "Mbololo", constituency: "Voi", county: "Taita-Taveta" },
+],
+
+  "Garissa": [
+  { ward: "Township", constituency: "Garissa Township", county: "Garissa" },
+  { ward: "Waberi", constituency: "Garissa Township", county: "Garissa" },
+  { ward: "Iftin", constituency: "Garissa Township", county: "Garissa" },
+  { ward: "Galbet", constituency: "Garissa Township", county: "Garissa" },
+],
   // Add more multi-ward towns here
   // "nakuru": [
   //   { ward: "Nakuru East", constituency: "Nakuru Town East", county: "Nakuru" },
