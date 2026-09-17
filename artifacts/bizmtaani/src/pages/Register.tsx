@@ -185,8 +185,14 @@ const homeLocation: HomeLocation = {
         homeLocation,
       });
 
-      // Apply referral code if one was entered — non-blocking
-      applyReferralCodeIfPresent(referralCode);
+      // Apply referral code if one was entered — still non-blocking
+      // (doesn't delay navigation), but now logs its own outcome so
+      // a failure is traceable later instead of vanishing silently.
+      applyReferralCodeIfPresent(referralCode).then((applied) => {
+        if (referralCode.trim()) {
+          console.log(`Referral code "${referralCode.trim()}" applied:`, applied);
+        }
+      });
 
       // Send email verification — non-blocking (don't fail if this errors)
       sendEmailVerification(cred.user).catch(() => {});
@@ -255,7 +261,11 @@ if (!existingProfile.exists()) {
 
   // Apply referral code if one was entered — non-blocking, and only
   // for genuinely new accounts, not existing users signing in again.
-  applyReferralCodeIfPresent(referralCode);
+  applyReferralCodeIfPresent(referralCode).then((applied) => {
+    if (referralCode.trim()) {
+      console.log(`Referral code "${referralCode.trim()}" applied:`, applied);
+    }
+  });
 } else {
   // Update only the location.
   // Do not overwrite subscription or existing profile data.
