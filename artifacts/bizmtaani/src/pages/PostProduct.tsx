@@ -20,7 +20,7 @@ import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { getWardInfo, getWardCoordinates, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { getRecaptchaToken } from "@/lib/recaptcha";
-import { initiatePaystackCharge, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
+import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
 
 // Picks a safe upload concurrency based on the device's reported
@@ -1547,14 +1547,14 @@ try {
   pendingProductIdRef.current = data.productId;
 
   // 5. Backend says payment is required
-  const paystackResult = await initiatePaystackCharge({
+  const stkResult = await initiateStkPush({
     phone: cleanedPhone,
     plan: data.plan as PaidListingPlan,
     productId: data.productId,
   });
 
   return {
-    checkoutRequestId: paystackResult.checkoutRequestId,
+    checkoutRequestId: stkResult.checkoutRequestId,
     productId: data.productId,
   };
 }
