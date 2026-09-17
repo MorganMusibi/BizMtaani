@@ -38,7 +38,7 @@ export function EmailVerificationBanner() {
     setSending(true);
     try {
       await sendEmailVerification(current);
-      toast({ title: "Verification email sent", description: `Check your inbox at ${current.email}` });
+      toast({ title: "Verification email sent", description: `Check your inbox (and spam folder) at ${current.email}` });
     } catch (err) {
       toast({
         title: "Could not send email",
@@ -71,8 +71,8 @@ export function EmailVerificationBanner() {
           Verify your email to unlock all features
         </p>
         <p className="text-[11px] text-amber-700 mt-0.5 leading-snug">
-          We sent a link to <strong>{user.email}</strong>
-        </p>
+  We sent a link to <strong>{user.email}</strong> — check your spam/junk folder if you don't see it.
+</p>
         <div className="flex items-center gap-3 mt-1.5">
           <button
             onClick={checkVerified}
