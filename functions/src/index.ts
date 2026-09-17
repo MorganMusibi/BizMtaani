@@ -458,7 +458,7 @@ export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [m
   const cooldownRef = db.collection("paymentCooldowns").doc(request.auth.uid);
 
   console.log("STEP 3: starting recaptcha + firestore reads");
-  const [, cooldownSnap, productSnap] = await Promise.all([
+  const [cooldownSnap, productSnap] = await Promise.all([
     // verifyRecaptcha(recaptchaToken, "initiate_payment"),
     cooldownRef.get(),
     db.collection("products").doc(productId).get(),
