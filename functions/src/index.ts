@@ -490,18 +490,29 @@ export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [m
     throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
   }
 
-  console.log("STEP 5: checking stale payments");
-  const stalePayments = await db.collection("payments")
-    .where("productId", "==", productId)
-    .where("status", "==", "pending")
-    .get();
+  // Clean up previous pending payments in the background.
+// This is not required before sending the new STK Push.
+db.collection("payments")
+  .where("productId", "==", productId)
+  .where("status", "==", "pending")
+  .get()
+  .then((stalePayments) => {
+    if (stalePayments.empty) return;
 
-  const supersedeBatch = db.batch();
-  stalePayments.docs.forEach((doc) => {
-    supersedeBatch.update(doc.ref, { status: "cancelled" });
+    const batch = db.batch();
+
+    stalePayments.docs.forEach((doc) => {
+      batch.update(doc.ref, { status: "cancelled" });
+    });
+
+    return batch.commit();
+  })
+  .then(() => {
+    console.log("STEP 5: stale payment cleanup completed");
+  })
+  .catch((err) => {
+    console.error("STEP 5: stale payment cleanup failed:", err);
   });
-  if (!stalePayments.empty) await supersedeBatch.commit();
-  console.log("STEP 6: stale payments handled");
 
   const formattedPhone = normalizePhone(phone);
   console.log("STEP 7: phone normalized:", formattedPhone);
