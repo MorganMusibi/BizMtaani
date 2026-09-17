@@ -549,12 +549,12 @@ console.log(
 
 const stkTimeoutId = setTimeout(() => {
   console.error(
-    `STEP 11 TIMEOUT: Safaricom STK endpoint did not respond within 45 seconds. ` +
+    `STEP 11 TIMEOUT: Safaricom STK endpoint did not respond within 90 seconds. ` +
     `URL=${darajaBase()}/mpesa/stkpush/v1/processrequest ` +
     `elapsedMs=${Date.now() - stkStartedAt}`
   );
   stkController.abort();
-}, 45_000);
+}, 90_000);
   let darajaData: any;
   try {
     darajaData = await new Promise((resolve, reject) => {
@@ -572,7 +572,7 @@ const stkTimeoutId = setTimeout(() => {
           "Content-Type": "application/json",
           "Content-Length": Buffer.byteLength(bodyStr),
         },
-        timeout: 40000,
+        timeout: 85000,
       }, (res: any) => {
         console.log("STEP 11a: response headers received, status:", res.statusCode);
         let data = "";
