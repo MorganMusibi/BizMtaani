@@ -537,7 +537,7 @@ db.collection("payments")
     PartyA: formattedPhone,
     PartyB: tillNumber,
     PhoneNumber: formattedPhone,
-    CallBackURL: process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`,
+    CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://europe-west1-${projectId}.cloudfunctions.net/mpesaCallback`}/${callbackToken}`,
     AccountReference: productId.slice(0, 12),
     TransactionDesc: `BizMtaani ${plan} listing`,
   };
@@ -782,8 +782,13 @@ export const paystackCallback = onRequest({ secrets: [paystackSecretKey], maxIns
   res.status(200).send("OK");
 });
 
-export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) => {
+export const mpesaCallback = onRequest({ region: "europe-west1", maxInstances: 100 }, async (req, res) => {
   try {
+    // Token now arrives as the last path segment (e.g. /mpesaCallback/abc123...)
+    // instead of a query parameter — a raw query string on CallBackURL was
+    // empirically causing STK push requests to hang (STEP 11), so this avoids
+    // query strings entirely while still authenticating the callback.
+    const pathToken = req.path.split("/").filter(Boolean).pop() ?? "";
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
 
@@ -813,7 +818,7 @@ export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) =
     // the response is sent.
     await db.runTransaction(async (tx) => {
       const snap = await tx.get(paymentRef);
-      const incomingHash = crypto.createHash("sha256").update(String(req.query["cbtoken"] ?? "")).digest("hex");
+      const incomingHash = crypto.createHash("sha256").update(pathToken).digest("hex");
       if (!snap.exists || snap.data()?.callbackTokenHash !== incomingHash) {
         return;
       }
