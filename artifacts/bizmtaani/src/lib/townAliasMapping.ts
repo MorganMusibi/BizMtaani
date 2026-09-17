@@ -344,7 +344,50 @@ export const TOWN_ALIASES = [
 
 // Tharaka
 { alias: "Kathwana", ward: "Nkondi", constituency: "Tharaka", county: "Tharaka-Nithi" },
- 
+
+  // ─── Embu County (014) — towns/estates whose names aren't ward names ───
+
+// Manyatta (Embu Town & surroundings)
+{ alias: "Embu Town", ward: "Kirimari", constituency: "Manyatta", county: "Embu" },
+{ alias: "Kikuyu Estate", ward: "Kirimari", constituency: "Manyatta", county: "Embu" },
+{ alias: "Majengo Embu", ward: "Kirimari", constituency: "Manyatta", county: "Embu" },
+{ alias: "Koinange Estate", ward: "Kirimari", constituency: "Manyatta", county: "Embu" },
+{ alias: "Kangaru", ward: "Nginda", constituency: "Manyatta", county: "Embu" },
+{ alias: "Itabua", ward: "Nginda", constituency: "Manyatta", county: "Embu" },
+{ alias: "Mucha", ward: "Ruguru/Ngandori", constituency: "Manyatta", county: "Embu" },
+{ alias: "Kianjokoma", ward: "Ruguru/Ngandori", constituency: "Manyatta", county: "Embu" },
+{ alias: "Kibugu", ward: "Ruguru/Ngandori", constituency: "Manyatta", county: "Embu" },
+{ alias: "Manyatta Market", ward: "Gaturi South", constituency: "Manyatta", county: "Embu" },
+
+// Runyenjes
+{ alias: "Runyenjes Town", ward: "Central Ward", constituency: "Runyenjes", county: "Embu" },
+{ alias: "Runyenjes Market", ward: "Central Ward", constituency: "Runyenjes", county: "Embu" },
+{ alias: "Karurumo", ward: "Kyeni North", constituency: "Runyenjes", county: "Embu" },
+{ alias: "Macha", ward: "Kyeni South", constituency: "Runyenjes", county: "Embu" },
+
+// Mbeere South
+{ alias: "Gachoka", ward: "Mbeti South", constituency: "Mbeere South", county: "Embu" },
+{ alias: "Kiritiri", ward: "Mbeti South", constituency: "Mbeere South", county: "Embu" },
+{ alias: "Karaba", ward: "Mwea", constituency: "Mbeere South", county: "Embu" },
+{ alias: "Kamburu", ward: "Mwea", constituency: "Mbeere South", county: "Embu" },
+
+// Mbeere North
+{ alias: "Siakago", ward: "Nthawa", constituency: "Mbeere North", county: "Embu" },
+{ alias: "Ishara", ward: "Evurore", constituency: "Mbeere North", county: "Embu" },
+  
+  // ─── Kitui County (015) — towns/estates whose names aren't ward names ───
+
+// Kitui Central
+{ alias: "Kalundu Market", ward: "Township", constituency: "Kitui Central", county: "Kitui" },
+
+// Kitui Rural
+{ alias: "Kisasi Market", ward: "Kisasi", constituency: "Kitui Rural", county: "Kitui" },
+
+// Kitui West
+{ alias: "Kabati Market", ward: "Mutonguni", constituency: "Kitui West", county: "Kitui" },  // verify ward
+
+// Mwingi Central
+{ alias: "Mwingi Town", ward: "Mwingi Central", constituency: "Mwingi Central", county: "Kitui" },
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
