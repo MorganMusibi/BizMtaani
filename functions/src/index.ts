@@ -526,7 +526,7 @@ export const initiateMpesaPayment = onCall({ region: "europe-west1", secrets: [m
     PartyA: formattedPhone,
     PartyB: tillNumber,
     PhoneNumber: formattedPhone,
-    CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`}?cbtoken=${callbackToken}`,
+    CallBackURL: process.env.MPESA_CALLBACK_URL ?? `https://us-central1-${projectId}.cloudfunctions.net/mpesaCallback`,
     AccountReference: productId.slice(0, 12),
     TransactionDesc: `BizMtaani ${plan} listing`,
   };
