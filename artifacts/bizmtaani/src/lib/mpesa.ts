@@ -138,7 +138,8 @@ export async function initiateStkPush(
     StkPushResult
   >(
     functions,
-    "initiateMpesaPayment"
+    "initiateMpesaPayment",
+    { timeout: 95000 } // matches the 85–90s server-side timeouts, with headroom
   );
 
   try {
