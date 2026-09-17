@@ -51,10 +51,7 @@ async function saveUserProfile(
     displayName: opts.displayName,
     email: opts.email ?? "",
     isBusinessOwner: opts.isBusinessOwner,
-    
-    subscriptionPlan: "free",
-premiumEndsAt: null,
-    
+
     ...(opts.isBusinessOwner && opts.businessName
       ? { businessName: opts.businessName }
       : {}),
