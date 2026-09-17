@@ -523,7 +523,6 @@ db.collection("payments")
 
 
   const ts = mpesaTimestamp();
-  const callbackToken = crypto.randomBytes(24).toString("hex");
   const projectId = process.env.GCLOUD_PROJECT ?? "";
   const shortcode = process.env.MPESA_SHORTCODE;
   const tillNumber = process.env.MPESA_TILL_NUMBER;
@@ -783,6 +782,7 @@ export const paystackCallback = onRequest({ secrets: [paystackSecretKey], maxIns
 });
 
 export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) => {
+  console.log("MPESA CALLBACK RECEIVED:", JSON.stringify(req.body));
   try {
     const callback = req.body?.Body?.stkCallback;
     if (!callback?.CheckoutRequestID) { res.json({ ResultCode: 0, ResultDesc: "Accepted" }); return; }
@@ -812,11 +812,17 @@ export const mpesaCallback = onRequest({ maxInstances: 100 }, async (req, res) =
     // of that runs, rather than risk it being cut off mid-way once
     // the response is sent.
     await db.runTransaction(async (tx) => {
-      const snap = await tx.get(paymentRef);
-      const incomingHash = crypto.createHash("sha256").update(String(req.query["cbtoken"] ?? "")).digest("hex");
-      if (!snap.exists || snap.data()?.callbackTokenHash !== incomingHash) {
-        return;
-      }
+  const snap = await tx.get(paymentRef);
+
+  if (!snap.exists) {
+    console.error(
+      "MPESA CALLBACK: payment not found:",
+      callback.CheckoutRequestID
+    );
+    return;
+  }
+
+  const existingStatus = snap.data()?.status;
       const existingStatus = snap.data()?.status;
       if (existingStatus === "completed" || existingStatus === "failed" || existingStatus === "cancelled") {
         return;
