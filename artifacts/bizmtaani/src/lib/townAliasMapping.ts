@@ -388,6 +388,27 @@ export const TOWN_ALIASES = [
 
 // Mwingi Central
 { alias: "Mwingi Town", ward: "Mwingi Central", constituency: "Mwingi Central", county: "Kitui" },
+  
+  // ─── Machakos County (016) — towns/estates whose names aren't ward names ───
+
+// Machakos Town
+{ alias: "Machakos Town", ward: "Machakos Central", constituency: "Machakos Town", county: "Machakos" },
+{ alias: "Konza", ward: "Kalama", constituency: "Machakos Town", county: "Machakos" },
+{ alias: "Mumbuni", ward: "Mumbuni North", constituency: "Machakos Town", county: "Machakos" },
+{ alias: "Kiima Kimwe", ward: "Muvuti/Kiima-Kimwe", constituency: "Machakos Town", county: "Machakos" },
+
+// Mavoko
+{ alias: "Mlolongo", ward: "Syokimau/Mulolongo", constituency: "Mavoko", county: "Machakos" },
+{ alias: "Katani", ward: "Muthwani", constituency: "Mavoko", county: "Machakos" },
+
+// Kangundo
+{ alias: "Kangundo Town", ward: "Kangundo Central", constituency: "Kangundo", county: "Machakos" },
+
+// Kathiani
+{ alias: "Kathiani Town", ward: "Kathiani Central", constituency: "Kathiani", county: "Machakos" },
+
+// Matungulu
+{ alias: "Kenol", ward: "Matungulu West", constituency: "Matungulu", county: "Machakos" },
   // Add more single-ward towns here
   // { alias: "kayole", ward: "Kayole North", constituency: "Embakasi North", county: "Nairobi" },
 ] as const;
@@ -446,6 +467,13 @@ export const MULTI_WARD_TOWNS = {
   { ward: "Waberi", constituency: "Garissa Township", county: "Garissa" },
   { ward: "Iftin", constituency: "Garissa Township", county: "Garissa" },
   { ward: "Galbet", constituency: "Garissa Township", county: "Garissa" },
+],
+
+  "Machakos Town": [
+  { ward: "Machakos Central", constituency: "Machakos Town", county: "Machakos" },
+  { ward: "Mumbuni North", constituency: "Machakos Town", county: "Machakos" },
+  { ward: "Mua", constituency: "Machakos Town", county: "Machakos" },
+  { ward: "Kola", constituency: "Machakos Town", county: "Machakos" },
 ],
   // Add more multi-ward towns here
   // "nakuru": [
