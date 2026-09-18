@@ -194,20 +194,25 @@ export async function uploadImage(
 
   // Report the uploaded image back to the draft record so it can be
   // cleaned up automatically if the advert is never published.
-  const functions = getFunctions(app, "europe-west1");
-  const claimId = draftId ?? resolvedSig.draftId;
-  if (claimId) {
-    // Must be awaited, not fire-and-forget — publishAdvert validates
-    // every imageUrls entry's public_id against this draft's
-    // publicIds array server-side. If this call is still in flight
-    // (or silently failed) when publishAdvert runs, a completely
-    // legitimate upload would be wrongly rejected as unverified.
-    const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
-    try {
-      await attachDraftUploadImage({ draftId: claimId, publicId: data.public_id });
-    } catch (error) {
-      console.error("Failed to attach draft upload record:", error);
-      throw new Error("Failed to finalize photo upload. Please try again.");
+  //
+  // skipAttach lets a batch caller (uploadImagesLimited) defer this
+  // to a single attachDraftUploadImages call covering every photo in
+  // the session, instead of one attach round-trip per photo. Callers
+  // that pass skipAttach=true MUST call attachDraftUploadImages
+  // themselves before publishing — publishAdvert validates every
+  // imageUrls entry's public_id against the draft's publicIds array,
+  // so an unattached upload is rejected as unverified.
+  if (!skipAttach) {
+    const functions = getFunctions(app, "europe-west1");
+    const claimId = draftId ?? resolvedSig.draftId;
+    if (claimId) {
+      const attachDraftUploadImage = httpsCallable(functions, "attachDraftUploadImage");
+      try {
+        await attachDraftUploadImage({ draftId: claimId, publicId: data.public_id });
+      } catch (error) {
+        console.error("Failed to attach draft upload record:", error);
+        throw new Error("Failed to finalize photo upload. Please try again.");
+      }
     }
   }
 
@@ -215,4 +220,25 @@ export async function uploadImage(
     url: data.secure_url,
     public_id: data.public_id,
   };
+}
+
+/**
+ * Attaches multiple already-uploaded images to a draft in one call —
+ * one Firestore read + one write for the whole batch, instead of one
+ * read + write per photo. Call this once after uploading every photo
+ * in a posting session with uploadImage(..., skipAttach: true).
+ */
+export async function attachDraftUploadImages(
+  draftId: string,
+  publicIds: string[]
+): Promise<void> {
+  if (publicIds.length === 0) return;
+  const functions = getFunctions(app, "europe-west1");
+  const attach = httpsCallable(functions, "attachDraftUploadImages");
+  try {
+    await attach({ draftId, publicIds });
+  } catch (error) {
+    console.error("Failed to attach draft upload records:", error);
+    throw new Error("Failed to finalize photo uploads. Please try again.");
+  }
 }
