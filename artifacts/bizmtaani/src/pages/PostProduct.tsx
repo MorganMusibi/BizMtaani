@@ -1291,8 +1291,6 @@ function isValidKenyanPhone(phone: string): boolean {
   }
   if (!(await validateStep())) return;
 
-  if (!(await validateStep())) return;
-
   if (step === 3) {
     await validateAdvertLocation();
   }
