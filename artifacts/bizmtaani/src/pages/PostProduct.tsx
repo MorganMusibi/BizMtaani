@@ -1554,6 +1554,7 @@ try {
     checkoutRequestId: data.checkoutRequestId!,
     productId: data.productId,
   };
+}
 
 /**
  * Corrected handlePublishFree
