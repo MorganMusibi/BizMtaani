@@ -56,7 +56,6 @@ interface Commission {
 interface ReferredUser {
   uid: string;
   displayName: string;
-  email?: string;
   photoURL?: string;
   joinedAt?: { seconds: number } | null;
   commissionPaidOut: boolean;
@@ -83,7 +82,6 @@ const marketerCacheByUid = new Map<string, MarketerCache>();
 // ✅ User profile cache - persists across dashboard sessions
 interface UserProfile {
   displayName: string;
-  email: string;
   isPremium: boolean;
   photoURL: string;
   timestamp: number;
@@ -140,12 +138,11 @@ async function getUserProfiles(uids: string[], force = false): Promise<Map<strin
         const data = d.data();
         const now = Date.now();
         const profile: UserProfile = {
-          displayName: data.displayName || "Unknown User",
-          email: data.email || "",
-          isPremium: !!(data.premiumEndsAt && data.premiumEndsAt.toDate() > new Date()),
-          photoURL: data.photoURL || "",
-          timestamp: now,
-        };
+  displayName: data.displayName || "Unknown User",
+  isPremium: !!(data.premiumEndsAt && data.premiumEndsAt.toDate() > new Date()),
+  photoURL: data.photoURL || "",
+  timestamp: now,
+};
         // ✅ Store in sessionStorage for cross-page/session persistence
         try {
           sessionStorage.setItem(`bizmtaani_user_profile_${d.id}`, JSON.stringify(profile));
@@ -272,16 +269,14 @@ try {
       // ✅ Use cached user profiles
       const userUids = referralsSnap.docs.map((d) => d.id);
       const userProfileMap = userUids.length > 0 
-  ? await getUserProfiles(userUids, force) 
+  ? await getUserProfiles(userUids) 
   : new Map();
-
       const referralsData: ReferredUser[] = referralsSnap.docs.map((d) => {
         const data = d.data();
         const userProfile = userProfileMap.get(d.id);
         return {
           uid: d.id,
           displayName: userProfile?.displayName || "Unknown User",
-          email: userProfile?.email || "",
           photoURL: userProfile?.photoURL || "",
           joinedAt: data.createdAt || null,
           commissionPaidOut: data.commissionPaidOut || false,
@@ -672,9 +667,6 @@ try {
                 >
                   <div>
                     <p className="font-bold text-sm">{r.displayName}</p>
-                    {r.email && (
-                      <p className="text-[10px] text-muted-foreground">{r.email}</p>
-                    )}
                     {r.joinedAt && (
                       <p className="text-[10px] text-muted-foreground mt-0.5">
                         Joined {timeAgo(r.joinedAt.seconds)}
