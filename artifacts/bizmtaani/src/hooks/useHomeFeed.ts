@@ -848,7 +848,8 @@ export function useHomeFeeds({
   isSearchMode,
   locationInfo,
   category,     
-  subcategory,  
+  subcategory,
+  refreshKey,
 }: {
   gpsReady: boolean;
   userCoords: [number, number] | null;
@@ -859,7 +860,13 @@ export function useHomeFeeds({
     county?: string;
   } | null;
   category?: string;      
-  subcategory?: string;   
+  subcategory?: string;
+  // Bump this from outside (e.g. right after a successful advert
+  // post) to force a fresh Firestore fetch even though gpsReady/
+  // locationInfo/userCoords haven't changed. clearFeedCache() alone
+  // only empties the cache — it doesn't make an already-mounted
+  // component re-run its fetch effect.
+  refreshKey?: number;
 }) {
 
 // Synchronous cache read at hook-init time — if this exact ward/coords
@@ -1530,7 +1537,8 @@ saveFeedCacheToStorage(feedCache);
   locationInfo?.county,
   userCoords,
   category,      
-  subcategory,  
+  subcategory,
+  refreshKey,
 ]);
 
 const loadMore = useCallback(async () => {
