@@ -44,7 +44,7 @@ export default defineConfig({
       manifest: false,
       includeAssets: ["favicon.svg", "icon-192.png", "icon-512.png", "icon-maskable-192.png", "icon-maskable-512.png", "robots.txt"],
       workbox: {
-  skipWaiting: true,
+  skipWaiting: false,
   clientsClaim: true,
   cleanupOutdatedCaches: true,
   maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB — kenya-wards.geojson (2.34 MB) exceeds Workbox's 2 MB default
