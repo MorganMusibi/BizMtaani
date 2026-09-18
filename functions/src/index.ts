@@ -286,6 +286,65 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
   return _darajaToken.token;
 }
 
+async function sendDarajaStkPush(
+  formattedPhone: string,
+  plan: string,
+  productId: string,
+  mpesaConsumerKey: ReturnType<typeof defineSecret>,
+  mpesaConsumerSecret: ReturnType<typeof defineSecret>,
+  mpesaPasskey: ReturnType<typeof defineSecret>
+): Promise<{ checkoutRequestId: string; customerMessage: string; callbackTokenHash: string }> {
+  const token = await getDarajaToken(mpesaConsumerKey.value(), mpesaConsumerSecret.value());
+
+  const ts = mpesaTimestamp();
+  const callbackToken = crypto.randomBytes(24).toString("hex");
+  const projectId = process.env.GCLOUD_PROJECT ?? "";
+  const shortcode = process.env.MPESA_SHORTCODE;
+  const tillNumber = process.env.MPESA_TILL_NUMBER;
+
+  const stkBody = {
+    BusinessShortCode: shortcode,
+    Password: Buffer.from(`${shortcode}${mpesaPasskey.value()}${ts}`).toString("base64"),
+    Timestamp: ts,
+    TransactionType: "CustomerBuyGoodsOnline",
+    Amount: PLAN_AMOUNTS[plan],
+    PartyA: formattedPhone,
+    PartyB: tillNumber,
+    PhoneNumber: formattedPhone,
+    CallBackURL: `${process.env.MPESA_CALLBACK_URL ?? `https://europe-west1-${projectId}.cloudfunctions.net/mpesaCallback`}/${callbackToken}`,
+    AccountReference: productId.slice(0, 12),
+    TransactionDesc: `BizMtaani ${plan} listing`,
+  };
+
+  const stkUrl = `${darajaBase()}/mpesa/stkpush/v1/processrequest`;
+  const response = await fetch(stkUrl, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify(stkBody),
+    signal: AbortSignal.timeout(90000),
+  });
+
+  const responseText = await response.text();
+  let darajaData: any;
+  try {
+    darajaData = JSON.parse(responseText);
+  } catch {
+    throw new Error(`Safaricom returned non-JSON response: ${responseText.slice(0, 500)}`);
+  }
+
+  if (darajaData.ResponseCode !== "0") {
+    throw new Error(darajaData.errorMessage ?? "Daraja error");
+  }
+
+  const callbackTokenHash = crypto.createHash("sha256").update(callbackToken).digest("hex");
+
+  return {
+    checkoutRequestId: darajaData.CheckoutRequestID,
+    customerMessage: darajaData.CustomerMessage,
+    callbackTokenHash,
+  };
+}
+
 /**
  * Records an admin action to a permanent, unmodifiable audit log.
  * Never throws — a logging failure should never block the actual
@@ -542,81 +601,18 @@ db.collection("payments")
     TransactionDesc: `BizMtaani ${plan} listing`,
   };
   
-console.log(
-  "STEP 10 CONFIG:",
-  JSON.stringify({
-    base: darajaBase(),
-    environment: process.env.MPESA_ENVIRONMENT,
-    shortcode: process.env.MPESA_SHORTCODE,
-    till: process.env.MPESA_TILL_NUMBER,
-    callback: process.env.MPESA_CALLBACK_URL,
-    transactionType: stkBody.TransactionType,
-  })
-);
+  const stkResult = await sendDarajaStkPush(formattedPhone, plan, productId, mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey);
 
-  console.log("STEP 10: sending STK push, shortcode:", process.env.MPESA_SHORTCODE, "till:", process.env.MPESA_TILL_NUMBER, "env:", process.env.MPESA_ENVIRONMENT);
-  let darajaData: any;
-
-try {
-  const stkUrl = `${darajaBase()}/mpesa/stkpush/v1/processrequest`;
-  const bodyStr = JSON.stringify(stkBody);
-
-  console.log("STEP 11-FETCH: sending STK request to:", stkUrl);
-
-  const startedAt = Date.now();
-
-  const response = await fetch(stkUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
-    body: bodyStr,
-    signal: AbortSignal.timeout(90000),
+  await db.collection("payments").doc(stkResult.checkoutRequestId).set({
+    checkoutRequestId: stkResult.checkoutRequestId,
+    callbackTokenHash: stkResult.callbackTokenHash,
+    plan, productId,
+    buyerId: request.auth.uid,
+    status: "pending",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  console.log(
-    "STEP 11-FETCH: HTTP response received:",
-    response.status,
-    `after ${Date.now() - startedAt}ms`
-  );
-
-  const responseText = await response.text();
-
-  console.log(
-    "STEP 11-FETCH: response body:",
-    responseText.slice(0, 1000)
-  );
-
-  try {
-    darajaData = JSON.parse(responseText);
-  } catch {
-    throw new Error(
-      `Safaricom returned non-JSON response: ${responseText.slice(0, 500)}`
-    );
-  }
-
-} catch (err) {
-  console.error(
-    "STEP 11-FETCH ERROR:",
-    err instanceof Error ? err.name : typeof err,
-    err instanceof Error ? err.message : String(err)
-  );
-
-  throw new HttpsError(
-    "internal",
-    `STK push request failed: ${
-      err instanceof Error ? err.message : String(err)
-    }`
-  );
-}
-  console.log("STEP 12: daraja response body:", JSON.stringify(darajaData));
-
-  if (darajaData.ResponseCode !== "0") throw new HttpsError("internal", darajaData.errorMessage ?? "Daraja error");
-  await db.collection("payments").doc(darajaData.CheckoutRequestID).set({ checkoutRequestId: darajaData.CheckoutRequestID, callbackTokenHash: crypto.createHash("sha256").update(callbackToken).digest("hex"), plan, productId, buyerId: request.auth.uid, status: "pending", createdAt: admin.firestore.FieldValue.serverTimestamp() });
-  console.log("STEP 13: payment doc saved, returning success");
-  return { checkoutRequestId: darajaData.CheckoutRequestID, customerMessage: darajaData.CustomerMessage };
-});
+  return { checkoutRequestId: stkResult.checkoutRequestId, customerMessage: stkResult.customerMessage };
 
  export const initiatePaystackPayment = onCall({ region: "europe-west1", minInstances: 1, secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
   console.log("PAYSTACK STEP 1: function started");
@@ -2149,6 +2145,76 @@ try {
   plan: effectivePlan,
 };
   });
+
+  export const publishAdvertAndPay = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 200, timeoutSeconds: 120 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, phone, ...otherData } = request.data;
+  const uid = request.auth.uid;
+
+  // ── Everything below through product creation is IDENTICAL to
+  // publishAdvert — same validation, same allowlisted write. Copy
+  // that function's body here unchanged, up through and including
+  // the "9. Return the generated productId" comment — but DON'T
+  // return yet. Instead, continue below.
+
+  // [ ... paste publishAdvert's full body here, unmodified, EXCEPT skip its final `return { ... }` ... ]
+
+  // At this point newProductRef, status, and effectivePlan are all
+  // in scope, exactly as they are at the end of publishAdvert.
+
+  if (status !== "pending_payment") {
+    return {
+      success: true,
+      productId: newProductRef.id,
+      status,
+      requiresPayment: false,
+      paymentInitiated: false,
+      plan: effectivePlan,
+    };
+  }
+
+  // Product is created and committed — from here on, NEVER throw.
+  // A payment-initiation failure must still return the productId so
+  // the client can retry against the same product instead of
+  // creating a duplicate on retry.
+  try {
+    const formattedPhone = normalizePhone(typeof phone === "string" ? phone : "");
+    const stkResult = await sendDarajaStkPush(formattedPhone, effectivePlan, newProductRef.id, mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey);
+
+    await db.collection("payments").doc(stkResult.checkoutRequestId).set({
+      checkoutRequestId: stkResult.checkoutRequestId,
+      callbackTokenHash: stkResult.callbackTokenHash,
+      plan: effectivePlan,
+      productId: newProductRef.id,
+      buyerId: uid,
+      status: "pending",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return {
+      success: true,
+      productId: newProductRef.id,
+      status,
+      requiresPayment: true,
+      paymentInitiated: true,
+      checkoutRequestId: stkResult.checkoutRequestId,
+      customerMessage: stkResult.customerMessage,
+      plan: effectivePlan,
+    };
+  } catch (err) {
+    console.error("Payment initiation failed inside publishAdvertAndPay:", err);
+    return {
+      success: true,
+      productId: newProductRef.id,
+      status,
+      requiresPayment: true,
+      paymentInitiated: false,
+      paymentError: err instanceof Error ? err.message : "Payment could not be started.",
+      plan: effectivePlan,
+    };
+  }
+});
  
 
 export const deleteAdvert = onCall({ region: "europe-west1", cors: true, secrets: [cloudinaryApiKey, cloudinaryApiSecret, cloudinaryCloudName] }, async (request) => {
