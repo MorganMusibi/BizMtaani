@@ -258,6 +258,48 @@ async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<
   }
 }
 
+const NO_RECAPTCHA_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes — stricter than a normal action cooldown
+
+/**
+ * If a reCAPTCHA token is present, verifies it normally (throws on
+ * failure, same as before). If it's missing — e.g. the script failed
+ * to load, an ad-blocker stripped it, a slow connection timed out —
+ * this does NOT hard-block the request. Instead it falls back to a
+ * stricter per-user cooldown, so a token-less submission still costs
+ * the caller something (rate limiting), without losing a legitimate
+ * user entirely over a client-side script failure.
+ */
+async function verifyRecaptchaOrFallback(
+  token: unknown,
+  expectedAction: string,
+  uid: string
+): Promise<void> {
+  if (typeof token === "string" && token.trim()) {
+    await verifyRecaptcha(token, expectedAction);
+    return;
+  }
+
+  const fallbackRef = db.collection("recaptchaFallbackCooldowns").doc(uid);
+  const fallbackSnap = await fallbackRef.get();
+  const lastFallbackAt = fallbackSnap.exists
+    ? fallbackSnap.data()?.lastFallbackAt?.toMillis()
+    : null;
+
+  if (lastFallbackAt && Date.now() - lastFallbackAt < NO_RECAPTCHA_COOLDOWN_MS) {
+    throw new HttpsError(
+      "resource-exhausted",
+      "Please wait a few minutes before trying again, or refresh the page and retry."
+    );
+  }
+
+  await fallbackRef.set({
+    lastFallbackAt: admin.firestore.FieldValue.serverTimestamp(),
+    expireAt: admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + NO_RECAPTCHA_COOLDOWN_MS)
+    ),
+  });
+}
+
 let _darajaToken: { token: string; expiresAt: number } | null = null;
 async function getDarajaToken(key: string, secret: string): Promise<string> {
   if (_darajaToken && Date.now() < _darajaToken.expiresAt - 60_000) return _darajaToken.token;
@@ -1865,7 +1907,7 @@ export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, c
       ? db.collection("draftUploads").doc(draftId).get()
       : Promise.resolve(null);
 
-  await verifyRecaptcha(recaptchaToken, "publish_advert");
+  await verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid);
 
   // Location must be resolved SERVER-SIDE from coordinates — never
   // trust ward/constituency/county/geohash strings supplied by the
@@ -2093,6 +2135,7 @@ try {
     serviceDetails: otherData.serviceDetails ?? null,
     accommodationDetails: otherData.accommodationDetails ?? null,
     commercialPropertyDetails: otherData.commercialPropertyDetails ?? null,
+    eventDetails: otherData.eventDetails ?? null,
 
     plan: effectivePlan,
     visibilityScope,
@@ -2158,7 +2201,7 @@ try {
       ? db.collection("draftUploads").doc(draftId).get()
       : Promise.resolve(null);
 
-  await verifyRecaptcha(recaptchaToken, "publish_advert");
+ await verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid);
 
   const submittedLat = typeof otherData.lat === "number" ? otherData.lat : null;
   const submittedLng = typeof otherData.lng === "number" ? otherData.lng : null;
@@ -2333,6 +2376,7 @@ try {
       serviceDetails: otherData.serviceDetails ?? null,
       accommodationDetails: otherData.accommodationDetails ?? null,
       commercialPropertyDetails: otherData.commercialPropertyDetails ?? null,
+      eventDetails: otherData.eventDetails ?? null,
 
       plan: effectivePlan,
       visibilityScope,
@@ -2477,7 +2521,7 @@ export const renewAdvert = onCall({ region: "europe-west1", cors: true }, async 
     recaptchaToken?: string;
   };
 
-  await verifyRecaptcha(recaptchaToken, "renew_advert");
+  await verifyRecaptchaOrFallback(recaptchaToken, "renew_advert", request.auth.uid);
 
   if (typeof productId !== "string" || !productId.trim()) {
     throw new HttpsError("invalid-argument", "Product ID is required.");
