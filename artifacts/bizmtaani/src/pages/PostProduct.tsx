@@ -1523,39 +1523,37 @@ try {
   console.warn("reCAPTCHA not available, proceeding without token:", error);
 }
 
-  const publishAdvert = httpsCallable<
-    typeof docData & { recaptchaToken: string },
-    PublishAdvertResponse
-  >(functions, "publishAdvert");
-
-  const result = await publishAdvert({ ...docData, recaptchaToken });
-  const data = result.data;
-
-  // 4. Backend says advert is already active
-  if (!data.requiresPayment) {
-    return {
-      checkoutRequestId: "",
-      productId: data.productId,
-    };
+  interface PublishAndPayResponse extends PublishAdvertResponse {
+    paymentInitiated: boolean;
+    checkoutRequestId?: string;
+    customerMessage?: string;
+    paymentError?: string;
   }
 
-  // Remember this product so a retry (e.g. after the M-Pesa modal's
-  // timeout screen) updates the same pending product instead of
-  // creating a duplicate.
+  const publishAdvertAndPay = httpsCallable<
+    typeof docData & { recaptchaToken: string },
+    PublishAndPayResponse
+  >(functions, "publishAdvertAndPay");
+
+  const result = await publishAdvertAndPay({ ...docData, recaptchaToken });
+  const data = result.data;
+
+  // Always stash productId immediately — a retry after any kind of
+  // failure below must reuse this product, never create a duplicate.
   pendingProductIdRef.current = data.productId;
 
-  // 5. Backend says payment is required
-  const stkResult = await initiateStkPush({
-    phone: cleanedPhone,
-    plan: data.plan as PaidListingPlan,
-    productId: data.productId,
-  });
+  if (!data.requiresPayment) {
+    return { checkoutRequestId: "", productId: data.productId };
+  }
+
+  if (!data.paymentInitiated) {
+    throw new Error(data.paymentError ?? "Could not start payment. Please try again.");
+  }
 
   return {
-    checkoutRequestId: stkResult.checkoutRequestId,
+    checkoutRequestId: data.checkoutRequestId!,
     productId: data.productId,
   };
-}
 
 /**
  * Corrected handlePublishFree
