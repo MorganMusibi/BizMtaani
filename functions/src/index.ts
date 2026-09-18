@@ -1907,8 +1907,6 @@ export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, c
       ? db.collection("draftUploads").doc(draftId).get()
       : Promise.resolve(null);
 
-  await verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid);
-
   // Location must be resolved SERVER-SIDE from coordinates — never
   // trust ward/constituency/county/geohash strings supplied by the
   // client, since those directly control who can see this advert
@@ -1931,9 +1929,14 @@ export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, c
       "We couldn't match this location to a known ward. Please pick your area manually and try again."
     );
   }
-  
-  // Check if the user has an active premium subscription
-const userSnap = await db.collection("users").doc(uid).get();
+
+  // reCAPTCHA verification and the user-subscription lookup don't
+  // depend on each other — run them in parallel instead of paying
+  // both round-trips one after another.
+  const [, userSnap] = await Promise.all([
+    verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid),
+    db.collection("users").doc(uid).get(),
+  ]);
 
 // Block suspended/scammer accounts from posting
 if (userSnap.exists && userSnap.data()?.blocked === true) {
@@ -2213,8 +2216,6 @@ try {
       ? db.collection("draftUploads").doc(draftId).get()
       : Promise.resolve(null);
 
- await verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid);
-
   const submittedLat = typeof otherData.lat === "number" ? otherData.lat : null;
   const submittedLng = typeof otherData.lng === "number" ? otherData.lng : null;
 
@@ -2230,7 +2231,10 @@ try {
     );
   }
 
-  const userSnap = await db.collection("users").doc(uid).get();
+  const [, userSnap] = await Promise.all([
+    verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid),
+    db.collection("users").doc(uid).get(),
+  ]);
 
   if (userSnap.exists && userSnap.data()?.blocked === true) {
     throw new HttpsError(
