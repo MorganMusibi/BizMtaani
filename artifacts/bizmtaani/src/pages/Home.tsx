@@ -210,7 +210,7 @@ const ProductCard = memo(function ProductCard({
 });
 
 export default function Home() {
-  const [, setLocation] = useLocation();
+  const [currentPath, setLocation] = useLocation();
   const { user, userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -396,6 +396,24 @@ const [activeKey, setActiveKey] = useState("All");
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
+  // Bumped whenever the user returns to "/" right after posting —
+  // forces useHomeFeeds to re-fetch even though nothing else about
+  // location/category changed.
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (currentPath !== "/") return;
+    try {
+      const justPosted = sessionStorage.getItem("bizmtaani_just_posted");
+      if (justPosted) {
+        sessionStorage.removeItem("bizmtaani_just_posted");
+        setFeedRefreshKey((k) => k + 1);
+      }
+    } catch {
+      // sessionStorage unavailable — nothing to do
+    }
+  }, [currentPath]);
+
   const {
     wardProducts,
     areaProducts,
@@ -412,6 +430,7 @@ const [activeKey, setActiveKey] = useState("All");
     userCoords,
     isSearchMode,
     locationInfo,
+    refreshKey: feedRefreshKey,
   });
 
   useEffect(() => {
