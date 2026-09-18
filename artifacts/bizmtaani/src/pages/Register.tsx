@@ -48,13 +48,16 @@ async function saveUserProfile(
   }
 ) {
   await setDoc(doc(db, "users", uid), {
-    displayName: opts.displayName,
-    email: opts.email ?? "",
-    isBusinessOwner: opts.isBusinessOwner,
-
-    ...(opts.isBusinessOwner && opts.businessName
-      ? { businessName: opts.businessName }
-      : {}),
+  displayName: opts.displayName,
+  email: opts.email ?? "",
+  isBusinessOwner: opts.isBusinessOwner,
+  searchNameLower: (opts.isBusinessOwner && opts.businessName
+    ? opts.businessName
+    : opts.displayName
+  ).trim().toLowerCase(),
+  ...(opts.isBusinessOwner && opts.businessName
+    ? { businessName: opts.businessName }
+    : {}),
     ...(opts.homeLocation ? { homeLocation: opts.homeLocation } : {}),
     createdAt: serverTimestamp(),
   });
