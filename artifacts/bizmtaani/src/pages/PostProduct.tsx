@@ -123,6 +123,10 @@ export default function PostProduct() {
     if (!user) return;
     try {
       sessionStorage.removeItem(`bizmtaani_my_listings_cache_${user.uid}`);
+      // Read by Home.tsx the next time the user lands on "/" — tells
+      // it to force a fresh feed fetch instead of trusting whatever
+      // it last rendered.
+      sessionStorage.setItem("bizmtaani_just_posted", "1");
     } catch {
       // sessionStorage unavailable — nothing to clear, safe to ignore
     }
