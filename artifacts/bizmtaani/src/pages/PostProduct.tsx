@@ -335,6 +335,29 @@ useEffect(() => {
   };
 }, []);
 
+    // Preload the reCAPTCHA token once the user reaches the plan/review
+  // steps — well before they hit Publish — so a slow network or
+  // script load doesn't stall them at the exact moment they submit.
+  const recaptchaTokenRef = useRef<string>("");
+
+  useEffect(() => {
+    if (step === 4 || step === 5) {
+      getRecaptchaToken("publish_advert")
+        .then((token) => { recaptchaTokenRef.current = token; })
+        .catch((err) => console.warn("reCAPTCHA preload failed:", err));
+    }
+  }, [step]);
+
+  async function resolveRecaptchaToken(): Promise<string> {
+    if (recaptchaTokenRef.current) return recaptchaTokenRef.current;
+    try {
+      return await getRecaptchaToken("publish_advert");
+    } catch (error) {
+      console.warn("reCAPTCHA not available, proceeding without token:", error);
+      return "";
+    }
+  }
+
   const catDef = selectedCategory
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
   : null;
@@ -1515,13 +1538,7 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
-  // Safely get reCAPTCHA token with fallback
-let recaptchaToken = "";
-try {
-  recaptchaToken = await getRecaptchaToken("publish_advert");
-} catch (error) {
-  console.warn("reCAPTCHA not available, proceeding without token:", error);
-}
+  const recaptchaToken = await resolveRecaptchaToken();
 
   interface PublishAndPayResponse extends PublishAdvertResponse {
     paymentInitiated: boolean;
@@ -1741,7 +1758,7 @@ equipmentDetails: isEquipment
     };
 
     // Publish advert through Cloud Function
-     const recaptchaToken = await getRecaptchaToken("publish_advert");
+     const recaptchaToken = await resolveRecaptchaToken();
      const publishAdvert = httpsCallable(functions, "publishAdvert");
 const result = await publishAdvert({ ...docData, recaptchaToken });
 
