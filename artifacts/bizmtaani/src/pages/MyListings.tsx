@@ -189,7 +189,6 @@ const loaded = snap.docs
   }
 
   const renewAdvert = httpsCallable<
-  const renewAdvert = httpsCallable<
     { productId: string; plan: string; recaptchaToken: string },
     { success: boolean; requiresPayment: boolean }
   >(functions, "renewAdvert");
