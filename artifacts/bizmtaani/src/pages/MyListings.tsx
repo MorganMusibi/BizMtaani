@@ -180,7 +180,9 @@ const loaded = snap.docs
   if (!renewProduct) throw new Error("No product selected");
 
   let recaptchaToken = renewRecaptchaTokenRef.current;
-  if (!recaptchaToken) {
+  if (recaptchaToken) {
+    renewRecaptchaTokenRef.current = "";
+  } else {
     try {
       recaptchaToken = await getRecaptchaToken("renew_advert");
     } catch (error) {
