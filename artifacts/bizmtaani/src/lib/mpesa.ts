@@ -131,7 +131,13 @@ export async function initiateStkPush(
   const functions = getFunctions(app, "europe-west1");
 
   const normalizedPhone = normalizePhone(params.phone);
-  const recaptchaToken = await getRecaptchaToken("initiate_payment");
+
+  // reCAPTCHA verification is currently commented out server-side in
+  // initiateMpesaPayment (functions/src/index.ts) — fetching a token
+  // here would just add a wasted round-trip for a check nothing
+  // consumes. Re-enable both sides together if abuse protection is
+  // needed again.
+  // const recaptchaToken = await getRecaptchaToken("initiate_payment");
 
   const initiate = httpsCallable<
     StkPushParams,
@@ -146,7 +152,7 @@ export async function initiateStkPush(
     const { data } = await initiate({
       ...params,
       phone: normalizedPhone,
-      recaptchaToken,
+      // recaptchaToken,
     });
 
     return data;
