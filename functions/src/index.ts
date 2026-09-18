@@ -2190,11 +2190,23 @@ try {
 };
   });
 
-  export const publishAdvertAndPay = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 200, timeoutSeconds: 120 }, async (request) => {
+  export const publishAdvertAndPay = onCall({ region: "europe-west1", minInstances: 1, secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 200, timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, phone, ...otherData } = request.data;
   const uid = request.auth.uid;
+
+  // Kick off the Daraja OAuth fetch immediately, in parallel with
+  // everything below — by the time sendDarajaStkPush runs later,
+  // the token is usually already cached (getDarajaToken checks its
+  // own module-level cache first), instead of adding its own
+  // round-trip on top of all the validation/creation work.
+  const earlyDarajaTokenPromise = getDarajaToken(
+    mpesaConsumerKey.value(),
+    mpesaConsumerSecret.value()
+  ).catch((err) => {
+    console.error("Early Daraja token prefetch failed (STK push will retry):", err);
+  });
 
   const draftSnapPromise =
     typeof draftId === "string" && draftId.trim()
