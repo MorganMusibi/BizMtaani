@@ -611,10 +611,11 @@ db.collection("payments")
     status: "pending",
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+return { checkoutRequestId: stkResult.checkoutRequestId, customerMessage: stkResult.customerMessage };
+});
 
-  return { checkoutRequestId: stkResult.checkoutRequestId, customerMessage: stkResult.customerMessage };
-
- export const initiatePaystackPayment = onCall({ region: "europe-west1", minInstances: 1, secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
+export const initiatePaystackPayment = onCall({ region: "europe-west1", minInstances: 1, secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
+  
   console.log("PAYSTACK STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -2152,16 +2153,218 @@ try {
   const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, phone, ...otherData } = request.data;
   const uid = request.auth.uid;
 
-  // ── Everything below through product creation is IDENTICAL to
-  // publishAdvert — same validation, same allowlisted write. Copy
-  // that function's body here unchanged, up through and including
-  // the "9. Return the generated productId" comment — but DON'T
-  // return yet. Instead, continue below.
+  const draftSnapPromise =
+    typeof draftId === "string" && draftId.trim()
+      ? db.collection("draftUploads").doc(draftId).get()
+      : Promise.resolve(null);
 
-  // [ ... paste publishAdvert's full body here, unmodified, EXCEPT skip its final `return { ... }` ... ]
+  await verifyRecaptcha(recaptchaToken, "publish_advert");
 
-  // At this point newProductRef, status, and effectivePlan are all
-  // in scope, exactly as they are at the end of publishAdvert.
+  const submittedLat = typeof otherData.lat === "number" ? otherData.lat : null;
+  const submittedLng = typeof otherData.lng === "number" ? otherData.lng : null;
+
+  if (submittedLat === null || submittedLng === null) {
+    throw new HttpsError("invalid-argument", "A location is required to publish an advert.");
+  }
+
+  const resolvedLocation = resolveWardServerSide(submittedLat, submittedLng);
+  if (!resolvedLocation) {
+    throw new HttpsError(
+      "failed-precondition",
+      "We couldn't match this location to a known ward. Please pick your area manually and try again."
+    );
+  }
+
+  const userSnap = await db.collection("users").doc(uid).get();
+
+  if (userSnap.exists && userSnap.data()?.blocked === true) {
+    throw new HttpsError(
+      "permission-denied",
+      "Your account has been suspended and cannot post adverts. Contact support if you believe this is a mistake."
+    );
+  }
+
+  let effectivePlan = plan;
+  let hasActiveSubscription = false;
+
+  if (userSnap.exists) {
+    const userData = userSnap.data();
+    if (
+      userData?.subscriptionPlan &&
+      userData?.premiumEndsAt &&
+      userData.premiumEndsAt.toDate() > new Date()
+    ) {
+      effectivePlan = userData.subscriptionPlan;
+      hasActiveSubscription = true;
+    }
+  }
+
+  const category = typeof otherData.category === "string" ? otherData.category : "";
+  if (PREMIUM_ONLY_CATEGORIES.includes(category) && effectivePlan === "free") {
+    throw new HttpsError("failed-precondition", `${category} adverts require an active Premium plan.`);
+  }
+
+  if (!PLAN_AMOUNTS.hasOwnProperty(effectivePlan)) {
+    throw new HttpsError("invalid-argument", "Invalid plan selected.");
+  }
+
+  if (!title || price === undefined || price === null || !Array.isArray(imageUrls)) {
+    throw new HttpsError("invalid-argument", "Missing required product details.");
+  }
+
+  const limit = MAX_PHOTO_LIMIT[effectivePlan] ?? 0;
+  if (imageUrls.length > limit) {
+    throw new HttpsError("failed-precondition", `Your plan allows a maximum of ${limit} photos.`);
+  }
+
+  if (imageUrls.length > 0) {
+    if (typeof draftId !== "string" || !draftId.trim()) {
+      throw new HttpsError("invalid-argument", "Missing upload session for the submitted photos.");
+    }
+
+    const draftSnap = await draftSnapPromise;
+    if (!draftSnap || !draftSnap.exists || draftSnap.data()?.uid !== uid) {
+      throw new HttpsError("permission-denied", "Invalid upload session for the submitted photos.");
+    }
+
+    const verifiedPublicIds: string[] = Array.isArray(draftSnap.data()?.publicIds)
+      ? draftSnap.data()!.publicIds
+      : [];
+    const verifiedSet = new Set(verifiedPublicIds);
+
+    for (const image of imageUrls) {
+      const publicId = typeof image === "object" && image !== null ? image.public_id : undefined;
+      if (typeof publicId !== "string" || !verifiedSet.has(publicId)) {
+        throw new HttpsError(
+          "permission-denied",
+          "One or more photos were not uploaded through the app and cannot be used."
+        );
+      }
+    }
+  }
+
+  const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
+
+  const activeCountSnap = await db
+    .collection("products")
+    .where("sellerId", "==", uid)
+    .where("status", "==", "active")
+    .count()
+    .get();
+
+  if (activeCountSnap.data().count >= activeAdLimit) {
+    throw new HttpsError(
+      "failed-precondition",
+      `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
+    );
+  }
+
+  const status =
+    effectivePlan === "free" || hasActiveSubscription ? "active" : "pending_payment";
+
+  const visibilityScope = effectivePlan === "free" ? "local" : "county";
+
+  const isHotelMenu = otherData.hotelMenu !== undefined && otherData.hotelMenu !== null;
+  const durationDays = LISTING_DURATIONS[effectivePlan] ?? 7;
+
+  let expiresAt: admin.firestore.Timestamp | null = null;
+  if (status === "active") {
+    if (isHotelMenu && hasActiveSubscription) {
+      expiresAt = userSnap.data()?.premiumEndsAt
+        ?? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
+    } else {
+      expiresAt = admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
+    }
+  }
+
+  let newProductRef: FirebaseFirestore.DocumentReference | null = null;
+  let reusingExisting = false;
+
+  if (typeof existingProductId === "string" && existingProductId.trim()) {
+    const existingRef = db.collection("products").doc(existingProductId);
+    const existingSnap = await existingRef.get();
+    if (
+      existingSnap.exists &&
+      existingSnap.data()?.sellerId === uid &&
+      existingSnap.data()?.status === "pending_payment"
+    ) {
+      newProductRef = existingRef;
+      reusingExisting = true;
+    }
+  }
+
+  try {
+    const productPayload = {
+      title,
+      description: typeof otherData.description === "string" ? otherData.description : "",
+      price,
+      priceRaw: typeof otherData.priceRaw === "string" ? otherData.priceRaw : "",
+      priceText: typeof otherData.priceText === "string" ? otherData.priceText : "",
+      rentPerMonthRaw: typeof otherData.rentPerMonthRaw === "string" ? otherData.rentPerMonthRaw : "",
+
+      category: typeof otherData.category === "string" ? otherData.category : "",
+      subcategory: typeof otherData.subcategory === "string" ? otherData.subcategory : "",
+
+      imageUrl: typeof otherData.imageUrl === "string" ? otherData.imageUrl : "",
+      imageUrls,
+
+      lat: submittedLat,
+      lng: submittedLng,
+
+      ward: resolvedLocation.wardName,
+      constituency: resolvedLocation.constituency,
+      county: resolvedLocation.county,
+
+      geohash: resolvedLocation.geohash,
+
+      sellerName: typeof otherData.sellerName === "string" ? otherData.sellerName : "",
+      sellerType: otherData.sellerType === "business" ? "business" : "individual",
+
+      priceDisplay: typeof otherData.priceDisplay === "string" ? otherData.priceDisplay : "fixed",
+      pricingBasis: typeof otherData.pricingBasis === "string" ? otherData.pricingBasis : null,
+
+      hotelMenu: otherData.hotelMenu ?? null,
+      eateryPayment: otherData.eateryPayment ?? null,
+      priceList: Array.isArray(otherData.priceList) ? otherData.priceList : null,
+      phone: typeof phone === "string" ? phone : "",
+
+      jobDetails: otherData.jobDetails ?? null,
+      vehicleDetails: otherData.vehicleDetails ?? null,
+      serviceDetails: otherData.serviceDetails ?? null,
+      accommodationDetails: otherData.accommodationDetails ?? null,
+      commercialPropertyDetails: otherData.commercialPropertyDetails ?? null,
+
+      plan: effectivePlan,
+      visibilityScope,
+      ownerId: uid,
+      sellerId: uid,
+      status,
+      expiringNotified: false,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt,
+      pendingPaymentStartedAt: status === "pending_payment"
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : null,
+    };
+
+    if (reusingExisting && newProductRef) {
+      await newProductRef.update(productPayload);
+    } else {
+      newProductRef = await db.collection("products").add(productPayload);
+    }
+  } catch (error) {
+    for (const image of imageUrls) {
+      if (image?.public_id) {
+        await deleteCloudinaryImage(image.public_id);
+      }
+    }
+    console.error("Advert creation failed:", error);
+    throw new HttpsError("internal", "Failed to create advert.");
+  }
+
+  if (typeof draftId === "string") {
+    db.collection("draftUploads").doc(draftId).update({ claimed: true }).catch(() => {});
+  }
 
   if (status !== "pending_payment") {
     return {
