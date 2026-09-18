@@ -220,8 +220,8 @@ const [selectedWard, setSelectedWard] = useState<{
 
     // 2. Update Firestore document (sets businessName if business owner, otherwise displayName)
     const updatePayload: Record<string, unknown> = isBusinessOwner
-      ? { businessName: updatedName }
-      : { displayName: updatedName };
+  ? { businessName: updatedName, searchNameLower: updatedName.toLowerCase() }
+  : { displayName: updatedName, searchNameLower: updatedName.toLowerCase() };
 
     // 3. Include the updated area, if the user changed it in this same form
     if (selectedWard) {
@@ -336,6 +336,7 @@ const [selectedWard, setSelectedWard] = useState<{
       await setDoc(doc(db, "users", user.uid), {
   isBusinessOwner: true,
   businessName: businessNameInput.trim(),
+  searchNameLower: businessNameInput.trim().toLowerCase(),
 }, { merge: true });
 
 
