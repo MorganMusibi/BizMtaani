@@ -1426,9 +1426,9 @@ areaLabel: wardInfo?.label?.trim() || "",
 
     sellerId: user.uid,
     sellerName:
-      userProfile?.displayName ??
-      user.displayName ??
-      "",
+  userProfile?.isBusinessOwner && userProfile?.businessName
+    ? userProfile.businessName
+    : userProfile?.displayName ?? user.displayName ?? "",
 
     sellerType: userProfile?.isBusinessOwner
       ? "business"
@@ -1700,9 +1700,9 @@ areaLabel: wardInfo?.label?.trim() || "",
 
       sellerId: user.uid,
       sellerName:
-        userProfile?.displayName ??
-        user.displayName ??
-        "",
+  userProfile?.isBusinessOwner && userProfile?.businessName
+    ? userProfile.businessName
+    : userProfile?.displayName ?? user.displayName ?? "",
 
       sellerType: userProfile?.isBusinessOwner
   ? "business"
