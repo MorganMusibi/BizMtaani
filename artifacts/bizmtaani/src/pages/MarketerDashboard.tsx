@@ -383,18 +383,17 @@ try {
         : new Map();
 
       const newReferrals: ReferredUser[] = snap.docs.map((d) => {
-        const data = d.data();
-        const userProfile = userProfileMap.get(d.id);
-        return {
-          uid: d.id,
-          displayName: userProfile?.displayName || "Unknown User",
-          email: userProfile?.email || "",
-          photoURL: userProfile?.photoURL || "",
-          joinedAt: data.createdAt || null,
-          commissionPaidOut: data.commissionPaidOut || false,
-          isPremium: userProfile?.isPremium || false,
-        };
-      });
+  const data = d.data();
+  const userProfile = userProfileMap.get(d.id);
+  return {
+    uid: d.id,
+    displayName: userProfile?.displayName || "Unknown User",
+    photoURL: userProfile?.photoURL || "",
+    joinedAt: data.createdAt || null,
+    commissionPaidOut: data.commissionPaidOut || false,
+    isPremium: userProfile?.isPremium || false,
+  };
+});
 
       setReferrals((prev) => [...prev, ...newReferrals]);
       setLastReferralDoc(snap.docs[snap.docs.length - 1] || null);
