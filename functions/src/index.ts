@@ -540,6 +540,36 @@ export const attachDraftUploadImage = onCall({ region: "europe-west1", cors: tru
   return { success: true };
 });
 
+/**
+ * Batched version of attachDraftUploadImage — attaches every photo
+ * from one posting session in a single read + single write, instead
+ * of one read + one write per photo. Callers should prefer this over
+ * calling attachDraftUploadImage once per image.
+ */
+export const attachDraftUploadImages = onCall({ region: "europe-west1", cors: true, maxInstances: 200 }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+
+  const { draftId, publicIds } = request.data as { draftId?: string; publicIds?: string[] };
+  if (!draftId || !Array.isArray(publicIds) || publicIds.length === 0) {
+    throw new HttpsError("invalid-argument", "draftId and a non-empty publicIds array are required.");
+  }
+  if (!publicIds.every((id) => typeof id === "string" && id.trim())) {
+    throw new HttpsError("invalid-argument", "publicIds must all be non-empty strings.");
+  }
+
+  const draftRef = db.collection("draftUploads").doc(draftId);
+  const draftSnap = await draftRef.get();
+  if (!draftSnap.exists || draftSnap.data()?.uid !== request.auth.uid) {
+    throw new HttpsError("permission-denied", "Invalid draft upload.");
+  }
+
+  await draftRef.update({
+    publicIds: admin.firestore.FieldValue.arrayUnion(...publicIds),
+  });
+
+  return { success: true };
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
