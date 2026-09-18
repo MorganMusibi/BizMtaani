@@ -6,7 +6,7 @@ import {
   rankProducts,
 } from "@/hooks/useHomeFeed";
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from "react";
-import { doc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc, collection, query, orderBy, startAt, endAt, limit, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useLocation } from "wouter";
 import { LocationBanner } from "@/components/LocationBanner";
@@ -25,7 +25,7 @@ import {
 import { CATEGORY_DEFS, getCategoryBadgeColor } from "@/lib/categories";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, MapPin, Loader2, Package, X } from "lucide-react";
+import { Search, Plus, MapPin, Loader2, Package, X, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 
@@ -393,6 +393,55 @@ const [activeKey, setActiveKey] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
+
+const [shopResults, setShopResults] = useState<
+  { uid: string; name: string; photoURL: string }[]
+>([]);
+const [shopSearchLoading, setShopSearchLoading] = useState(false);
+
+useEffect(() => {
+  if (!searchQuery) {
+    setShopResults([]);
+    return;
+  }
+  let cancelled = false;
+  setShopSearchLoading(true);
+
+  const prefixLower = searchQuery.toLowerCase();
+  const shopsQuery = query(
+    collection(db, "users"),
+    orderBy("searchNameLower"),
+    startAt(prefixLower),
+    endAt(prefixLower + "\uf8ff"),
+    limit(10)
+  );
+
+  getDocs(shopsQuery)
+    .then((snap) => {
+      if (cancelled) return;
+      setShopResults(
+        snap.docs.map((d) => {
+          const data = d.data();
+          return {
+            uid: d.id,
+            name: data.businessName || data.displayName || "Unnamed",
+            photoURL: data.photoURL || "",
+          };
+        })
+      );
+    })
+    .catch((err) => {
+      console.warn("Shop search failed:", err);
+      if (!cancelled) setShopResults([]);
+    })
+    .finally(() => {
+      if (!cancelled) setShopSearchLoading(false);
+    });
+
+  return () => {
+    cancelled = true;
+  };
+}, [searchQuery]);
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
@@ -656,14 +705,46 @@ const handleAreaSearchSelect = useCallback(
       )}
 
       {isSearchMode && (
-        <div className="flex-shrink-0 bg-card border-b border-border px-4 py-2 flex items-center gap-2 z-40">
-          <span className="text-xs text-muted-foreground">Results for:</span>
-          <span className="flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
-            {searchQuery}
-            <button onClick={clearSearch} className="ml-1"><X size={11} /></button>
-          </span>
-        </div>
-      )}
+  <div className="flex-shrink-0 bg-card border-b border-border px-4 py-2 flex items-center gap-2 z-40">
+    <span className="text-xs text-muted-foreground">Results for:</span>
+    <span className="flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
+      {searchQuery}
+      <button onClick={clearSearch} className="ml-1"><X size={11} /></button>
+    </span>
+  </div>
+)}
+
+{isSearchMode && (shopSearchLoading || shopResults.length > 0) && (
+  <div className="flex-shrink-0 bg-card border-b border-border px-4 py-3 z-30">
+    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
+      Shops
+    </p>
+    {shopSearchLoading ? (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Loader2 size={14} className="animate-spin" /> Searching shops...
+      </div>
+    ) : (
+      <div className="flex gap-2 overflow-x-auto no-scrollbar">
+        {shopResults.map((shop) => (
+          <button
+            key={shop.uid}
+            onClick={() => setLocation(`/shop/${shop.uid}`)}
+            className="flex-shrink-0 flex items-center gap-2 bg-muted rounded-full pl-1 pr-3 py-1 hover:bg-muted/80 transition-colors"
+          >
+            {shop.photoURL ? (
+              <img src={shop.photoURL} alt={shop.name} className="w-6 h-6 rounded-full object-cover" />
+            ) : (
+              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                <Store size={12} className="text-primary" />
+              </div>
+            )}
+            <span className="text-xs font-semibold">{shop.name}</span>
+          </button>
+        ))}
+      </div>
+    )}
+  </div>
+)}
 
       <div className="flex-shrink-0 bg-card/90 backdrop-blur-sm border-b border-border z-30">
         <div className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar">
