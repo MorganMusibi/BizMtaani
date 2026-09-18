@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
   collection, query, where, orderBy, limit, getDocs, deleteDoc, doc,
@@ -116,6 +116,20 @@ export default function MyListings() {
   const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("premium_weekly");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
+  // Preloaded as soon as the renew sheet opens, so by the time the
+  // user picks a plan and taps "Pay & Renew" the token's already
+  // ready instead of being fetched at that exact moment.
+  const renewRecaptchaTokenRef = useRef<string>("");
+
+  useEffect(() => {
+    if (renewProduct) {
+      renewRecaptchaTokenRef.current = "";
+      getRecaptchaToken("renew_advert")
+        .then((token) => { renewRecaptchaTokenRef.current = token; })
+        .catch((err) => console.warn("reCAPTCHA preload failed:", err));
+    }
+  }, [renewProduct]);
+
   async function fetchProducts(opts?: { skipCache?: boolean }) {
     if (!user) return;
 
@@ -165,7 +179,16 @@ const loaded = snap.docs
   async function handleRenewInitiate(phone: string): Promise<{ checkoutRequestId: string; productId: string }> {
   if (!renewProduct) throw new Error("No product selected");
 
-  const recaptchaToken = await getRecaptchaToken("renew_advert");
+  let recaptchaToken = renewRecaptchaTokenRef.current;
+  if (!recaptchaToken) {
+    try {
+      recaptchaToken = await getRecaptchaToken("renew_advert");
+    } catch (error) {
+      console.warn("reCAPTCHA not available, proceeding without token:", error);
+    }
+  }
+
+  const renewAdvert = httpsCallable<
   const renewAdvert = httpsCallable<
     { productId: string; plan: string; recaptchaToken: string },
     { success: boolean; requiresPayment: boolean }
