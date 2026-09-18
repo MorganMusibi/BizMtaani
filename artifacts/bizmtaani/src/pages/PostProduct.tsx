@@ -4,7 +4,7 @@ const functions = getFunctions(app, "europe-west1");
 import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { db } from "@/lib/firebase";
-import { uploadImage, getCloudinaryUploadSignature, compressImageBeforeUpload } from "@/lib/uploadImage";
+import { uploadImage, getCloudinaryUploadSignature, compressImageBeforeUpload, attachDraftUploadImages } from "@/lib/uploadImage";
 import { useAuth } from "@/contexts/AuthContext";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { Button } from "@/components/ui/button";
@@ -69,13 +69,26 @@ async function uploadImagesLimited(
   async function worker() {
     while (next < files.length) {
       const i = next++;
-      results[i] = await uploadImage(files[i], "product", draftId, sig, compressedFiles[i]);
+      // skipAttach: true — each photo's public_id is collected below
+      // and attached to the draft in one batched call after every
+      // upload finishes, instead of one attach round-trip per photo.
+      results[i] = await uploadImage(files[i], "product", draftId, sig, compressedFiles[i], true);
     }
   }
 
   await Promise.all(
     Array.from({ length: Math.min(concurrency, files.length) }, worker)
   );
+
+  // Attach every uploaded photo to the draft in a single call. Must
+  // be awaited before this function returns — publishAdvert /
+  // publishAdvertAndPay validate every imageUrls entry's public_id
+  // against the draft's publicIds array, so an unattached upload
+  // would be wrongly rejected.
+  const publicIds = results.map((r) => r.public_id).filter(Boolean);
+  if (publicIds.length > 0) {
+    await attachDraftUploadImages(draftId, publicIds);
+  }
 
   return results;
 }
