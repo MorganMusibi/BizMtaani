@@ -349,7 +349,15 @@ useEffect(() => {
   }, [step]);
 
   async function resolveRecaptchaToken(): Promise<string> {
-    if (recaptchaTokenRef.current) return recaptchaTokenRef.current;
+    // reCAPTCHA tokens are single-use — consume and clear the
+    // preloaded one immediately, so a retry (e.g. after a wrong
+    // M-Pesa PIN) never resubmits an already-used token, which
+    // Google rejects and the backend surfaces as "permission denied."
+    if (recaptchaTokenRef.current) {
+      const token = recaptchaTokenRef.current;
+      recaptchaTokenRef.current = "";
+      return token;
+    }
     try {
       return await getRecaptchaToken("publish_advert");
     } catch (error) {
