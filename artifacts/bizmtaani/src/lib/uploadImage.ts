@@ -134,7 +134,8 @@ export async function uploadImage(
   type: ImageUploadType,
   draftId?: string | null,
   sig?: CloudinarySignatureResult & { draftId: string },
-  preCompressedFile?: File
+  preCompressedFile?: File,
+  skipAttach?: boolean
 ): Promise<{
   url: string;
   public_id: string;
