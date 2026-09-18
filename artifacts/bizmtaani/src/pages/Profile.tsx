@@ -1117,23 +1117,41 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
 )}
         
         {/* Business management — only for business owners */}
-        {isBusinessOwner && (
-          <button
-            onClick={() => setLocation("/business")}
-            className="w-full flex items-center gap-4 px-4 py-4 bg-gradient-to-r from-primary/10 to-orange-50 border-2 border-primary/30 rounded-2xl hover:border-primary transition-all text-left active:scale-[0.98]"
-          >
-            <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
-              <Store size={22} className="text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Manage My Business</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Dashboard, listings, shop profile & tools
-              </p>
-            </div>
-            <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
-          </button>
-        )}
+{isBusinessOwner && (
+  <>
+    <button
+      onClick={() => setLocation("/business")}
+      className="w-full flex items-center gap-4 px-4 py-4 bg-gradient-to-r from-primary/10 to-orange-50 border-2 border-primary/30 rounded-2xl hover:border-primary transition-all text-left active:scale-[0.98]"
+    >
+      <div className="w-11 h-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+        <Store size={22} className="text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-sm">Manage My Business</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Dashboard, listings, shop profile & tools
+        </p>
+      </div>
+      <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+    </button>
+
+    <button
+      onClick={() => setLocation(`/shop/${user.uid}`)}
+      className="w-full flex items-center gap-4 px-4 py-4 bg-card border border-border rounded-2xl hover:border-primary/40 transition-all text-left active:scale-[0.98]"
+    >
+      <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center flex-shrink-0">
+        <Store size={22} className="text-blue-700" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-sm">View My Shop</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          See your shop the way buyers see it
+        </p>
+      </div>
+      <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
+    </button>
+  </>
+)}
 
         {/* Jobs link */}
         <button
