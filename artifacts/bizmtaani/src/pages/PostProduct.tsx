@@ -164,7 +164,6 @@ const [step, setStep] = useState<Step>(1);
   "Commercial Property",
   "Entertainment & Events",
   "Leisure & Activities",
-  "General Products",
   "Vehicles",
   "Home, Furniture & Appliances",
 ];
