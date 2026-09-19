@@ -1317,7 +1317,6 @@ if (wardHadResults) {
   setInitialLoading(false);
   return;
 }
-}
 // ============================================================
 // INITIAL NEARBY AREA LOAD — BUFFERED  
 //
