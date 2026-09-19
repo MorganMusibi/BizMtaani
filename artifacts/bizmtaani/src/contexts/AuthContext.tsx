@@ -20,6 +20,8 @@ import { auth, db } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { registerForNotifications } from "@/lib/notifications";
 
+const OPTIMISTIC_AUTH_KEY = "bizmtaani_was_signed_in";
+
 export interface HomeLocation {
   lat: number;
   lng: number;
@@ -53,6 +55,14 @@ export interface UserProfile {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
+  // Optimistic, localStorage-backed flag: true if the user was signed
+  // in as of their last session, set synchronously before Firebase
+  // Auth's own session-restore chain (App Check exchange, accounts:lookup,
+  // token refresh — can take ~2s+) has had a chance to resolve. Lets UI
+  // that only needs "is someone probably signed in" (e.g. the Advertise
+  // button) render instantly instead of waiting on that full chain.
+  // Corrected the moment onAuthStateChanged actually fires.
+  likelySignedIn: boolean;
 
   userProfile: UserProfile | null;
   profileLoading: boolean;
@@ -76,6 +86,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  likelySignedIn: false,
 
   userProfile: null,
   profileLoading: true,
@@ -100,6 +111,19 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  // Read synchronously at mount, before Firebase Auth has resolved
+  // anything — lets the UI assume "probably signed in" instantly on
+  // a repeat visit instead of waiting out the full session-restore
+  // chain. See the interface comment above for why this exists.
+  const [likelySignedIn, setLikelySignedIn] = useState(
+    () => {
+      try {
+        return localStorage.getItem(OPTIMISTIC_AUTH_KEY) === "1";
+      } catch {
+        return false;
+      }
+    }
+  );
 
   const [userProfile, setUserProfile] =
     useState<UserProfile | null>(null);
@@ -169,6 +193,17 @@ export function AuthProvider({
         async (currentUser) => {
           setUser(currentUser);
           setLoading(false);
+
+          try {
+            if (currentUser) {
+              localStorage.setItem(OPTIMISTIC_AUTH_KEY, "1");
+            } else {
+              localStorage.removeItem(OPTIMISTIC_AUTH_KEY);
+            }
+          } catch {
+            // localStorage unavailable — safe to ignore
+          }
+          setLikelySignedIn(!!currentUser);
 
           // Reset admin state whenever auth changes.
           setIsAdmin(false);
@@ -308,6 +343,7 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
       value={{
         user,
         loading,
+        likelySignedIn,
 
         userProfile,
         profileLoading,
