@@ -211,7 +211,7 @@ const ProductCard = memo(function ProductCard({
 
 export default function Home() {
   const [currentPath, setLocation] = useLocation();
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, likelySignedIn } = useAuth();
   const { toast } = useToast();
   
   const { 
@@ -662,7 +662,7 @@ const handleAreaSearchSelect = useCallback(
           <span className="font-black text-lg tracking-tight">BizMtaani</span>
         </div>
         <div className="flex items-center gap-1">
-          {user && (
+          {(user || likelySignedIn) && (
             <button
               data-testid="fab-post-product"
               onClick={() => setLocation("/post")}
@@ -970,7 +970,7 @@ const handleAreaSearchSelect = useCallback(
         )}
       </div>
 
-      {user && (
+      {(user || likelySignedIn) && (
         <div className="fixed bottom-20 right-4 z-40 pointer-events-none">
           <button
             data-testid="fab-advertise"
