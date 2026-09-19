@@ -61,6 +61,8 @@ const PREMIUM_ONLY_CATEGORIES = [
   "Commercial Property",
   "Entertainment & Events",
   "Leisure & Activities",
+  "Vehicles",
+  "Home, Furniture & Appliances",
 ];
 
 // If you are using limits in your backend, update them here:
