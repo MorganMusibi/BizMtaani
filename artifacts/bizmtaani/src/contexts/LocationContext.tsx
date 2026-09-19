@@ -94,28 +94,85 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // 2) valid local cache — instant, no spinner
   // 3) GPS — spins, capped at 5s; stops the moment it resolves
   // 4) still nothing after the cap — prompt for GPS or manual entry
+  //
+  // Profile and GPS no longer run strictly in sequence: profile gets
+  // a short head start (it's usually just reading an already-open
+  // Firestore listener, near-instant), but if it hasn't resolved
+  // within GPS_RACE_GRACE_MS, GPS starts anyway rather than waiting
+  // indefinitely behind a slow profile fetch. Whichever settles
+  // first wins via the shared settledRef guard.
+  const GPS_RACE_GRACE_MS = 600;
+
   useEffect(() => {
-  if (resolutionStarted.current) return;
+    if (resolutionStarted.current) return;
 
-  // 1) Valid recent cache wins first — checked immediately, with no
-  // dependency on auth/profile having resolved yet. This is what
-  // makes a return visit feel instant instead of waiting on a full
-  // auth + Firestore profile round-trip just to read localStorage.
-  if (cached?.gpsReady && cached.locationInfo) {
+    if (cached?.gpsReady && cached.locationInfo) {
+      resolutionStarted.current = true;
+      setGpsReady(true);
+      settle("resolved");
+      return;
+    }
+
     resolutionStarted.current = true;
-    setGpsReady(true);
-    settle("resolved");
-    return;
-  }
 
-  // Everything past this point genuinely needs userProfile, so it's
-  // still gated on profileLoading.
-  if (profileLoading) return;
-  resolutionStarted.current = true;
+    function startGps() {
+      if (settledRef.current) return; // profile already won
+      if (!navigator.geolocation) {
+        setGpsReady(true);
+        settle("unresolved");
+        return;
+      }
 
-  // 2) No valid cache — fall back to the profile's saved home area.
-    // No extra Firestore read here: userProfile is already loaded via
-    // AuthContext's existing onSnapshot subscription.
+      capTimerRef.current = setTimeout(() => {
+        setGpsReady(true);
+        settle("unresolved");
+      }, LOCATION_RESOLVE_CAP_MS);
+
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (settledRef.current) return; // profile won while GPS was resolving
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          setGpsGranted(true);
+
+          const resolved = await getWardInfo(lat, lng);
+          if (settledRef.current) return; // profile won during the network round-trip
+          setGpsReady(true);
+          if (resolved) {
+            setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
+            setUserCoords([lat, lng]);
+            settle("resolved");
+          } else {
+            settle("unresolved");
+          }
+        },
+        () => {
+          if (settledRef.current) return;
+          setGpsGranted(false);
+          setGpsReady(true);
+          settle("unresolved");
+        },
+        { enableHighAccuracy: true, timeout: LOCATION_RESOLVE_CAP_MS, maximumAge: 0 }
+      );
+    }
+
+    // Give the profile fetch a brief head start before racing GPS —
+    // avoids an unnecessary permission prompt for the common case
+    // where profileLoading resolves almost immediately.
+    const graceTimer = setTimeout(() => {
+      if (!settledRef.current) startGps();
+    }, GPS_RACE_GRACE_MS);
+
+    return () => clearTimeout(graceTimer);
+  }, []);
+
+  // Resolves from the profile the moment it finishes loading — races
+  // against startGps() above via the shared settledRef; whichever
+  // settles first wins, the other is simply ignored.
+  useEffect(() => {
+    if (profileLoading) return;
+    if (settledRef.current) return;
+
     const savedArea = userProfile?.homeLocation;
     if (savedArea && savedArea.areaName) {
       setLocationInfo({
@@ -127,51 +184,15 @@ export function LocationProvider({ children }: { children: ReactNode }) {
         label: savedArea.label ?? undefined,
       } as ResolvedLocation);
       setUserCoords(
-  savedArea.lat != null && savedArea.lng != null
-    ? [savedArea.lat, savedArea.lng]
-    : null
-);
+        savedArea.lat != null && savedArea.lng != null
+          ? [savedArea.lat, savedArea.lng]
+          : null
+      );
       setGpsReady(true);
       settle("resolved");
-      return;
     }
-
-    // 3) Nothing saved and nothing cached — fall back to GPS, capped
-    // at 5s, then prompt if still unresolved.
-    if (!navigator.geolocation) {
-      setGpsReady(true);
-      settle("unresolved");
-      return;
-    }
-
-    capTimerRef.current = setTimeout(() => {
-      setGpsReady(true);
-      settle("unresolved");
-    }, LOCATION_RESOLVE_CAP_MS);
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const lat = position.coords.latitude;
-        const lng = position.coords.longitude;
-        setGpsGranted(true);
-
-        const resolved = await getWardInfo(lat, lng);
-        setGpsReady(true);
-        if (resolved) {
-          setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
-          setUserCoords([lat, lng]);
-          settle("resolved");
-        } else {
-          settle("unresolved");
-        }
-      },
-      () => {
-        setGpsGranted(false);
-        setGpsReady(true);
-        settle("unresolved");
-      },
-      { enableHighAccuracy: true, timeout: LOCATION_RESOLVE_CAP_MS, maximumAge: 0 }
-    );
+    // No saved area — nothing to do here; GPS (already running or
+    // about to start via the grace timer above) will settle this.
   }, [profileLoading, userProfile]);
 
   const refreshLocation = async () => {
