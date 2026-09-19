@@ -4,7 +4,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from "firebase/storage";
 import { getMessaging, isSupported } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
-import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, getToken } from "firebase/app-check";
 
 
 const firebaseConfig = {
@@ -32,7 +32,7 @@ if (import.meta.env.DEV) {
 }
 
 export const appCheck = initializeAppCheck(app, {
-  provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+  provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
   isTokenAutoRefreshEnabled: true,
 });
 
