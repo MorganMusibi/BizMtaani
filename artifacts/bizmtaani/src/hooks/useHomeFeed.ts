@@ -1166,39 +1166,66 @@ if (category && subcategory) {
     // Keep existing ward + nearby geohash behavior.
     // ============================================================
 
-    const wardName = locationInfo?.wardName ?? "";
+     const wardName = locationInfo?.wardName ?? "";
 
     let localWardProducts: Product[] = [];
     let localWardCursor: CreatedAtCursor | null = null;
     let localWardDone = true;
 
-    if (wardName) {
-      try {
-        const snap = await getDocs(
-          wardQuery(wardName)
-        );
+    // The ward query and the stage-0 premium gap-fill query don't
+    // depend on each other — the gap-fill only needs userCoords, and
+    // only uses the ward query's results afterward, to dedupe. They
+    // used to run strictly one after the other (gap-fill only started
+    // once the ward query had fully resolved); firing both together
+    // removes one full round-trip's worth of serialized latency
+    // whenever a ward name is already known. Each has its own catch
+    // so a failure in one doesn't wipe out a successful result from
+    // the other, same isolation as before.
+    let stage0Snapshots: Awaited<ReturnType<typeof getDocs>>[] = [];
+    let stage0Prefixes: string[] = [];
 
+    if (wardName) {
+      stage0Prefixes = getNearbyGeohashPrefixes(
+        userCoords[0],
+        userCoords[1],
+        radiusKmToGeohashPrecision(HOME_FEED_RADIUS_STEPS[0])
+      );
+      const stage0Queries = areaQueries(
+        userCoords,
+        HOME_FEED_RADIUS_STEPS[0],
+        {},
+        {},
+        true // premium-only — free ads are already fully covered by wardQuery
+      );
+
+      const wardPromise = getDocs(wardQuery(wardName)).catch((error) => {
+        console.error("Failed to load ward adverts:", error);
+        return null;
+      });
+      const stage0Promise = Promise.all(stage0Queries.map((q) => getDocs(q))).catch((error) => {
+        console.error("Failed stage-0 premium gap-fill query:", error);
+        return [] as Awaited<ReturnType<typeof getDocs>>[];
+      });
+
+      const [wardSnap, resolvedStage0Snapshots] = await Promise.all([wardPromise, stage0Promise]);
+      stage0Snapshots = resolvedStage0Snapshots;
+
+      if (wardSnap) {
         const docs = filterVisibleProducts(
-  toProducts(snap.docs),
-  userCoords,
-  wardName
-);
+          toProducts(wardSnap.docs),
+          userCoords,
+          wardName
+        );
 
         localWardProducts = sortNearbyProducts(docs, userCoords);
-        const lastWardDoc = snap.docs[snap.docs.length - 1];
+        const lastWardDoc = wardSnap.docs[wardSnap.docs.length - 1];
         localWardCursor = lastWardDoc ? createdAtCursorFromDoc(lastWardDoc) : null;
-        localWardDone = snap.docs.length < WARD_PAGE;
+        localWardDone = wardSnap.docs.length < WARD_PAGE;
 
-setWardProducts(localWardProducts);
-setWardCursor(localWardCursor);
-setWardDone(localWardDone);
-
-      } catch (error) {
-        console.error(
-          "Failed to load ward adverts:",
-          error
-        );
-
+        setWardProducts(localWardProducts);
+        setWardCursor(localWardCursor);
+        setWardDone(localWardDone);
+      } else {
         setWardDone(true);
       }
     } else {
@@ -1207,8 +1234,8 @@ setWardDone(localWardDone);
 
     // The ward query already covers this user's most-local candidates
     // (a product in their ward is almost always also within 2.5km of
-    // them). The stage-0 geohash fan-out below targets that exact
-    // same 2.5km radius, so running it whenever the ward query found
+    // them). The stage-0 geohash fan-out targets that exact same
+    // 2.5km radius, so running it whenever the ward query found
     // anything at all would re-fetch — and re-bill for — mostly the
     // same documents under a different index. Skip stage 0 entirely
     // whenever the ward query returned any results, and start any
@@ -1225,28 +1252,13 @@ if (wardHadResults) {
   // slightly different geocode result) would never surface via
   // wardQuery — and jumping straight to areaRadiusStage=1 below
   // permanently excludes it too, since stage 1+ only accepts
-  // distance > 2.5km. Run one premium-only stage-0 (2.5km) geohash
-  // query here to close that gap before moving on to stage 1.
+  // distance > 2.5km. The stage-0 premium snapshots already fetched
+  // above (in parallel with the ward query) close that gap.
   let stage0PremiumProducts: Product[] = [];
   let stage0Cursors: Record<string, GeohashCursor | null> = {};
   let stage0DonePrefixes: Record<string, boolean> = {};
 
   try {
-    const stage0Queries = areaQueries(
-      userCoords,
-      HOME_FEED_RADIUS_STEPS[0],
-      {},
-      {},
-      true // premium-only — free ads are already fully covered by wardQuery
-    );
-
-    const stage0Snapshots = await Promise.all(stage0Queries.map((q) => getDocs(q)));
-    const stage0Prefixes = getNearbyGeohashPrefixes(
-      userCoords[0],
-      userCoords[1],
-      radiusKmToGeohashPrecision(HOME_FEED_RADIUS_STEPS[0])
-    );
-
     const pageProducts = stage0Snapshots.flatMap((snap) => {
       const products = toProducts(snap.docs);
       return products.filter((product) => {
@@ -1258,8 +1270,6 @@ if (wardHadResults) {
       });
     });
 
-    // Dedupe against what the ward query already found, so an ad that
-    // DID match by ward name isn't shown twice.
     const wardIds = new Set(localWardProducts.map((p) => p.id));
     stage0PremiumProducts = Array.from(
       new Map(pageProducts.filter((p) => !wardIds.has(p.id)).map((p) => [p.id, p])).values()
@@ -1278,7 +1288,7 @@ if (wardHadResults) {
       if (snap.docs.length < AREA_BUFFER_FETCH) stage0DonePrefixes[prefix] = true;
     });
   } catch (error) {
-    console.error("Failed stage-0 premium gap-fill query:", error);
+    console.error("Failed to process stage-0 premium gap-fill results:", error);
   }
 
   const sortedStage0 = sortNearbyProducts(stage0PremiumProducts, userCoords);
@@ -1306,6 +1316,7 @@ if (wardHadResults) {
 
   setInitialLoading(false);
   return;
+}
 }
 // ============================================================
 // INITIAL NEARBY AREA LOAD — BUFFERED  
