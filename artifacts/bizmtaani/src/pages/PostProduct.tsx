@@ -164,6 +164,9 @@ const [step, setStep] = useState<Step>(1);
   "Commercial Property",
   "Entertainment & Events",
   "Leisure & Activities",
+  "General Products",
+  "Vehicles",
+  "Home, Furniture & Appliances",
 ];
 const isPremiumOnlyCategory = PREMIUM_ONLY_CATEGORIES.includes(selectedCategory);
   const [selectedSubcategory, setSelectedSubcategory] = useState("");
