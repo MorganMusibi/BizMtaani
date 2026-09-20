@@ -2071,6 +2071,7 @@ if (userSnap.exists) {
   .collection("products")
   .where("sellerId", "==", uid)
   .where("status", "==", "active")
+  .where("excludeFromFreeLimit", "==", false)
   .count()
   .get();
 
@@ -2177,6 +2178,7 @@ try {
     ownerId: uid,
     sellerId: uid,
     status,
+    excludeFromFreeLimit: false,
     expiringNotified: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
@@ -2340,6 +2342,7 @@ try {
     .collection("products")
     .where("sellerId", "==", uid)
     .where("status", "==", "active")
+    .where("excludeFromFreeLimit", "==", false)
     .count()
     .get();
 
@@ -2431,6 +2434,7 @@ try {
       ownerId: uid,
       sellerId: uid,
       status,
+      excludeFromFreeLimit: false,
       expiringNotified: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt,
@@ -3352,6 +3356,98 @@ export const applyForMarketer = onCall({ cors: true, }, async (request) => {
   return { success: true };
 });
 
+/**
+ * Admin-only: create a free, unclaimed advert on a business's behalf
+ * (from outreach — e.g. Google Maps + WhatsApp). excludeFromFreeLimit
+ * is permanently true, so even after the owner claims it (sellerId
+ * flips to their real uid via claimListing, not yet implemented),
+ * this never counts against their own MAX_ACTIVE_ADS cap.
+ */
+export const adminCreateListing = onCall({ region: "europe-west1", cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const { title, category, subcategory, ward, constituency, county, price, ownerPhone } =
+    request.data as {
+      title?: string;
+      category?: string;
+      subcategory?: string | null;
+      ward?: string;
+      constituency?: string | null;
+      county?: string | null;
+      price?: number;
+      ownerPhone?: string;
+    };
+
+  if (typeof title !== "string" || !title.trim()) {
+    throw new HttpsError("invalid-argument", "A business name is required.");
+  }
+  if (typeof category !== "string" || !category.trim()) {
+    throw new HttpsError("invalid-argument", "A category is required.");
+  }
+  if (typeof ward !== "string" || !ward.trim()) {
+    throw new HttpsError("invalid-argument", "A ward is required.");
+  }
+  if (typeof ownerPhone !== "string" || !ownerPhone.trim()) {
+    throw new HttpsError("invalid-argument", "The owner's phone number is required.");
+  }
+
+  const durationDays = LISTING_DURATIONS.free;
+
+  const docRef = await db.collection("products").add({
+    title: title.trim(),
+    description: "",
+    price: typeof price === "number" ? price : 0,
+    priceRaw: "",
+    priceText: "",
+    rentPerMonthRaw: "",
+
+    category: category.trim(),
+    subcategory: typeof subcategory === "string" && subcategory.trim() ? subcategory.trim() : "",
+
+    imageUrl: "",
+    imageUrls: [],
+
+    lat: null,
+    lng: null,
+
+    ward: ward.trim(),
+    constituency: typeof constituency === "string" && constituency.trim() ? constituency.trim() : "",
+    county: typeof county === "string" && county.trim() ? county.trim() : "",
+
+    sellerName: title.trim(),
+    sellerType: "business",
+
+    priceDisplay: "fixed",
+    pricingBasis: null,
+
+    plan: "free",
+    visibilityScope: "local",
+    ownerId: "SYSTEM",
+    sellerId: "SYSTEM",
+    status: "active",
+    excludeFromFreeLimit: true,
+    createdByAdmin: true,
+    claimed: false,
+    claimedBy: null,
+    ownerPhone: ownerPhone.trim(),
+    expiringNotified: false,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    expiresAt: admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() + durationDays * 86_400_000)
+    ),
+    pendingPaymentStartedAt: null,
+  });
+
+  const projectDomain = "www.bizmtaani.site";
+  const claimUrl = `https://${projectDomain}/claim/${docRef.id}`;
+
+  await logAdminAction(request.auth.uid, "admin_create_listing", {
+    targetProductId: docRef.id,
+    ownerPhone: ownerPhone.trim(),
+  });
+
+  return { listingId: docRef.id, claimUrl };
+});
 
 /**
  * Admin-only: reject a pending marketer application.
