@@ -18,6 +18,7 @@ import {
   Megaphone,
   TrendingUp,
   RefreshCw,
+  Plus,
 } from "lucide-react";
 import {
   collection, getCountFromServer, query,
@@ -37,7 +38,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog" | "createListing";
 interface ProductReport {
   id: string;
   productId: string;
@@ -332,7 +333,19 @@ export default function AdminDashboard() {
   const [jobsLoading, setJobsLoading] = useState(false);
   const [jobsLoaded, setJobsLoaded] = useState(false);
   const [processingJobId, setProcessingJobId] = useState<string | null>(null);
-
+// Create Listing tab — admin bulk-creates a business listing before
+  // the owner has signed up; excludeFromFreeLimit keeps it from ever
+  // counting against the owner's own 3-free-ad cap, even after claim
+  const [newListingTitle, setNewListingTitle] = useState("");
+  const [newListingCategory, setNewListingCategory] = useState("");
+  const [newListingSubcategory, setNewListingSubcategory] = useState("");
+  const [newListingWard, setNewListingWard] = useState("");
+  const [newListingConstituency, setNewListingConstituency] = useState("");
+  const [newListingCounty, setNewListingCounty] = useState("");
+  const [newListingPrice, setNewListingPrice] = useState("");
+  const [newListingPhone, setNewListingPhone] = useState("");
+  const [creatingListing, setCreatingListing] = useState(false);
+  const [lastCreatedClaimUrl, setLastCreatedClaimUrl] = useState<string | null>(null);
   // Marketers tab — lazily loaded, matches the pattern used elsewhere
   const [marketers, setMarketers] = useState<Marketer[]>([]);
   const [marketersLoading, setMarketersLoading] = useState(false);
@@ -400,6 +413,49 @@ export default function AdminDashboard() {
       alert("Failed to delete the job.");
     } finally {
       setProcessingJobId(null);
+    }
+  }
+
+  // -------------------------------------------------------
+  // CREATE LISTING — admin creates an unclaimed advert on a business's
+  // behalf (from Google Maps outreach); calls adminCreateListing Cloud
+  // Function, which must NOT be added to PostProduct.tsx's publish path
+  // -------------------------------------------------------
+  async function createListing() {
+    if (!newListingTitle.trim() || !newListingCategory.trim() || !newListingWard.trim() || !newListingPhone.trim()) {
+      alert("Title, category, ward, and phone number are required.");
+      return;
+    }
+    setCreatingListing(true);
+    try {
+      const adminCreateListing = httpsCallable(functions, "adminCreateListing");
+      const result = await adminCreateListing({
+        title: newListingTitle.trim(),
+        category: newListingCategory.trim(),
+        subcategory: newListingSubcategory.trim() || null,
+        ward: newListingWard.trim(),
+        constituency: newListingConstituency.trim() || null,
+        county: newListingCounty.trim() || null,
+        price: newListingPrice ? Number(newListingPrice) : 0,
+        ownerPhone: newListingPhone.trim(),
+      });
+      const { claimUrl } = result.data as { listingId: string; claimUrl: string };
+      setLastCreatedClaimUrl(claimUrl);
+      setNewListingTitle("");
+      setNewListingCategory("");
+      setNewListingSubcategory("");
+      setNewListingWard("");
+      setNewListingConstituency("");
+      setNewListingCounty("");
+      setNewListingPrice("");
+      setNewListingPhone("");
+      // Invalidate the Adverts tab cache so it shows the new listing next open
+      setAdvertsLoaded(false);
+    } catch (error) {
+      console.error("Failed to create listing:", error);
+      alert("Failed to create the listing.");
+    } finally {
+      setCreatingListing(false);
     }
   }
 
@@ -1111,6 +1167,7 @@ export default function AdminDashboard() {
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
     { title: "Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
+    { title: "Create Listing", icon: Plus, tab: "createListing" },
     { title: "Marketers", icon: Megaphone, tab: "marketers" },
     { title: "Adverts", icon: Package, tab: "adverts" },
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
@@ -1801,6 +1858,132 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               )}
+            </>
+          )}
+
+          {activeTab === "createListing" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Create listing</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
+                  Create a free, unclaimed listing on a business's behalf. They'll get a claim link to make it their own — it never counts against their 3 free adverts.
+                </p>
+              </div>
+
+              <div className={`${panelCls} p-5 space-y-4 max-w-lg`}>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Business name *</label>
+                  <input
+                    type="text"
+                    value={newListingTitle}
+                    onChange={(e) => setNewListingTitle(e.target.value)}
+                    className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                    style={{ borderColor: "var(--pd-line)" }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Category *</label>
+                    <input
+                      type="text"
+                      value={newListingCategory}
+                      onChange={(e) => setNewListingCategory(e.target.value)}
+                      placeholder="e.g. Services"
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Subcategory</label>
+                    <input
+                      type="text"
+                      value={newListingSubcategory}
+                      onChange={(e) => setNewListingSubcategory(e.target.value)}
+                      placeholder="e.g. Plumbing & Electrical"
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Ward *</label>
+                    <input
+                      type="text"
+                      value={newListingWard}
+                      onChange={(e) => setNewListingWard(e.target.value)}
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Constituency</label>
+                    <input
+                      type="text"
+                      value={newListingConstituency}
+                      onChange={(e) => setNewListingConstituency(e.target.value)}
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">County</label>
+                    <input
+                      type="text"
+                      value={newListingCounty}
+                      onChange={(e) => setNewListingCounty(e.target.value)}
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Price (KES)</label>
+                    <input
+                      type="number"
+                      value={newListingPrice}
+                      onChange={(e) => setNewListingPrice(e.target.value)}
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-[var(--pd-ink-soft)]">Owner phone (WhatsApp) *</label>
+                    <input
+                      type="text"
+                      value={newListingPhone}
+                      onChange={(e) => setNewListingPhone(e.target.value)}
+                      placeholder="+2547..."
+                      className="w-full h-10 px-3 border bg-[var(--pd-paper)] text-sm"
+                      style={{ borderColor: "var(--pd-line)" }}
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={createListing}
+                  disabled={creatingListing}
+                  className={`${btnPrimary} w-full flex items-center justify-center gap-2`}
+                >
+                  {creatingListing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+                  {creatingListing ? "Creating…" : "Create listing"}
+                </button>
+
+                {lastCreatedClaimUrl && (
+                  <div
+                    className="p-3 border text-xs space-y-1"
+                    style={{ borderColor: "var(--pd-green)", background: "var(--pd-green-soft)" }}
+                  >
+                    <p className="font-medium" style={{ color: "var(--pd-green)" }}>Listing created. Send this claim link to the owner:</p>
+                    <p style={fontMono}>{lastCreatedClaimUrl}</p>
+                  </div>
+                )}
+              </div>
             </>
           )}
 
