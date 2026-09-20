@@ -39,6 +39,7 @@ const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 const CategorySubcategories = lazy(() => import("@/pages/CategorySubcategories"));
 const CategoryAds = lazy(() => import("@/pages/CategoryAds"));
 const MarketerDashboard = lazy(() => import("@/pages/MarketerDashboard"));
+const ClaimListing = lazy(() => import("@/pages/ClaimListing"));
 
 // Configuration for API requests
 // Updated path to correctly reach the root lib folder
@@ -106,6 +107,7 @@ function Router() {
         <Route path="/category/:categoryKey" component={CategorySubcategories} />
         <Route path="/category/:categoryKey/:subcategory" component={CategoryAds} />
         <Route path="/marketer" component={MarketerDashboard} />
+        <Route path="/claim/:listingId" component={ClaimListing} />
         <Route component={NotFound} />
       </Switch>
     </Suspense>
