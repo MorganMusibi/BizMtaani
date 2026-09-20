@@ -3499,3 +3499,32 @@ export const backfillMissingCreatedAt = onCall({ cors: true }, async (request) =
 
   return { success: true, fixedCount, totalChecked: snap.size };
 });
+
+    /**
+ * One-time backfill: every product created before excludeFromFreeLimit
+ * existed needs it explicitly set to false, or the new active-ad-limit
+ * query (which filters on excludeFromFreeLimit == false) will silently
+ * exclude them from the count, undercounting every existing user's
+ * active adverts. Run this once, immediately after deploying the
+ * publishAdvert/publishAdvertAndPay changes, before relying on the
+ * limit check.
+ */
+export const backfillExcludeFromFreeLimit = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const snap = await db.collection("products").get();
+  const batch = db.batch();
+  let fixedCount = 0;
+
+  snap.docs.forEach((doc) => {
+    const data = doc.data();
+    if (data.excludeFromFreeLimit === undefined) {
+      batch.update(doc.ref, { excludeFromFreeLimit: false });
+      fixedCount++;
+    }
+  });
+
+  if (fixedCount > 0) await batch.commit();
+
+  return { success: true, fixedCount, totalChecked: snap.size };
+});
