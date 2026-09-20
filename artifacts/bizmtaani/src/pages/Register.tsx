@@ -382,7 +382,12 @@ if (!existingProfile.exists()) {
 
             <p className="text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary font-semibold">Sign in</Link>
+              <Link
+                href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"}
+                className="text-primary font-semibold"
+              >
+                Sign in
+              </Link>
             </p>
           </>
         )}
@@ -523,7 +528,12 @@ if (!existingProfile.exists()) {
 
             <p className="mt-6 text-center text-sm text-muted-foreground">
               Already have an account?{" "}
-              <Link href="/login" className="text-primary font-semibold">Sign in</Link>
+              <Link
+                href={redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login"}
+                className="text-primary font-semibold"
+              >
+                Sign in
+              </Link>
             </p>
           </>
         )}
