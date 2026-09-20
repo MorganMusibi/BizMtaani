@@ -3044,7 +3044,7 @@
                 "wards": [
                     "Karen",
                     "Nairobi West",
-                    "Mugumu-Ini",
+                    "Mugumo-Ini",
                     "South C",
                     "Nyayo Highrise"
                 ]
@@ -3052,7 +3052,7 @@
             {
                 "constituency_name": "Kibra",
                 "wards": [
-                    "Woodley/Kenyatta Golf Course",
+                    "Woodley/Kenyatta Golf",
                     "Sarang'Ombe",
                     "Makina",
                     "Lindi",
@@ -3116,15 +3116,15 @@
                     "Kayole Central",
                     "Kayole South",
                     "Komarock",
-                    "Matopeni / Spring Valley"
+                    "Matopeni"
                 ]
             },
             {
                 "constituency_name": "Embakasi East",
                 "wards": [
                     "Utawala",
-                    "Upper Savanna",
-                    "Lower Savanna",
+                    "Upper Savannah",
+                    "Lower Savannah",
                     "Embakasi",
                     "Mihango"
                 ]
@@ -3132,8 +3132,8 @@
             {
                 "constituency_name": "Embakasi West",
                 "wards": [
-                    "Umoja 1",
-                    "Umoja 2",
+                    "Umoja I",
+                    "Umoja II",
                     "Mowlem",
                     "Kariobangi South"
                 ]
