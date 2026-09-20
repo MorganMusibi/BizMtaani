@@ -18,6 +18,15 @@ const updateSW = registerSW({
 });
 
 document.addEventListener("visibilitychange", () => {
+  // Skip the reload-on-background entirely while on /admin — the
+  // dashboard's Create Listing flow requires leaving the tab (to
+  // paste a claim link into WhatsApp) and coming straight back,
+  // repeatedly, by design. Applying the update here would silently
+  // wipe in-progress form state and the active tab every single time.
+  // The update just stays queued (updateReady remains true) until the
+  // admin navigates away from /admin and backgrounds the tab again.
+  if (window.location.pathname.startsWith("/admin")) return;
+
   if (document.visibilityState === "hidden" && updateReady) {
     updateReady = false;
     updateSW(true); // activates new SW + reloads, but app is hidden right now
