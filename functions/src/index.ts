@@ -2071,7 +2071,6 @@ if (userSnap.exists) {
   .collection("products")
   .where("sellerId", "==", uid)
   .where("status", "==", "active")
-  .where("excludeFromFreeLimit", "==", false)
   .count()
   .get();
 
@@ -2178,7 +2177,6 @@ try {
     ownerId: uid,
     sellerId: uid,
     status,
-    excludeFromFreeLimit: false,
     expiringNotified: false,
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     expiresAt,
@@ -2342,7 +2340,6 @@ try {
     .collection("products")
     .where("sellerId", "==", uid)
     .where("status", "==", "active")
-    .where("excludeFromFreeLimit", "==", false)
     .count()
     .get();
 
@@ -2434,7 +2431,6 @@ try {
       ownerId: uid,
       sellerId: uid,
       status,
-      excludeFromFreeLimit: false,
       expiringNotified: false,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       expiresAt,
@@ -3356,186 +3352,6 @@ export const applyForMarketer = onCall({ cors: true, }, async (request) => {
   return { success: true };
 });
 
-/**
- * Admin-only: create a free, unclaimed advert on a business's behalf
- * (from outreach — e.g. Google Maps + WhatsApp). excludeFromFreeLimit
- * is permanently true, so even after the owner claims it (sellerId
- * flips to their real uid via claimListing, not yet implemented),
- * this never counts against their own MAX_ACTIVE_ADS cap.
- */
-export const adminCreateListing = onCall({ region: "europe-west1", cors: true }, async (request) => {
-  requireAdmin(request);
-
-  const { title, category, subcategory, ward, constituency, county, price, ownerPhone } =
-    request.data as {
-      title?: string;
-      category?: string;
-      subcategory?: string | null;
-      ward?: string;
-      constituency?: string | null;
-      county?: string | null;
-      price?: number;
-      ownerPhone?: string;
-    };
-
-  if (typeof title !== "string" || !title.trim()) {
-    throw new HttpsError("invalid-argument", "A business name is required.");
-  }
-  if (typeof category !== "string" || !category.trim()) {
-    throw new HttpsError("invalid-argument", "A category is required.");
-  }
-  if (typeof ward !== "string" || !ward.trim()) {
-    throw new HttpsError("invalid-argument", "A ward is required.");
-  }
-  if (typeof ownerPhone !== "string" || !ownerPhone.trim()) {
-    throw new HttpsError("invalid-argument", "The owner's phone number is required.");
-  }
-
-  const durationDays = LISTING_DURATIONS.premium_weekly; // 7 days premium reach — admin-seeded listings get a boosted first week to make claiming worthwhile
-
-  const docRef = await db.collection("products").add({
-    title: title.trim(),
-    description: "",
-    price: typeof price === "number" ? price : 0,
-    priceRaw: "",
-    priceText: "",
-    rentPerMonthRaw: "",
-
-    category: category.trim(),
-    subcategory: typeof subcategory === "string" && subcategory.trim() ? subcategory.trim() : "",
-
-    imageUrl: "",
-    imageUrls: [],
-
-    lat: null,
-    lng: null,
-
-    ward: ward.trim(),
-    constituency: typeof constituency === "string" && constituency.trim() ? constituency.trim() : "",
-    county: typeof county === "string" && county.trim() ? county.trim() : "",
-
-    sellerName: title.trim(),
-    sellerType: "business",
-
-    priceDisplay: "fixed",
-    pricingBasis: null,
-
-    plan: "premium_weekly",
-    visibilityScope: "county",
-    ownerId: "SYSTEM",
-    sellerId: "SYSTEM",
-    status: "active",
-    excludeFromFreeLimit: true,
-    createdByAdmin: true,
-    claimed: false,
-    claimedBy: null,
-    ownerPhone: ownerPhone.trim(),
-    expiringNotified: false,
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    expiresAt: admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + durationDays * 86_400_000)
-    ),
-    pendingPaymentStartedAt: null,
-  });
-
-  const projectDomain = "www.bizmtaani.site";
-  const claimUrl = `https://${projectDomain}/claim/${docRef.id}`;
-
-  await logAdminAction(request.auth.uid, "admin_create_listing", {
-    targetProductId: docRef.id,
-    ownerPhone: ownerPhone.trim(),
-  });
-
-  return { listingId: docRef.id, claimUrl };
-});
-
-const CLAIM_COOLDOWN_MS = 60_000; // stops repeated wrong-phone guesses from being scripted
-
-/**
- * Lets a signed-in user claim an admin-created listing by proving
- * they own the phone number it was created with. On match, flips
- * sellerId/ownerId from "SYSTEM" to the caller's real uid so the
- * listing behaves exactly like one they posted themselves from here
- * on — same edit/delete/renew paths, no special-casing needed
- * elsewhere. plan/expiresAt are left untouched: whatever premium
- * time adminCreateListing granted keeps running as-is.
- */
-export const claimListing = onCall({ region: "europe-west1", cors: true }, async (request) => {
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in to claim a listing.");
-
-  const { listingId, phone } = request.data as { listingId?: string; phone?: string };
-  if (typeof listingId !== "string" || !listingId.trim()) {
-    throw new HttpsError("invalid-argument", "listingId is required.");
-  }
-  if (typeof phone !== "string" || !phone.trim()) {
-    throw new HttpsError("invalid-argument", "A phone number is required to verify ownership.");
-  }
-
-  const uid = request.auth.uid;
-
-  // Per-user cooldown on claim attempts — same pattern as report
-  // submission, stops scripted phone-guessing against a known listingId.
-  const cooldownRef = db.collection("claimCooldowns").doc(uid);
-  const cooldownSnap = await cooldownRef.get();
-  const lastAttemptAt = cooldownSnap.exists ? cooldownSnap.data()?.lastAttemptAt?.toMillis() : null;
-  if (lastAttemptAt && Date.now() - lastAttemptAt < CLAIM_COOLDOWN_MS) {
-    throw new HttpsError("resource-exhausted", "Please wait a moment before trying again.");
-  }
-  await cooldownRef.set({
-    lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
-    expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
-  });
-
-  const productRef = db.collection("products").doc(listingId);
-  const productSnap = await productRef.get();
-
-  if (!productSnap.exists) {
-    throw new HttpsError("not-found", "This listing no longer exists.");
-  }
-
-  const product = productSnap.data()!;
-
-  if (product.createdByAdmin !== true) {
-    throw new HttpsError("failed-precondition", "This listing isn't available to claim.");
-  }
-
-  if (product.claimed === true) {
-    throw new HttpsError(
-      "failed-precondition",
-      product.claimedBy === uid
-        ? "You've already claimed this listing."
-        : "This listing has already been claimed by someone else."
-    );
-  }
-
-  let normalizedInput: string;
-  let normalizedStored: string;
-  try {
-    normalizedInput = normalizePhone(phone);
-    normalizedStored = normalizePhone(product.ownerPhone ?? "");
-  } catch {
-    throw new HttpsError("invalid-argument", "Please enter a valid Kenyan phone number.");
-  }
-
-  if (normalizedInput !== normalizedStored) {
-    throw new HttpsError(
-      "permission-denied",
-      "That phone number doesn't match the one this listing was registered with."
-    );
-  }
-
-  await productRef.update({
-    sellerId: uid,
-    ownerId: uid,
-    claimed: true,
-    claimedBy: uid,
-    claimedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  await logAdminAction(uid, "claim_listing", { targetProductId: listingId });
-
-  return { success: true, productId: listingId };
-});
 
 /**
  * Admin-only: reject a pending marketer application.
@@ -3579,35 +3395,6 @@ export const backfillMissingCreatedAt = onCall({ cors: true }, async (request) =
       // "now", which is far better than the doc being invisible to
       // any orderBy("createdAt") query forever.
       batch.update(doc.ref, { createdAt: admin.firestore.FieldValue.serverTimestamp() });
-      fixedCount++;
-    }
-  });
-
-  if (fixedCount > 0) await batch.commit();
-
-  return { success: true, fixedCount, totalChecked: snap.size };
-});
-
-    /**
- * One-time backfill: every product created before excludeFromFreeLimit
- * existed needs it explicitly set to false, or the new active-ad-limit
- * query (which filters on excludeFromFreeLimit == false) will silently
- * exclude them from the count, undercounting every existing user's
- * active adverts. Run this once, immediately after deploying the
- * publishAdvert/publishAdvertAndPay changes, before relying on the
- * limit check.
- */
-export const backfillExcludeFromFreeLimit = onCall({ cors: true }, async (request) => {
-  requireAdmin(request);
-
-  const snap = await db.collection("products").get();
-  const batch = db.batch();
-  let fixedCount = 0;
-
-  snap.docs.forEach((doc) => {
-    const data = doc.data();
-    if (data.excludeFromFreeLimit === undefined) {
-      batch.update(doc.ref, { excludeFromFreeLimit: false });
       fixedCount++;
     }
   });
