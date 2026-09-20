@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
   sendEmailVerification,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -224,78 +225,97 @@ const homeLocation: HomeLocation = {
 
   async function handleGoogleLogin() {
     if (!selectedWard) {
-  toast({ title: "Chagua eneo Lako Kwanza", variant: "destructive" });
-  return;
-}
-setGoogleLoading(true);
-try {
-  const coords = await getWardCoordinates(
-    selectedWard.wardName,
-    selectedWard.constituencyName,
-    selectedWard.countyName
-  );
-  const homeLocation: HomeLocation = {
-  lat: coords?.lat ?? null,
-  lng: coords?.lng ?? null,
-    areaName: selectedWard.wardName,
-    constituency: selectedWard.constituencyName,
-    county: selectedWard.countyName,
-  };
-
-      const result = await signInWithPopup(
-  auth,
-  googleProvider
-);
-
-const userRef = doc(db, "users", result.user.uid);
-const existingProfile = await getDoc(userRef);
-
-if (!existingProfile.exists()) {
-  await saveUserProfile(result.user.uid, {
-    displayName:
-      result.user.displayName ?? "BizMtaani User",
-    email: result.user.email ?? "",
-    isBusinessOwner: isBusinessOwner ?? false,
-    businessName: isBusinessOwner
-      ? (result.user.displayName ?? undefined)
-      : undefined,
-    homeLocation,
-  });
-
-  // Apply referral code if one was entered — non-blocking, and only
-  // for genuinely new accounts, not existing users signing in again.
-  applyReferralCodeIfPresent(referralCode).then((applied) => {
-    if (referralCode.trim()) {
-      console.log(`Referral code "${referralCode.trim()}" applied:`, applied);
+      toast({ title: "Chagua eneo Lako Kwanza", variant: "destructive" });
+      return;
     }
-  });
-} else {
-  // Update only the location.
-  // Do not overwrite subscription or existing profile data.
-  await setDoc(
-    userRef,
-    {
-      homeLocation,
-    },
-    { merge: true }
-  );
-}
-      setLocation("/");
-      } catch (err: unknown) {
-  console.error("Google sign-in failed:", err);
 
-  toast({
-    title: "Google sign-in failed",
-    description: getFirebaseErrorMessage(
-      err,
-      "Unable to sign in with Google. Please try again."
-    ),
-    variant: "destructive",
-  });
-    } finally {
-      setGoogleLoading(false);
-    }
+    setGoogleLoading(true);
+
+    // Stash what we need — this state won't survive the redirect to Google and back.
+    sessionStorage.setItem(
+      "pendingGoogleSignup",
+      JSON.stringify({ selectedWard, isBusinessOwner, referralCode })
+    );
+
+    await signInWithRedirect(auth, googleProvider);
+    // Page navigates away to Google here — nothing after this line runs.
   }
+
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result) return;
+
+        const pendingRaw = sessionStorage.getItem("pendingGoogleSignup");
+        sessionStorage.removeItem("pendingGoogleSignup");
+        const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+
+        const ward = pending?.selectedWard ?? selectedWard;
+        const bizOwner = pending?.isBusinessOwner ?? isBusinessOwner;
+        const refCode = pending?.referralCode ?? referralCode;
+
+        if (!ward) {
+          toast({
+            title: "Please pick your area again",
+            description: "Select your area and try Continue with Google again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
+        const coords = await getWardCoordinates(
+          ward.wardName,
+          ward.constituencyName,
+          ward.countyName
+        );
+        const homeLocation: HomeLocation = {
+          lat: coords?.lat ?? null,
+          lng: coords?.lng ?? null,
+          areaName: ward.wardName,
+          constituency: ward.constituencyName,
+          county: ward.countyName,
+        };
+
+        const userRef = doc(db, "users", result.user.uid);
+        const existingProfile = await getDoc(userRef);
+
+        if (!existingProfile.exists()) {
+          await saveUserProfile(result.user.uid, {
+            displayName: result.user.displayName ?? "BizMtaani User",
+            email: result.user.email ?? "",
+            isBusinessOwner: bizOwner ?? false,
+            businessName: bizOwner ? (result.user.displayName ?? undefined) : undefined,
+            homeLocation,
+          });
+
+          applyReferralCodeIfPresent(refCode ?? "").then((applied) => {
+            if ((refCode ?? "").trim()) {
+              console.log(`Referral code "${refCode.trim()}" applied:`, applied);
+            }
+          });
+        } else {
+          await setDoc(userRef, { homeLocation }, { merge: true });
+        }
+
+        setLocation("/");
+      })
+      .catch((err: unknown) => {
+        console.error("Google sign-in failed:", err);
+
+        toast({
+          title: "Google sign-in failed",
+          description: getFirebaseErrorMessage(
+            err,
+            "Unable to sign in with Google. Please try again."
+          ),
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setGoogleLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const nameLabel = isBusinessOwner === true ? "Business name" : "Your full name";
   const namePlaceholder = isBusinessOwner === true
