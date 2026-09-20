@@ -288,7 +288,6 @@ if (!existingProfile.exists()) {
     { merge: true }
   );
 }
-      }
       setLocation(postAuthPath);
       } catch (err: unknown) {
   console.error("Google sign-in failed:", err);
