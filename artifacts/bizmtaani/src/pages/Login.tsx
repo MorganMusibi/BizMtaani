@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider,
   sendPasswordResetEmail,
 } from "firebase/auth";
@@ -55,25 +56,33 @@ export default function Login() {
 
   async function handleGoogleLogin() {
     setGoogleLoading(true);
-
-    try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      setLocation("/");
-    } catch (err: unknown) {
-      console.error("Google sign-in error:", err);
-
-      toast({
-        title: "Google sign-in failed",
-        description: getFirebaseErrorMessage(
-          err,
-          "Unable to sign in with Google. Please try again."
-        ),
-        variant: "destructive",
-      });
-    } finally {
-      setGoogleLoading(false);
-    }
+    await signInWithRedirect(auth, new GoogleAuthProvider());
+    // Page navigates away to Google here — nothing after this line runs.
   }
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result) {
+          setLocation("/");
+        }
+      })
+      .catch((err: unknown) => {
+        console.error("Google redirect sign-in error:", err);
+
+        toast({
+          title: "Google sign-in failed",
+          description: getFirebaseErrorMessage(
+            err,
+            "Unable to sign in with Google. Please try again."
+          ),
+          variant: "destructive",
+        });
+      })
+      .finally(() => {
+        setGoogleLoading(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function handleForgotPassword(e: React.FormEvent) {
     e.preventDefault();
