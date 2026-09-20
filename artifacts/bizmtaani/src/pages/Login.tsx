@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, useSearch, Link } from "wouter";
+import { useLocation, Link } from "wouter";
 import {
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -17,15 +17,7 @@ import { Loader2 } from "lucide-react";
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const search = useSearch();
   const { toast } = useToast();
-
-  // Mirrors Register.tsx's redirect handling — if Login was opened
-  // with ?redirect=/some/path (e.g. from the claim-listing flow),
-  // send the user there after sign-in instead of the home feed. Only
-  // ever a same-site path, never a full URL (open-redirect guard).
-  const redirectParam = new URLSearchParams(search).get("redirect");
-  const postAuthPath = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,7 +36,7 @@ export default function Login() {
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      setLocation(postAuthPath);
+      setLocation("/");
     } catch (err: unknown) {
       console.error("Login error:", err);
 
@@ -66,7 +58,7 @@ export default function Login() {
 
     try {
       await signInWithPopup(auth, new GoogleAuthProvider());
-      setLocation(postAuthPath);
+      setLocation("/");
     } catch (err: unknown) {
       console.error("Google sign-in error:", err);
 
@@ -311,7 +303,7 @@ export default function Login() {
         <p className="mt-6 text-center text-sm text-muted-foreground">
           No account?{" "}
           <Link
-            href={redirectParam ? `/register?redirect=${encodeURIComponent(redirectParam)}` : "/register"}
+            href="/register"
             className="text-primary font-semibold"
           >
             Create one free
