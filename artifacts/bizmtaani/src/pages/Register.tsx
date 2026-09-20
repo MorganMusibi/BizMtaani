@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
@@ -92,7 +92,15 @@ try {
 
 export default function Register() {
   const [, setLocation] = useLocation();
+  const search = useSearch();
   const { toast } = useToast();
+
+  // If Register was opened with ?redirect=/some/path (e.g. from the
+  // claim-listing flow), send the user there after signup instead of
+  // the home feed. Only ever a same-site path — never follow a full
+  // URL, which would allow an open-redirect via a crafted link.
+  const redirectParam = new URLSearchParams(search).get("redirect");
+  const postAuthPath = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/";
 
   const [step, setStep] = useState<Step>(1);
   const [isBusinessOwner, setIsBusinessOwner] = useState<boolean | null>(null);
@@ -205,7 +213,7 @@ const homeLocation: HomeLocation = {
         description: "Check your email and click the verification link to unlock all features.",
       });
 
-      setLocation("/");
+      setLocation(postAuthPath);
       } catch (err: unknown) {
   console.error("Registration failed:", err);
 
@@ -280,7 +288,8 @@ if (!existingProfile.exists()) {
     { merge: true }
   );
 }
-      setLocation("/");
+      }
+      setLocation(postAuthPath);
       } catch (err: unknown) {
   console.error("Google sign-in failed:", err);
 
@@ -308,7 +317,7 @@ if (!existingProfile.exists()) {
 
         {/* Back button */}
         <button
-          onClick={() => (step === 1 ? setLocation("/login") : setStep(1))}
+          onClick={() => (step === 1 ? setLocation(redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : "/login") : setStep(1))}
           className="flex items-center gap-1 text-muted-foreground mb-8 hover:text-foreground transition-colors self-start"
         >
           <ChevronLeft size={18} />
