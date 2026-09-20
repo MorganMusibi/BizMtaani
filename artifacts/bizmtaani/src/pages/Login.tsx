@@ -62,11 +62,23 @@ export default function Login() {
   useEffect(() => {
     getRedirectResult(auth)
       .then((result) => {
+        sessionStorage.setItem("debug_redirect_result", JSON.stringify({
+          gotResult: !!result,
+          uid: result?.user?.uid ?? null,
+          time: new Date().toISOString(),
+        }));
+
         if (result) {
           setLocation("/");
         }
       })
       .catch((err: unknown) => {
+        sessionStorage.setItem("debug_redirect_error", JSON.stringify({
+          code: (err as any)?.code,
+          message: (err as any)?.message,
+          time: new Date().toISOString(),
+        }));
+
         console.error("Google redirect sign-in error:", err);
 
         toast({
