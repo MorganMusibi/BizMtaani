@@ -3391,7 +3391,7 @@ export const adminCreateListing = onCall({ region: "europe-west1", cors: true },
     throw new HttpsError("invalid-argument", "The owner's phone number is required.");
   }
 
-  const durationDays = LISTING_DURATIONS.free;
+  const durationDays = LISTING_DURATIONS.premium_weekly; // 7 days premium reach — admin-seeded listings get a boosted first week to make claiming worthwhile
 
   const docRef = await db.collection("products").add({
     title: title.trim(),
@@ -3420,8 +3420,8 @@ export const adminCreateListing = onCall({ region: "europe-west1", cors: true },
     priceDisplay: "fixed",
     pricingBasis: null,
 
-    plan: "free",
-    visibilityScope: "local",
+    plan: "premium_weekly",
+    visibilityScope: "county",
     ownerId: "SYSTEM",
     sellerId: "SYSTEM",
     status: "active",
