@@ -3449,6 +3449,94 @@ export const adminCreateListing = onCall({ region: "europe-west1", cors: true },
   return { listingId: docRef.id, claimUrl };
 });
 
+const CLAIM_COOLDOWN_MS = 60_000; // stops repeated wrong-phone guesses from being scripted
+
+/**
+ * Lets a signed-in user claim an admin-created listing by proving
+ * they own the phone number it was created with. On match, flips
+ * sellerId/ownerId from "SYSTEM" to the caller's real uid so the
+ * listing behaves exactly like one they posted themselves from here
+ * on — same edit/delete/renew paths, no special-casing needed
+ * elsewhere. plan/expiresAt are left untouched: whatever premium
+ * time adminCreateListing granted keeps running as-is.
+ */
+export const claimListing = onCall({ region: "europe-west1", cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in to claim a listing.");
+
+  const { listingId, phone } = request.data as { listingId?: string; phone?: string };
+  if (typeof listingId !== "string" || !listingId.trim()) {
+    throw new HttpsError("invalid-argument", "listingId is required.");
+  }
+  if (typeof phone !== "string" || !phone.trim()) {
+    throw new HttpsError("invalid-argument", "A phone number is required to verify ownership.");
+  }
+
+  const uid = request.auth.uid;
+
+  // Per-user cooldown on claim attempts — same pattern as report
+  // submission, stops scripted phone-guessing against a known listingId.
+  const cooldownRef = db.collection("claimCooldowns").doc(uid);
+  const cooldownSnap = await cooldownRef.get();
+  const lastAttemptAt = cooldownSnap.exists ? cooldownSnap.data()?.lastAttemptAt?.toMillis() : null;
+  if (lastAttemptAt && Date.now() - lastAttemptAt < CLAIM_COOLDOWN_MS) {
+    throw new HttpsError("resource-exhausted", "Please wait a moment before trying again.");
+  }
+  await cooldownRef.set({
+    lastAttemptAt: admin.firestore.FieldValue.serverTimestamp(),
+    expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
+  });
+
+  const productRef = db.collection("products").doc(listingId);
+  const productSnap = await productRef.get();
+
+  if (!productSnap.exists) {
+    throw new HttpsError("not-found", "This listing no longer exists.");
+  }
+
+  const product = productSnap.data()!;
+
+  if (product.createdByAdmin !== true) {
+    throw new HttpsError("failed-precondition", "This listing isn't available to claim.");
+  }
+
+  if (product.claimed === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      product.claimedBy === uid
+        ? "You've already claimed this listing."
+        : "This listing has already been claimed by someone else."
+    );
+  }
+
+  let normalizedInput: string;
+  let normalizedStored: string;
+  try {
+    normalizedInput = normalizePhone(phone);
+    normalizedStored = normalizePhone(product.ownerPhone ?? "");
+  } catch {
+    throw new HttpsError("invalid-argument", "Please enter a valid Kenyan phone number.");
+  }
+
+  if (normalizedInput !== normalizedStored) {
+    throw new HttpsError(
+      "permission-denied",
+      "That phone number doesn't match the one this listing was registered with."
+    );
+  }
+
+  await productRef.update({
+    sellerId: uid,
+    ownerId: uid,
+    claimed: true,
+    claimedBy: uid,
+    claimedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAdminAction(uid, "claim_listing", { targetProductId: listingId });
+
+  return { success: true, productId: listingId };
+});
+
 /**
  * Admin-only: reject a pending marketer application.
  */
