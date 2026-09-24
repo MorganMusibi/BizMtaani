@@ -2118,7 +2118,12 @@ const isMasterAdmin = uid === OWNER_UID;
 
   let expiresAt: admin.firestore.Timestamp | null = null;
   if (status === "active") {
-    if (isHotelMenu && hasActiveSubscription) {
+    if (isMasterAdmin) {
+      // Never expires — scheduledCleanup's `where("expiresAt", "<", now)`
+      // query excludes documents with no expiresAt value, so this is
+      // never auto-archived. Delete manually if it should come down.
+      expiresAt = null;
+    } else if (isHotelMenu && hasActiveSubscription) {
       expiresAt = userSnap.data()?.premiumEndsAt
         ?? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
     } else {
@@ -2390,7 +2395,12 @@ const isMasterAdmin = uid === OWNER_UID;
 
   let expiresAt: admin.firestore.Timestamp | null = null;
   if (status === "active") {
-    if (isHotelMenu && hasActiveSubscription) {
+    if (isMasterAdmin) {
+      // Never expires — scheduledCleanup's `where("expiresAt", "<", now)`
+      // query excludes documents with no expiresAt value, so this is
+      // never auto-archived. Delete manually if it should come down.
+      expiresAt = null;
+    } else if (isHotelMenu && hasActiveSubscription) {
       expiresAt = userSnap.data()?.premiumEndsAt
         ?? admin.firestore.Timestamp.fromDate(new Date(Date.now() + durationDays * 86_400_000));
     } else {
