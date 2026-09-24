@@ -474,6 +474,7 @@ useEffect(() => {
     loadMore,
     previewProducts,
     areaIsPremiumOnly,
+    adminBroadcastProducts,
   } = useHomeFeeds({
     gpsReady,
     userCoords,
@@ -624,9 +625,13 @@ const handleAreaSearchSelect = useCallback(
   const { rankedWardProducts, rankedAreaProducts, totalVisible } = useMemo(() => {
     const wardIds = new Set(wardProducts.map((p) => p.id));
     const areaOnly = areaProducts.filter((p) => !wardIds.has(p.id));
+    // Master admin broadcast ads are location-independent — merge them
+    // into the "more listings nearby" section so they actually reach
+    // the home feed, not just category pages/search.
+    const areaWithBroadcast = dedupe(areaOnly, adminBroadcastProducts);
 
     const filteredWard = applyFilters(wardProducts);
-    const filteredArea = applyFilters(areaOnly);
+    const filteredArea = applyFilters(areaWithBroadcast);
 
     const rankedWard = userCoords ? rankProducts(filteredWard, userCoords) : filteredWard;
     const rankedArea = userCoords ? rankProducts(filteredArea, userCoords) : filteredArea;
@@ -636,7 +641,7 @@ const handleAreaSearchSelect = useCallback(
       rankedAreaProducts: rankedArea,
       totalVisible: rankedWard.length + rankedArea.length,
     };
-  }, [wardProducts, areaProducts, activeKey, searchQuery, userCoords]);
+  }, [wardProducts, areaProducts, adminBroadcastProducts, activeKey, searchQuery, userCoords]);
   
   const isLoadingMore = areaLoading;
   const allDone = areaDone;
