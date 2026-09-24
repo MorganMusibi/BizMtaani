@@ -109,12 +109,50 @@ function saveJobsCacheToStorage(cache: Map<string, JobsCacheEntry>) {
 
 export const jobsCache = loadJobsCacheFromStorage();
 
+// Master admin broadcast jobs — location-independent, cached the same
+// way the product feed's adminBroadcastCache is: shared across every
+// viewer on this device, refreshed on its own TTL.
+interface AdminBroadcastJobsCacheEntry { jobs: JobPost[]; timestamp: number; }
+
+function loadAdminBroadcastJobsCacheFromStorage(): Map<string, AdminBroadcastJobsCacheEntry> {
+  try {
+    const raw = localStorage.getItem(ADMIN_BROADCAST_JOBS_CACHE_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, AdminBroadcastJobsCacheEntry>;
+    return new Map(Object.entries(parsed));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveAdminBroadcastJobsCacheToStorage(cache: Map<string, AdminBroadcastJobsCacheEntry>) {
+  try {
+    const serializable: Record<string, AdminBroadcastJobsCacheEntry> = {};
+    cache.forEach((entry, key) => { serializable[key] = entry; });
+    localStorage.setItem(ADMIN_BROADCAST_JOBS_CACHE_KEY, JSON.stringify(serializable));
+  } catch {
+    // localStorage full or unavailable — cache just won't persist across reload
+  }
+}
+
+export const adminBroadcastJobsCache = loadAdminBroadcastJobsCacheFromStorage();
+
+function computeAdminBroadcastJobsCacheKey(category: string, jobType: string): string {
+  return `${category}_${jobType}`;
+}
+
 // Called after a successful job post so the poster's own device shows
 // the new listing immediately instead of waiting out the TTL.
 export function clearJobsCache() {
   jobsCache.clear();
   try {
     localStorage.removeItem(JOBS_CACHE_STORAGE_KEY);
+  } catch {
+    // safe to ignore
+  }
+  adminBroadcastJobsCache.clear();
+  try {
+    localStorage.removeItem(ADMIN_BROADCAST_JOBS_CACHE_KEY);
   } catch {
     // safe to ignore
   }
@@ -273,6 +311,34 @@ function fallbackQuery(category: string, jobType: string, cursor?: Cursor | null
     return query(coll, ...filters, orderBy("createdAt", "desc"), startAfter(cursor), limit(PAGE_SIZE));
   }
   return query(coll, ...filters, orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+}
+
+// ============================================================
+// MASTER ADMIN BROADCAST QUERY
+//
+// fallbackQuery and areaJobQueries are both fundamentally local — a
+// nationwide-but-unfiltered-by-distance fallback only when GPS isn't
+// ready yet, or a fixed 30km geohash fan-out once it is. Neither can
+// ever surface an admin job to a viewer genuinely far from wherever
+// that job's lat/lng happens to be. Admin jobs need their own
+// unscoped query, independent of the viewer's location — still
+// respects category/jobType filters, same as every other job query,
+// so switching categories doesn't unexpectedly surface admin jobs
+// from other categories.
+// ============================================================
+function adminBroadcastJobQuery(category: string, jobType: string, cursor?: Cursor | null) {
+  const coll = collection(db, "jobs");
+  const filters: ReturnType<typeof where>[] = [
+    where("posterId", "==", OWNER_UID),
+    where("status", "==", "active"),
+  ];
+  if (category !== "All") filters.push(where("category", "==", category));
+  if (jobType !== "All Types") filters.push(where("jobType", "==", jobType));
+
+  if (cursor) {
+    return query(coll, ...filters, orderBy("createdAt", "desc"), startAfter(cursor), limit(ADMIN_BROADCAST_PAGE));
+  }
+  return query(coll, ...filters, orderBy("createdAt", "desc"), limit(ADMIN_BROADCAST_PAGE));
 }
 
 // Single fixed-radius geohash fan-out — one query per nearby prefix,
