@@ -2882,6 +2882,95 @@ await cooldownRef.set({
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 5C. PASSWORD RESET (PHONE OTP)
+// ═══════════════════════════════════════════════════════════════════════════
+// Paste this whole block into the consolidated Cloud Functions backend
+// file, right after the "5B. REPORT SUBMISSION" section and before
+// "6. ADMIN MANAGEMENT" (i.e. just above the `setAdminRole` export).
+// No new imports needed — onCall, HttpsError, and admin are already
+// imported at the top of that file.
+//
+// Flow: client verifies phone ownership via Firebase Phone Auth (SMS OTP)
+// client-side, which signs them into a temporary/ephemeral phone-auth
+// session. That session's ID token carries a verified `phone_number`
+// claim. This function trusts that claim, looks up the REAL account (the
+// one created via the synthetic-email trick at signup) by phone number,
+// and resets ITS password using the Admin SDK — the ephemeral phone-auth
+// session is a proof-of-ownership mechanism only, not the account itself.
+
+const PHONE_AUTH_DOMAIN = "bizmtaani.local"; // must match phoneIdentity.ts exactly
+
+function normalizeKenyanPhone(input: string): string | null {
+  const digits = input.replace(/\D/g, "");
+  if (/^(07|01)\d{8}$/.test(digits)) return "254" + digits.slice(1);
+  if (/^254(7|1)\d{8}$/.test(digits)) return digits;
+  if (/^(7|1)\d{8}$/.test(digits)) return "254" + digits;
+  return null;
+}
+
+export const resetPasswordViaPhoneOtp = onCall(async (request) => {
+  const { auth: callerAuth, data } = request;
+
+  if (!callerAuth) {
+    throw new HttpsError(
+      "unauthenticated",
+      "You must verify your phone number first."
+    );
+  }
+
+  // Firebase sets this claim only when the caller signed in via a verified
+  // phone-auth SMS OTP — this is the actual proof, not something the
+  // client can fake by just passing a phone number in `data`.
+  const verifiedPhone = callerAuth.token.phone_number as string | undefined;
+  if (!verifiedPhone) {
+    throw new HttpsError(
+      "failed-precondition",
+      "This request wasn't made with a phone-verified session."
+    );
+  }
+
+  const newPassword = (data?.newPassword ?? "") as string;
+  if (typeof newPassword !== "string" || newPassword.length < 6) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Password must be at least 6 characters."
+    );
+  }
+
+  const normalizedPhone = normalizeKenyanPhone(verifiedPhone);
+  if (!normalizedPhone) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Could not read a valid phone number from the verification."
+    );
+  }
+
+  const syntheticEmail = `${normalizedPhone}@${PHONE_AUTH_DOMAIN}`;
+
+  let targetUser;
+  try {
+    targetUser = await admin.auth().getUserByEmail(syntheticEmail);
+  } catch {
+    throw new HttpsError(
+      "not-found",
+      "No BizMtaani account is registered with this phone number."
+    );
+  }
+
+  await admin.auth().updateUser(targetUser.uid, { password: newPassword });
+
+  // Clean up the ephemeral phone-auth account created just to prove
+  // ownership — it's a throwaway verification artifact, not a real
+  // account, and shouldn't accumulate in the Auth user list.
+  if (callerAuth.uid !== targetUser.uid) {
+    admin.auth().deleteUser(callerAuth.uid).catch(() => {});
+  }
+
+  return { success: true };
+});
+
+
+// ═══════════════════════════════════════════════════════════════════════════
 // 6. ADMIN MANAGEMENT
 // ═══════════════════════════════════════════════════════════════════════════
 
