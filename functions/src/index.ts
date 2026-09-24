@@ -2101,7 +2101,13 @@ const isMasterAdmin = uid === OWNER_UID;
   // never trusted from the client. Free stays local-radius (2.5km);
   // premium gets wider area-based reach, capped at the feed's
   // HOME_FEED_MAX_RADIUS_KM (30km) — never countywide or nationwide.
-  const visibilityScope = effectivePlan === "free" ? "local" : "county";
+  // Master admin adverts broadcast everywhere, not just within the
+  // normal free (ward) / premium (30km) reach.
+  const visibilityScope = isMasterAdmin
+    ? "all_areas"
+    : effectivePlan === "free"
+      ? "local"
+      : "county";
 
   // 6. Logic: Dynamic Expiry (Only if active immediately)
   // Hotel menu adverts follow the seller's subscription instead of a fixed
@@ -2371,7 +2377,13 @@ const isMasterAdmin = uid === OWNER_UID;
       ? "active"
       : "pending_payment";
 
-  const visibilityScope = effectivePlan === "free" ? "local" : "county";
+  // Master admin adverts broadcast everywhere, not just within the
+  // normal free (ward) / premium (30km) reach.
+  const visibilityScope = isMasterAdmin
+    ? "all_areas"
+    : effectivePlan === "free"
+      ? "local"
+      : "county";
 
   const isHotelMenu = otherData.hotelMenu !== undefined && otherData.hotelMenu !== null;
   const durationDays = LISTING_DURATIONS[effectivePlan] ?? 7;
