@@ -1993,6 +1993,10 @@ if (userSnap.exists) {
     hasActiveSubscription = true;
   }
 }
+  // Master admin posts are unrestricted: no active-ad-count cap, no
+// payment requirement, and always broadcast to every viewer
+// (visibilityScope "all_areas"), regardless of chosen plan.
+const isMasterAdmin = uid === OWNER_UID;
 
   // 0. Validation: Category requires Premium
   const category = typeof otherData.category === "string" ? otherData.category : "";
@@ -2289,6 +2293,11 @@ try {
       hasActiveSubscription = true;
     }
   }
+
+    // Master admin posts are unrestricted: no active-ad-count cap, no
+// payment requirement, and always broadcast to every viewer
+// (visibilityScope "all_areas"), regardless of chosen plan.
+const isMasterAdmin = uid === OWNER_UID;
 
   const category = typeof otherData.category === "string" ? otherData.category : "";
   if (PREMIUM_ONLY_CATEGORIES.includes(category) && effectivePlan === "free") {
