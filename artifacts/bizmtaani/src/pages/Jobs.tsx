@@ -38,6 +38,16 @@ const PAGE_SIZE = 15;
 const PREFIX_FETCH_SIZE = 15; // per-prefix page size for the fan-out
 const JOBS_RADIUS_KM = 30;
 
+// Must match OWNER_UID in functions/index.ts and useHomeFeed.ts exactly.
+// Jobs posted by this account bypass the normal 30km geohash-radius
+// discovery entirely — see adminBroadcastJobQuery below — since that
+// radius cap would otherwise make an admin job invisible to any viewer
+// more than 30km from wherever the admin happens to be.
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+const ADMIN_BROADCAST_PAGE = 30;
+const ADMIN_BROADCAST_JOBS_CACHE_TTL_MS = 10 * 60 * 1000;
+const ADMIN_BROADCAST_JOBS_CACHE_KEY = "bizmtaani_jobs_admin_broadcast_cache";
+
 export const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
 const MAX_CACHED_KEYS = 6;
