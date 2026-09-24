@@ -2090,10 +2090,12 @@ const isMasterAdmin = uid === OWNER_UID;
 
   // 5. Logic: Status Determination
   // Paid plans start as 'pending_payment'; Free plans start as 'active'
+  // Master admin adverts are always active immediately — never
+  // gated on payment, regardless of which plan was selected.
   const status =
-  effectivePlan === "free" || hasActiveSubscription
-    ? "active"
-    : "pending_payment";
+    isMasterAdmin || effectivePlan === "free" || hasActiveSubscription
+      ? "active"
+      : "pending_payment";
 
   // Visibility scope is derived server-side from the verified plan —
   // never trusted from the client. Free stays local-radius (2.5km);
@@ -2362,8 +2364,12 @@ const isMasterAdmin = uid === OWNER_UID;
     );
   }
 
+  // Master admin adverts are always active immediately — never
+  // gated on payment, regardless of which plan was selected.
   const status =
-    effectivePlan === "free" || hasActiveSubscription ? "active" : "pending_payment";
+    isMasterAdmin || effectivePlan === "free" || hasActiveSubscription
+      ? "active"
+      : "pending_payment";
 
   const visibilityScope = effectivePlan === "free" ? "local" : "county";
 
