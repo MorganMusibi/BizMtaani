@@ -534,6 +534,58 @@ export default function Jobs() {
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // Master admin broadcast jobs — independent of GPS/location, always
+  // visible regardless of category filter matching what was fetched.
+  const initialBroadcastCacheKey = computeAdminBroadcastJobsCacheKey(activeCategory, activeType);
+  const initialBroadcastCached = adminBroadcastJobsCache.get(initialBroadcastCacheKey);
+  const [adminBroadcastJobs, setAdminBroadcastJobs] = useState<JobPost[]>(
+    initialBroadcastCached && Date.now() - initialBroadcastCached.timestamp < ADMIN_BROADCAST_JOBS_CACHE_TTL_MS
+      ? initialBroadcastCached.jobs
+      : []
+  );
+
+  useEffect(() => {
+    const cacheKey = computeAdminBroadcastJobsCacheKey(activeCategory, activeType);
+    const cached = adminBroadcastJobsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < ADMIN_BROADCAST_JOBS_CACHE_TTL_MS) {
+      setAdminBroadcastJobs(cached.jobs);
+      return;
+    }
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Admin can post unlimited jobs — page through fully rather
+        // than a single capped fetch. ADMIN_BROADCAST_MAX_PAGES is a
+        // runaway-loop safety net, not a real visibility limit.
+        let all: JobPost[] = [];
+        let cursor: Cursor | null = null;
+        let pages = 0;
+        const ADMIN_BROADCAST_MAX_PAGES = 50;
+
+        while (pages < ADMIN_BROADCAST_MAX_PAGES) {
+          const snap = await getDocs(adminBroadcastJobQuery(activeCategory, activeType, cursor));
+          lazyExpireJobs(snap.docs);
+          all = all.concat(toJobs(snap.docs));
+          pages++;
+          if (snap.docs.length < ADMIN_BROADCAST_PAGE) break;
+          cursor = snap.docs[snap.docs.length - 1] ?? null;
+          if (!cursor) break;
+        }
+
+        if (!cancelled) {
+          setAdminBroadcastJobs(all);
+          adminBroadcastJobsCache.set(cacheKey, { jobs: all, timestamp: Date.now() });
+          saveAdminBroadcastJobsCacheToStorage(adminBroadcastJobsCache);
+        }
+      } catch (error) {
+        console.error("Failed to load master admin broadcast jobs:", error);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [activeCategory, activeType]);
   useEffect(() => {
     let cancelled = false;
     getLocationHierarchy()
@@ -728,7 +780,14 @@ export default function Jobs() {
     );
   }
 
-  const visible = applyLocalFilters(jobs);
+  // Merge admin broadcast jobs into whatever the normal query found —
+  // dedupe covers the case where an admin job also happens to be
+  // within the normal 30km fan-out and got fetched both ways.
+  const combinedJobs = dedupe(jobs, adminBroadcastJobs);
+  const sortedCombinedJobs = userCoords
+    ? sortJobsByProximity(combinedJobs, userCoords, locationInfo?.wardName)
+    : combinedJobs;
+  const visible = applyLocalFilters(sortedCombinedJobs);
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
