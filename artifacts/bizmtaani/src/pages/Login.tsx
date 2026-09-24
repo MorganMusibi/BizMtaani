@@ -1,63 +1,24 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  signOut,
+  type ConfirmationResult,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { auth, functions } from "@/lib/firebase";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
+import { normalizeKenyanPhone, resolveAuthEmail } from "@/lib/phoneIdentity";
+import { sendPhoneOtp, resetPhoneOtpState } from "@/lib/phoneOtp";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-// Must match Register.tsx exactly — same synthetic domain used to back
-// phone-only accounts in Firebase Auth.
-const PHONE_AUTH_DOMAIN = "bizmtaani.local";
+const RESET_RECAPTCHA_CONTAINER_ID = "recaptcha-container-login-reset";
 
-/**
- * Normalizes a Kenyan phone number to 2547XXXXXXXX / 2541XXXXXXXX format.
- * Accepts 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, +2547XXXXXXXX, 7XXXXXXXX.
- * Returns null if the input doesn't match a recognizable Kenyan mobile format.
- */
-function normalizeKenyanPhone(input: string): string | null {
-  const digits = input.replace(/\D/g, "");
-
-  if (/^(07|01)\d{8}$/.test(digits)) {
-    return "254" + digits.slice(1);
-  }
-  if (/^254(7|1)\d{8}$/.test(digits)) {
-    return digits;
-  }
-  if (/^(7|1)\d{8}$/.test(digits)) {
-    return "254" + digits;
-  }
-  return null;
-}
-
-function phoneToAuthEmail(normalizedPhone: string): string {
-  return `${normalizedPhone}@${PHONE_AUTH_DOMAIN}`;
-}
-
-/**
- * Turns whatever the user typed — a real email or a phone number — into
- * the actual string Firebase Auth needs. Returns null if it's neither.
- */
-function resolveAuthEmail(identifier: string): string | null {
-  const trimmed = identifier.trim();
-  if (!trimmed) return null;
-
-  if (trimmed.includes("@")) {
-    // Looks like an email. Reject anyone trying to type our internal
-    // synthetic domain directly.
-    if (trimmed.toLowerCase().endsWith(`@${PHONE_AUTH_DOMAIN}`)) return null;
-    return trimmed;
-  }
-
-  const normalizedPhone = normalizeKenyanPhone(trimmed);
-  return normalizedPhone ? phoneToAuthEmail(normalizedPhone) : null;
-}
 
 export default function Login() {
   const [, setLocation] = useLocation();
@@ -71,6 +32,156 @@ export default function Login() {
 
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
+
+  // Phone-OTP reset flow — separate from the email-link flow above.
+  // "method" picks which UI shows; "phase" only applies to phone.
+  const [resetMethod, setResetMethod] = useState<"email" | "phone">("email");
+  const [resetPhase, setResetPhase] = useState<"request" | "otp">("request");
+  const [resetPhone, setResetPhone] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [newPhonePassword, setNewPhonePassword] = useState("");
+  const [phoneResetLoading, setPhoneResetLoading] = useState(false);
+  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+
+  function openForgotPassword() {
+    const trimmed = identifier.trim();
+    if (trimmed && !trimmed.includes("@")) {
+      // They typed a phone number on the login screen — default the
+      // reset modal to the phone flow instead of email.
+      setResetMethod("phone");
+      setResetPhone(trimmed);
+      setResetEmail("");
+    } else {
+      setResetMethod("email");
+      setResetEmail(trimmed.includes("@") ? trimmed : "");
+      setResetPhone("");
+    }
+    setResetPhase("request");
+    setOtpCode("");
+    setNewPhonePassword("");
+    setShowForgotPassword(true);
+  }
+
+  function closeForgotPasswordModal() {
+    setShowForgotPassword(false);
+    setResetPhase("request");
+    setOtpCode("");
+    setNewPhonePassword("");
+    confirmationResultRef.current = null;
+    resetPhoneOtpState();
+  }
+
+  async function handleSendResetOtp(e: React.FormEvent) {
+    e.preventDefault();
+
+    const normalizedPhone = normalizeKenyanPhone(resetPhone);
+    if (!normalizedPhone) {
+      toast({
+        title: "Enter a valid phone number",
+        description: "e.g. 0712 345 678",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPhoneResetLoading(true);
+    try {
+      confirmationResultRef.current = await sendPhoneOtp(
+        normalizedPhone,
+        RESET_RECAPTCHA_CONTAINER_ID
+      );
+      setResetPhase("otp");
+      toast({ title: "Code sent", description: `We sent a code to ${resetPhone}.` });
+    } catch (err: unknown) {
+      console.error("Failed to send reset OTP:", err);
+      // A failed send may leave the reCAPTCHA verifier in a bad state —
+      // clear it so the next attempt (e.g. after fixing a typo) starts fresh.
+      resetPhoneOtpState();
+      toast({
+        title: "Could not send code",
+        description: getFirebaseErrorMessage(
+          err,
+          "Please check the number and try again."
+        ),
+        variant: "destructive",
+      });
+    } finally {
+      setPhoneResetLoading(false);
+    }
+  }
+
+  async function handleConfirmResetOtp(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!confirmationResultRef.current) {
+      toast({
+        title: "Session expired",
+        description: "Please request a new code.",
+        variant: "destructive",
+      });
+      setResetPhase("request");
+      return;
+    }
+
+    if (newPhonePassword.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "At least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setPhoneResetLoading(true);
+    try {
+      // Signs the browser into a temporary phone-auth session — this is
+      // only used as proof of phone ownership; resetPasswordViaPhoneOtp
+      // resets the REAL account and deletes this ephemeral one.
+      await confirmationResultRef.current.confirm(otpCode.trim());
+
+      const resetPasswordViaPhoneOtp = httpsCallable<
+        { newPassword: string },
+        { success: boolean }
+      >(functions, "resetPasswordViaPhoneOtp");
+
+      await resetPasswordViaPhoneOtp({ newPassword: newPhonePassword });
+
+      // The ephemeral session's account no longer exists server-side
+      // (or shouldn't be used further either way) — sign out so the
+      // user lands back on a clean login screen.
+      await signOut(auth).catch(() => {});
+
+      toast({
+        title: "Password updated",
+        description: "You can now sign in with your new password.",
+      });
+
+      setIdentifier(resetPhone);
+      setPassword("");
+      closeForgotPasswordModal();
+    } catch (err: unknown) {
+      console.error("Failed to confirm reset OTP:", err);
+      // Wrong code is a retryable mistake on the SAME confirmationResult —
+      // don't clear the verifier or bounce back to the request step for
+      // that case. Anything else (expired session, etc.) needs a fresh code.
+      const code = (err as { code?: string })?.code ?? "";
+      if (code !== "auth/invalid-verification-code") {
+        resetPhoneOtpState();
+        confirmationResultRef.current = null;
+        setResetPhase("request");
+      }
+      toast({
+        title: "Could not verify code",
+        description: getFirebaseErrorMessage(
+          err,
+          "Please check the code and try again."
+        ),
+        variant: "destructive",
+      });
+    } finally {
+      setPhoneResetLoading(false);
+    }
+  }
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -266,10 +377,7 @@ export default function Login() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setResetEmail(identifier.includes("@") ? identifier : "");
-                  setShowForgotPassword(true);
-                }}
+                onClick={openForgotPassword}
                 className="text-sm font-semibold text-primary hover:underline"
               >
                 Forgot password?
@@ -319,8 +427,8 @@ export default function Login() {
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-6"
           onClick={() => {
-            if (!resetLoading) {
-              setShowForgotPassword(false);
+            if (!resetLoading && !phoneResetLoading) {
+              closeForgotPasswordModal();
             }
           }}
         >
@@ -332,65 +440,173 @@ export default function Login() {
               Reset your password
             </h2>
 
-            <p className="mt-2 text-sm text-muted-foreground">
-              Enter the email address associated with your BizMtaani
-              account and we'll send you a password reset link. This only
-              works for accounts created with an email address — phone-only
-              accounts can't receive a reset email.
-            </p>
+            {/* Method toggle */}
+            <div className="flex rounded-xl bg-muted p-1 mt-4 mb-1">
+              <button
+                type="button"
+                onClick={() => { setResetMethod("phone"); setResetPhase("request"); }}
+                className={`flex-1 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                  resetMethod === "phone" ? "bg-background shadow-sm" : "text-muted-foreground"
+                }`}
+                disabled={resetLoading || phoneResetLoading}
+              >
+                Phone
+              </button>
+              <button
+                type="button"
+                onClick={() => setResetMethod("email")}
+                className={`flex-1 h-9 rounded-lg text-sm font-semibold transition-colors ${
+                  resetMethod === "email" ? "bg-background shadow-sm" : "text-muted-foreground"
+                }`}
+                disabled={resetLoading || phoneResetLoading}
+              >
+                Email
+              </button>
+            </div>
 
-            <form
-              onSubmit={handleForgotPassword}
-              className="mt-6 space-y-4"
-            >
-              <div className="space-y-1.5">
-                <Label htmlFor="reset-email">
-                  Email address
-                </Label>
+            {resetMethod === "email" ? (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Enter the email address associated with your BizMtaani
+                  account and we'll send you a password reset link. This only
+                  works for accounts created with an email address.
+                </p>
 
-                <Input
-                  id="reset-email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                  required
-                  className="h-12"
-                  disabled={resetLoading}
-                />
-              </div>
-
-              <div className="flex gap-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 h-12"
-                  onClick={() => setShowForgotPassword(false)}
-                  disabled={resetLoading}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  type="submit"
-                  className="flex-1 h-12 font-bold"
-                  disabled={resetLoading}
-                >
-                  {resetLoading ? (
-                    <Loader2
-                      size={18}
-                      className="animate-spin"
+                <form onSubmit={handleForgotPassword} className="mt-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-email">Email address</Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      autoComplete="email"
+                      placeholder="you@example.com"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      required
+                      className="h-12"
+                      disabled={resetLoading}
                     />
-                  ) : (
-                    "Send link"
-                  )}
-                </Button>
-              </div>
-            </form>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-12"
+                      onClick={closeForgotPasswordModal}
+                      disabled={resetLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1 h-12 font-bold" disabled={resetLoading}>
+                      {resetLoading ? <Loader2 size={18} className="animate-spin" /> : "Send link"}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : resetPhase === "request" ? (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Enter your phone number and we'll text you a one-time code
+                  to reset your password.
+                </p>
+
+                <form onSubmit={handleSendResetOtp} className="mt-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-phone">Phone number</Label>
+                    <Input
+                      id="reset-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      autoComplete="tel"
+                      placeholder="07XX XXX XXX"
+                      value={resetPhone}
+                      onChange={(e) => setResetPhone(e.target.value)}
+                      required
+                      className="h-12"
+                      disabled={phoneResetLoading}
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-12"
+                      onClick={closeForgotPasswordModal}
+                      disabled={phoneResetLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1 h-12 font-bold" disabled={phoneResetLoading}>
+                      {phoneResetLoading ? <Loader2 size={18} className="animate-spin" /> : "Send code"}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Enter the code sent to {resetPhone} and choose a new password.
+                </p>
+
+                <form onSubmit={handleConfirmResetOtp} className="mt-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-otp">Verification code</Label>
+                    <Input
+                      id="reset-otp"
+                      type="text"
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value)}
+                      required
+                      className="h-12"
+                      disabled={phoneResetLoading}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="reset-new-password">New password</Label>
+                    <Input
+                      id="reset-new-password"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="At least 6 characters"
+                      value={newPhonePassword}
+                      onChange={(e) => setNewPhonePassword(e.target.value)}
+                      required
+                      className="h-12"
+                      disabled={phoneResetLoading}
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 h-12"
+                      onClick={closeForgotPasswordModal}
+                      disabled={phoneResetLoading}
+                    >
+                      Cancel
+                    </Button>
+                    <Button type="submit" className="flex-1 h-12 font-bold" disabled={phoneResetLoading}>
+                      {phoneResetLoading ? <Loader2 size={18} className="animate-spin" /> : "Reset password"}
+                    </Button>
+                  </div>
+                </form>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {/* Invisible reCAPTCHA container for phone-OTP password reset —
+          must be mounted whenever the modal can be, not just after
+          the phone form renders, so sendPhoneOtp always finds it. */}
+      <div id={RESET_RECAPTCHA_CONTAINER_ID} />
     </div>
   );
 }
