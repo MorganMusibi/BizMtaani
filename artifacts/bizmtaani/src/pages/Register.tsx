@@ -3,6 +3,7 @@ import { useLocation, Link } from "wouter";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+  sendEmailVerification,
 } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, functions } from "@/lib/firebase";
@@ -14,17 +15,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, ChevronLeft, Store, User, MapPin } from "lucide-react";
+import { Loader2, ChevronLeft, Store, User, MapPin, Mail, Phone } from "lucide-react";
 
 type Step = 1 | 2;
+type SignupMethod = "email" | "phone";
 
 interface HomeLocation {
   lat: number | null; lng: number | null;
   areaName: string; constituency: string; county: string;
 }
 
-// Domain used only to satisfy Firebase Auth's email/password requirement.
-// Never sent anywhere, never shown to the user, not a real mailbox.
+// Domain used only to satisfy Firebase Auth's email/password requirement
+// for phone-based accounts. Never sent anywhere, never shown to the user,
+// not a real mailbox.
 const PHONE_AUTH_DOMAIN = "bizmtaani.local";
 
 /**
@@ -55,7 +58,8 @@ async function saveUserProfile(
   uid: string,
   opts: {
     displayName: string;
-    phone: string;
+    email?: string;
+    phone?: string;
     isBusinessOwner: boolean;
     businessName?: string;
     homeLocation?: HomeLocation;
@@ -63,7 +67,8 @@ async function saveUserProfile(
 ) {
   await setDoc(doc(db, "users", uid), {
     displayName: opts.displayName,
-    phone: opts.phone,
+    email: opts.email ?? "",
+    ...(opts.phone ? { phone: opts.phone } : {}),
     isBusinessOwner: opts.isBusinessOwner,
     searchNameLower: (opts.isBusinessOwner && opts.businessName
       ? opts.businessName
@@ -107,6 +112,7 @@ export default function Register() {
 
   const [step, setStep] = useState<Step>(1);
   const [isBusinessOwner, setIsBusinessOwner] = useState<boolean | null>(null);
+  const [signupMethod, setSignupMethod] = useState<SignupMethod>("phone");
 
   // Form fields
   const [name, setName] = useState("");
@@ -117,6 +123,7 @@ export default function Register() {
   } | null>(null);
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [resolvingArea, setResolvingArea] = useState(false);
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
@@ -166,15 +173,25 @@ export default function Register() {
       toast({ title: "Chagua eneo lako", variant: "destructive" });
       return;
     }
-    const normalizedPhone = normalizeKenyanPhone(phone);
-    if (!normalizedPhone) {
-      toast({
-        title: "Enter a valid phone number",
-        description: "e.g. 0712 345 678",
-        variant: "destructive",
-      });
-      return;
+
+    let normalizedPhone: string | null = null;
+    if (signupMethod === "phone") {
+      normalizedPhone = normalizeKenyanPhone(phone);
+      if (!normalizedPhone) {
+        toast({
+          title: "Enter a valid phone number",
+          description: "e.g. 0712 345 678",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else {
+      if (!email.trim()) {
+        toast({ title: "Please enter your email", variant: "destructive" });
+        return;
+      }
     }
+
     if (password.length < 6) {
       toast({ title: "Password too short", description: "At least 6 characters.", variant: "destructive" });
       return;
@@ -195,12 +212,16 @@ export default function Register() {
         county: selectedWard.countyName,
       };
 
-      const authEmail = phoneToAuthEmail(normalizedPhone);
+      const authEmail = signupMethod === "phone"
+        ? phoneToAuthEmail(normalizedPhone!)
+        : email.trim();
+
       const cred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await updateProfile(cred.user, { displayName: name.trim() });
       await saveUserProfile(cred.user.uid, {
         displayName: name.trim(),
-        phone: normalizedPhone,
+        email: signupMethod === "email" ? email.trim() : undefined,
+        phone: signupMethod === "phone" ? normalizedPhone! : undefined,
         isBusinessOwner: isBusinessOwner ?? false,
         businessName: isBusinessOwner ? name.trim() : undefined,
         homeLocation,
@@ -212,22 +233,29 @@ export default function Register() {
         }
       });
 
+      if (signupMethod === "email") {
+        // Non-blocking — don't fail signup if this errors.
+        sendEmailVerification(cred.user).catch(() => {});
+      }
+
       toast({
         title: "Account created!",
-        description: "Welcome to BizMtaani.",
+        description: signupMethod === "email"
+          ? "Check your email and click the verification link to unlock all features."
+          : "Welcome to BizMtaani.",
       });
 
       setLocation("/");
     } catch (err: unknown) {
       console.error("Registration failed:", err);
 
-      // Firebase will report "email-already-in-use" for a duplicate phone —
-      // reword it so it actually makes sense to the user.
       const rawMessage = getFirebaseErrorMessage(
         err,
         "Unable to create your account. Please try again."
       );
-      const description = rawMessage.toLowerCase().includes("email")
+      // Firebase reports "email-already-in-use" even for a duplicate phone
+      // (since phone accounts are backed by a synthetic email) — reword it.
+      const description = signupMethod === "phone" && rawMessage.toLowerCase().includes("email")
         ? "This phone number is already registered. Try signing in instead."
         : rawMessage;
 
@@ -386,6 +414,30 @@ export default function Register() {
               />
             </div>
 
+            {/* ── Email / Phone toggle ── */}
+            <div className="flex rounded-xl bg-muted p-1 mb-4">
+              <button
+                type="button"
+                data-testid="button-method-phone"
+                onClick={() => setSignupMethod("phone")}
+                className={`flex-1 h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  signupMethod === "phone" ? "bg-background shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                <Phone size={14} /> Phone
+              </button>
+              <button
+                type="button"
+                data-testid="button-method-email"
+                onClick={() => setSignupMethod("email")}
+                className={`flex-1 h-9 rounded-lg text-sm font-semibold flex items-center justify-center gap-1.5 transition-colors ${
+                  signupMethod === "email" ? "bg-background shadow-sm" : "text-muted-foreground"
+                }`}
+              >
+                <Mail size={14} /> Email
+              </button>
+            </div>
+
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="name">{nameLabel}</Label>
@@ -400,20 +452,38 @@ export default function Register() {
                   autoFocus
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="phone">Phone number</Label>
-                <Input
-                  id="phone"
-                  data-testid="input-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  placeholder="07XX XXX XXX"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                  className="h-12"
-                />
-              </div>
+
+              {signupMethod === "phone" ? (
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone">Phone number</Label>
+                  <Input
+                    id="phone"
+                    data-testid="input-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    placeholder="07XX XXX XXX"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    data-testid="input-email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="h-12"
+                  />
+                </div>
+              )}
+
               <div className="space-y-1.5">
                 <Label htmlFor="password">Password</Label>
                 <Input
