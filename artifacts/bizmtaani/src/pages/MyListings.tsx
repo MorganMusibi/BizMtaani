@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import {
-  collection, query, where, orderBy, limit, getDocs, deleteDoc, doc,
+  collection, query, where, orderBy, limit, getDocs, deleteDoc, doc, startAfter, Timestamp,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -64,8 +64,29 @@ function PriceListPreview({ priceList }: { priceList: Product["priceList"] }) {
   );
 }
 
+const MY_LISTINGS_PAGE = 20;
+
+// Same serializable-cursor pattern as useHomeFeed.ts — a raw
+// {seconds,nanoseconds} object survives JSON.stringify/sessionStorage,
+// unlike a QueryDocumentSnapshot.
+type CreatedAtCursor = { seconds: number; nanoseconds: number };
+
+function createdAtCursorFromProduct(p: Product): CreatedAtCursor | null {
+  if (!p.createdAt || typeof p.createdAt.seconds !== "number") return null;
+  return {
+    seconds: p.createdAt.seconds,
+    nanoseconds: (p.createdAt as any).nanoseconds ?? 0,
+  };
+}
+
+function createdAtCursorToTimestamp(cursor: CreatedAtCursor): Timestamp {
+  return new Timestamp(cursor.seconds, cursor.nanoseconds);
+}
+
 interface ListingsCacheEntry {
   products: Product[];
+  cursor: CreatedAtCursor | null;
+  hasMore: boolean;
   timestamp: number;
 }
 const LISTINGS_CACHE_TTL_MS = 5 * 60 * 1000; // 2 minutes
@@ -109,6 +130,9 @@ export default function MyListings() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<CreatedAtCursor | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [confirmProduct, setConfirmProduct] = useState<Product | null>(null);
 
   // Renewal state
@@ -137,21 +161,74 @@ export default function MyListings() {
       const cached = readListingsCache(user.uid);
       if (cached && Date.now() - cached.timestamp < LISTINGS_CACHE_TTL_MS) {
         setProducts(cached.products);
+        setCursor(cached.cursor);
+        setHasMore(cached.hasMore);
         return;
       }
     }
 
+    // Ordered + paginated server-side, rather than fetching a flat
+    // 20-doc cap client-sorted — a seller (master admin included) with
+    // more than 20 listings needs loadMoreProducts() below to reach
+    // anything past the newest page.
     const q = query(
-  collection(db, "products"),
-  where("sellerId", "==", user.uid),
-  limit(20)
-);
-const snap = await getDocs(q);
-const loaded = snap.docs
-  .map((d) => ({ id: d.id, ...d.data() } as Product))
-  .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      collection(db, "products"),
+      where("sellerId", "==", user.uid),
+      orderBy("createdAt", "desc"),
+      limit(MY_LISTINGS_PAGE)
+    );
+    const snap = await getDocs(q);
+    const loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+    const lastDoc = loaded[loaded.length - 1];
+    const newCursor = lastDoc ? createdAtCursorFromProduct(lastDoc) : null;
+    const newHasMore = snap.docs.length === MY_LISTINGS_PAGE;
+
     setProducts(loaded);
-    writeListingsCache(user.uid, { products: loaded, timestamp: Date.now() });
+    setCursor(newCursor);
+    setHasMore(newHasMore);
+    writeListingsCache(user.uid, {
+      products: loaded,
+      cursor: newCursor,
+      hasMore: newHasMore,
+      timestamp: Date.now(),
+    });
+  }
+
+  async function loadMoreProducts() {
+    if (!user || !hasMore || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "products"),
+        where("sellerId", "==", user.uid),
+        orderBy("createdAt", "desc"),
+        ...(cursor ? [startAfter(createdAtCursorToTimestamp(cursor))] : []),
+        limit(MY_LISTINGS_PAGE)
+      );
+      const snap = await getDocs(q);
+      const newProducts = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Product));
+      const lastDoc = newProducts[newProducts.length - 1];
+      const newCursor = lastDoc ? createdAtCursorFromProduct(lastDoc) : cursor;
+      const newHasMore = snap.docs.length === MY_LISTINGS_PAGE;
+
+      setProducts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const merged = [...prev, ...newProducts.filter((p) => !existingIds.has(p.id))];
+        writeListingsCache(user!.uid, {
+          products: merged,
+          cursor: newCursor,
+          hasMore: newHasMore,
+          timestamp: Date.now(),
+        });
+        return merged;
+      });
+      setCursor(newCursor);
+      setHasMore(newHasMore);
+    } catch (err) {
+      console.error("Failed to load more listings:", err);
+    } finally {
+      setLoadingMore(false);
+    }
   }
 
   useEffect(() => {
@@ -351,6 +428,21 @@ const loaded = snap.docs
                     </div>
                   ))}
                 </div>
+              </div>
+        )}
+
+            {hasMore && (
+              <div className="flex justify-center pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadMoreProducts}
+                  disabled={loadingMore}
+                  className="gap-2"
+                >
+                  {loadingMore ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {loadingMore ? "Loading..." : "Load more listings"}
+                </Button>
               </div>
             )}
           </>
