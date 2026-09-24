@@ -2071,24 +2071,20 @@ const isMasterAdmin = uid === OWNER_UID;
   // 4. Logic: Active Ad Limit Enforcement (applies to every plan
   // except the master admin, who has no cap — "unlimited posts").
   if (!isMasterAdmin) {
-    // Master admin posts are unrestricted: no active-ad-count cap —
-  // matches the same isMasterAdmin gate already applied in publishAdvert.
-  if (!isMasterAdmin) {
     const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
-    const activeCountSnap = await db
-      .collection("products")
-      .where("sellerId", "==", uid)
-      .where("status", "==", "active")
-      .count()
-      .get();
+  const activeCountSnap = await db
+    .collection("products")
+    .where("sellerId", "==", uid)
+    .where("status", "==", "active")
+    .count()
+    .get();
 
-    if (activeCountSnap.data().count >= activeAdLimit) {
-      throw new HttpsError(
-        "failed-precondition",
-        `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
-      );
-    }
+  if (activeCountSnap.data().count >= activeAdLimit) {
+    throw new HttpsError(
+      "failed-precondition",
+      `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
+    );
   }
   }
 
@@ -2363,20 +2359,24 @@ const isMasterAdmin = uid === OWNER_UID;
     }
   }
 
-  const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
+  // Master admin posts are unrestricted: no active-ad-count cap —
+  // matches the same isMasterAdmin gate already applied in publishAdvert.
+  if (!isMasterAdmin) {
+    const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
-  const activeCountSnap = await db
-    .collection("products")
-    .where("sellerId", "==", uid)
-    .where("status", "==", "active")
-    .count()
-    .get();
+    const activeCountSnap = await db
+      .collection("products")
+      .where("sellerId", "==", uid)
+      .where("status", "==", "active")
+      .count()
+      .get();
 
-  if (activeCountSnap.data().count >= activeAdLimit) {
-    throw new HttpsError(
-      "failed-precondition",
-      `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
-    );
+    if (activeCountSnap.data().count >= activeAdLimit) {
+      throw new HttpsError(
+        "failed-precondition",
+        `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
+      );
+    }
   }
 
   // Master admin adverts are always active immediately — never
