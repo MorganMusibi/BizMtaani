@@ -25,34 +25,7 @@ interface HomeLocation {
   areaName: string; constituency: string; county: string;
 }
 
-// Domain used only to satisfy Firebase Auth's email/password requirement
-// for phone-based accounts. Never sent anywhere, never shown to the user,
-// not a real mailbox.
-const PHONE_AUTH_DOMAIN = "bizmtaani.local";
-
-/**
- * Normalizes a Kenyan phone number to 2547XXXXXXXX / 2541XXXXXXXX format.
- * Accepts 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, +2547XXXXXXXX, 7XXXXXXXX.
- * Returns null if the input doesn't match a recognizable Kenyan mobile format.
- */
-function normalizeKenyanPhone(input: string): string | null {
-  const digits = input.replace(/\D/g, "");
-
-  if (/^(07|01)\d{8}$/.test(digits)) {
-    return "254" + digits.slice(1);
-  }
-  if (/^254(7|1)\d{8}$/.test(digits)) {
-    return digits;
-  }
-  if (/^(7|1)\d{8}$/.test(digits)) {
-    return "254" + digits;
-  }
-  return null;
-}
-
-function phoneToAuthEmail(normalizedPhone: string): string {
-  return `${normalizedPhone}@${PHONE_AUTH_DOMAIN}`;
-}
+import { normalizeKenyanPhone, phoneToAuthEmail } from "@/lib/phoneIdentity";
 
 async function saveUserProfile(
   uid: string,
