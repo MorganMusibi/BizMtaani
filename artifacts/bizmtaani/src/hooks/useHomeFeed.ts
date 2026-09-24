@@ -19,6 +19,18 @@ interface ProductImage { url: string; public_id?: string;
 const WARD_PAGE = 20;
 const AREA_PAGE = 20;
 const AREA_BUFFER_FETCH = 20;
+
+// Single source of truth for the master admin/owner UID — must match
+// OWNER_UID in the Cloud Functions backend exactly. Products posted by
+// this account are treated as universally visible (see
+// isProductVisibleToUser) and are actively broadcast to every viewer
+// regardless of ward or distance (see adminBroadcastQuery below),
+// since normal geohash-radius discovery is capped at
+// HOME_FEED_MAX_RADIUS_KM and would never reach a viewer far from
+// where the admin's advert happens to be located.
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+const ADMIN_BROADCAST_PAGE = 30;
+
 // Internal geographic discovery stages.
 //
 // These are NOT user-selected visibility distances.
@@ -209,6 +221,15 @@ export function clearFeedCache() {
   } catch {
     // localStorage unavailable — nothing to clear, safe to ignore
   }
+  // Also clear the persisted admin-broadcast cache, so a fresh admin
+  // post shows up for every viewer immediately rather than waiting
+  // out ADMIN_BROADCAST_CACHE_TTL_MS.
+  adminBroadcastCache = null;
+  try {
+    localStorage.removeItem(ADMIN_BROADCAST_CACHE_KEY);
+  } catch {
+    // localStorage unavailable — nothing to clear, safe to ignore
+  }
 }
 
 function computeFeedCacheKey(
@@ -393,6 +414,18 @@ function getProductVisibilityScope(product: Product) {
   userCoords: [number, number],
   userWardName?: string
 ) {
+  // Master admin adverts are visible to every user, everywhere — no
+  // ward match required, no distance cap. This is the visibility half
+  // of "posted by master admin = visible everywhere, unlimited posts";
+  // the discovery half (actually surfacing a far-away admin product to
+  // a viewer, since geohash-radius discovery below is capped at
+  // HOME_FEED_MAX_RADIUS_KM) is handled separately by
+  // adminBroadcastQuery / the adminBroadcastProducts fetch further
+  // down this file.
+  if (product.sellerId === OWNER_UID) {
+    return true;
+  }
+
   const distance = getDistanceKm(
     userCoords[0],
     userCoords[1],
@@ -442,6 +475,13 @@ function isProductEligibleForFeedStage(
   distanceKm: number,
   stageIndex: number
 ) {
+  // Master admin adverts pass every discovery stage unconditionally —
+  // consistent with isProductVisibleToUser() treating them as visible
+  // everywhere, not just within the normal free/premium distance tiers.
+  if (product.sellerId === OWNER_UID) {
+    return true;
+  }
+
   const isPremium = isPremiumProduct(product);
 
   // ============================================================
@@ -661,6 +701,75 @@ function wardQuery(
   }
 
 // ============================================================
+// MASTER ADMIN BROADCAST QUERY
+//
+// Ward and geohash-radius discovery (wardQuery/areaQueries below) are
+// both fundamentally local — a ward name match, or a geohash prefix
+// within HOME_FEED_MAX_RADIUS_KM (30km) of the viewer. Neither can
+// ever surface a master-admin advert to a viewer who happens to be
+// far from wherever that advert's lat/lng is. Since admin adverts are
+// meant to be visible everywhere regardless of distance, they need
+// their own unscoped query, independent of the viewer's location.
+// ============================================================
+function adminBroadcastQuery(cursor?: CreatedAtCursor | null) {
+  const coll = collection(db, "products");
+  const baseFilters = [
+    where("sellerId", "==", OWNER_UID),
+    where("status", "==", "active"),
+  ];
+
+  if (cursor) {
+    return query(
+      coll,
+      ...baseFilters,
+      orderBy("createdAt", "desc"),
+      startAfter(createdAtCursorToTimestamp(cursor)),
+      limit(ADMIN_BROADCAST_PAGE)
+    );
+  }
+
+  return query(
+    coll,
+    ...baseFilters,
+    orderBy("createdAt", "desc"),
+    limit(ADMIN_BROADCAST_PAGE)
+  );
+}
+
+// Persisted the same way previewCache is — admin broadcast content
+// doesn't depend on the viewer's location at all, so every viewer on
+// this device can share one cached fetch instead of re-querying on
+// every mount.
+const ADMIN_BROADCAST_CACHE_TTL_MS = 10 * 60 * 1000;
+const ADMIN_BROADCAST_CACHE_KEY = "bizmtaani_admin_broadcast_cache";
+
+function loadAdminBroadcastCacheFromStorage(): { products: Product[]; timestamp: number } | null {
+  try {
+    const raw = localStorage.getItem(ADMIN_BROADCAST_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { products: Product[]; timestamp: number };
+    if (Date.now() - parsed.timestamp >= ADMIN_BROADCAST_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function saveAdminBroadcastCacheToStorage(products: Product[]) {
+  try {
+    localStorage.setItem(
+      ADMIN_BROADCAST_CACHE_KEY,
+      JSON.stringify({ products, timestamp: Date.now() })
+    );
+  } catch {
+    // localStorage full or unavailable — cache just won't persist across reload
+  }
+}
+
+let adminBroadcastCache: { products: Product[]; timestamp: number } | null =
+  loadAdminBroadcastCacheFromStorage();
+
+// ============================================================
 // FIX — SERVER-SIDE PREMIUM FILTER (the big one)
 //
 // isProductEligibleForFeedStage() already rejects every non-premium
@@ -777,6 +886,10 @@ function areaQueries(
 // + status + visibilityScope + createdAt for the premium one) —
 // Firestore will show a console link to auto-create either index the
 // first time each query runs, same as any other new compound query.
+//
+// Note: master admin adverts (visibilityScope "all_areas") already
+// flow through categoryPremiumQuery like any other all_areas advert —
+// no special-casing needed here.
 // ============================================================
 function categoryFreeQuery(
   category: string,
@@ -927,6 +1040,53 @@ const [initialLoading, setInitialLoading] = useState(!initialCached);
 // of how long location resolution takes.
 const [previewProducts, setPreviewProducts] = useState<Product[]>(previewCache?.products ?? []);
 const [previewLoading, setPreviewLoading] = useState(!previewCache);
+
+// Master admin broadcast — independent of GPS/location/ward, same as
+// previewProducts above, but NOT a placeholder: this list is meant to
+// stay populated permanently, on every screen, for every viewer,
+// regardless of where the real ward/area feed ends up resolving to.
+// Kept as its own separate list rather than threaded into
+// wardProducts/areaProducts, since those two already carry complex
+// pagination/cursor/cache state built around ward-matching and
+// geohash-radius discovery that admin adverts deliberately bypass.
+// Callers should merge this in wherever they render the feed (e.g.
+// `dedupe(adminBroadcastProducts, wardProducts)`).
+const [adminBroadcastProducts, setAdminBroadcastProducts] = useState<Product[]>(
+  adminBroadcastCache?.products ?? []
+);
+const [adminBroadcastLoading, setAdminBroadcastLoading] = useState(!adminBroadcastCache);
+
+useEffect(() => {
+  if (adminBroadcastCache && Date.now() - adminBroadcastCache.timestamp < ADMIN_BROADCAST_CACHE_TTL_MS) {
+    setAdminBroadcastProducts(adminBroadcastCache.products);
+    setAdminBroadcastLoading(false);
+    return;
+  }
+
+  let cancelled = false;
+  setAdminBroadcastLoading(true);
+
+  (async () => {
+    try {
+      const snap = await getDocs(adminBroadcastQuery());
+      const products = toProducts(snap.docs);
+      if (!cancelled) {
+        setAdminBroadcastProducts(products);
+        adminBroadcastCache = { products, timestamp: Date.now() };
+        saveAdminBroadcastCacheToStorage(products);
+      }
+    } catch (error) {
+      console.error("Failed to load master admin broadcast listings:", error);
+    } finally {
+      if (!cancelled) setAdminBroadcastLoading(false);
+    }
+  })();
+
+  return () => { cancelled = true; };
+  // refreshKey included so a freshly-posted admin advert shows up for
+  // the poster immediately, same as the rest of the feed.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [refreshKey]);
 
 useEffect(() => {
   // Only worth fetching a nationwide fallback when the real,
@@ -2099,6 +2259,11 @@ return {
   loadMore,
   previewProducts,
   previewLoading,
+  // Master admin broadcast listings — always visible everywhere,
+  // independent of ward/distance. Merge into whatever list you're
+  // rendering, e.g. dedupe(adminBroadcastProducts, wardProducts).
+  adminBroadcastProducts,
+  adminBroadcastLoading,
   // True once discovery has moved past stage 0 (2.5km) — at that
   // point isProductEligibleForFeedStage only allows premium adverts
   // through, and free adverts are ward-matched so they never appear
