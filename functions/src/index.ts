@@ -2071,6 +2071,9 @@ const isMasterAdmin = uid === OWNER_UID;
   // 4. Logic: Active Ad Limit Enforcement (applies to every plan
   // except the master admin, who has no cap — "unlimited posts").
   if (!isMasterAdmin) {
+    // Master admin posts are unrestricted: no active-ad-count cap —
+  // matches the same isMasterAdmin gate already applied in publishAdvert.
+  if (!isMasterAdmin) {
     const activeAdLimit = MAX_ACTIVE_ADS[effectivePlan] ?? 3;
 
     const activeCountSnap = await db
@@ -2086,6 +2089,7 @@ const isMasterAdmin = uid === OWNER_UID;
         `You have reached the maximum of ${activeAdLimit} active adverts for your current plan.`
       );
     }
+  }
   }
 
   // 5. Logic: Status Determination
