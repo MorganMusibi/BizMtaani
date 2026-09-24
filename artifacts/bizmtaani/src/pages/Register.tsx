@@ -1,28 +1,21 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import {
   createUserWithEmailAndPassword,
   updateProfile,
-  sendEmailVerification,
-  signInWithRedirect,
-  getRedirectResult,
-  GoogleAuthProvider,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { auth, db, functions } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
-import { getRecaptchaToken } from "@/lib/recaptcha";
 import { getWardCoordinates } from "@/lib/location";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { SiGoogle } from "react-icons/si";
 import { Loader2, ChevronLeft, Store, User, MapPin } from "lucide-react";
 
-const googleProvider = new GoogleAuthProvider();
 type Step = 1 | 2;
 
 interface HomeLocation {
@@ -30,35 +23,55 @@ interface HomeLocation {
   areaName: string; constituency: string; county: string;
 }
 
+// Domain used only to satisfy Firebase Auth's email/password requirement.
+// Never sent anywhere, never shown to the user, not a real mailbox.
+const PHONE_AUTH_DOMAIN = "bizmtaani.local";
+
 /**
- * Try to geocode an area name → coordinates + ward info.
- * Times out in 4 s. Returns null on any failure — never throws.
+ * Normalizes a Kenyan phone number to 2547XXXXXXXX / 2541XXXXXXXX format.
+ * Accepts 07XXXXXXXX, 01XXXXXXXX, 2547XXXXXXXX, +2547XXXXXXXX, 7XXXXXXXX.
+ * Returns null if the input doesn't match a recognizable Kenyan mobile format.
  */
+function normalizeKenyanPhone(input: string): string | null {
+  const digits = input.replace(/\D/g, "");
 
+  if (/^(07|01)\d{8}$/.test(digits)) {
+    return "254" + digits.slice(1);
+  }
+  if (/^254(7|1)\d{8}$/.test(digits)) {
+    return digits;
+  }
+  if (/^(7|1)\d{8}$/.test(digits)) {
+    return "254" + digits;
+  }
+  return null;
+}
 
-
+function phoneToAuthEmail(normalizedPhone: string): string {
+  return `${normalizedPhone}@${PHONE_AUTH_DOMAIN}`;
+}
 
 async function saveUserProfile(
   uid: string,
   opts: {
     displayName: string;
-    email?: string;
+    phone: string;
     isBusinessOwner: boolean;
     businessName?: string;
     homeLocation?: HomeLocation;
   }
 ) {
   await setDoc(doc(db, "users", uid), {
-  displayName: opts.displayName,
-  email: opts.email ?? "",
-  isBusinessOwner: opts.isBusinessOwner,
-  searchNameLower: (opts.isBusinessOwner && opts.businessName
-    ? opts.businessName
-    : opts.displayName
-  ).trim().toLowerCase(),
-  ...(opts.isBusinessOwner && opts.businessName
-    ? { businessName: opts.businessName }
-    : {}),
+    displayName: opts.displayName,
+    phone: opts.phone,
+    isBusinessOwner: opts.isBusinessOwner,
+    searchNameLower: (opts.isBusinessOwner && opts.businessName
+      ? opts.businessName
+      : opts.displayName
+    ).trim().toLowerCase(),
+    ...(opts.isBusinessOwner && opts.businessName
+      ? { businessName: opts.businessName }
+      : {}),
     ...(opts.homeLocation ? { homeLocation: opts.homeLocation } : {}),
     createdAt: serverTimestamp(),
   });
@@ -73,14 +86,12 @@ async function applyReferralCodeIfPresent(code: string): Promise<boolean> {
   const trimmed = code.trim();
   if (!trimmed) return true;
 
-  // Matches generateReferralCode's format: 1–6 letters + a 3-char
-  // suffix. Skips the network call entirely for obvious typos.
   if (!/^[A-Z]{1,6}[A-Z0-9]{3}$/.test(trimmed)) {
     console.warn("Referral code format invalid, skipping submission:", trimmed);
     return false;
   }
 
-try {
+  try {
     const submitReferralCode = httpsCallable(functions, "submitReferralCode");
     await submitReferralCode({ code: trimmed });
     return true;
@@ -89,7 +100,6 @@ try {
     return false;
   }
 }
-
 
 export default function Register() {
   const [, setLocation] = useLocation();
@@ -101,49 +111,46 @@ export default function Register() {
   // Form fields
   const [name, setName] = useState("");
   const [selectedWard, setSelectedWard] = useState<{
-  wardName: string;
-  constituencyName: string;
-  countyName: string;
-} | null>(null);
-const [showAreaPicker, setShowAreaPicker] = useState(false);
-const [resolvingArea, setResolvingArea] = useState(false);
-  const [email, setEmail] = useState("");
+    wardName: string;
+    constituencyName: string;
+    countyName: string;
+  } | null>(null);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const [resolvingArea, setResolvingArea] = useState(false);
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
 
   async function handleAreaPicked(ward: {
-  wardName: string;
-  constituencyName: string;
-  countyName: string;
-}) {
-  setResolvingArea(true);
-  try {
-    const coords = await getWardCoordinates(
-      ward.wardName,
-      ward.constituencyName,
-      ward.countyName
-    );
+    wardName: string;
+    constituencyName: string;
+    countyName: string;
+  }) {
+    setResolvingArea(true);
+    try {
+      const coords = await getWardCoordinates(
+        ward.wardName,
+        ward.constituencyName,
+        ward.countyName
+      );
 
-    setSelectedWard(ward);
+      setSelectedWard(ward);
 
-    if (!coords) {
-      // Rare — ward exists in MasterHierarchy.json but not in the
-      // GeoJSON map data. Still save the name so signup isn't blocked.
-      toast({
-        title: "Area saved",
-        description: "We couldn't pin it on the map, but your area is noted.",
-      });
+      if (!coords) {
+        toast({
+          title: "Area saved",
+          description: "We couldn't pin it on the map, but your area is noted.",
+        });
+      }
+
+      setShowAreaPicker(false);
+    } finally {
+      setResolvingArea(false);
     }
+  }
 
-    setShowAreaPicker(false);
-  } finally {
-    setResolvingArea(false);
-  }
-  }
-  
   function handleTypeSelect(type: boolean) {
     setIsBusinessOwner(type);
     setStep(2);
@@ -156,9 +163,18 @@ const [resolvingArea, setResolvingArea] = useState(false);
       return;
     }
     if (!selectedWard) {
-  toast({ title: "Chagua eneo lako", variant: "destructive" });
-  return;
-}
+      toast({ title: "Chagua eneo lako", variant: "destructive" });
+      return;
+    }
+    const normalizedPhone = normalizeKenyanPhone(phone);
+    if (!normalizedPhone) {
+      toast({
+        title: "Enter a valid phone number",
+        description: "e.g. 0712 345 678",
+        variant: "destructive",
+      });
+      return;
+    }
     if (password.length < 6) {
       toast({ title: "Password too short", description: "At least 6 characters.", variant: "destructive" });
       return;
@@ -167,155 +183,63 @@ const [resolvingArea, setResolvingArea] = useState(false);
     setLoading(true);
     try {
       const coords = await getWardCoordinates(
-  selectedWard.wardName,
-  selectedWard.constituencyName,
-  selectedWard.countyName
-);
-const homeLocation: HomeLocation = {
-  lat: coords?.lat ?? null,
-  lng: coords?.lng ?? null,
-  areaName: selectedWard.wardName,
-  constituency: selectedWard.constituencyName,
-  county: selectedWard.countyName,
-};
+        selectedWard.wardName,
+        selectedWard.constituencyName,
+        selectedWard.countyName
+      );
+      const homeLocation: HomeLocation = {
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
+        areaName: selectedWard.wardName,
+        constituency: selectedWard.constituencyName,
+        county: selectedWard.countyName,
+      };
 
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      const authEmail = phoneToAuthEmail(normalizedPhone);
+      const cred = await createUserWithEmailAndPassword(auth, authEmail, password);
       await updateProfile(cred.user, { displayName: name.trim() });
       await saveUserProfile(cred.user.uid, {
         displayName: name.trim(),
-        email: email.trim(),
+        phone: normalizedPhone,
         isBusinessOwner: isBusinessOwner ?? false,
         businessName: isBusinessOwner ? name.trim() : undefined,
         homeLocation,
       });
 
-      // Apply referral code if one was entered — still non-blocking
-      // (doesn't delay navigation), but now logs its own outcome so
-      // a failure is traceable later instead of vanishing silently.
       applyReferralCodeIfPresent(referralCode).then((applied) => {
         if (referralCode.trim()) {
           console.log(`Referral code "${referralCode.trim()}" applied:`, applied);
         }
       });
 
-      // Send email verification — non-blocking (don't fail if this errors)
-      sendEmailVerification(cred.user).catch(() => {});
-
       toast({
         title: "Account created!",
-        description: "Check your email and click the verification link to unlock all features.",
+        description: "Welcome to BizMtaani.",
       });
 
       setLocation("/");
-      } catch (err: unknown) {
-  console.error("Registration failed:", err);
+    } catch (err: unknown) {
+      console.error("Registration failed:", err);
 
-  toast({
-    title: "Registration failed",
-    description: getFirebaseErrorMessage(
-      err,
-      "Unable to create your account. Please try again."
-    ),
-    variant: "destructive",
-  });
+      // Firebase will report "email-already-in-use" for a duplicate phone —
+      // reword it so it actually makes sense to the user.
+      const rawMessage = getFirebaseErrorMessage(
+        err,
+        "Unable to create your account. Please try again."
+      );
+      const description = rawMessage.toLowerCase().includes("email")
+        ? "This phone number is already registered. Try signing in instead."
+        : rawMessage;
+
+      toast({
+        title: "Registration failed",
+        description,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   }
-
-  async function handleGoogleLogin() {
-    if (!selectedWard) {
-      toast({ title: "Chagua eneo Lako Kwanza", variant: "destructive" });
-      return;
-    }
-
-    setGoogleLoading(true);
-
-    // Stash what we need — this state won't survive the redirect to Google and back.
-    sessionStorage.setItem(
-      "pendingGoogleSignup",
-      JSON.stringify({ selectedWard, isBusinessOwner, referralCode })
-    );
-
-    await signInWithRedirect(auth, googleProvider);
-    // Page navigates away to Google here — nothing after this line runs.
-  }
-
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (!result) return;
-
-        const pendingRaw = sessionStorage.getItem("pendingGoogleSignup");
-        sessionStorage.removeItem("pendingGoogleSignup");
-        const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
-
-        const ward = pending?.selectedWard ?? selectedWard;
-        const bizOwner = pending?.isBusinessOwner ?? isBusinessOwner;
-        const refCode = pending?.referralCode ?? referralCode;
-
-        if (!ward) {
-          toast({
-            title: "Please pick your area again",
-            description: "Select your area and try Continue with Google again.",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        const coords = await getWardCoordinates(
-          ward.wardName,
-          ward.constituencyName,
-          ward.countyName
-        );
-        const homeLocation: HomeLocation = {
-          lat: coords?.lat ?? null,
-          lng: coords?.lng ?? null,
-          areaName: ward.wardName,
-          constituency: ward.constituencyName,
-          county: ward.countyName,
-        };
-
-        const userRef = doc(db, "users", result.user.uid);
-        const existingProfile = await getDoc(userRef);
-
-        if (!existingProfile.exists()) {
-          await saveUserProfile(result.user.uid, {
-            displayName: result.user.displayName ?? "BizMtaani User",
-            email: result.user.email ?? "",
-            isBusinessOwner: bizOwner ?? false,
-            businessName: bizOwner ? (result.user.displayName ?? undefined) : undefined,
-            homeLocation,
-          });
-
-          applyReferralCodeIfPresent(refCode ?? "").then((applied) => {
-            if ((refCode ?? "").trim()) {
-              console.log(`Referral code "${refCode.trim()}" applied:`, applied);
-            }
-          });
-        } else {
-          await setDoc(userRef, { homeLocation }, { merge: true });
-        }
-
-        setLocation("/");
-      })
-      .catch((err: unknown) => {
-        console.error("Google sign-in failed:", err);
-
-        toast({
-          title: "Google sign-in failed",
-          description: getFirebaseErrorMessage(
-            err,
-            "Unable to sign in with Google. Please try again."
-          ),
-          variant: "destructive",
-        });
-      })
-      .finally(() => {
-        setGoogleLoading(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const nameLabel = isBusinessOwner === true ? "Business name" : "Your full name";
   const namePlaceholder = isBusinessOwner === true
@@ -421,32 +345,32 @@ const homeLocation: HomeLocation = {
               </p>
             </div>
 
-            {/* ── Location field (required, shared between email & Google flows) ── */}
+            {/* ── Location field ── */}
             <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 mb-5">
-  <div className="flex items-center gap-1.5 mb-1.5">
-    <MapPin size={13} className="text-primary flex-shrink-0" />
-    <Label className="text-xs font-bold text-foreground">
-      Your area / location *
-    </Label>
-  </div>
-  <button
-    type="button"
-    data-testid="button-select-area"
-    onClick={() => setShowAreaPicker(true)}
-    className="w-full h-11 px-3 rounded-xl bg-background border border-border text-left text-sm flex items-center"
-  >
-    {selectedWard ? (
-      <span className="font-semibold">
-        {selectedWard.wardName}, {selectedWard.constituencyName}
-      </span>
-    ) : (
-      <span className="text-muted-foreground">Tap to search your ward</span>
-    )}
-  </button>
-  <p className="text-[11px] text-muted-foreground mt-1.5">
-    Connect na wauzaji pamoja na wanunuzi karibu nawe.
-  </p>
-</div>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <MapPin size={13} className="text-primary flex-shrink-0" />
+                <Label className="text-xs font-bold text-foreground">
+                  Your area / location *
+                </Label>
+              </div>
+              <button
+                type="button"
+                data-testid="button-select-area"
+                onClick={() => setShowAreaPicker(true)}
+                className="w-full h-11 px-3 rounded-xl bg-background border border-border text-left text-sm flex items-center"
+              >
+                {selectedWard ? (
+                  <span className="font-semibold">
+                    {selectedWard.wardName}, {selectedWard.constituencyName}
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">Tap to search your ward</span>
+                )}
+              </button>
+              <p className="text-[11px] text-muted-foreground mt-1.5">
+                Connect na wauzaji pamoja na wanunuzi karibu nawe.
+              </p>
+            </div>
 
             <div className="mb-5">
               <Label htmlFor="referralCode" className="text-xs font-bold text-foreground">
@@ -460,27 +384,6 @@ const homeLocation: HomeLocation = {
                 onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
                 className="h-11 mt-1.5"
               />
-            </div>
-
-            <Button
-              data-testid="button-google-register"
-              type="button"
-              variant="outline"
-              className="w-full h-12 gap-3 font-semibold mb-6"
-              onClick={handleGoogleLogin}
-              disabled={googleLoading}
-            >
-              {googleLoading ? <Loader2 size={18} className="animate-spin" /> : <SiGoogle size={18} />}
-              Continue with Google
-            </Button>
-
-            <div className="relative mb-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="bg-background px-3 text-xs text-muted-foreground uppercase tracking-wider">or</span>
-              </div>
             </div>
 
             <form onSubmit={handleRegister} className="space-y-4">
@@ -498,14 +401,15 @@ const homeLocation: HomeLocation = {
                 />
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="phone">Phone number</Label>
                 <Input
-                  id="email"
-                  data-testid="input-email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="phone"
+                  data-testid="input-phone"
+                  type="tel"
+                  inputMode="numeric"
+                  placeholder="07XX XXX XXX"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
                   required
                   className="h-12"
                 />
@@ -541,12 +445,12 @@ const homeLocation: HomeLocation = {
         )}
       </div>
       {showAreaPicker && (
-  <AreaPickerSheet
-    onSearchSelect={handleAreaPicked}
-    resolving={resolvingArea}
-    onDismiss={() => setShowAreaPicker(false)}
-  />
-)}
+        <AreaPickerSheet
+          onSearchSelect={handleAreaPicked}
+          resolving={resolvingArea}
+          onDismiss={() => setShowAreaPicker(false)}
+        />
+      )}
     </div>
   );
 }
