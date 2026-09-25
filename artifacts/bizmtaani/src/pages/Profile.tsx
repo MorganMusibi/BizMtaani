@@ -147,7 +147,7 @@ const [selectedWard, setSelectedWard] = useState<{
     return;
   }
   if (!marketerReason.trim()) {
-    toast({ title: "Tell us why you want to be a marketer", variant: "destructive" });
+    toast({ title: "Tell us why you want to be a brand ambassador", variant: "destructive" });
     return;
   }
 
