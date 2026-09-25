@@ -299,11 +299,19 @@ useEffect(() => {
         </div>
 
         {job.requirements && (
-          <div>
-            <h3 className="font-semibold mb-2">Requirements</h3>
-            <p>{job.requirements}</p>
-          </div>
-        )}
+  <div>
+    <h3 className="font-semibold mb-2">Requirements</h3>
+    <ul className="list-disc pl-5 space-y-1 leading-relaxed">
+      {job.requirements
+        .split("\n")
+        .map((point, index) => (
+          point.trim() && (
+            <li key={index}>{point.trim()}</li>
+          )
+        ))}
+    </ul>
+  </div>
+)}
 {isOwner ? (
   <div className="space-y-2">
     <div className="rounded-xl bg-muted/50 px-4 py-3 text-center">
