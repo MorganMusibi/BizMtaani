@@ -429,7 +429,7 @@ try {
 
   function handleShare() {
     if (!marketer) return;
-    const message = `Use my BizMtaani marketer code ${marketer.referralCode} when you sign up! ${window.location.origin}`;
+    const message = `Use my BizMtaani Brand Ambassador code ${marketer.referralCode} when you sign up! ${window.location.origin}`;
     if (navigator.share) {
       navigator.share({ title: "Join BizMtaani", text: message });
     } else {
@@ -469,9 +469,9 @@ try {
       <div className="min-h-screen flex flex-col items-center justify-center gap-4 px-4 bg-background">
         <div className="text-center">
           <Gift size={48} className="mx-auto text-muted-foreground" />
-          <h2 className="font-bold text-lg mt-4">Not a Marketer</h2>
+           <h2 className="font-bold text-lg mt-4">Not a Brand Ambassador</h2>
           <p className="text-sm text-muted-foreground mt-2 max-w-sm">
-            You are not registered as a marketer. Apply through your profile settings.
+            You are not registered as a Brand Ambassador. Apply through your profile settings.
           </p>
         </div>
         <Button onClick={() => navigate("/profile")}>Go back</Button>
@@ -495,7 +495,7 @@ try {
           >
             <ChevronLeft size={24} />
           </button>
-          <span className="font-black text-base">Marketer Dashboard</span>
+          <span className="font-black text-base">Brand Ambassador Dashboard</span>
         </div>
         <button
           onClick={() => loadMarketerData(true)}
@@ -540,7 +540,7 @@ try {
 
         {/* ─── Referral Code ─────────────────────────────────────────── */}
         <div className="bg-card border border-border rounded-2xl p-4 space-y-3">
-          <p className="font-black text-sm">Your Marketer Code</p>
+          <p className="font-black text-sm">Your Brand Ambassador Code</p>
           <div className="flex items-center gap-2">
             <div className="flex-1 h-11 rounded-xl border-2 border-dashed border-[#00A651]/40 flex items-center justify-center font-black text-base tracking-wider text-[#00A651]">
               {marketer.referralCode}
