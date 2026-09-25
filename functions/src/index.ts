@@ -27,7 +27,6 @@ const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
 const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
-const paystackSecretKey = defineSecret("PAYSTACK_SECRET_KEY");
 
 // Single source of truth for the owner UID — referenced by every
 // admin-only function instead of repeating the literal string.
@@ -196,10 +195,6 @@ function normalizePhone(raw: string): string {
   if ((p.startsWith("07") || p.startsWith("01")) && p.length === 10) return "254" + p.slice(1);
   if (p.startsWith("7") && p.length === 9) return "254" + p;
   throw new Error(`Invalid Kenyan number: ${raw}`);
-}
-
-function normalizePhoneForPaystack(raw: string): string {
-  return "+" + normalizePhone(raw);
 }
 
 // Constructed once per warm instance and reused across every
@@ -680,171 +675,6 @@ db.collection("payments")
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 return { checkoutRequestId: stkResult.checkoutRequestId, customerMessage: stkResult.customerMessage };
-});
-
-export const initiatePaystackPayment = onCall({ region: "europe-west1", minInstances: 1, secrets: [paystackSecretKey], cors: true, maxInstances: 150, timeoutSeconds: 60 }, async (request) => {
-  
-  console.log("PAYSTACK STEP 1: function started");
-  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
-  const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
-
-  if (typeof productId !== "string" || !productId.trim()) {
-    throw new HttpsError("invalid-argument", "Product ID is required.");
-  }
-
-  const cooldownRef = db.collection("paymentCooldowns").doc(request.auth.uid);
-
-  const [, cooldownSnap, productSnap] = await Promise.all([
-    verifyRecaptcha(recaptchaToken, "initiate_payment"),
-    cooldownRef.get(),
-    db.collection("products").doc(productId).get(),
-  ]);
-
-  const lastInitiatedAt = cooldownSnap.exists ? cooldownSnap.data()?.lastInitiatedAt?.toMillis() : null;
-  if (lastInitiatedAt && Date.now() - lastInitiatedAt < MPESA_INITIATION_COOLDOWN_MS) {
-    throw new HttpsError("resource-exhausted", "Please wait a moment before trying to pay again.");
-  }
-
-  await cooldownRef.set({
-    lastInitiatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    expireAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() + 5 * 60 * 1000)),
-  });
-
-  if (!productSnap.exists) throw new HttpsError("not-found", "Advert not found.");
-  const productData = productSnap.data()!;
-  if (productData.sellerId !== request.auth.uid) {
-    throw new HttpsError("permission-denied", "You can only initiate payment for your own adverts.");
-  }
-  if (productData.status !== "pending_payment") {
-    throw new HttpsError("failed-precondition", "This advert is not awaiting payment.");
-  }
-
-  const plan = productData.plan;
-  if (typeof plan !== "string" || !PLAN_AMOUNTS.hasOwnProperty(plan)) {
-    throw new HttpsError("invalid-argument", "This advert has no valid plan on record.");
-  }
-
-  db.collection("payments")
-    .where("productId", "==", productId)
-    .where("status", "==", "pending")
-    .get()
-    .then((stalePayments) => {
-      if (stalePayments.empty) return;
-      const batch = db.batch();
-      stalePayments.docs.forEach((doc) => batch.update(doc.ref, { status: "cancelled" }));
-      return batch.commit();
-    })
-    .catch((err) => console.error("Stale payment cleanup failed:", err));
-
-  const formattedPhone = normalizePhoneForPaystack(phone);
-  const email = request.auth.token.email ?? `${request.auth.uid}@bizmtaani.site`;
-  const amountKobo = PLAN_AMOUNTS[plan] * 100;
-
-  console.log("PAYSTACK STEP 2: sending charge request");
-
-  let paystackRes: Response;
-  try {
-    paystackRes = await fetch("https://api.paystack.co/charge", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${paystackSecretKey.value()}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        amount: amountKobo,
-        currency: "KES",
-        mobile_money: { phone: formattedPhone, provider: "mpesa" },
-        metadata: { productId, buyerId: request.auth.uid, plan },
-      }),
-    });
-  } catch (err) {
-    console.error("PAYSTACK STEP 2 FAILED:", err);
-    throw new HttpsError("internal", `Paystack charge request failed: ${err instanceof Error ? err.message : String(err)}`);
-  }
-
-  const paystackData = (await paystackRes.json()) as any;
-  console.log("PAYSTACK STEP 3: response:", JSON.stringify(paystackData));
-
-  if (!paystackData.status) {
-    throw new HttpsError("internal", paystackData.message ?? "Paystack error");
-  }
-
-  const reference = paystackData.data.reference as string;
-  const chargeStatus = paystackData.data.status as string;
-
-  await db.collection("payments").doc(reference).set({
-    checkoutRequestId: reference,
-    provider: "paystack",
-    plan,
-    productId,
-    buyerId: request.auth.uid,
-    status: "pending",
-    createdAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
-
-  // Test-mode charges can complete synchronously (status: "success")
-  // instead of going through the async pay_offline + webhook flow —
-  // handle that case immediately instead of waiting on a webhook that
-  // may never fire for this particular charge.
-  if (chargeStatus === "success") {
-    await db.collection("payments").doc(reference).update({
-      status: "completed",
-      mpesaCode: paystackData.data.receipt_number ?? null,
-      confirmedAmountKES: (paystackData.data.amount ?? amountKobo) / 100,
-      completedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  }
-
-  console.log("PAYSTACK STEP 4: payment doc saved, returning");
-  return { checkoutRequestId: reference, customerMessage: paystackData.data.display_text ?? "Check your phone to complete payment." };
-});
-  
-export const paystackCallback = onRequest({ secrets: [paystackSecretKey], maxInstances: 100 }, async (req, res) => {
-  try {
-    const signature = req.headers["x-paystack-signature"] as string | undefined;
-    const rawBody = (req as any).rawBody as Buffer;
-
-    if (!signature || !rawBody) {
-      res.status(400).send("Missing signature or body");
-      return;
-    }
-
-    const expectedSignature = crypto
-      .createHmac("sha512", paystackSecretKey.value())
-      .update(rawBody)
-      .digest("hex");
-
-    if (expectedSignature !== signature) {
-      console.error("Paystack webhook signature mismatch");
-      res.status(400).send("Invalid signature");
-      return;
-    }
-
-    const event = req.body;
-
-    if (event.event === "charge.success") {
-      const reference = event.data.reference as string;
-      const paymentRef = db.collection("payments").doc(reference);
-
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(paymentRef);
-        if (!snap.exists) return;
-        const existingStatus = snap.data()?.status;
-        if (existingStatus === "completed" || existingStatus === "failed" || existingStatus === "cancelled") return;
-
-        tx.update(paymentRef, {
-          status: "completed",
-          mpesaCode: event.data.receipt_number ?? null,
-          confirmedAmountKES: (event.data.amount ?? 0) / 100,
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-    }
-  } catch (err) {
-    console.error("paystackCallback error:", err);
-  }
-  res.status(200).send("OK");
 });
 
 export const mpesaCallback = onRequest({ region: "europe-west1", maxInstances: 100 }, async (req, res) => {
