@@ -3233,7 +3233,7 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
     { type: "marketer_approved", referralCode: code }
   );
 
-  await logAdminAction(request.auth.uid, "approve_marketer", { targetUid: uid, referralCode: code });
+  await logAdminAction(request.auth.uid, "approve_brand_ambassador", { targetUid: uid, referralCode: code });
 
   return { success: true, referralCode: code };
 });
@@ -3263,7 +3263,7 @@ export const setMarketerStatus = onCall({ cors: true }, async (request) => {
 
   await logAdminAction(
     request.auth.uid,
-    status === "suspended" ? "suspend_marketer" : "reactivate_marketer",
+    status === "suspended" ? "suspend_brand_ambassador" : "reactivate_brand_ambassador",
     { targetUid: uid }
   );
 
@@ -3452,7 +3452,7 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
     { type: "marketer_rejected" }
   );
 
-  await logAdminAction(request.auth.uid, "reject_marketer_application", { targetUid: uid });
+  await logAdminAction(request.auth.uid, "reject_brand_ambassador_application", { targetUid: uid });
 
   return { success: true };
 });
