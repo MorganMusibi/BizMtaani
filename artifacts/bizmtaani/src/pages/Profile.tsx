@@ -1275,7 +1275,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
 
 <div>
   <label className="text-xs font-semibold text-muted-foreground">
-    Why do you want to be a marketer? *
+    Why do you want to be a brand ambassador? *
   </label>
   <textarea
     placeholder="Tell us a bit about yourself..."
