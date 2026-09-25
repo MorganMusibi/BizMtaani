@@ -172,16 +172,3 @@ export async function initiateStkPush(
     );
   }
 }
-
-      export async function initiatePaystackCharge({ phone, plan, productId }: { phone: string; plan: PaidListingPlan; productId: string }) {
-  const functions = getFunctions(app, "europe-west1");
-
-  const recaptchaToken = await getRecaptchaToken("initiate_payment");
-  const initiatePaystackPayment = httpsCallable<
-    { phone: string; plan: PaidListingPlan; productId: string; recaptchaToken: string },
-    { checkoutRequestId: string; customerMessage: string }
-  >(functions, "initiatePaystackPayment");
-
-  const { data } = await initiatePaystackPayment({ phone, plan, productId, recaptchaToken });
-  return data;
-}
