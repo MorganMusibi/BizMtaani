@@ -793,7 +793,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Marketer Dashboard</p>
+              <p className="font-black text-sm">Brand Ambassador Dashboard</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 View earnings & your referral code
               </p>
@@ -806,7 +806,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Marketer Application Pending</p>
+              <p className="font-black text-sm">Brand Ambassador Application Pending</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 We're reviewing your application
               </p>
@@ -821,7 +821,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Become a Marketer</p>
+              <p className="font-black text-sm">Become a Brand Ambassador</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Earn cash by referring premium users
               </p>
