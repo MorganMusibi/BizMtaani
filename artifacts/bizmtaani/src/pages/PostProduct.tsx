@@ -19,7 +19,6 @@ import { encodeGeohash } from "@/lib/geohash";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { getWardInfo, getWardCoordinates, type ResolvedLocation, } from "@/lib/location";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { getRecaptchaToken } from "@/lib/recaptcha";
 import { initiateStkPush, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, type ListingPlan, type PaidListingPlan,
 } from "@/lib/mpesa";
 
@@ -353,37 +352,6 @@ useEffect(() => {
     imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
   };
 }, []);
-
-    // Preload the reCAPTCHA token once the user reaches the plan/review
-  // steps — well before they hit Publish — so a slow network or
-  // script load doesn't stall them at the exact moment they submit.
-  const recaptchaTokenRef = useRef<string>("");
-
-  useEffect(() => {
-    if (step === 4 || step === 5) {
-      getRecaptchaToken("publish_advert")
-        .then((token) => { recaptchaTokenRef.current = token; })
-        .catch((err) => console.warn("reCAPTCHA preload failed:", err));
-    }
-  }, [step]);
-
-  async function resolveRecaptchaToken(): Promise<string> {
-    // reCAPTCHA tokens are single-use — consume and clear the
-    // preloaded one immediately, so a retry (e.g. after a wrong
-    // M-Pesa PIN) never resubmits an already-used token, which
-    // Google rejects and the backend surfaces as "permission denied."
-    if (recaptchaTokenRef.current) {
-      const token = recaptchaTokenRef.current;
-      recaptchaTokenRef.current = "";
-      return token;
-    }
-    try {
-      return await getRecaptchaToken("publish_advert");
-    } catch (error) {
-      console.warn("reCAPTCHA not available, proceeding without token:", error);
-      return "";
-    }
-  }
 
   const catDef = selectedCategory
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
@@ -1565,8 +1533,6 @@ equipmentDetails: isEquipment
   };
   
   // 3. Ask backend to create the advert
-  const recaptchaToken = await resolveRecaptchaToken();
-
   interface PublishAndPayResponse extends PublishAdvertResponse {
     paymentInitiated: boolean;
     checkoutRequestId?: string;
@@ -1575,11 +1541,11 @@ equipmentDetails: isEquipment
   }
 
   const publishAdvertAndPay = httpsCallable<
-    typeof docData & { recaptchaToken: string },
+    typeof docData,
     PublishAndPayResponse
   >(functions, "publishAdvertAndPay");
 
-  const result = await publishAdvertAndPay({ ...docData, recaptchaToken });
+  const result = await publishAdvertAndPay(docData);
   const data = result.data;
 
   // Always stash productId immediately — a retry after any kind of
@@ -1785,9 +1751,8 @@ equipmentDetails: isEquipment
     };
 
     // Publish advert through Cloud Function
-     const recaptchaToken = await resolveRecaptchaToken();
      const publishAdvert = httpsCallable(functions, "publishAdvert");
-const result = await publishAdvert({ ...docData, recaptchaToken });
+const result = await publishAdvert(docData);
 
 const data = result.data as PublishAdvertResponse;
  if (data.success) {
