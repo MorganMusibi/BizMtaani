@@ -671,7 +671,11 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
           Edit
         </button>
       </div>
-      <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
+      {userProfile?.phone ? (
+        <p data-testid="text-email" className="text-muted-foreground text-sm">{userProfile.phone}</p>
+      ) : user.email ? (
+        <p data-testid="text-email" className="text-muted-foreground text-sm">{user.email}</p>
+      ) : null}
       <p className="text-xs text-muted-foreground mt-0.5">
         Tap photo to view • Tap camera to change
       </p>
@@ -766,7 +770,6 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
             <Gift size={18} className="text-primary" />
             <p className="font-black text-sm">Referrals & Rewards</p>
           </div>
-
           {isMarketer && (
   <div className="flex items-center justify-between bg-primary/5 rounded-xl px-3 py-2.5">
     <div>
