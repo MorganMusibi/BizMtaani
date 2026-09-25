@@ -8,6 +8,7 @@ import { sendEmailVerification } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { PHONE_AUTH_DOMAIN } from "@/lib/phoneIdentity";
 import { Mail, X, RefreshCw } from "lucide-react";
 
 export function EmailVerificationBanner() {
@@ -19,12 +20,13 @@ export function EmailVerificationBanner() {
   const [sending, setSending] = useState(false);
   const [checking, setChecking] = useState(false);
 
-  // Only show for email/password users who have not verified
+  // Only show for accounts with a REAL email address that hasn't been
+  // verified. Phone signups also use the password provider (via a
+  // synthetic {phone}@bizmtaani.local address), so providerId alone
+  // can't distinguish them — checking the email's own domain does.
   if (!user) return null;
   if (user.emailVerified) return null;
-  // Google users have a providerId of "google.com" — skip them
-  const isEmailUser = user.providerData.some((p) => p.providerId === "password");
-  if (!isEmailUser) return null;
+  if (!user.email || user.email.toLowerCase().endsWith(`@${PHONE_AUTH_DOMAIN}`)) return null;
   if (dismissed) return null;
 
   function dismiss() {
