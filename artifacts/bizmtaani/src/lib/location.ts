@@ -10,7 +10,6 @@ import {
 } from "@/lib/locationHierarchy";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { app } from "@/lib/firebase";
-import { getRecaptchaToken } from "@/lib/recaptcha";
 import { resolveWardFromAlias, getAllWardsForTown, isMultiWardTown } from "./townAliasMapping";
 
 /**
@@ -251,7 +250,6 @@ export async function searchLocationWithWardPicker(
 export async function nominatimFallback(lat: number, lng: number): Promise<Partial<ResolvedLocation>> {
   try {
     const functions = getFunctions(app, "us-central1");
-    const recaptchaToken = await getRecaptchaToken("reverse_geocode");
     const reverseGeocode = httpsCallable<
       { lat: number; lng: number; recaptchaToken: string },
       Record<string, string | null>
