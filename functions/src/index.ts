@@ -8,7 +8,6 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
-import { ProxyAgent, fetch as undiciFetch } from "undici";
 import * as admin from "firebase-admin";
 import { resolveWardServerSide } from "./locationResolver";
 
@@ -592,7 +591,6 @@ export const initiateMpesaPayment = onCall({ region: "europe-west1", minInstance
 
   console.log("STEP 3: starting recaptcha + firestore reads");
   const [cooldownSnap, productSnap] = await Promise.all([
-    // verifyRecaptcha(recaptchaToken, "initiate_payment"),
     cooldownRef.get(),
     db.collection("products").doc(productId).get(),
   ]);
@@ -1819,49 +1817,6 @@ async function throttleNominatim() {
   lastNominatimCallAt = Date.now();
 }
 
-// Replace the existing throttleNominatim with this distributed version
-async function throttleNominatimWithLock(): Promise<void> {
-  const lockDocId = "nominatim_throttle";
-  const lockRef = db.collection("rateLimitLocks").doc(lockDocId);
-  const minGapMs = 1100;
-
-  let acquired = false;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (!acquired && attempts < maxAttempts) {
-    attempts++;
-    
-    try {
-      await db.runTransaction(async (tx) => {
-        const snap = await tx.get(lockRef);
-        const now = Date.now();
-        const lastCallAt = snap.exists ? snap.data()?.lastCallAt?.toMillis() ?? 0 : 0;
-        
-        if (now - lastCallAt < minGapMs) {
-          throw new Error("Rate limit in effect, retry later");
-        }
-        
-        tx.set(lockRef, {
-          lastCallAt: admin.firestore.Timestamp.fromMillis(now),
-          expireAt: admin.firestore.Timestamp.fromMillis(now + 2000),
-        });
-        
-        acquired = true;
-      });
-    } catch (error) {
-      // Another instance held the lock or rate limit was active
-      if (attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-      }
-    }
-  }
-
-  if (!acquired) {
-    // Fallback: wait locally if we couldn't get the lock
-    await new Promise(resolve => setTimeout(resolve, minGapMs));
-  }
-          }
 export const reverseGeocode = onCall(
   {
     cors: true,
@@ -2928,12 +2883,6 @@ await cooldownRef.set({
 // ═══════════════════════════════════════════════════════════════════════════
 // 5C. PASSWORD RESET (PHONE OTP)
 // ═══════════════════════════════════════════════════════════════════════════
-// Paste this whole block into the consolidated Cloud Functions backend
-// file, right after the "5B. REPORT SUBMISSION" section and before
-// "6. ADMIN MANAGEMENT" (i.e. just above the `setAdminRole` export).
-// No new imports needed — onCall, HttpsError, and admin are already
-// imported at the top of that file.
-//
 // Flow: client verifies phone ownership via Firebase Phone Auth (SMS OTP)
 // client-side, which signs them into a temporary/ephemeral phone-auth
 // session. That session's ID token carries a verified `phone_number`
@@ -3283,7 +3232,7 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
 
   await sendPushToUid(
     uid,
-    "You're approved as a marketer! 🎉",
+    "You're approved as a Brand Ambassador! 🎉",
     `Your referral code is ${code}. Start sharing it to earn commissions.`,
     { type: "marketer_approved", referralCode: code }
   );
@@ -3462,7 +3411,7 @@ export const applyForMarketer = onCall({ cors: true, }, async (request) => {
   }
 
   if (typeof reason !== "string" || !reason.trim()) {
-    throw new HttpsError("invalid-argument", "Please tell us why you want to be a marketer.");
+    throw new HttpsError("invalid-argument", "Please tell us why you want to be a Brand Ambassador.");
   }
 
   // Pull email from the user's own account/profile — never trust a
@@ -3502,8 +3451,8 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
 
   await sendPushToUid(
     uid,
-    "Marketer application update",
-    "Your marketer application wasn't approved this time. Contact support if you'd like to know more.",
+    "Brand Ambassador application update",
+    "Your Brand Ambassador application wasn't approved this time. Contact support if you'd like to know more.",
     { type: "marketer_rejected" }
   );
 
