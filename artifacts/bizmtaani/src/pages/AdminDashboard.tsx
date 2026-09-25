@@ -1166,7 +1166,7 @@ export default function AdminDashboard() {
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
-    { title: "Ambassador Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
+    { title: "Brand Ambassador Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
     { title: "Create Listing", icon: Plus, tab: "createListing" },
     { title: "Brand Ambassadors", icon: Megaphone, tab: "marketers" },
     { title: "Adverts", icon: Package, tab: "adverts" },
