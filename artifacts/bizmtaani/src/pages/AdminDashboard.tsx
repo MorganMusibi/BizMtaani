@@ -555,19 +555,19 @@ export default function AdminDashboard() {
   }
 
   async function makeMarketer(targetUser: AdminUser) {
-    if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a marketer?`)) return;
+    if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a Brand Ambassador?`)) return;
     setProcessingUserId(targetUser.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
       const result = await approveMarketer({ uid: targetUser.id });
       const { referralCode } = result.data as { referralCode: string };
-      alert(`Marketer approved. Their referral code is: ${referralCode}`);
-      // Invalidate the marketers cache so the Marketers tab shows this
-      // new entry next time it's opened, without an extra read now.
+      alert(`Brand Ambassador approved. Their referral code is: ${referralCode}`);
+      // Invalidate the marketers cache so the Brand Ambassadors tab shows
+      // this new entry next time it's opened, without an extra read now.
       setMarketersLoaded(false);
     } catch (error) {
       console.error("Failed to approve marketer:", error);
-      alert("Failed to approve this user as a marketer.");
+      alert("Failed to approve this user as a Brand Ambassador.");
     } finally {
       setProcessingUserId(null);
     }
@@ -659,15 +659,15 @@ export default function AdminDashboard() {
   }
 
   async function approveApplication(application: MarketerApplication) {
-    if (!confirm(`Approve "${application.fullName || application.id}" as a marketer?`)) return;
+    if (!confirm(`Approve "${application.fullName || application.id}" as a Brand Ambassador?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
       const result = await approveMarketer({ uid: application.id });
       const { referralCode } = result.data as { referralCode: string };
-      alert(`Marketer approved. Their referral code is: ${referralCode}`);
+      alert(`Brand Ambassador approved. Their referral code is: ${referralCode}`);
       setApplications((prev) => prev.filter((a) => a.id !== application.id));
-      // Invalidate marketers cache so the Marketers tab reflects this on next open.
+      // Invalidate marketers cache so the Brand Ambassadors tab reflects this on next open.
       setMarketersLoaded(false);
     } catch (error) {
       console.error("Failed to approve application:", error);
@@ -1166,9 +1166,9 @@ export default function AdminDashboard() {
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
-    { title: "Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
+    { title: "Ambassador Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
     { title: "Create Listing", icon: Plus, tab: "createListing" },
-    { title: "Marketers", icon: Megaphone, tab: "marketers" },
+    { title: "Brand Ambassadors", icon: Megaphone, tab: "marketers" },
     { title: "Adverts", icon: Package, tab: "adverts" },
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
     { title: "Payments", icon: CreditCard, tab: "payments" },
@@ -1646,7 +1646,7 @@ export default function AdminDashboard() {
                                     disabled={processingUserId === u.id}
                                     className={linkGreen}
                                   >
-                                    {processingUserId === u.id ? "…" : "Make marketer"}
+                                    {processingUserId === u.id ? "…" : "Make Brand Ambassador"}
                                   </button>
                                 )}
                                 {u.role !== "admin" && (
@@ -1801,9 +1801,9 @@ export default function AdminDashboard() {
           {activeTab === "applications" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer applications</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassador applications</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
-                  Pending applications from users wanting to become marketers.
+                  Pending applications from users wanting to become Brand Ambassadors.
                 </p>
               </div>
 
@@ -1990,16 +1990,16 @@ export default function AdminDashboard() {
           {activeTab === "marketers" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketers</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassadors</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
-                  Approved marketers and their commission earnings. To approve a new marketer, use "Make marketer" on the Users tab.
+                  Approved Brand Ambassadors and their commission earnings. To approve a new one, use "Make Brand Ambassador" on the Users tab.
                 </p>
               </div>
 
               {marketersLoading ? (
                 <Spinner />
               ) : marketers.length === 0 ? (
-                <EmptyState>No marketers approved yet.</EmptyState>
+                <EmptyState>No Brand Ambassadors approved yet.</EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
