@@ -242,9 +242,9 @@ export default function MyListings() {
   if (!renewProduct) throw new Error("No product selected");
 
   const renewAdvert = httpsCallable<
-    { productId: string; plan: string }
-    { success: boolean; requiresPayment: boolean }
-  >(functions, "renewAdvert");
+  { productId: string; plan: string },
+  { success: boolean; requiresPayment: boolean }
+>(functions, "renewAdvert");
 
   const { data } = await renewAdvert({ productId: renewProduct.id, plan: renewPlan });
 
