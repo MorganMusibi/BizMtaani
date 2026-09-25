@@ -27,7 +27,6 @@ const cloudinaryCloudName = defineSecret("CLOUDINARY_CLOUD_NAME");
 const mpesaConsumerKey = defineSecret("MPESA_CONSUMER_KEY");
 const mpesaConsumerSecret = defineSecret("MPESA_CONSUMER_SECRET");
 const mpesaPasskey = defineSecret("MPESA_PASSKEY");
-const daraProxyUrl = defineSecret("DARAJA_PROXY_URL");
 const paystackSecretKey = defineSecret("PAYSTACK_SECRET_KEY");
 
 // Single source of truth for the owner UID — referenced by every
@@ -176,9 +175,6 @@ function darajaBase(): string {
   return isSandbox() ? "https://sandbox.safaricom.co.ke" : "https://api.safaricom.co.ke";
 }
 
-async function fetchViaProxy(url: string, options: any = {}): Promise<Response> {
-  return fetch(url, options);
-}
 
 function mpesaTimestamp(): string {
   const now = new Date();
@@ -311,7 +307,7 @@ async function getDarajaToken(key: string, secret: string): Promise<string> {
   let res: Response;
   try {
     console.log(`Daraja token request starting: ${darajaBase()}/oauth/v1/generate`);
-    res = await fetchViaProxy(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
+    res = await fetch(`${darajaBase()}/oauth/v1/generate?grant_type=client_credentials`, {
       headers: { Authorization: `Basic ${creds}` },
       signal: controller.signal,
     });
@@ -575,7 +571,7 @@ export const attachDraftUploadImages = onCall({ region: "europe-west1", cors: tr
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-export const initiateMpesaPayment = onCall({ region: "europe-west1", minInstances: 1, memory: "512MiB", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey, daraProxyUrl], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
+export const initiateMpesaPayment = onCall({ region: "europe-west1", minInstances: 1, memory: "512MiB", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
   console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
