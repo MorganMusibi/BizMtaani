@@ -47,7 +47,7 @@ function loadCachedLocationState() {
 }
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const { userProfile, profileLoading } = useAuth();
+  const { user, userProfile, profileLoading } = useAuth();
   const cached = loadCachedLocationState();
 
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cached?.locationInfo ?? null);
@@ -62,7 +62,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // to settle the outcome — only the first one to fire wins.
   const settledRef = useRef(false);
   const capTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const startGpsRef = useRef<(() => void) | null>(null);
   function settle(outcome: "resolved" | "unresolved") {
     if (settledRef.current) return;
     settledRef.current = true;
@@ -95,15 +95,21 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // 3) GPS — spins, capped at 5s; stops the moment it resolves
   // 4) still nothing after the cap — prompt for GPS or manual entry
   //
-  // Profile and GPS no longer run strictly in sequence: profile gets
-  // a short head start (it's usually just reading an already-open
-  // Firestore listener, near-instant), but if it hasn't resolved
-  // within GPS_RACE_GRACE_MS, GPS starts anyway rather than waiting
-  // indefinitely behind a slow profile fetch. Whichever settles
-  // first wins via the shared settledRef guard.
-  const GPS_RACE_GRACE_MS = 600;
+  // GPS is only ever requested for a signed-in user who turns out to
+  // have NO saved profile area — a returning user with homeLocation
+  // already set should never see the OS permission prompt again. A
+  // safety cap covers the rare case where the profile fetch itself
+  // hangs, so this can never wait forever.
+  const PROFILE_WAIT_SAFETY_CAP_MS = 4000;
 
   useEffect(() => {
+    if (!user) {
+      // Not signed in yet — never auto-request location for an
+      // unauthenticated visitor. Register.tsx handles its own
+      // explicit, user-initiated location step during signup.
+      setIsLocationLoading(false);
+      return;
+    }
     if (resolutionStarted.current) return;
 
     if (cached?.gpsReady && cached.locationInfo) {
@@ -156,20 +162,23 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       );
     }
 
-    // Give the profile fetch a brief head start before racing GPS —
-    // avoids an unnecessary permission prompt for the common case
-    // where profileLoading resolves almost immediately.
-    const graceTimer = setTimeout(() => {
+    startGpsRef.current = startGps;
+
+    // Safety net only — if the profile fetch itself hangs longer
+    // than this, fall back to GPS rather than leaving the user
+    // stuck. In the normal case, the profile-resolution effect below
+    // settles this first (with or without GPS) well before this fires.
+    const safetyTimer = setTimeout(() => {
       if (!settledRef.current) startGps();
-    }, GPS_RACE_GRACE_MS);
+    }, PROFILE_WAIT_SAFETY_CAP_MS);
 
-    return () => clearTimeout(graceTimer);
-  }, []);
-
+    return () => clearTimeout(safetyTimer);
+  }, [user]);
   // Resolves from the profile the moment it finishes loading — races
   // against startGps() above via the shared settledRef; whichever
   // settles first wins, the other is simply ignored.
   useEffect(() => {
+    if (!user) return;
     if (profileLoading) return;
     if (settledRef.current) return;
 
@@ -190,11 +199,13 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       );
       setGpsReady(true);
       settle("resolved");
+    } else {
+      // Profile finished loading and genuinely has no saved area —
+      // this is the only case that should ever trigger a GPS
+      // permission prompt.
+      startGpsRef.current?.();
     }
-    // No saved area — nothing to do here; GPS (already running or
-    // about to start via the grace timer above) will settle this.
   }, [profileLoading, userProfile]);
-
   const refreshLocation = async () => {
     setIsLocationLoading(true);
     setNeedsLocationPrompt(false);
