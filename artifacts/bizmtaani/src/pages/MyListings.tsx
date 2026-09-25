@@ -14,7 +14,7 @@ import {
 import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
-import { initiatePaystackCharge, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
+import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 import { getRecaptchaToken } from "@/lib/recaptcha";
@@ -278,7 +278,7 @@ export default function MyListings() {
     return { checkoutRequestId: "", productId: renewProduct.id };
   }
 
-  const result = await initiatePaystackCharge({ phone, plan: renewPlan, productId: renewProduct.id });
+  const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id, recaptchaToken });
   return { checkoutRequestId: result.checkoutRequestId, productId: renewProduct.id };
 }
 
