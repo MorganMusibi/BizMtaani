@@ -12,7 +12,6 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@google-cloud/recaptcha-enterprise": "^5.0.0",
     "firebase-admin": "^13.4.0",
     "firebase-functions": "^7.2.5",
     "undici": "^6.19.8"
