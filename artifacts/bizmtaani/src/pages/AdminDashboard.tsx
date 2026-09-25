@@ -2065,8 +2065,8 @@ export default function AdminDashboard() {
             <>
               <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer payouts</h2>
-                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Monthly commission owed to each marketer.</p>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassador payouts</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Monthly commission owed to each Brand Ambassador.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -2086,7 +2086,7 @@ export default function AdminDashboard() {
                 <Spinner />
               ) : payouts.length === 0 ? (
                 <EmptyState>
-                  No payout data for {payoutMonth}. It may not have closed yet, or no marketers earned commissions.
+                  No payout data for {payoutMonth}. It may not have closed yet, or no Brand Ambassadors earned commissions.
                 </EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
@@ -2139,14 +2139,14 @@ export default function AdminDashboard() {
           {activeTab === "leaderboard" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Top marketers</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Top Brand Ambassadors</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Ranked by earnings this month.</p>
               </div>
 
               {leaderboardLoading ? (
                 <Spinner />
               ) : leaderboard.length === 0 ? (
-                <EmptyState>No marketer earnings recorded yet this month.</EmptyState>
+                <EmptyState>No Brand Ambassador earnings recorded yet this month.</EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
