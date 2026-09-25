@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import {
   collection, query, where, orderBy, limit, getDocs, deleteDoc, doc, startAfter, Timestamp,
@@ -17,7 +17,6 @@ import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
-import { getRecaptchaToken } from "@/lib/recaptcha";
 interface Product {
   id: string;
   title: string;
@@ -140,20 +139,6 @@ export default function MyListings() {
   const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("premium_weekly");
   const [showRenewModal, setShowRenewModal] = useState(false);
 
-  // Preloaded as soon as the renew sheet opens, so by the time the
-  // user picks a plan and taps "Pay & Renew" the token's already
-  // ready instead of being fetched at that exact moment.
-  const renewRecaptchaTokenRef = useRef<string>("");
-
-  useEffect(() => {
-    if (renewProduct) {
-      renewRecaptchaTokenRef.current = "";
-      getRecaptchaToken("renew_advert")
-        .then((token) => { renewRecaptchaTokenRef.current = token; })
-        .catch((err) => console.warn("reCAPTCHA preload failed:", err));
-    }
-  }, [renewProduct]);
-
   async function fetchProducts(opts?: { skipCache?: boolean }) {
     if (!user) return;
 
@@ -256,29 +241,18 @@ export default function MyListings() {
   async function handleRenewInitiate(phone: string): Promise<{ checkoutRequestId: string; productId: string }> {
   if (!renewProduct) throw new Error("No product selected");
 
-  let recaptchaToken = renewRecaptchaTokenRef.current;
-  if (recaptchaToken) {
-    renewRecaptchaTokenRef.current = "";
-  } else {
-    try {
-      recaptchaToken = await getRecaptchaToken("renew_advert");
-    } catch (error) {
-      console.warn("reCAPTCHA not available, proceeding without token:", error);
-    }
-  }
-
   const renewAdvert = httpsCallable<
     { productId: string; plan: string; recaptchaToken: string },
     { success: boolean; requiresPayment: boolean }
   >(functions, "renewAdvert");
 
-  const { data } = await renewAdvert({ productId: renewProduct.id, plan: renewPlan, recaptchaToken });
+  const { data } = await renewAdvert({ productId: renewProduct.id, plan: renewPlan });
 
   if (!data.requiresPayment) {
     return { checkoutRequestId: "", productId: renewProduct.id };
   }
 
-  const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id, recaptchaToken });
+  const result = await initiateStkPush({ phone, plan: renewPlan, productId: renewProduct.id });
   return { checkoutRequestId: result.checkoutRequestId, productId: renewProduct.id };
 }
 
