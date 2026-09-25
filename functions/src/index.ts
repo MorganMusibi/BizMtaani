@@ -197,101 +197,6 @@ function normalizePhone(raw: string): string {
   throw new Error(`Invalid Kenyan number: ${raw}`);
 }
 
-// Constructed once per warm instance and reused across every
-// verifyRecaptcha() call, instead of re-importing the package and
-// rebuilding the client (with its own credential setup) on every
-// single request — that was wasted CPU time billed to every call
-// site (initiateMpesaPayment, reverseGeocode, publishAdvert,
-// submitReferralCode, applyForMarketer).
-let _recaptchaClient: import("@google-cloud/recaptcha-enterprise").RecaptchaEnterpriseServiceClient | null = null;
-async function getRecaptchaClient() {
-  if (!_recaptchaClient) {
-    const { RecaptchaEnterpriseServiceClient } = await import('@google-cloud/recaptcha-enterprise');
-    _recaptchaClient = new RecaptchaEnterpriseServiceClient();
-  }
-  return _recaptchaClient;
-}
-
-async function verifyRecaptcha(token: unknown, expectedAction: string): Promise<void> {
-  if (typeof token !== "string" || !token.trim()) {
-    throw new HttpsError("invalid-argument", "Missing reCAPTCHA token.");
-  }
-
-  try {
-    const client = await getRecaptchaClient();
-
-    const projectId = process.env.GCLOUD_PROJECT;
-    const [assessment] = await client.createAssessment({
-      parent: `projects/${projectId}`,
-      assessment: {
-        event: {
-          token: token,
-          siteKey: "6LddmkgtAAAAANnCYmsgANE0PNJC5xNltv7dYRL8",
-          expectedAction: expectedAction,
-        },
-      },
-    });
-
-    if (!assessment.tokenProperties?.valid) {
-      throw new HttpsError("permission-denied", "Invalid reCAPTCHA token.");
-    }
-
-    if (assessment.tokenProperties?.action !== expectedAction) {
-      throw new HttpsError("permission-denied", "reCAPTCHA action mismatch.");
-    }
-
-    const score = assessment.riskAnalysis?.score ?? 0;
-    if (score < 0.3) {
-      throw new HttpsError("permission-denied", "reCAPTCHA score too low.");
-    }
-  } catch (error) {
-    console.error("reCAPTCHA verification error:", error);
-    throw new HttpsError("permission-denied", "reCAPTCHA verification failed.");
-  }
-}
-
-const NO_RECAPTCHA_COOLDOWN_MS = 5 * 60 * 1000; // 5 minutes — stricter than a normal action cooldown
-
-/**
- * If a reCAPTCHA token is present, verifies it normally (throws on
- * failure, same as before). If it's missing — e.g. the script failed
- * to load, an ad-blocker stripped it, a slow connection timed out —
- * this does NOT hard-block the request. Instead it falls back to a
- * stricter per-user cooldown, so a token-less submission still costs
- * the caller something (rate limiting), without losing a legitimate
- * user entirely over a client-side script failure.
- */
-async function verifyRecaptchaOrFallback(
-  token: unknown,
-  expectedAction: string,
-  uid: string
-): Promise<void> {
-  if (typeof token === "string" && token.trim()) {
-    await verifyRecaptcha(token, expectedAction);
-    return;
-  }
-
-  const fallbackRef = db.collection("recaptchaFallbackCooldowns").doc(uid);
-  const fallbackSnap = await fallbackRef.get();
-  const lastFallbackAt = fallbackSnap.exists
-    ? fallbackSnap.data()?.lastFallbackAt?.toMillis()
-    : null;
-
-  if (lastFallbackAt && Date.now() - lastFallbackAt < NO_RECAPTCHA_COOLDOWN_MS) {
-    throw new HttpsError(
-      "resource-exhausted",
-      "Please wait a few minutes before trying again, or refresh the page and retry."
-    );
-  }
-
-  await fallbackRef.set({
-    lastFallbackAt: admin.firestore.FieldValue.serverTimestamp(),
-    expireAt: admin.firestore.Timestamp.fromDate(
-      new Date(Date.now() + NO_RECAPTCHA_COOLDOWN_MS)
-    ),
-  });
-}
-
 let _darajaToken: { token: string; expiresAt: number } | null = null;
 async function getDarajaToken(key: string, secret: string): Promise<string> {
   if (_darajaToken && Date.now() < _darajaToken.expiresAt - 60_000) return _darajaToken.token;
@@ -1650,7 +1555,7 @@ export const reverseGeocode = onCall(
     concurrency: 1,
   },
   async (request) => {
-    const { lat, lng, recaptchaToken } = request.data as { lat?: number; lng?: number; recaptchaToken?: string };
+    const { lat, lng } = request.data as { lat?: number; lng?: number };
 
     if (typeof lat !== "number" || typeof lng !== "number") {
       throw new HttpsError("invalid-argument", "lat and lng are required numbers.");
@@ -1664,10 +1569,6 @@ export const reverseGeocode = onCall(
       return cached.data();
     }
 
-    // Only verify reCAPTCHA on an actual cache miss (i.e. only when
-    // we're about to call the external Nominatim service) — a cache
-    // hit is just a Firestore read and needs no bot protection.
-    await verifyRecaptcha(recaptchaToken, "reverse_geocode");
     await throttleNominatim();
 
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=14`;
@@ -1712,7 +1613,7 @@ export const reverseGeocode = onCall(
 export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, cors: true, maxInstances: 200 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, ...otherData } = request.data;
+  const { plan, title, price, imageUrls, draftId, productId: existingProductId, ...otherData } = request.data;
   const uid = request.auth.uid;
 
   const draftSnapPromise =
@@ -1743,13 +1644,7 @@ export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, c
     );
   }
 
-  // reCAPTCHA verification and the user-subscription lookup don't
-  // depend on each other — run them in parallel instead of paying
-  // both round-trips one after another.
-  const [, userSnap] = await Promise.all([
-    verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid),
-    db.collection("users").doc(uid).get(),
-  ]);
+  const userSnap = await db.collection("users").doc(uid).get();
 
 // Block suspended/scammer accounts from posting
 if (userSnap.exists && userSnap.data()?.blocked === true) {
@@ -2029,7 +1924,7 @@ try {
   export const publishAdvertAndPay = onCall({ region: "europe-west1", minInstances: 1, secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 200, timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { plan, title, price, imageUrls, draftId, recaptchaToken, productId: existingProductId, phone, ...otherData } = request.data;
+  const { plan, title, price, imageUrls, draftId, productId: existingProductId, phone, ...otherData } = request.data;
   const uid = request.auth.uid;
 
   // Kick off the Daraja OAuth fetch immediately, in parallel with
@@ -2064,10 +1959,7 @@ try {
     );
   }
 
-  const [, userSnap] = await Promise.all([
-    verifyRecaptchaOrFallback(recaptchaToken, "publish_advert", uid),
-    db.collection("users").doc(uid).get(),
-  ]);
+  const userSnap = await db.collection("users").doc(uid).get();
 
   if (userSnap.exists && userSnap.data()?.blocked === true) {
     throw new HttpsError(
@@ -2388,13 +2280,10 @@ export const deleteAdvert = onCall({ region: "europe-west1", cors: true, secrets
 export const renewAdvert = onCall({ region: "europe-west1", cors: true }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
-  const { productId, plan, recaptchaToken } = request.data as {
+  const { productId, plan } = request.data as {
     productId?: string;
     plan?: string;
-    recaptchaToken?: string;
   };
-
-  await verifyRecaptchaOrFallback(recaptchaToken, "renew_advert", request.auth.uid);
 
   if (typeof productId !== "string" || !productId.trim()) {
     throw new HttpsError("invalid-argument", "Product ID is required.");
