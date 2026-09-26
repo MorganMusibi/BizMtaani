@@ -31,7 +31,7 @@ const CONTACT_METHODS = [
 ] as const;
 
 export default function PostJob() {
-  const { user, userProfile } = useAuth();
+  const { user, userProfile, loading: authLoading } = useAuth();
   const [, navigate] = useLocation();
   const { toast } = useToast();
 
@@ -57,6 +57,7 @@ export default function PostJob() {
   const [resolvingArea, setResolvingArea] = useState(false);
 
   useEffect(() => {
+  if (authLoading) return;
   if (!user) { navigate("/login"); return; }
   
   // Check if we have a saved location from the profile
