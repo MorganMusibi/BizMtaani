@@ -56,6 +56,17 @@ function NotificationSetup() {
   return null;
 }
 
+function InstallPromptGate() {
+  const { user, likelySignedIn } = useAuth();
+
+  // Only offer installation once someone has actually signed up —
+  // showing it to a cold, first-time, not-yet-signed-in visitor is
+  // exactly the kind of premature ask that erodes trust before it's
+  // been earned.
+  if (!user && !likelySignedIn) return null;
+
+  return <InstallPrompt />;
+}
 function ProfileSetupGate() {
   const { user, userProfile, profileLoading } = useAuth();
 
