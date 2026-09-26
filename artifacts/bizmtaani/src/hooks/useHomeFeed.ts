@@ -1507,20 +1507,26 @@ if (wardHadResults) {
 // Flow:
 //   Firestore -> areaBuffer -> 20 visible products
 // ============================================================
-
 try {
   let currentCursors: Record<string, GeohashCursor | null> = {};
   let currentDonePrefixes: Record<string, boolean> = {};
 
   let collectedProducts: Product[] = [];
   let iterations = 0;
-  // Not a visibility limit — purely a runaway-loop safety net.
-  // Real exhaustion is decided by allPrefixesDone below; this should
-  // never realistically be reached.
   const MAX_ITERATIONS = 10000;
   let allPrefixesDone = false;
 
   const currentRadius = HOME_FEED_RADIUS_STEPS[0];
+
+  // FIX: this loop used to run to completion (a full 20-product buffer,
+  // or every prefix exhausted) before anything reached the screen — in
+  // a sparsely-populated area that could mean several sequential
+  // Firestore round-trips with a blank screen the whole time. Now the
+  // first non-empty batch is flushed immediately; the loop then keeps
+  // running purely to top up the scroll buffer in the background.
+  let hasFlushedFirstPaint = false;
+  let shownIds = new Set<string>();
+  let flushedFirstPage: Product[] = [];
 
   while (
     collectedProducts.length < AREA_BUFFER_FETCH &&
@@ -1528,120 +1534,76 @@ try {
     iterations < MAX_ITERATIONS
   ) {
     iterations++;
-  const prefixes = getNearbyGeohashPrefixes(
-  userCoords[0],
-  userCoords[1],
-  radiusKmToGeohashPrecision(currentRadius)
-);
+    const prefixes = getNearbyGeohashPrefixes(
+      userCoords[0],
+      userCoords[1],
+      radiusKmToGeohashPrecision(currentRadius)
+    );
 
-// Stage 0 allows both free and premium adverts (see
-// isProductEligibleForFeedStage), so it must NOT use the
-// premium-only server-side filter — that filter is only safe
-// for stage >= 1.
-const queries = areaQueries(
-  userCoords,
-  currentRadius,
-  currentCursors,
-  currentDonePrefixes,
-  true
-);
+    const queries = areaQueries(
+      userCoords,
+      currentRadius,
+      currentCursors,
+      currentDonePrefixes,
+      true
+    );
 
     if (queries.length === 0) {
       allPrefixesDone = true;
       break;
     }
 
-    const snapshots = await Promise.all(
-      queries.map((q) => getDocs(q))
-    );
+    const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
 
-    const pageProducts = snapshots.flatMap(
-  (snap) => {
-    const products = toProducts(snap.docs);
-
-    return products.filter((product) => {
-      const distance = getDistanceKm(
-        userCoords[0],
-        userCoords[1],
-        product.lat,
-        product.lng
-      );
-
-      return (
-        isProductVisibleToUser(
-          product,
-          userCoords,
-          wardName
-        ) &&
-        isProductEligibleForFeedStage(
-          product,
-          distance,
-          0
-        )
-      );
+    const pageProducts = snapshots.flatMap((snap) => {
+      const products = toProducts(snap.docs);
+      return products.filter((product) => {
+        const distance = getDistanceKm(
+          userCoords[0],
+          userCoords[1],
+          product.lat,
+          product.lng
+        );
+        return (
+          isProductVisibleToUser(product, userCoords, wardName) &&
+          isProductEligibleForFeedStage(product, distance, 0)
+        );
+      });
     });
-  }
-);
 
     const uniquePageProducts = Array.from(
-      new Map(
-        pageProducts.map((product) => [
-          product.id,
-          product,
-        ])
-      ).values()
+      new Map(pageProducts.map((product) => [product.id, product])).values()
     );
 
     collectedProducts = Array.from(
       new Map(
-        [
-          ...collectedProducts,
-          ...uniquePageProducts,
-        ].map((product) => [
+        [...collectedProducts, ...uniquePageProducts].map((product) => [
           product.id,
           product,
         ])
       ).values()
     );
 
-    const updatedCursors: Record<
-      string,
-      GeohashCursor | null
-    > = {
+    const updatedCursors: Record<string, GeohashCursor | null> = {
       ...currentCursors,
     };
-
-    const updatedDonePrefixes: Record<
-      string,
-      boolean
-    > = {
+    const updatedDonePrefixes: Record<string, boolean> = {
       ...currentDonePrefixes,
-    }
+    };
     let queryIndex = 0;
 
     prefixes.forEach((prefix) => {
       const key = prefix;
-
-      if (currentDonePrefixes[key]) {
-        return;
-      }
-
+      if (currentDonePrefixes[key]) return;
       const snap = snapshots[queryIndex];
       queryIndex++;
-
       if (!snap) {
         updatedDonePrefixes[key] = true;
         return;
       }
-
       const lastDoc = snap.docs[snap.docs.length - 1];
-      if (lastDoc) {
-        updatedCursors[key] = geohashCursorFromDoc(lastDoc);
-      }
-
-      if (snap.docs.length < AREA_BUFFER_FETCH) {
-        updatedDonePrefixes[key] = true;
-      }
+      if (lastDoc) updatedCursors[key] = geohashCursorFromDoc(lastDoc);
+      if (snap.docs.length < AREA_BUFFER_FETCH) updatedDonePrefixes[key] = true;
     });
 
     currentCursors = updatedCursors;
@@ -1651,68 +1613,98 @@ const queries = areaQueries(
       (prefix) => currentDonePrefixes[prefix] === true
     );
 
-
-    // Prevent an infinite loop when every active prefix
-    // returns an empty snapshot.
     if (
       snapshots.length > 0 &&
-      snapshots.every(
-        (snap) => snap.docs.length === 0
-      )
+      snapshots.every((snap) => snap.docs.length === 0)
     ) {
       allPrefixesDone = true;
     }
+
+    // FIRST-PAINT FLUSH — show what we have the moment we have anything,
+    // rather than waiting for the buffer to fill or prefixes to exhaust.
+    if (!hasFlushedFirstPaint && collectedProducts.length > 0) {
+      hasFlushedFirstPaint = true;
+      const sortedSoFar = sortNearbyProducts(collectedProducts, userCoords);
+      flushedFirstPage = sortedSoFar.slice(0, AREA_PAGE);
+      const restAsBuffer = sortedSoFar.slice(AREA_PAGE);
+      shownIds = new Set(flushedFirstPage.map((p) => p.id));
+
+      setAreaProducts(flushedFirstPage);
+      setAreaBuffer(restAsBuffer);
+      setAreaCursors(currentCursors);
+      setAreaDonePrefixes(currentDonePrefixes);
+      setAreaDone(false);
+      setInitialLoading(false);
+      // No cache write yet — the background top-up below may still add
+      // more; the cache gets the fuller result once collection finishes.
+    }
   }
 
-  // collectedProducts was already filtered by isProductVisibleToUser +
-  // isProductEligibleForFeedStage inside the pageProducts step above —
-  // re-filtering here was redundant (same checks, same data, always
-  // true) and recomputed every product's distance a second time.
-  const sortedBuffer = sortNearbyProducts(
-    collectedProducts,
-    userCoords
-  );
+  // Final commit, once the background top-up finishes (or the area is
+  // genuinely exhausted).
+  const sortedBuffer = sortNearbyProducts(collectedProducts, userCoords);
 
-  // First 20 products become visible.
-  // Everything else stays in the buffer.
-  const localAreaProducts = sortedBuffer.slice(0, AREA_PAGE);
-  const localAreaBuffer = sortedBuffer.slice(AREA_PAGE);
-  const localAreaDone = allPrefixesDone && sortedBuffer.length <= AREA_PAGE;
+  if (hasFlushedFirstPaint) {
+    // The first page is already on screen — never reshuffle what the
+    // user is already looking at. Anything collected since the flush
+    // that isn't already shown becomes the buffer for "load more".
+    const newBuffer = sortedBuffer.filter((p) => !shownIds.has(p.id));
+    const localAreaDone = allPrefixesDone && newBuffer.length === 0;
 
-  setAreaProducts(localAreaProducts);
-  setAreaBuffer(localAreaBuffer);
-  setAreaCursors(currentCursors);
-  setAreaDonePrefixes(currentDonePrefixes);
-  setAreaDone(localAreaDone);
+    setAreaBuffer(newBuffer);
+    setAreaCursors(currentCursors);
+    setAreaDonePrefixes(currentDonePrefixes);
+    setAreaDone(localAreaDone);
 
-  feedCache.set(cacheKey, {
-  wardProducts: localWardProducts,
-  wardCursor: localWardCursor,
-  wardDone: localWardDone,
-  areaProducts: localAreaProducts,
-  areaBuffer: localAreaBuffer,
-  areaCursors: currentCursors,
-  areaDonePrefixes: currentDonePrefixes,
-  areaDone: localAreaDone,
-  areaRadiusStage: 0,
-  timestamp: Date.now(),
-});
-saveFeedCacheToStorage(feedCache);
+    feedCache.set(cacheKey, {
+      wardProducts: localWardProducts,
+      wardCursor: localWardCursor,
+      wardDone: localWardDone,
+      areaProducts: flushedFirstPage,
+      areaBuffer: newBuffer,
+      areaCursors: currentCursors,
+      areaDonePrefixes: currentDonePrefixes,
+      areaDone: localAreaDone,
+      areaRadiusStage: 0,
+      timestamp: Date.now(),
+    });
+    saveFeedCacheToStorage(feedCache);
+  } else {
+    // Nothing was ever found — identical to the original behavior for
+    // a genuinely empty area.
+    const localAreaProducts = sortedBuffer.slice(0, AREA_PAGE);
+    const localAreaBuffer = sortedBuffer.slice(AREA_PAGE);
+    const localAreaDone = allPrefixesDone && sortedBuffer.length <= AREA_PAGE;
 
+    setAreaProducts(localAreaProducts);
+    setAreaBuffer(localAreaBuffer);
+    setAreaCursors(currentCursors);
+    setAreaDonePrefixes(currentDonePrefixes);
+    setAreaDone(localAreaDone);
+
+    feedCache.set(cacheKey, {
+      wardProducts: localWardProducts,
+      wardCursor: localWardCursor,
+      wardDone: localWardDone,
+      areaProducts: localAreaProducts,
+      areaBuffer: localAreaBuffer,
+      areaCursors: currentCursors,
+      areaDonePrefixes: currentDonePrefixes,
+      areaDone: localAreaDone,
+      areaRadiusStage: 0,
+      timestamp: Date.now(),
+    });
+    saveFeedCacheToStorage(feedCache);
+  }
 } catch (error) {
-  console.error(
-    "Failed to load nearby adverts:",
-    error
-  );
-
+  console.error("Failed to load nearby adverts:", error);
   setAreaProducts([]);
   setAreaBuffer([]);
   setAreaDone(true);
 }
 
-    
+setInitialLoading(false);
 
-    setInitialLoading(false);
   };
 
     run();
