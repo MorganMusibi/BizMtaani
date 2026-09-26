@@ -1990,6 +1990,7 @@ const data = result.data as PublishAdvertResponse;
   });
 
   invalidateOwnCaches();
+   clearDraft();
   navigate(`/product/${data.productId}`);
  }
     else {
@@ -2044,6 +2045,7 @@ toast({
     });
 
     invalidateOwnCaches();
+    clearDraft();
     navigate(`/product/${result.productId}`);
   } catch (error: unknown) {
   console.error("Publish premium advert failed:", error);
