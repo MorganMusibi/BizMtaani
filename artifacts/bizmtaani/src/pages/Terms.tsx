@@ -415,16 +415,12 @@ export default function Terms() {
             </p>
 
             <div className="mt-4 bg-card border border-border rounded-2xl p-4">
-              <p className="font-bold text-sm">BizMtaani Support</p>
+  <p className="font-bold text-sm">BizMtaani Support</p>
 
-              <p className="text-sm text-muted-foreground mt-2">
-                Email: morganmusibi@gmail.com
-              </p>
-
-              <p className="text-sm text-muted-foreground mt-1">
-                Phone: +254 702 278 606
-              </p>
-            </div>
+  <p className="text-sm text-muted-foreground mt-2">
+    Phone / WhatsApp: +254 702 278 606
+  </p>
+</div>
           </section>
 
           {/* Navigation */}
