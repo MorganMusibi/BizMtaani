@@ -421,6 +421,165 @@ useEffect(() => {
     imagePreviewsRef.current.forEach((url) => URL.revokeObjectURL(url));
   };
 }, []);
+  // Restore an unsaved draft, if one exists, once the user is known.
+  // Placed AFTER the profile/GPS effect above so restored values
+  // (e.g. phone, location) win over the profile's defaults if both
+  // are present.
+  useEffect(() => {
+    if (!user || draftRestoredRef.current) return;
+    draftRestoredRef.current = true;
+    try {
+      const raw = sessionStorage.getItem(getDraftKey(user.uid));
+      if (!raw) return;
+      const draft = JSON.parse(raw) as PostDraftSnapshot;
+      if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+        sessionStorage.removeItem(getDraftKey(user.uid));
+        return;
+      }
+
+      setStep(draft.step);
+      setSelectedCategory(draft.selectedCategory);
+      setSelectedSubcategory(draft.selectedSubcategory);
+      setCustomSubcategory(draft.customSubcategory);
+      setTitle(draft.title);
+      setDescription(draft.description);
+      setPrice(draft.price);
+      setRentPerMonth(draft.rentPerMonth);
+      setPriceText(draft.priceText);
+      setJobTitle(draft.jobTitle);
+      setJobSkills(draft.jobSkills);
+      setJobExperience(draft.jobExperience);
+      setJobEducation(draft.jobEducation);
+      setJobEmploymentType(draft.jobEmploymentType);
+      setJobAvailability(draft.jobAvailability);
+      setVehicleMake(draft.vehicleMake);
+      setVehicleModel(draft.vehicleModel);
+      setVehicleYear(draft.vehicleYear);
+      setVehicleCondition(draft.vehicleCondition);
+      setVehicleMileage(draft.vehicleMileage);
+      setVehicleTransmission(draft.vehicleTransmission);
+      setVehicleFuelType(draft.vehicleFuelType);
+      setVehicleRegistration(draft.vehicleRegistration);
+      setServiceType(draft.serviceType);
+      setServiceArea(draft.serviceArea);
+      setServicePricingType(draft.servicePricingType);
+      setPriceDisplay(draft.priceDisplay);
+      setPricingBasis(draft.pricingBasis);
+      setPhone(draft.phone);
+      setEateryPaymentMethod(draft.eateryPaymentMethod);
+      setEateryPaymentOther(draft.eateryPaymentOther);
+      setEateryPaymentNumber(draft.eateryPaymentNumber);
+      setEateryPaybillAccount(draft.eateryPaybillAccount);
+      setHotelMenu(draft.hotelMenu);
+      setPriceListItems(draft.priceListItems);
+      setCoords(draft.coords);
+      setWardInfo(draft.wardInfo);
+      setLocationName(draft.locationName);
+      setPlan(draft.plan);
+      setBedrooms(draft.bedrooms);
+      setBathrooms(draft.bathrooms);
+      setFurnishing(draft.furnishing);
+      setLandSize(draft.landSize);
+      setStayDetails(draft.stayDetails);
+      setSpaceDetails(draft.spaceDetails);
+      setSharedHousingDetails(draft.sharedHousingDetails);
+      setEquipmentType(draft.equipmentType);
+      setEquipmentCondition(draft.equipmentCondition);
+      setEventDate(draft.eventDate);
+      setEventStartTime(draft.eventStartTime);
+      setEventEndTime(draft.eventEndTime);
+      setEventVenue(draft.eventVenue);
+      setEventOrganizer(draft.eventOrganizer);
+      setTicketPrice(draft.ticketPrice);
+
+      toast({
+        title: "Draft restored",
+        description: "We recovered your unsaved advert. Please re-add any photos you had selected.",
+      });
+    } catch (err) {
+      console.warn("Failed to restore post draft:", err);
+    }
+  }, [user]);
+
+  function buildDraftSnapshot(): PostDraftSnapshot {
+    return {
+      step, selectedCategory, selectedSubcategory, customSubcategory,
+      title, description, price, rentPerMonth, priceText,
+      jobTitle, jobSkills, jobExperience, jobEducation, jobEmploymentType, jobAvailability,
+      vehicleMake, vehicleModel, vehicleYear, vehicleCondition, vehicleMileage,
+      vehicleTransmission, vehicleFuelType, vehicleRegistration,
+      serviceType, serviceArea, servicePricingType, priceDisplay, pricingBasis, phone,
+      eateryPaymentMethod, eateryPaymentOther, eateryPaymentNumber, eateryPaybillAccount,
+      hotelMenu, priceListItems, coords, wardInfo, locationName, plan,
+      bedrooms, bathrooms, furnishing, landSize, stayDetails, spaceDetails, sharedHousingDetails,
+      equipmentType, equipmentCondition,
+      eventDate, eventStartTime, eventEndTime, eventVenue, eventOrganizer, ticketPrice,
+      savedAt: Date.now(),
+    };
+  }
+
+  function saveDraftNow() {
+    if (!user) return;
+    try {
+      sessionStorage.setItem(getDraftKey(user.uid), JSON.stringify(buildDraftSnapshot()));
+    } catch (err) {
+      console.warn("Failed to save post draft:", err);
+    }
+  }
+
+  function clearDraft() {
+    if (!user) return;
+    try {
+      sessionStorage.removeItem(getDraftKey(user.uid));
+    } catch {
+      // ignore
+    }
+  }
+
+  // Debounced autosave — fires ~800ms after the user stops typing/changing
+  // fields. Skipped until the restore effect above has run once, so we
+  // never immediately re-save a blank form over a not-yet-restored draft.
+  useEffect(() => {
+    if (!user || !draftRestoredRef.current) return;
+    if (saveDraftTimeoutRef.current) clearTimeout(saveDraftTimeoutRef.current);
+    saveDraftTimeoutRef.current = setTimeout(saveDraftNow, 800);
+    return () => {
+      if (saveDraftTimeoutRef.current) clearTimeout(saveDraftTimeoutRef.current);
+    };
+  }, [
+    step, selectedCategory, selectedSubcategory, customSubcategory,
+    title, description, price, rentPerMonth, priceText,
+    jobTitle, jobSkills, jobExperience, jobEducation, jobEmploymentType, jobAvailability,
+    vehicleMake, vehicleModel, vehicleYear, vehicleCondition, vehicleMileage,
+    vehicleTransmission, vehicleFuelType, vehicleRegistration,
+    serviceType, serviceArea, servicePricingType, priceDisplay, pricingBasis, phone,
+    eateryPaymentMethod, eateryPaymentOther, eateryPaymentNumber, eateryPaybillAccount,
+    hotelMenu, priceListItems, coords, wardInfo, locationName, plan,
+    bedrooms, bathrooms, furnishing, landSize, stayDetails, spaceDetails, sharedHousingDetails,
+    equipmentType, equipmentCondition,
+    eventDate, eventStartTime, eventEndTime, eventVenue, eventOrganizer, ticketPrice,
+  ]);
+
+  // Flush immediately the instant the tab is backgrounded — the debounce
+  // above may not fire in time if the OS kills the page right after the
+  // user switches away, which is exactly the scenario this fixes.
+  const saveDraftNowRef = useRef(saveDraftNow);
+  saveDraftNowRef.current = saveDraftNow;
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.visibilityState === "hidden") saveDraftNowRef.current();
+    }
+    function handlePageHide() {
+      saveDraftNowRef.current();
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, []);
 
   const catDef = selectedCategory
   ? CATEGORY_DEFS.find((c) => c.key === selectedCategory)
