@@ -142,7 +142,7 @@ function App() {
               {showBottomNav && <BottomNav />}
              </div>
             <ProfileSetupGate />
-            <InstallPrompt />
+            <InstallPromptGate />
             <UpdatePrompt />
             <RecaptchaDisclosure />
             <Toaster />
