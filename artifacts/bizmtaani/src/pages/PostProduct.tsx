@@ -121,6 +121,74 @@ const PRICING_BASIS_OPTIONS = [
   { value: "quote_only", label: "Quote Only" },
 ];
 type Step = 1 | 2 | 3 | 4 | 5;
+
+// Persists text/location/plan fields across accidental reloads (e.g.
+// Android/iOS killing the backgrounded tab when the user briefly
+// switches apps to copy text). Photos are intentionally NOT included —
+// File objects can't be serialized to sessionStorage, so photos must
+// be re-added after a restore.
+interface PostDraftSnapshot {
+  step: Step;
+  selectedCategory: CategoryKey | "";
+  selectedSubcategory: string;
+  customSubcategory: string;
+  title: string;
+  description: string;
+  price: string;
+  rentPerMonth: string;
+  priceText: string;
+  jobTitle: string;
+  jobSkills: string;
+  jobExperience: string;
+  jobEducation: string;
+  jobEmploymentType: string;
+  jobAvailability: string;
+  vehicleMake: string;
+  vehicleModel: string;
+  vehicleYear: string;
+  vehicleCondition: string;
+  vehicleMileage: string;
+  vehicleTransmission: string;
+  vehicleFuelType: string;
+  vehicleRegistration: string;
+  serviceType: string;
+  serviceArea: string;
+  servicePricingType: string;
+  priceDisplay: "fixed" | "negotiable" | "contact" | "quote" | "free" | "custom";
+  pricingBasis: string;
+  phone: string;
+  eateryPaymentMethod: "mpesa" | "till" | "paybill" | "pochi" | "other" | "";
+  eateryPaymentOther: string;
+  eateryPaymentNumber: string;
+  eateryPaybillAccount: string;
+  hotelMenu: HotelMenu;
+  priceListItems: { name: string; priceType: "fixed" | "contact" | "custom"; price: string; priceText: string }[];
+  coords: { lat: number; lng: number } | null;
+  wardInfo: ResolvedLocation | null;
+  locationName: string;
+  plan: ListingPlan;
+  bedrooms: string;
+  bathrooms: string;
+  furnishing: string;
+  landSize: string;
+  stayDetails: string;
+  spaceDetails: string;
+  sharedHousingDetails: string;
+  equipmentType: string;
+  equipmentCondition: string;
+  eventDate: string;
+  eventStartTime: string;
+  eventEndTime: string;
+  eventVenue: string;
+  eventOrganizer: string;
+  ticketPrice: string;
+  savedAt: number;
+}
+
+const DRAFT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours — older drafts aren't restored
+function getDraftKey(uid: string) {
+  return `bizmtaani_post_draft_${uid}`;
+}
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium, loading: authLoading,
 } = useAuth();
