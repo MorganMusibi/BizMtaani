@@ -216,10 +216,11 @@ export default function PostProduct() {
   // Shared across all photos uploaded during this posting session, so
   // every image (and eventually the advert itself) claims the same
   // draft record. Generated once, lazily, on first upload.
-  const draftIdRef = useRef<string | null>(null);
-  const pendingProductIdRef = useRef<string | null>(null);
+const draftIdRef = useRef<string | null>(null); const pendingProductIdRef = useRef<string | null>(null);
 const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 const isPublishingRef = useRef(false);
+const draftRestoredRef = useRef(false);
+const saveDraftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const [, navigate] = useLocation();
 const { toast } = useToast();
 const [step, setStep] = useState<Step>(1);
