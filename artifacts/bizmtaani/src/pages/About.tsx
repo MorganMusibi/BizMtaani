@@ -253,21 +253,7 @@ export default function About() {
               </div>
             </a>
 
-            <a
-               href="mailto:bizmtaani2@gmail.com"
-              className="flex items-center gap-3 bg-card border border-border rounded-2xl p-4 active:scale-[0.98] transition-transform"
-            >
-              <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Mail size={18} className="text-primary" />
-              </div>
-
-              <div>
-                <p className="font-bold text-sm">Email us</p>
-                <p className="text-xs text-muted-foreground">
-                  bizmtaani2@gmail.com
-                </p>
-              </div>
-            </a>
+            
           </div>
         </section>
 
