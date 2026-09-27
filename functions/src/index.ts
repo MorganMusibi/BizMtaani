@@ -1392,15 +1392,22 @@ export const getMarketerOnboardingStats = onCall({ cors: true }, async (request)
     throw new HttpsError("invalid-argument", "A non-empty uids array is required.");
   }
 
-  const results: Record<string, { totalOnboarded: number; premiumCount: number }> = {};
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const todayTs = admin.firestore.Timestamp.fromDate(startOfToday);
+
+  const results: Record<string, { today: number; totalOnboarded: number; premiumCount: number }> = {};
 
   await Promise.all(
     uids.map(async (uid) => {
-      const [totalSnap, premiumSnap] = await Promise.all([
-        db.collection("referrals").where("marketerUid", "==", uid).count().get(),
-        db.collection("referrals").where("marketerUid", "==", uid).where("commissionPaidOut", "==", true).count().get(),
+      const base = db.collection("referrals").where("marketerUid", "==", uid);
+      const [todaySnap, totalSnap, premiumSnap] = await Promise.all([
+        base.where("createdAt", ">=", todayTs).count().get(),
+        base.count().get(),
+        base.where("commissionPaidOut", "==", true).count().get(),
       ]);
       results[uid] = {
+        today: todaySnap.data().count,
         totalOnboarded: totalSnap.data().count,
         premiumCount: premiumSnap.data().count,
       };
