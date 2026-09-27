@@ -2021,6 +2021,9 @@ export default function AdminDashboard() {
                         <th className={thCls}>Code</th>
                         <th className={thCls}>Name / email</th>
                         <th className={thCls}>Status</th>
+                        <th className={thCls}>Today</th>
+                        <th className={thCls}>Onboarded</th>
+                        <th className={thCls}>Premium</th>
                         <th className={thCls}>Earned</th>
                         <th className={thCls}>Paid out</th>
                         <th className={thCls}>Balance</th>
