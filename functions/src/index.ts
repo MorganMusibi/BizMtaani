@@ -1377,6 +1377,38 @@ export const getTopMarketers = onCall({ cors: true }, async (request) => {
 
   return { leaderboard };
 });
+/**
+ * Admin-only: for a list of marketer UIDs, returns each marketer's
+ * total onboarded users (everyone who signed up with their referral
+ * code, premium or not) and how many of those ever converted to
+ * premium. Uses count() aggregation queries — 1 Firestore read per
+ * query regardless of collection size, cheap even at scale.
+ */
+export const getMarketerOnboardingStats = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const { uids } = request.data as { uids?: string[] };
+  if (!Array.isArray(uids) || uids.length === 0) {
+    throw new HttpsError("invalid-argument", "A non-empty uids array is required.");
+  }
+
+  const results: Record<string, { totalOnboarded: number; premiumCount: number }> = {};
+
+  await Promise.all(
+    uids.map(async (uid) => {
+      const [totalSnap, premiumSnap] = await Promise.all([
+        db.collection("referrals").where("marketerUid", "==", uid).count().get(),
+        db.collection("referrals").where("marketerUid", "==", uid).where("commissionPaidOut", "==", true).count().get(),
+      ]);
+      results[uid] = {
+        totalOnboarded: totalSnap.data().count,
+        premiumCount: premiumSnap.data().count,
+      };
+    })
+  );
+
+  return { stats: results };
+});
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 4. NOTIFICATIONS
