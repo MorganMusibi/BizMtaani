@@ -475,8 +475,20 @@ export default function AdminDashboard() {
       const snap = await getDocs(
         query(collection(db, "marketers"), orderBy("createdAt", "desc"), limit(50))
       );
-      setMarketers(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Marketer)));
+      const loaded = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Marketer));
+      setMarketers(loaded);
       setMarketersLoaded(true);
+
+      if (loaded.length > 0) {
+        try {
+          const getMarketerOnboardingStats = httpsCallable(functions, "getMarketerOnboardingStats");
+          const result = await getMarketerOnboardingStats({ uids: loaded.map((m) => m.id) });
+          const data = result.data as { stats: Record<string, { today: number; totalOnboarded: number; premiumCount: number }> };
+          setOnboardingStats(data.stats ?? {});
+        } catch (error) {
+          console.error("Failed to load marketer onboarding stats:", error);
+        }
+      }
     } catch (error) {
       console.error("Failed to load marketers:", error);
     } finally {
