@@ -2034,6 +2034,7 @@ export default function AdminDashboard() {
                       {marketers.map((m) => {
                         const earned = m.totalEarnedKES ?? 0;
                         const paid = m.totalWithdrawnKES ?? 0;
+                        const stats = onboardingStats[m.id];
                         return (
                           <tr key={m.id} className="border-t" style={{ borderColor: "var(--pd-line)" }}>
                             <td className="px-4 py-3" style={fontMono}>{m.referralCode ?? "—"}</td>
@@ -2048,6 +2049,9 @@ export default function AdminDashboard() {
                                 <StatusDot color="var(--pd-green)" label="active" />
                               )}
                             </td>
+                            <td className="px-4 py-3" style={fontMono}>{stats ? stats.today : "…"}</td>
+                            <td className="px-4 py-3" style={fontMono}>{stats ? stats.totalOnboarded : "…"}</td>
+                            <td className="px-4 py-3" style={fontMono}>{stats ? stats.premiumCount : "…"}</td>
                             <td className="px-4 py-3" style={fontMono}>KES {earned.toLocaleString("en-GB")}</td>
                             <td className="px-4 py-3" style={fontMono}>KES {paid.toLocaleString("en-GB")}</td>
                             <td className="px-4 py-3 font-medium" style={fontMono}>
