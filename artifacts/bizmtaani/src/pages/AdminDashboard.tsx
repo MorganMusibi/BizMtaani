@@ -351,6 +351,7 @@ export default function AdminDashboard() {
   const [marketersLoading, setMarketersLoading] = useState(false);
   const [marketersLoaded, setMarketersLoaded] = useState(false);
   const [processingMarketerId, setProcessingMarketerId] = useState<string | null>(null);
+  const [onboardingStats, setOnboardingStats] = useState<Record<string, { today: number; totalOnboarded: number; premiumCount: number }>>({});
 
   // Payouts tab — lazily loaded per selected month
   const [payoutMonth, setPayoutMonth] = useState(() => {
