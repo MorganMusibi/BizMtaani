@@ -18,6 +18,7 @@ import {
   type ChatParticipant,
 } from "@/lib/chatService";
 import { clearJobsCache, jobsCache, JOBS_CACHE_TTL_MS, type JobPost } from "./Jobs";
+import { usePageMeta, SITE_URL, type PageMeta } from "@/hooks/usePageMeta";
 
 // Helper function needed for your component
 function timeAgo(seconds: number): string {
@@ -35,6 +36,94 @@ const TYPE_COLORS: Record<string, string> = {
   "Remote": "bg-teal-100 text-teal-700",
   "Internship": "bg-amber-100 text-amber-700",
 };
+
+// Google for Jobs uses a fixed enum for employmentType — not
+// freeform text — so BizMtaani's own job type labels get mapped
+// across. "Remote" isn't an employment type in schema.org terms;
+// it's handled separately below via jobLocationType.
+const EMPLOYMENT_TYPE_MAP: Record<string, string> = {
+  "Full-time": "FULL_TIME",
+  "Part-time": "PART_TIME",
+  "Contract": "CONTRACTOR",
+  "Internship": "INTERN",
+};
+
+function isJobPastDeadline(deadline?: string): boolean {
+  if (!deadline) return false;
+  return new Date(`${deadline}T23:59:59`) < new Date();
+}
+
+function buildJobMeta(job: JobPost): PageMeta {
+  const place = job.areaLabel || job.ward || job.county || "Kenya";
+  const title = `${job.title.trim().slice(0, 60)} at ${job.company} | BizMtaani`;
+
+  const cleanDescription = (job.description ?? "").replace(/\s+/g, " ").trim();
+  const description = cleanDescription
+    ? cleanDescription.slice(0, 155)
+    : `${job.jobType} ${job.category} role at ${job.company}, ${place}. Apply on BizMtaani.`;
+
+  const path = `/jobs/${job.id}`;
+  const url = `${SITE_URL}${path}`;
+  const expired = isJobPastDeadline(job.deadline);
+  const isRemote = job.jobType === "Remote";
+
+  // datePosted and validThrough are both required by Google for
+  // Jobs — a JobPosting missing either is silently excluded from
+  // that surface even if it otherwise validates.
+  const datePosted = job.createdAt ? new Date(job.createdAt.seconds * 1000).toISOString() : undefined;
+  const validThrough = job.deadline ? new Date(`${job.deadline}T23:59:59`).toISOString() : undefined;
+
+  let jsonLd: Record<string, unknown> | null = null;
+
+  if (!expired && datePosted && validThrough) {
+    jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "JobPosting",
+      title: job.title,
+      description: cleanDescription || description,
+      identifier: {
+        "@type": "PropertyValue",
+        name: "BizMtaani",
+        value: job.id,
+      },
+      datePosted,
+      validThrough,
+      hiringOrganization: {
+        "@type": "Organization",
+        name: job.company,
+      },
+      employmentType: EMPLOYMENT_TYPE_MAP[job.jobType] ?? "OTHER",
+      url,
+      ...(isRemote
+        ? {
+            jobLocationType: "TELECOMMUTE",
+            applicantLocationRequirements: {
+              "@type": "Country",
+              name: "Kenya",
+            },
+          }
+        : {
+            jobLocation: {
+              "@type": "Place",
+              address: {
+                "@type": "PostalAddress",
+                addressLocality: job.areaLabel || job.ward || undefined,
+                addressRegion: job.county || undefined,
+                addressCountry: "KE",
+              },
+            },
+          }),
+    };
+  }
+
+  return {
+    title,
+    description,
+    canonicalPath: path,
+    noindex: expired,
+    jsonLd,
+  };
+}
 
 export default function JobDetail() {
   const [, params] = useRoute("/jobs/:id");
