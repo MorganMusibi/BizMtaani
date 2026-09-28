@@ -15,6 +15,7 @@ import {
   ChatParticipant,
 } from "@/lib/chatService";
 import { isProductVisibleToUser, clearFeedCache } from "@/hooks/useHomeFeed";
+import { usePageMeta, SITE_URL, type PageMeta } from "@/hooks/usePageMeta";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
