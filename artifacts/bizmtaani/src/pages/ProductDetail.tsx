@@ -778,6 +778,18 @@ useEffect(() => {
         ? product.imageUrls.map((img: string | { url: string; public_id?: string }) => (typeof img === 'string' ? img : img.url)) 
         : product.imageUrl ? [product.imageUrl] : [])
     : [];
+  
+  usePageMeta(
+  product
+    ? buildProductMeta(product, images)
+    : !loading
+    ? {
+        title: "Advert not found | BizMtaani",
+        description: "This advert is no longer available on BizMtaani.",
+        noindex: true,
+      }
+    : null
+);
 
   // NOW handleChat CAN SAFELY USE "images"
   
