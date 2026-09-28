@@ -294,6 +294,67 @@ function getAvatarThumbnailUrl(url: string): string {
   }
   return url;
 }
+function buildProductMeta(product: Product, images: string[]): PageMeta {
+  const place = product.areaLabel || product.ward || product.county || "Kenya";
+  const title = `${product.title.trim().slice(0, 60)} in ${place} | BizMtaani`;
+
+  const cleanDescription = (product.description ?? "").replace(/\s+/g, " ").trim();
+  const description = cleanDescription
+    ? cleanDescription.slice(0, 155)
+    : `${product.subcategory ?? product.category} in ${place}. Chat with the seller directly on BizMtaani.`;
+
+  const path = `/product/${product.id}`;
+  const url = `${SITE_URL}${path}`;
+  const imageUrls = images.slice(0, 5).map(getDetailImageUrl);
+
+  // Same rule the feed uses: a missing status counts as active.
+  const isLive = (!product.status || product.status === "active") && isNotExpired(product);
+
+  const isRental = product.category === "Accommodation";
+  const showsPrice =
+    !product.priceDisplay ||
+    product.priceDisplay === "fixed" ||
+    product.priceDisplay === "negotiable";
+  const amount = isRental ? (product.rentPerMonth ?? product.price) : product.price;
+
+  const jsonLd: Record<string, unknown> = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.title,
+    description,
+    url,
+    category: product.subcategory ?? product.category,
+    ...(imageUrls.length > 0 ? { image: imageUrls } : {}),
+  };
+
+  if (isLive && showsPrice && amount > 0) {
+    jsonLd.offers = {
+      "@type": "Offer",
+      url,
+      priceCurrency: "KES",
+      availability: "https://schema.org/InStock",
+      ...(isRental
+        ? {
+            priceSpecification: {
+              "@type": "UnitPriceSpecification",
+              price: amount,
+              priceCurrency: "KES",
+              unitCode: "MON",
+            },
+          }
+        : { price: amount }),
+    };
+  }
+
+  return {
+    title,
+    description,
+    canonicalPath: path,
+    image: imageUrls[0],
+    noindex: !isLive,
+    jsonLd: isLive ? jsonLd : null,
+  };
+}
 function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
   const periodsWithItems = MEAL_PERIODS.filter(({ key }) => (menu[key]?.length ?? 0) > 0);
   if (periodsWithItems.length === 0) return null;
