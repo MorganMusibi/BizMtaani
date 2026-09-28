@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "https://europe-west1-bizmtaani-f50d5.cloudfunctions.net/sitemap"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
