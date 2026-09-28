@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 
 // Set to your real production domain, no trailing slash.
-export const SITE_URL = "https://bizmtaani.com";
+export const SITE_URL = "https://www.bizmtaani.site";
 
 export interface PageMeta {
   title: string;
