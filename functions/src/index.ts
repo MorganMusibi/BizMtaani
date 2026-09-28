@@ -3239,3 +3239,114 @@ export const backfillMissingCreatedAt = onCall({ cors: true }, async (request) =
 
   return { success: true, fixedCount, totalChecked: snap.size };
 });
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. SITEMAP (served at /sitemap.xml via a Vercel rewrite)
+// ═══════════════════════════════════════════════════════════════════════════
+const SITEMAP_SITE_URL = "https://www.bizmtaani.site";
+const SITEMAP_MAX_URLS = 45_000; // hard protocol limit is 50,000
+const SITEMAP_PAGE = 1000;
+const SITEMAP_CACHE_TTL_MS = 60 * 60 * 1000;
+let _sitemapCache: { xml: string; timestamp: number } | null = null;
+
+function xmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
+}
+
+function sitemapEntry(path: string, lastmod?: Date | null): string {
+  const lastmodTag = lastmod ? `<lastmod>${lastmod.toISOString()}</lastmod>` : "";
+  return `<url><loc>${xmlEscape(SITEMAP_SITE_URL + path)}</loc>${lastmodTag}</url>`;
+}
+
+// Pages through every active doc in a collection, fetching only the
+// fields the sitemap needs (cheaper than full documents).
+async function forEachActiveDoc(
+  collectionName: string,
+  fields: string[],
+  visit: (doc: FirebaseFirestore.QueryDocumentSnapshot) => boolean | void
+): Promise<void> {
+  let last: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  while (true) {
+    let q: FirebaseFirestore.Query = db
+      .collection(collectionName)
+      .where("status", "==", "active")
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .select(...fields)
+      .limit(SITEMAP_PAGE);
+    if (last) q = q.startAfter(last);
+
+    const snap = await q.get();
+    if (snap.empty) return;
+    for (const d of snap.docs) {
+      if (visit(d) === false) return;
+    }
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < SITEMAP_PAGE) return;
+  }
+}
+
+export const sitemap = onRequest(
+  { region: "europe-west1", maxInstances: 3, memory: "512MiB", timeoutSeconds: 120 },
+  async (_req, res) => {
+    try {
+      res.set("Content-Type", "application/xml; charset=utf-8");
+      res.set("Cache-Control", "public, max-age=300, s-maxage=3600");
+
+      if (_sitemapCache && Date.now() - _sitemapCache.timestamp < SITEMAP_CACHE_TTL_MS) {
+        res.status(200).send(_sitemapCache.xml);
+        return;
+      }
+
+      const entries: string[] = [
+        sitemapEntry("/"),
+        sitemapEntry("/jobs"),
+        sitemapEntry("/about"),
+        sitemapEntry("/privacy"),
+        sitemapEntry("/terms"),
+      ];
+      const nowSec = Date.now() / 1000;
+      const sellerIds = new Set<string>();
+
+      // Active, unexpired adverts. Master-admin adverts have no
+      // expiresAt and are always included.
+      await forEachActiveDoc("products", ["createdAt", "expiresAt", "sellerId"], (d) => {
+        if (entries.length >= SITEMAP_MAX_URLS) return false;
+        const data = d.data();
+        if (data.expiresAt && data.expiresAt.seconds <= nowSec) return;
+        entries.push(sitemapEntry(`/product/${d.id}`, data.createdAt?.toDate?.() ?? null));
+        if (typeof data.sellerId === "string") sellerIds.add(data.sellerId);
+      });
+
+      // Active jobs whose deadline (YYYY-MM-DD) hasn't passed.
+      const today = new Date().toISOString().slice(0, 10);
+      await forEachActiveDoc("jobs", ["createdAt", "deadline"], (d) => {
+        if (entries.length >= SITEMAP_MAX_URLS) return false;
+        const data = d.data();
+        if (typeof data.deadline === "string" && data.deadline < today) return;
+        entries.push(sitemapEntry(`/jobs/${d.id}`, data.createdAt?.toDate?.() ?? null));
+      });
+
+      // Shop pages for sellers with at least one live advert.
+      for (const sellerId of sellerIds) {
+        if (entries.length >= SITEMAP_MAX_URLS) break;
+        entries.push(sitemapEntry(`/shop/${sellerId}`));
+      }
+
+      const xml =
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+        entries.join("\n") +
+        `\n</urlset>`;
+
+      _sitemapCache = { xml, timestamp: Date.now() };
+      res.status(200).send(xml);
+    } catch (error) {
+      console.error("Sitemap generation failed:", error);
+      res.status(500).send("Sitemap temporarily unavailable.");
+    }
+  }
+);
