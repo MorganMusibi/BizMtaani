@@ -295,6 +295,18 @@ useEffect(() => {
     );
   }
 
+  usePageMeta(
+  job
+    ? buildJobMeta(job)
+    : !loading
+    ? {
+        title: "Job not found | BizMtaani",
+        description: "This job listing is no longer available on BizMtaani.",
+        noindex: true,
+      }
+    : null
+);
+
   const isOwner = user?.uid === job.posterId;
   const isExpired = job.deadline
     ? new Date(`${job.deadline}T23:59:59`) < new Date()
