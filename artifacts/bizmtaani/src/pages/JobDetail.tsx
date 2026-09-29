@@ -286,6 +286,18 @@ useEffect(() => {
   );
 }
 
+  usePageMeta(
+    job
+      ? buildJobMeta(job)
+      : !loading
+      ? {
+          title: "Job not found | BizMtaani",
+          description: "This job listing is no longer available on BizMtaani.",
+          noindex: true,
+        }
+      : null
+  );
+
   if (!job) {
     return (
       <div className="flex flex-col h-screen items-center justify-center gap-4 px-6">
@@ -294,18 +306,6 @@ useEffect(() => {
       </div>
     );
   }
-
-  usePageMeta(
-  job
-    ? buildJobMeta(job)
-    : !loading
-    ? {
-        title: "Job not found | BizMtaani",
-        description: "This job listing is no longer available on BizMtaani.",
-        noindex: true,
-      }
-    : null
-);
 
   const isOwner = user?.uid === job.posterId;
   const isExpired = job.deadline
