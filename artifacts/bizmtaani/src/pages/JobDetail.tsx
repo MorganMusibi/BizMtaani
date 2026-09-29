@@ -299,8 +299,6 @@ useEffect(() => {
 }
 
   if (!job) {
-
-  if (!job) {
     return (
       <div className="flex flex-col h-screen items-center justify-center gap-4 px-6">
         <p className="font-bold text-lg">Job not found</p>
