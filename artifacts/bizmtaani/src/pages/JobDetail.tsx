@@ -278,14 +278,6 @@ useEffect(() => {
     }
   }
 
-  if (loading || authLoading) {
-  return (
-    <div className="flex flex-col h-screen items-center justify-center gap-3">
-      <Loader2 size={28} className="animate-spin text-primary" />
-    </div>
-  );
-}
-
   usePageMeta(
     job
       ? buildJobMeta(job)
@@ -297,6 +289,16 @@ useEffect(() => {
         }
       : null
   );
+
+  if (loading || authLoading) {
+  return (
+    <div className="flex flex-col h-screen items-center justify-center gap-3">
+      <Loader2 size={28} className="animate-spin text-primary" />
+    </div>
+  );
+}
+
+  if (!job) {
 
   if (!job) {
     return (
