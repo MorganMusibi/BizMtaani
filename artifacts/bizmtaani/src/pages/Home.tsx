@@ -394,7 +394,20 @@ const [activeKey, setActiveKey] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
-
+// Reads ?q= from the URL on load, so a link like
+  // https://www.bizmtaani.site/?q=plumber (e.g. from Google's
+  // Sitelinks Searchbox) actually runs that search instead of
+  // landing on a plain, unfiltered homepage.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (q && q.trim()) {
+      setSearchInput(q.trim());
+      setSearchQuery(q.trim());
+      setShowSearch(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 const [shopResults, setShopResults] = useState<
   { uid: string; name: string; photoURL: string }[]
 >([]);
@@ -474,6 +487,11 @@ useEffect(() => {
       "@type": "WebSite",
       name: "BizMtaani",
       url: SITE_URL,
+      potentialAction: {
+        "@type": "SearchAction",
+        target: `${SITE_URL}/?q={search_term_string}`,
+        "query-input": "required name=search_term_string",
+      },
     },
   });
 
