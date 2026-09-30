@@ -3480,6 +3480,27 @@ async function forEachActiveDoc(
   }
 }
 
+async function forEachActiveLandingPage(
+  visit: (doc: FirebaseFirestore.QueryDocumentSnapshot) => boolean | void
+): Promise<void> {
+  let last: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  while (true) {
+    let q: FirebaseFirestore.Query = db
+      .collection("landingPages")
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .limit(SITEMAP_PAGE);
+    if (last) q = q.startAfter(last);
+
+    const snap = await q.get();
+    if (snap.empty) return;
+    for (const d of snap.docs) {
+      if (visit(d) === false) return;
+    }
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < SITEMAP_PAGE) return;
+  }
+}
+
 export const sitemap = onRequest(
   { region: "europe-west1", maxInstances: 3, memory: "512MiB", timeoutSeconds: 120 },
   async (_req, res) => {
