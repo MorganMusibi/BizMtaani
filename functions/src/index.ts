@@ -3542,6 +3542,20 @@ export const sitemap = onRequest(
         entries.push(sitemapEntry(`/jobs/${d.id}`, data.createdAt?.toDate?.() ?? null));
       });
 
+      // Ward+category landing pages — only ones with at least one
+      // live listing exist in this collection at all (see the
+      // landingPages triggers above), so no extra filtering needed.
+      await forEachActiveLandingPage((d) => {
+        if (entries.length >= SITEMAP_MAX_URLS) return false;
+        const data = d.data();
+        entries.push(
+          sitemapEntry(
+            `/${data.countySlug}/${data.wardSlug}/${data.categorySlug}`,
+            data.updatedAt?.toDate?.() ?? null
+          )
+        );
+      });
+
       // Shop pages for sellers with at least one live advert.
       for (const sellerId of sellerIds) {
         if (entries.length >= SITEMAP_MAX_URLS) break;
