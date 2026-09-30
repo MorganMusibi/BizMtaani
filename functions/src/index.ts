@@ -10,6 +10,7 @@ import { setGlobalOptions } from "firebase-functions/v2";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { resolveWardServerSide } from "./locationResolver";
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -904,6 +905,197 @@ export const revertProductOnPaymentFailure = onDocumentUpdated(
     });
   }
 );
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. LANDING PAGES (ward + category combos with live listings)
+//
+// Keeps a small landingPages collection in sync with exactly which
+// county+ward+category combinations currently have at least one
+// active, unexpired advert. This is what the sitemap function reads
+// from — it lets the sitemap list only combinations that genuinely
+// have content, instead of every possible combination in Kenya
+// (~1,450 wards × ~15 categories), most of which are empty. Listing
+// empty pages is the "thin content" problem that actively hurts SEO.
+//
+// A doc is deleted entirely once its count reaches zero, so the
+// sitemap query is always just "read every doc in this collection" —
+// no filtering needed on the read side.
+// ═══════════════════════════════════════════════════════════════════════════
+
+function slugifyForLandingPage(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/['’‘`]/g, "")
+    .replace(/[/]/g, "-")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function landingPageKey(county: string, ward: string, category: string): string {
+  return `${slugifyForLandingPage(county)}__${slugifyForLandingPage(ward)}__${slugifyForLandingPage(category)}`;
+}
+
+async function adjustLandingPageCount(
+  county: string | undefined,
+  ward: string | undefined,
+  category: string | undefined,
+  delta: number
+): Promise<void> {
+  if (!county?.trim() || !ward?.trim() || !category?.trim()) return;
+
+  const key = landingPageKey(county, ward, category);
+  const ref = db.collection("landingPages").doc(key);
+
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(ref);
+      const current = snap.exists ? (snap.data()?.activeCount ?? 0) : 0;
+      const next = current + delta;
+
+      if (next <= 0) {
+        if (snap.exists) tx.delete(ref);
+        return;
+      }
+
+      tx.set(
+        ref,
+        {
+          county,
+          ward,
+          category,
+          countySlug: slugifyForLandingPage(county),
+          wardSlug: slugifyForLandingPage(ward),
+          categorySlug: slugifyForLandingPage(category),
+          activeCount: next,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+        { merge: true }
+      );
+    });
+  } catch (error) {
+    // Never let a landing-page bookkeeping failure affect the actual
+    // product write that triggered it — this is a derived index, not
+    // the source of truth.
+    console.error(`Failed to adjust landing page count for ${key}:`, error);
+  }
+}
+
+export const onProductCreatedForLandingPages = onDocumentCreated(
+  "products/{productId}",
+  async (event) => {
+    const data = event.data?.data();
+    if (!data || data.status !== "active") return;
+    await adjustLandingPageCount(data.county, data.ward, data.category, 1);
+  }
+);
+
+export const onProductUpdatedForLandingPages = onDocumentUpdated(
+  "products/{productId}",
+  async (event) => {
+    const before = event.data?.before?.data();
+    const after = event.data?.after?.data();
+    if (!before || !after) return;
+
+    const wasActive = before.status === "active";
+    const isActive = after.status === "active";
+
+    if (!wasActive && isActive) {
+      await adjustLandingPageCount(after.county, after.ward, after.category, 1);
+      return;
+    }
+
+    if (wasActive && !isActive) {
+      await adjustLandingPageCount(before.county, before.ward, before.category, -1);
+      return;
+    }
+
+    if (wasActive && isActive) {
+      const locationOrCategoryChanged =
+        before.county !== after.county ||
+        before.ward !== after.ward ||
+        before.category !== after.category;
+
+      if (locationOrCategoryChanged) {
+        await adjustLandingPageCount(before.county, before.ward, before.category, -1);
+        await adjustLandingPageCount(after.county, after.ward, after.category, 1);
+      }
+    }
+  }
+);
+
+export const onProductDeletedForLandingPages = onDocumentDeleted(
+  "products/{productId}",
+  async (event) => {
+    const data = event.data?.data();
+    if (!data || data.status !== "active") return;
+    await adjustLandingPageCount(data.county, data.ward, data.category, -1);
+  }
+);
+
+/**
+ * Admin-only, one-off: populates landingPages from every currently
+ * active product — necessary because the triggers above only fire on
+ * FUTURE writes. Run this once after deploying the triggers, then
+ * never again (new activity keeps the collection in sync from then on).
+ */
+export const backfillLandingPages = onCall({ cors: true, timeoutSeconds: 300 }, async (request) => {
+  requireAdmin(request);
+
+  const counts = new Map<string, { county: string; ward: string; category: string; count: number }>();
+  let lastDoc: FirebaseFirestore.QueryDocumentSnapshot | null = null;
+  let scanned = 0;
+  const PAGE = 500;
+
+  while (true) {
+    let q = db
+      .collection("products")
+      .where("status", "==", "active")
+      .orderBy(admin.firestore.FieldPath.documentId())
+      .select("county", "ward", "category")
+      .limit(PAGE);
+    if (lastDoc) q = q.startAfter(lastDoc);
+
+    const snap = await q.get();
+    if (snap.empty) break;
+
+    for (const doc of snap.docs) {
+      const data = doc.data();
+      if (!data.county?.trim() || !data.ward?.trim() || !data.category?.trim()) continue;
+      const key = landingPageKey(data.county, data.ward, data.category);
+      const existing = counts.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        counts.set(key, { county: data.county, ward: data.ward, category: data.category, count: 1 });
+      }
+    }
+
+    scanned += snap.docs.length;
+    lastDoc = snap.docs[snap.docs.length - 1];
+    if (snap.docs.length < PAGE) break;
+  }
+
+  const committer = new BatchCommitter(400);
+  counts.forEach(({ county, ward, category, count }, key) => {
+    committer.set(
+      db.collection("landingPages").doc(key),
+      {
+        county,
+        ward,
+        category,
+        countySlug: slugifyForLandingPage(county),
+        wardSlug: slugifyForLandingPage(ward),
+        categorySlug: slugifyForLandingPage(category),
+        activeCount: count,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+  await committer.finalize();
+
+  return { success: true, productsScanned: scanned, landingPagesCreated: counts.size };
+});
 
 async function deleteCloudinaryImage(publicId: string) {
   const timestamp = Math.floor(Date.now() / 1000);
