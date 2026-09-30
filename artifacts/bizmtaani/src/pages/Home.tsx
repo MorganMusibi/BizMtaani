@@ -28,6 +28,7 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, MapPin, Loader2, Package, X, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
+import { usePageMeta, SITE_URL } from "@/hooks/usePageMeta";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 
@@ -462,6 +463,19 @@ useEffect(() => {
       // sessionStorage unavailable — nothing to do
     }
   }, [currentPath]);
+  
+  usePageMeta({
+    title: "BizMtaani — Buy, Sell & Find Jobs Near You in Kenya",
+    description:
+      "Local classifieds and jobs board for Kenya. Browse products, services, rentals, and job listings near you, ward by ward. Post free adverts or find work today.",
+    canonicalPath: "/",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: "BizMtaani",
+      url: SITE_URL,
+    },
+  });
 
   const {
     wardProducts,
