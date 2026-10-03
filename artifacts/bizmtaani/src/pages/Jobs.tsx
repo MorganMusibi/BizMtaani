@@ -426,12 +426,13 @@ function sortJobsByProximity(
   wardName?: string
 ): JobPost[] {
   return [...jobs].sort((a, b) => {
-    if (wardName) {
-      const aMatch = a.ward?.toLowerCase() === wardName.toLowerCase();
-      const bMatch = b.ward?.toLowerCase() === wardName.toLowerCase();
-      if (aMatch && !bMatch) return -1;
-      if (!aMatch && bMatch) return 1;
-    }
+    // PRIMARY — newest first.
+    const createdA = a.createdAt?.seconds ?? 0;
+    const createdB = b.createdAt?.seconds ?? 0;
+    if (createdA !== createdB) return createdB - createdA;
+
+    // SECONDARY — nearest first, only used as a tiebreaker for jobs
+    // posted at the exact same second (rare).
     if (!userCoords) return 0;
     const distA = a.lat != null && a.lng != null ? getDistanceKm(userCoords[0], userCoords[1], a.lat, a.lng) : Infinity;
     const distB = b.lat != null && b.lng != null ? getDistanceKm(userCoords[0], userCoords[1], b.lat, b.lng) : Infinity;
