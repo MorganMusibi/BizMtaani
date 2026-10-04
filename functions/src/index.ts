@@ -3576,3 +3576,92 @@ export const sitemap = onRequest(
     }
   }
 );
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. SOCIAL SHARE PREVIEW (Facebook/WhatsApp/Twitter crawlers only)
+//
+// Facebook's crawler (and WhatsApp's, which reuses it) never runs
+// JavaScript, so it can't see the per-page meta tags usePageMeta()
+// sets client-side — it only reads whatever is already in the raw
+// HTML response. This endpoint serves THOSE crawlers a minimal,
+// pre-rendered page with the real product's title/image/url baked
+// in as static tags. Real visitors never see this — they're routed
+// to the normal React app (see the vercel.json change below).
+// ═══════════════════════════════════════════════════════════════════════════
+const SHARE_SITE_URL = "https://www.bizmtaani.site";
+
+function shareHtmlEscape(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function shareDetailImageUrl(url: string): string {
+  if (url && url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_1200,c_limit/");
+  }
+  return url;
+}
+
+export const productShareMeta = onRequest(
+  { region: "europe-west1", maxInstances: 20 },
+  async (req, res) => {
+    const productId = req.path.split("/").filter(Boolean).pop() ?? "";
+    const pageUrl = `${SHARE_SITE_URL}/product/${productId}`;
+
+    let title = "BizMtaani — Buy, Sell & Find Jobs Near You in Kenya";
+    let description = "Browse local adverts, services, and jobs on BizMtaani.";
+    let image = `${SHARE_SITE_URL}/bizmtaani-icon.png`;
+
+    try {
+      const snap = await db.collection("products").doc(productId).get();
+      const data = snap.exists ? snap.data() : null;
+
+      if (data && (!data.status || data.status === "active")) {
+        const place = data.areaLabel || data.ward || data.county || "Kenya";
+        title = `${String(data.title ?? "").slice(0, 60)} in ${place} | BizMtaani`;
+
+        const cleanDescription = String(data.description ?? "").replace(/\s+/g, " ").trim();
+        description = cleanDescription
+          ? cleanDescription.slice(0, 155)
+          : `${data.subcategory ?? data.category ?? ""} in ${place}. Chat with the seller on BizMtaani.`;
+
+        const imageUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
+        const firstImage = imageUrls[0];
+        const rawImage =
+          (typeof firstImage === "string" ? firstImage : firstImage?.url) || data.imageUrl || "";
+        if (rawImage) image = shareDetailImageUrl(rawImage);
+      }
+    } catch (error) {
+      console.error(`productShareMeta failed for ${productId}:`, error);
+      // Falls through to the generic BizMtaani preview set above.
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>${shareHtmlEscape(title)}</title>
+<meta property="og:type" content="product" />
+<meta property="og:title" content="${shareHtmlEscape(title)}" />
+<meta property="og:description" content="${shareHtmlEscape(description)}" />
+<meta property="og:image" content="${shareHtmlEscape(image)}" />
+<meta property="og:url" content="${shareHtmlEscape(pageUrl)}" />
+<meta property="og:site_name" content="BizMtaani" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${shareHtmlEscape(title)}" />
+<meta name="twitter:description" content="${shareHtmlEscape(description)}" />
+<meta name="twitter:image" content="${shareHtmlEscape(image)}" />
+<link rel="canonical" href="${shareHtmlEscape(pageUrl)}" />
+</head>
+<body>
+<p>If you're not redirected, <a href="${shareHtmlEscape(pageUrl)}">view this advert on BizMtaani</a>.</p>
+</body>
+</html>`;
+
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=300, s-maxage=3600");
+    res.status(200).send(html);
+  }
+);
