@@ -5,6 +5,17 @@
       "destination": "https://europe-west1-bizmtaani-f50d5.cloudfunctions.net/sitemap"
     },
     {
+      "source": "/product/:id",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest).*"
+        }
+      ],
+      "destination": "https://europe-west1-bizmtaani-f50d5.cloudfunctions.net/productShareMeta/:id"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
