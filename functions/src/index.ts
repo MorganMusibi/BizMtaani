@@ -3665,3 +3665,67 @@ export const productShareMeta = onRequest(
     res.status(200).send(html);
   }
 );
+// ═══════════════════════════════════════════════════════════════════════════
+// 11. JOB SHARE PREVIEW (Facebook/WhatsApp/Twitter crawlers only)
+// Same purpose as productShareMeta above, for /jobs/:id instead.
+// ═══════════════════════════════════════════════════════════════════════════
+
+export const jobShareMeta = onRequest(
+  { region: "europe-west1", maxInstances: 20 },
+  async (req, res) => {
+    const jobId = req.path.split("/").filter(Boolean).pop() ?? "";
+    const pageUrl = `${SHARE_SITE_URL}/jobs/${jobId}`;
+
+    let title = "BizMtaani — Buy, Sell & Find Jobs Near You in Kenya";
+    let description = "Browse local jobs and gigs on BizMtaani.";
+    const image = `${SHARE_SITE_URL}/bizmtaani-icon.png`;
+
+    try {
+      const snap = await db.collection("jobs").doc(jobId).get();
+      const data = snap.exists ? snap.data() : null;
+
+      const isExpired =
+        typeof data?.deadline === "string" &&
+        new Date(`${data.deadline}T23:59:59`) < new Date();
+
+      if (data && (!data.status || data.status === "active") && !isExpired) {
+        const place = data.areaLabel || data.ward || data.county || "Kenya";
+        title = `${String(data.title ?? "").slice(0, 60)} at ${data.company ?? "BizMtaani"} | BizMtaani`;
+
+        const cleanDescription = String(data.description ?? "").replace(/\s+/g, " ").trim();
+        description = cleanDescription
+          ? cleanDescription.slice(0, 155)
+          : `${data.jobType ?? ""} ${data.category ?? ""} role at ${data.company ?? ""}, ${place}. Apply on BizMtaani.`;
+      }
+    } catch (error) {
+      console.error(`jobShareMeta failed for ${jobId}:`, error);
+      // Falls through to the generic BizMtaani preview set above.
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>${shareHtmlEscape(title)}</title>
+<meta property="og:type" content="website" />
+<meta property="og:title" content="${shareHtmlEscape(title)}" />
+<meta property="og:description" content="${shareHtmlEscape(description)}" />
+<meta property="og:image" content="${shareHtmlEscape(image)}" />
+<meta property="og:url" content="${shareHtmlEscape(pageUrl)}" />
+<meta property="og:site_name" content="BizMtaani" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="${shareHtmlEscape(title)}" />
+<meta name="twitter:description" content="${shareHtmlEscape(description)}" />
+<meta name="twitter:image" content="${shareHtmlEscape(image)}" />
+<link rel="canonical" href="${shareHtmlEscape(pageUrl)}" />
+</head>
+<body>
+<p>If you're not redirected, <a href="${shareHtmlEscape(pageUrl)}">view this job on BizMtaani</a>.</p>
+</body>
+</html>`;
+
+    res.set("Content-Type", "text/html; charset=utf-8");
+    res.set("Cache-Control", "public, max-age=300, s-maxage=3600");
+    res.status(200).send(html);
+  }
+);
