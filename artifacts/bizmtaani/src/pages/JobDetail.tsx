@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   ChevronLeft, Loader2, Share2, Trash2, Briefcase, 
   Building2, MapPin, Banknote, Clock, Mail, 
-  MessageSquare, Phone 
+  MessageSquare, Phone,
+  Copy // CHANGE 1: added Copy icon
 } from "lucide-react";
 import {
   startJobApplicationChat,
@@ -255,7 +256,17 @@ useEffect(() => {
   }
 
 }
-  
+
+  // CHANGE 2: new function to copy the recruiter's email/phone
+  async function handleCopyContact() {
+    if (!job?.contact) return;
+    try {
+      await navigator.clipboard.writeText(job.contact);
+      toast({ title: "Copied!" });
+    } catch {
+      toast({ title: "Could not copy", variant: "destructive" });
+    }
+  }
 
   function handleApply() {
     if (!job) return;
@@ -314,6 +325,10 @@ useEffect(() => {
   const ApplyIcon = job.contactMethod === "email" ? Mail : job.contactMethod === "whatsapp" ? MessageSquare : Phone;
   const applyLabel = job.contactMethod === "email" ? "Apply via Email" : job.contactMethod === "whatsapp" ? "Apply on WhatsApp" : "Call to Apply";
 
+  // CHANGE 3: true when the recruiter gave their own way to apply
+  const hasExternalContact =
+    !!job.contactMethod && job.contactMethod !== "none" && !!job.contact?.trim();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="flex items-center gap-3 border-b p-4">
@@ -357,46 +372,49 @@ useEffect(() => {
         )}
       </header>
 
-      <div className="p-4 space-y-5">
-        <div>
-          <h2 className="text-2xl font-bold">{job.title}</h2>
-          <p className="text-muted-foreground">{job.company}</p>
+      {/* CHANGE 4: select-text lets users highlight and copy anything on the page */}
+      <div className="p-4 space-y-5 select-text [-webkit-touch-callout:default]">
+
+        {/* CHANGE 5: new header card replaces the old title / chips / salary / location / posted blocks */}
+        <div className="rounded-2xl border bg-card p-4 space-y-3">
+          <div>
+            <h2 className="text-2xl font-bold leading-tight">{job.title}</h2>
+            <p className="flex items-center gap-1.5 text-muted-foreground mt-1">
+              <Building2 size={15} /> {job.company}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-bold ${TYPE_COLORS[job.jobType] ?? "bg-muted"}`}>
+              {job.jobType}
+            </span>
+            <span className="px-3 py-1 rounded-full bg-muted text-xs">{job.category}</span>
+          </div>
+
+          <div className="grid gap-2 text-sm">
+            {job.salary && (
+              <div className="flex items-center gap-2"><Banknote size={16} /> {job.salary}</div>
+            )}
+            {(job.ward || job.county) && (
+              <div className="flex items-center gap-2">
+                <MapPin size={16} /> {job.ward ? (job.areaLabel ?? job.ward) : job.county}
+              </div>
+            )}
+            {job.createdAt && (
+              <div className="flex items-center gap-2"><Clock size={16} /> Posted {timeAgo(job.createdAt.seconds)}</div>
+            )}
+            {job.deadline && (
+              <div className={`flex items-center gap-2 ${isExpired ? "text-destructive" : ""}`}>
+                <Clock size={16} /> {isExpired ? "Expired" : "Deadline"}: {job.deadline}
+              </div>
+            )}
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold ${TYPE_COLORS[job.jobType] ?? "bg-muted"}`}>
-            {job.jobType}
-          </span>
-
-          <span className="px-3 py-1 rounded-full bg-muted text-xs">
-            {job.category}
-          </span>
-        </div>
-
-        {job.salary && (
-          <div className="flex items-center gap-2">
-            <Banknote size={18} />
-            <span>{job.salary}</span>
-          </div>
-        )}
-
-        {(job.ward || job.county) && (
-          <div className="flex items-center gap-2">
-            <MapPin size={18} />
-            <span>{job.ward ? (job.areaLabel ?? job.ward) : job.county}</span>
-          </div>
-        )}
-
-        {job.createdAt && (
-          <div className="flex items-center gap-2">
-            <Clock size={18} />
-            <span>{timeAgo(job.createdAt.seconds)}</span>
-          </div>
-        )}
 
         <div>
           <h3 className="font-semibold mb-2">Description</h3>
-          <p>{job.description}</p>
+          {/* CHANGE 4b: whitespace-pre-line keeps the recruiter's line breaks */}
+          <p className="whitespace-pre-line leading-relaxed">{job.description}</p>
         </div>
 
         {job.requirements && (
@@ -455,28 +473,40 @@ useEffect(() => {
   </Button>
 ) : (
   <div className="space-y-3 pt-2">
-    <Button
-      type="button"
-      className="w-full h-12 font-bold"
-      onClick={handleApplyViaChat}
-    >
-      <MessageSquare className="mr-2" size={18} />
-      Apply via BizMtaani Chat
-    </Button>
-
-    {job.contactMethod &&
-      job.contactMethod !== "none" &&
-      job.contact?.trim() && (
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full h-12"
-          onClick={handleApply}
-        >
+    {/* CHANGE 6: recruiter's own contact method is primary; BizMtaani chat is secondary */}
+    {hasExternalContact ? (
+      <>
+        <Button type="button" className="w-full h-12 font-bold" onClick={handleApply}>
           <ApplyIcon className="mr-2" size={18} />
           {applyLabel}
         </Button>
-      )}
+
+        <div className="flex items-center justify-between gap-3 rounded-xl border bg-muted/40 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">
+              {job.contactMethod === "email" ? "Email" : job.contactMethod === "whatsapp" ? "WhatsApp" : "Phone"}
+            </p>
+            <p className="font-semibold break-all select-text">{job.contact}</p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={handleCopyContact}>
+            <Copy className="mr-1" size={14} /> Copy
+          </Button>
+        </div>
+
+        <button
+          type="button"
+          onClick={handleApplyViaChat}
+          className="w-full text-center text-sm text-muted-foreground underline underline-offset-4 py-1"
+        >
+          Or message the employer on BizMtaani
+        </button>
+      </>
+    ) : (
+      <Button type="button" className="w-full h-12 font-bold" onClick={handleApplyViaChat}>
+        <MessageSquare className="mr-2" size={18} />
+        Apply via BizMtaani Chat
+      </Button>
+    )}
 
     <div className="rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 px-4 py-3">
       <p className="text-xs font-bold text-amber-800 dark:text-amber-400">
