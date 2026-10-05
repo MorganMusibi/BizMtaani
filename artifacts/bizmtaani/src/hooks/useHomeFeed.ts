@@ -986,7 +986,6 @@ export function useHomeFeeds({
 // combo is already cached and fresh, seed state with it directly so
 // the first render after remounting doesn't show empty + spinner
 // before the effect below gets a chance to run.
-const runIdRef = useRef(0);
 const initialCacheKey = !isSearchMode && gpsReady && userCoords
   ? computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory)
   : null;
@@ -1074,8 +1073,20 @@ useEffect(() => {
       // beyond the newest 30 — page through until exhausted.
       // ADMIN_BROADCAST_MAX_PAGES is a runaway-loop safety net, not a
       // real visibility limit (50 * 30 = 1500 admin ads ceiling).
-            const snap = await getDocs(adminBroadcastQuery(null));
-      const all = toProducts(snap.docs);
+      let all: Product[] = [];
+      let cursor: CreatedAtCursor | null = null;
+      let pages = 0;
+      const ADMIN_BROADCAST_MAX_PAGES = 50;
+
+      while (pages < ADMIN_BROADCAST_MAX_PAGES) {
+        const snap = await getDocs(adminBroadcastQuery(cursor));
+        all = all.concat(toProducts(snap.docs));
+        pages++;
+        if (snap.docs.length < ADMIN_BROADCAST_PAGE) break;
+        const lastDoc = snap.docs[snap.docs.length - 1];
+        cursor = lastDoc ? createdAtCursorFromDoc(lastDoc) : null;
+        if (!cursor) break;
+      }
 
       if (!cancelled) {
         setAdminBroadcastProducts(all);
@@ -1147,8 +1158,6 @@ useEffect(() => {
   }
   skipNextResetRef.current = null;
 
-const myRun = ++runIdRef.current;
-const stale = () => runIdRef.current !== myRun;
 setInitialLoading(true);
 
 setWardProducts([]);
@@ -1270,9 +1279,8 @@ if (category && subcategory) {
       getDocs(categoryPremiumQuery(category, subcategory)),
     ]);
 
-    if (stale()) return;
-const freeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
-const premiumProducts = toProducts(premiumSnap.docs);
+    const freeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
+    const premiumProducts = toProducts(premiumSnap.docs);
     const merged = dedupe(freeProducts, premiumProducts);
 
     // Rank by distance if we have user coords
@@ -1378,7 +1386,6 @@ const premiumProducts = toProducts(premiumSnap.docs);
       });
 
       const [wardSnap, resolvedStage0Snapshots] = await Promise.all([wardPromise, stage0Promise]);
-      if (stale()) return;
       stage0Snapshots = resolvedStage0Snapshots;
 
       if (wardSnap) {
@@ -1547,7 +1554,6 @@ try {
     }
 
     const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
-    if (stale()) return;
 
     const pageProducts = snapshots.flatMap((snap) => {
       const products = toProducts(snap.docs);
@@ -1668,11 +1674,8 @@ try {
     // a genuinely empty area.
     const localAreaProducts = sortedBuffer.slice(0, AREA_PAGE);
     const localAreaBuffer = sortedBuffer.slice(AREA_PAGE);
-    const localAreaDone = false;
-// Stage 0 found nothing: continue at stage 1 (5km, premium only)
-setAreaRadiusStage(1);
-currentCursors = {};
-currentDonePrefixes = {};
+    const localAreaDone = allPrefixesDone && sortedBuffer.length <= AREA_PAGE;
+
     setAreaProducts(localAreaProducts);
     setAreaBuffer(localAreaBuffer);
     setAreaCursors(currentCursors);
@@ -1688,7 +1691,7 @@ currentDonePrefixes = {};
       areaCursors: currentCursors,
       areaDonePrefixes: currentDonePrefixes,
       areaDone: localAreaDone,
-      areaRadiusStage: 1,
+      areaRadiusStage: 0,
       timestamp: Date.now(),
     });
     saveFeedCacheToStorage(feedCache);
@@ -1712,8 +1715,7 @@ setInitialLoading(false);
   locationInfo?.wardName,
   locationInfo?.constituency,
   locationInfo?.county,
-  userCoords?.[0],
-userCoords?.[1],
+  userCoords,
   category,      
   subcategory,
   refreshKey,
