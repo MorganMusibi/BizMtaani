@@ -47,7 +47,7 @@ function loadCachedLocationState() {
 }
 
 export function LocationProvider({ children }: { children: ReactNode }) {
-  const { user, userProfile, profileLoading } = useAuth();
+  const { user, userProfile, profileLoading, likelySignedIn } = useAuth();
   const cached = loadCachedLocationState();
 
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cached?.locationInfo ?? null);
@@ -103,11 +103,10 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const PROFILE_WAIT_SAFETY_CAP_MS = 4000;
 
   useEffect(() => {
-    if (!user) {
-      // Not signed in yet — never auto-request location for an
-      // unauthenticated visitor. Register.tsx handles its own
-      // explicit, user-initiated location step during signup.
+        if (!user) {
       setIsLocationLoading(false);
+      // brand-new visitor: no cache, not signed in → Home shows the "Set my area" prompt
+      if (!likelySignedIn && !cached?.userCoords) setNeedsLocationPrompt(true);
       return;
     }
     if (resolutionStarted.current) return;
@@ -121,8 +120,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
     resolutionStarted.current = true;
 
-    function startGps() {
-      if (settledRef.current) return; // profile already won
+        function startGps() {
+      if (settledRef.current) return;
       if (!navigator.geolocation) {
         setGpsReady(true);
         settle("unresolved");
@@ -136,13 +135,27 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          if (settledRef.current) return; // profile won while GPS was resolving
+          if (settledRef.current) return;
+          // GPS fix arrived: stop the cap timer so it can't discard the ward lookup
+          if (capTimerRef.current) {
+            clearTimeout(capTimerRef.current);
+            capTimerRef.current = null;
+          }
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           setGpsGranted(true);
 
-          const resolved = await getWardInfo(lat, lng);
-          if (settledRef.current) return; // profile won during the network round-trip
+          let resolved: ResolvedLocation | null = null;
+          try {
+            resolved = await Promise.race([
+              getWardInfo(lat, lng),
+              new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+            ]);
+          } catch {
+            resolved = null;
+          }
+
+          if (settledRef.current) return;
           setGpsReady(true);
           if (resolved) {
             setLocationInfo({ ...resolved, lat, lng } as ResolvedLocation);
@@ -158,7 +171,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
           setGpsReady(true);
           settle("unresolved");
         },
-        { enableHighAccuracy: true, timeout: LOCATION_RESOLVE_CAP_MS, maximumAge: 0 }
+        { enableHighAccuracy: false, timeout: LOCATION_RESOLVE_CAP_MS, maximumAge: 10 * 60 * 1000 }
       );
     }
 
