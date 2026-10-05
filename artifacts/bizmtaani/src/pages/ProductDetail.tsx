@@ -7,7 +7,8 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight } from "lucide-react";
+// CHANGE 1: added Copy icon
+import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight, Copy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
 import {
@@ -791,6 +792,17 @@ useEffect(() => {
     : null
 );
 
+  // CHANGE 2: new function to copy the seller's phone number
+  async function handleCopyPhone() {
+    if (!product?.phone) return;
+    try {
+      await navigator.clipboard.writeText(product.phone);
+      toast({ title: "Number copied!" });
+    } catch {
+      toast({ title: "Could not copy", variant: "destructive" });
+    }
+  }
+
   // NOW handleChat CAN SAFELY USE "images"
   
       async function handleChat() {
@@ -992,7 +1004,8 @@ async function saveMenuChanges() {
     : "Seller";
 
     return (
-  <div className="min-h-screen bg-background pb-36 select-none">
+  /* CHANGE 3: select-none -> select-text so users can highlight and copy text */
+  <div className="min-h-screen bg-background pb-36 select-text">
     <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
       <button
         data-testid="button-back"
@@ -1009,7 +1022,9 @@ async function saveMenuChanges() {
       </button>
     </header>
 
+    {/* CHANGE 5: select-none here keeps the long-press-on-photo options menu working */}
     <div
+  className="select-none"
   onTouchStart={handlePressStart}
   onTouchMove={handlePressCancel}
   onTouchEnd={handlePressCancel}
@@ -1084,38 +1099,38 @@ async function saveMenuChanges() {
     </h2>
   </div>
 ) : isAccommodation ? (
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
       KES {product.rentPerMonthRaw || (product.rentPerMonth ?? product.price).toLocaleString()} / month
     </h2>
 
   ) : product.priceDisplay === "contact" ? (
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
       Contact for Price
     </h2>
 
   ) : product.priceDisplay === "quote" ? (
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
       Request Quote
     </h2>
 
   ) : product.priceDisplay === "free" ? (
-    <h2 className="text-xl sm:text-2xl font-bold text-green-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-green-600">
       Free
     </h2>
 
   ) : product.priceDisplay === "custom" ? (
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
       {product.priceText || "Contact for Price"}
     </h2>
 
     ) : (
-    <h2 className="text-xl sm:text-2xl font-bold text-orange-600 select-none">
+    <h2 className="text-xl sm:text-2xl font-bold text-orange-600">
       KES {product.priceRaw || product.price.toLocaleString()}
     </h2>
   )}
 
   {product.priceDisplay === "negotiable" && (
-    <div className="mt-2 select-none">
+    <div className="mt-2">
       <span className="rounded-full bg-amber-100 px-3 py-0.5 text-xs font-bold text-amber-700">
         Negotiable
       </span>
@@ -1131,9 +1146,10 @@ async function saveMenuChanges() {
     <div className="p-5 space-y-3">
       <h2 className="text-lg font-bold">Description</h2>
 
+      {/* CHANGE 6: whitespace-pre-line keeps the seller's line breaks */}
       <p
         data-testid="text-product-description"
-        className="leading-7 text-muted-foreground"
+        className="leading-7 text-muted-foreground whitespace-pre-line"
       >
         {product.description}
       </p>
@@ -1164,6 +1180,18 @@ async function saveMenuChanges() {
 )}
         {/*Title, Price, Description, Menu) ... */}
 
+        {/* CHANGE 7: copyable phone number card, shown above the Seller card */}
+        {product.phone && !isSeller && (
+          <Card className="p-4 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">{roleLabel} phone</p>
+              <p className="font-bold text-lg break-all select-text">{product.phone}</p>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={handleCopyPhone}>
+              <Copy className="mr-1" size={14} /> Copy
+            </Button>
+          </Card>
+        )}
         
           <Card className="p-5 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
   <h2 className="text-lg font-bold mb-4">Seller</h2>      
@@ -1192,13 +1220,14 @@ async function saveMenuChanges() {
         {product.sellerName}
       </h3>
 
-      <p className="text-sm text-green-600">
-        ✓ Verified Seller
-      </p>
-
-      <p className="text-sm text-muted-foreground">
-        ⭐ 4.8 • 24 Listings
-      </p>
+      {/* CHANGE 9: the "Verified Seller" line only shows when the advert is really
+          marked verified, and the made-up "4.8 rating • 24 Listings" line is removed
+          because there is no real data behind it */}
+      {product.verified === true && (
+        <p className="text-sm text-green-600">
+          ✓ Verified Seller
+        </p>
+      )}
 
       {distance !== null && (
         <p className="text-xs text-muted-foreground mt-1">
@@ -1435,35 +1464,41 @@ const itemDistance =
       </Button>
     </div>
   ) : (
+    /* CHANGE 8: if the seller gave a phone number, Call is the main button and Chat is
+       secondary. With no phone number, chat stays the main button. */
     <div className="flex gap-3">
-  {product.phone && (
-    <a
-      href={`tel:${product.phone}`}
-      className="flex-1 h-12 flex items-center justify-center gap-2 rounded-xl bg-secondary text-white font-bold shadow-lg"
-    >
-      <Phone size={17} /> Call
-    </a>
-  )}
-
-  <Button
-    data-testid="button-chat-seller"
-    className={`h-12 font-bold gap-2 shadow-xl flex-1`}
-    onClick={handleChat}
-    disabled={chatLoading}
-  >
-    {chatLoading ? (
-      <Loader2 size={18} className="animate-spin" />
-    ) : (
-      <MessageCircle size={18} />
-    )}
-    {isAccommodation
-      ? "Message Landlord"
-      : isEatery
-      ? "Contact Restaurant"
-      : "Chat with Seller"}
-  </Button>
-</div>
-
+      {product.phone ? (
+        <>
+          <a
+            href={`tel:${product.phone}`}
+            className="flex-[2] h-12 flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground font-bold shadow-lg"
+          >
+            <Phone size={17} />
+            {isAccommodation ? "Call Landlord" : isEatery ? "Call Restaurant" : "Call Seller"}
+          </a>
+          <Button
+            data-testid="button-chat-seller"
+            variant="outline"
+            className="h-12 font-bold gap-2 flex-1 bg-background"
+            onClick={handleChat}
+            disabled={chatLoading}
+          >
+            {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+            Chat
+          </Button>
+        </>
+      ) : (
+        <Button
+          data-testid="button-chat-seller"
+          className="h-12 font-bold gap-2 shadow-xl flex-1"
+          onClick={handleChat}
+          disabled={chatLoading}
+        >
+          {chatLoading ? <Loader2 size={18} className="animate-spin" /> : <MessageCircle size={18} />}
+          {isAccommodation ? "Message Landlord" : isEatery ? "Contact Restaurant" : "Chat with Seller"}
+        </Button>
+      )}
+    </div>
   )}
 </div>
 
@@ -1712,3 +1747,4 @@ const itemDistance =
     </div>
   );
 }
+
