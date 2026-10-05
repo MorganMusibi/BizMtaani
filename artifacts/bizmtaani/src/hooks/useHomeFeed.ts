@@ -1668,8 +1668,11 @@ try {
     // a genuinely empty area.
     const localAreaProducts = sortedBuffer.slice(0, AREA_PAGE);
     const localAreaBuffer = sortedBuffer.slice(AREA_PAGE);
-    const localAreaDone = allPrefixesDone && sortedBuffer.length <= AREA_PAGE;
-
+    const localAreaDone = false;
+// Stage 0 found nothing: continue at stage 1 (5km, premium only)
+setAreaRadiusStage(1);
+currentCursors = {};
+currentDonePrefixes = {};
     setAreaProducts(localAreaProducts);
     setAreaBuffer(localAreaBuffer);
     setAreaCursors(currentCursors);
@@ -1685,7 +1688,7 @@ try {
       areaCursors: currentCursors,
       areaDonePrefixes: currentDonePrefixes,
       areaDone: localAreaDone,
-      areaRadiusStage: 0,
+      areaRadiusStage: 1,
       timestamp: Date.now(),
     });
     saveFeedCacheToStorage(feedCache);
