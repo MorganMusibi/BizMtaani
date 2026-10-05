@@ -854,13 +854,15 @@ const handleAreaSearchSelect = useCallback(
           Cheki mneti connection yako and try again.
         </p>
       </div>
-    ) : previewProducts.length > 0 ? (
+        ) : placeholderProducts.length > 0 ? (
       <>
-        <p className="text-center text-xs text-muted-foreground mb-3">
-          Finding listings near you...
-        </p>
+        {areaPrompt ?? (
+          <p className="text-center text-xs text-muted-foreground mb-3">
+            Finding listings near you...
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
-          {previewProducts.slice(0, 8).map((p) => (
+          {placeholderProducts.map((p) => (
             <ProductCard
               key={p.id}
               product={p}
@@ -876,6 +878,7 @@ const handleAreaSearchSelect = useCallback(
       </>
     ) : (
       <>
+                {areaPrompt}
         {loadingTooLong && (
           <p className="text-center text-xs text-muted-foreground mb-3">
             This is taking longer than usual — check mneti connection yako.
@@ -1009,7 +1012,7 @@ const handleAreaSearchSelect = useCallback(
         </div>
       )}
 
-      {!user && gpsReady && (
+            {!user && !likelySignedIn && (
         <div className="flex-shrink-0 bg-card border-t border-border px-4 py-3 flex items-center gap-3 z-40">
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm">Sell to buyers near you</p>
