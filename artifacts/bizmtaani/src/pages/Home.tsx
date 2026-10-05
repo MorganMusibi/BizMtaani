@@ -266,7 +266,8 @@ useEffect(() => {
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-        setGpsGranted(true);
+                setGpsGranted(true);
+        setGpsReady(true);
         setLocationErrorMsg(null);
 
         try {
@@ -345,9 +346,9 @@ useEffect(() => {
           );
         }
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
-  }, [locationInfo?.wardName, toast, setGpsGranted, setLocationInfo, setUserCoords]);
+    }, [locationInfo?.wardName, toast, setGpsGranted, setGpsReady, setLocationInfo, setUserCoords]);
 
   // Load hierarchy with localStorage caching
 useEffect(() => {
@@ -360,11 +361,11 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  if (needsLocationPrompt && !hasPromptedArea.current) {
+    if (needsLocationPrompt && user && !hasPromptedArea.current) {
     hasPromptedArea.current = true;
     setShowAreaPicker(true);
   }
-}, [needsLocationPrompt]);
+}, [needsLocationPrompt, user]);
 
 const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
@@ -481,7 +482,6 @@ useEffect(() => {
     areaDone,
     initialLoading,
     loadMore,
-    previewProducts,
     areaIsPremiumOnly,
     adminBroadcastProducts,
   } = useHomeFeeds({
@@ -491,13 +491,26 @@ useEffect(() => {
     locationInfo,
     refreshKey: feedRefreshKey,
   });
+    const placeholderProducts = adminBroadcastProducts.slice(0, 8);
+  const waitingForLocation = !userCoords;
+  const areaPrompt =
+    !isLocationLoading && waitingForLocation ? (
+      <div className="text-center mb-3">
+        <p className="text-xs text-muted-foreground mb-2">
+          Choose your area to see listings near you
+        </p>
+        <Button size="sm" onClick={() => setShowRefreshOptions(true)}>
+          Set my area
+        </Button>
+      </div>
+    ) : null;
 
   useEffect(() => {
   if (!initialLoading) {
     setLoadingTooLong(false);
     return;
   }
-  const timer = setTimeout(() => setLoadingTooLong(true), 6000);
+  const timer = setTimeout(() => setLoadingTooLong(true), 3000);
   return () => clearTimeout(timer);
 }, [initialLoading]);
 
@@ -637,7 +650,7 @@ const handleAreaSearchSelect = useCallback(
     // Master admin broadcast ads are location-independent — merge them
     // into the "more listings nearby" section so they actually reach
     // the home feed, not just category pages/search.
-    const areaWithBroadcast = dedupe(areaOnly, adminBroadcastProducts);
+    const areaWithBroadcast = dedupe(areaOnly, adminBroadcastProducts.slice(0, 12));
 
     const filteredWard = applyFilters(wardProducts);
     const filteredArea = applyFilters(areaWithBroadcast);
@@ -829,7 +842,7 @@ const handleAreaSearchSelect = useCallback(
         )}
 
         {/* Show loading spinner while initial loading and no products yet */}
-        {initialLoading ? (
+                {(initialLoading || waitingForLocation) ? (
   <div className="px-3 pt-3 pb-24">
     {isOffline ? (
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-6">
