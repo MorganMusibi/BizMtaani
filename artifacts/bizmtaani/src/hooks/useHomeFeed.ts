@@ -987,6 +987,7 @@ export function useHomeFeeds({
 // the first render after remounting doesn't show empty + spinner
 // before the effect below gets a chance to run.
 const initialCacheKey = !isSearchMode && gpsReady && userCoords
+  const runIdRef = useRef(0);
   ? computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory)
   : null;
 const initialCached = initialCacheKey ? getFreshFeedCacheEntry(initialCacheKey) : null;
@@ -1146,6 +1147,8 @@ useEffect(() => {
   }
   skipNextResetRef.current = null;
 
+const myRun = ++runIdRef.current;
+const stale = () => runIdRef.current !== myRun;
 setInitialLoading(true);
 
 setWardProducts([]);
@@ -1374,6 +1377,7 @@ if (category && subcategory) {
       });
 
       const [wardSnap, resolvedStage0Snapshots] = await Promise.all([wardPromise, stage0Promise]);
+      if (stale()) return;
       stage0Snapshots = resolvedStage0Snapshots;
 
       if (wardSnap) {
@@ -1542,6 +1546,7 @@ try {
     }
 
     const snapshots = await Promise.all(queries.map((q) => getDocs(q)));
+    if (stale()) return;
 
     const pageProducts = snapshots.flatMap((snap) => {
       const products = toProducts(snap.docs);
