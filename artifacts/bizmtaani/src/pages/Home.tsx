@@ -351,35 +351,12 @@ useEffect(() => {
 
   // Load hierarchy with localStorage caching
 useEffect(() => {
-  let cancelled = false;
-  const CACHE_KEY = "bizmtaani_hierarchy_cache";
-  const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-  const loadHierarchy = async () => {
-    try {
-      const cached = localStorage.getItem(CACHE_KEY);
-      const cacheTime = localStorage.getItem(`${CACHE_KEY}_time`);
-      
-      if (cached && cacheTime && Date.now() - parseInt(cacheTime) < CACHE_TTL) {
-        // Use cached data - just mark ready
-        if (!cancelled) setHierarchyReady(true);
-        return;
-      }
-      
-      // Fetch fresh
-      await getLocationHierarchy();
-      localStorage.setItem(CACHE_KEY, "loaded"); // Store a marker
-      localStorage.setItem(`${CACHE_KEY}_time`, String(Date.now()));
-      if (!cancelled) setHierarchyReady(true);
-    } catch (error) {
-      console.error("Failed to load hierarchy:", error);
-      // Fail open - allow app to work
-      if (!cancelled) setHierarchyReady(true);
-    }
-  };
-  
-  loadHierarchy();
-  return () => { cancelled = true; };
+  const run = () =>
+    getLocationHierarchy()
+      .catch((e) => console.error("Failed to load hierarchy:", e))
+      .finally(() => setHierarchyReady(true));
+  const t = setTimeout(run, 1500);
+  return () => clearTimeout(t);
 }, []);
 
 useEffect(() => {
