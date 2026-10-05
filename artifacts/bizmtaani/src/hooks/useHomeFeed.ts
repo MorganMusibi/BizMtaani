@@ -986,8 +986,8 @@ export function useHomeFeeds({
 // combo is already cached and fresh, seed state with it directly so
 // the first render after remounting doesn't show empty + spinner
 // before the effect below gets a chance to run.
+const runIdRef = useRef(0);
 const initialCacheKey = !isSearchMode && gpsReady && userCoords
-  const runIdRef = useRef(0);
   ? computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory)
   : null;
 const initialCached = initialCacheKey ? getFreshFeedCacheEntry(initialCacheKey) : null;
@@ -1270,8 +1270,9 @@ if (category && subcategory) {
       getDocs(categoryPremiumQuery(category, subcategory)),
     ]);
 
-    const freeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
-    const premiumProducts = toProducts(premiumSnap.docs);
+    if (stale()) return;
+const freeProducts = freeSnap ? toProducts(freeSnap.docs) : [];
+const premiumProducts = toProducts(premiumSnap.docs);
     const merged = dedupe(freeProducts, premiumProducts);
 
     // Rank by distance if we have user coords
@@ -1708,7 +1709,8 @@ setInitialLoading(false);
   locationInfo?.wardName,
   locationInfo?.constituency,
   locationInfo?.county,
-  userCoords,
+  userCoords?.[0],
+userCoords?.[1],
   category,      
   subcategory,
   refreshKey,
