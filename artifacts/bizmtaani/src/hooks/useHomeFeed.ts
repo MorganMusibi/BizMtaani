@@ -1073,20 +1073,8 @@ useEffect(() => {
       // beyond the newest 30 — page through until exhausted.
       // ADMIN_BROADCAST_MAX_PAGES is a runaway-loop safety net, not a
       // real visibility limit (50 * 30 = 1500 admin ads ceiling).
-      let all: Product[] = [];
-      let cursor: CreatedAtCursor | null = null;
-      let pages = 0;
-      const ADMIN_BROADCAST_MAX_PAGES = 50;
-
-      while (pages < ADMIN_BROADCAST_MAX_PAGES) {
-        const snap = await getDocs(adminBroadcastQuery(cursor));
-        all = all.concat(toProducts(snap.docs));
-        pages++;
-        if (snap.docs.length < ADMIN_BROADCAST_PAGE) break;
-        const lastDoc = snap.docs[snap.docs.length - 1];
-        cursor = lastDoc ? createdAtCursorFromDoc(lastDoc) : null;
-        if (!cursor) break;
-      }
+            const snap = await getDocs(adminBroadcastQuery(null));
+      const all = toProducts(snap.docs);
 
       if (!cancelled) {
         setAdminBroadcastProducts(all);
