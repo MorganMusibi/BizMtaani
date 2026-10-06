@@ -1139,9 +1139,13 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  if (!gpsReady || !userCoords) return;
+  // Category pages can load premium/admin adverts without a location;
+  // every other mode still needs coordinates.
+  const isCategoryMode = Boolean(category && subcategory);
+  if (!gpsReady) return;
+  if (!userCoords && !isCategoryMode) return;
 
-  const cacheKeyForThisRun = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
+  const cacheKeyForThisRun = computeFeedCacheKey(
   // State was already seeded from this exact cache entry when the hook
   // first mounted — skip the reset-and-refetch for this one run only.
   if (!isSearchMode && skipNextResetRef.current === cacheKeyForThisRun) {
@@ -1338,7 +1342,11 @@ const premiumProducts = toProducts(premiumSnap.docs);
     // NORMAL HOME FEED
     // Keep existing ward + nearby geohash behavior.
     // ============================================================
-
+    // Past this point everything needs real coordinates.
+    if (!userCoords) {
+      setInitialLoading(false);
+      return;
+    }
      const wardName = locationInfo?.wardName ?? "";
 
     let localWardProducts: Product[] = [];
@@ -1723,7 +1731,8 @@ userCoords?.[1],
 ]);
 
 const loadMore = useCallback(async () => {
-  if (!userCoords) return;
+  const isCategoryMode = Boolean(category && subcategory);
+  if (!userCoords && !isCategoryMode) return;
 
   const cacheKey = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
 
