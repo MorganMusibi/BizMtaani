@@ -33,9 +33,9 @@ document.addEventListener("visibilitychange", () => {
   }
 });
 
-window.addEventListener('vite:preloadError', async () => {
-  const key = 'bizmtaani_last_preload_reload_at';
-  const lastAttempt = Number(sessionStorage.getItem(key) ?? '0');
+window.addEventListener("vite:preloadError", async () => {
+  const key = "bizmtaani_last_preload_reload_at";
+  const lastAttempt = Number(sessionStorage.getItem(key) ?? "0");
   const now = Date.now();
 
   // Time-based guard, not a one-shot guard: allows recovery from a
@@ -45,7 +45,7 @@ window.addEventListener('vite:preloadError', async () => {
   // that no legitimate reload cycle could hit it twice, short enough
   // that a user isn't stuck waiting.
   if (now - lastAttempt < 15_000) {
-    console.error('Preload failed again too soon after a reload — stopping to avoid a loop.');
+    console.error("Preload failed again too soon after a reload — stopping to avoid a loop.");
     return;
   }
   sessionStorage.setItem(key, String(now));
@@ -54,7 +54,7 @@ window.addEventListener('vite:preloadError', async () => {
   // reload actually fetches the current deploy's manifest instead of
   // potentially re-hitting a cached stale one.
   try {
-    if ('caches' in window) {
+    if ("caches" in window) {
       const keys = await caches.keys();
       await Promise.all(keys.map((k) => caches.delete(k)));
     }
@@ -64,16 +64,28 @@ window.addEventListener('vite:preloadError', async () => {
 
   window.location.reload();
 });
-preloadWards();
+
+// A synchronous throw here must never stop the app from rendering
+// (which would leave the user stuck on the boot splash).
+try {
+  preloadWards();
+} catch (e) {
+  console.error("preloadWards failed:", e);
+}
 
 createRoot(document.getElementById("root")!).render(<App />);
 
-requestAnimationFrame(() => {
-  requestAnimationFrame(() => {
-    const splash = document.getElementById("boot-splash");
-    if (splash) {
-      splash.classList.add("fade-out");
-      splash.addEventListener("transitionend", () => splash.remove(), { once: true });
-    }
-  });
-});
+// ─── Boot splash removal ───
+// Removed on transitionend, with a timed fallback in case that event
+// never fires (background tab, reduced motion, browser quirk).
+function hideSplash() {
+  const splash = document.getElementById("boot-splash");
+  if (!splash) return;
+  splash.classList.add("fade-out");
+  splash.addEventListener("transitionend", () => splash.remove(), { once: true });
+  setTimeout(() => splash.remove(), 600);
+}
+
+requestAnimationFrame(() => requestAnimationFrame(hideSplash));
+// Last resort if anything above stalled.
+setTimeout(hideSplash, 8000);
