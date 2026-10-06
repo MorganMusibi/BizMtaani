@@ -1103,7 +1103,7 @@ useEffect(() => {
   // would just be a wasted Firestore read for content nobody sees.
   // gpsReady's value at mount time is what matters here, which is
   // exactly what an empty dependency array captures.
-  if (gpsReady) {
+    if (gpsReady && userCoords) {
     setPreviewLoading(false);
     return;
   }
