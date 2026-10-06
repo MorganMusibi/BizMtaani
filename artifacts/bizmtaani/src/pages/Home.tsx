@@ -165,17 +165,17 @@ const ProductCard = memo(function ProductCard({
             <Package size={28} className="text-muted-foreground" />
           </div>
         )}
-        
+
         {priceLabel && (
           <div className="absolute bottom-2 left-2 bg-black/60 backdrop-blur-sm text-white text-xs font-bold px-2 py-1 rounded-lg z-[5]">
             {priceLabel}
           </div>
         )}
-        
+
         <div className={`absolute top-2 right-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor} z-[5]`}>
           {product.subcategory ?? product.category}
         </div>
-        
+
         {isAccommodation &&
           Array.isArray(product.imageUrls) &&
           product.imageUrls.length > 1 && (
@@ -214,44 +214,44 @@ export default function Home() {
   const [currentPath, setLocation] = useLocation();
   const { user, userProfile, likelySignedIn } = useAuth();
   const { toast } = useToast();
-  
-  const { 
-  locationInfo,
-  userCoords,
-  gpsGranted,
-  gpsReady,
-  setLocationInfo,
-  setUserCoords,
-  setGpsGranted,
-  setGpsReady,
-  refreshLocation,
-  isLocationLoading,
-  needsLocationPrompt, 
-  setNeedsLocationPrompt,
-} = useLocationContext();
+
+  const {
+    locationInfo,
+    userCoords,
+    gpsGranted,
+    gpsReady,
+    setLocationInfo,
+    setUserCoords,
+    setGpsGranted,
+    setGpsReady,
+    refreshLocation,
+    isLocationLoading,
+    needsLocationPrompt,
+    setNeedsLocationPrompt,
+  } = useLocationContext();
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
 
-const [showAreaPicker, setShowAreaPicker] = useState(false);
-const hasPromptedArea = useRef(false);
-const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
-const [refreshingLocation, setRefreshingLocation] = useState(false);
-const [showRefreshOptions, setShowRefreshOptions] = useState(false);
+  const [showAreaPicker, setShowAreaPicker] = useState(false);
+  const hasPromptedArea = useRef(false);
+  const [locationErrorMsg, setLocationErrorMsg] = useState<string | null>(null);
+  const [refreshingLocation, setRefreshingLocation] = useState(false);
+  const [showRefreshOptions, setShowRefreshOptions] = useState(false);
 
-const [isOffline, setIsOffline] = useState(!navigator.onLine);
-const [loadingTooLong, setLoadingTooLong] = useState(false);
+  const [isOffline, setIsOffline] = useState(!navigator.onLine);
+  const [loadingTooLong, setLoadingTooLong] = useState(false);
 
-useEffect(() => {
-  function handleOnline() { setIsOffline(false); }
-  function handleOffline() { setIsOffline(true); }
-  window.addEventListener("online", handleOnline);
-  window.addEventListener("offline", handleOffline);
-  return () => {
-    window.removeEventListener("online", handleOnline);
-    window.removeEventListener("offline", handleOffline);
-  };
-}, []);
-  
+  useEffect(() => {
+    function handleOnline() { setIsOffline(false); }
+    function handleOffline() { setIsOffline(true); }
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
   const refreshFailureTimestampsRef = useRef<number[]>([]);
   const REFRESH_FAILURE_WINDOW_MS = 60 * 1000;
   const REFRESH_FAILURE_THRESHOLD = 3;
@@ -266,7 +266,7 @@ useEffect(() => {
       async (position) => {
         const lat = position.coords.latitude;
         const lng = position.coords.longitude;
-                setGpsGranted(true);
+        setGpsGranted(true);
         setGpsReady(true);
         setLocationErrorMsg(null);
 
@@ -306,7 +306,7 @@ useEffect(() => {
           setRefreshingLocation(false);
         }
       },
-        
+
       (error) => {
         console.warn("Manual location refresh failed:", error);
         setRefreshingLocation(false);
@@ -348,31 +348,32 @@ useEffect(() => {
       },
       { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
     );
-    }, [locationInfo?.wardName, toast, setGpsGranted, setGpsReady, setLocationInfo, setUserCoords]);
+  }, [locationInfo?.wardName, toast, setGpsGranted, setGpsReady, setLocationInfo, setUserCoords]);
 
   // Load hierarchy with localStorage caching
-useEffect(() => {
-  const run = () =>
-    getLocationHierarchy()
-      .catch((e) => console.error("Failed to load hierarchy:", e))
-      .finally(() => setHierarchyReady(true));
-  const t = setTimeout(run, 1500);
-  return () => clearTimeout(t);
-}, []);
+  useEffect(() => {
+    const run = () =>
+      getLocationHierarchy()
+        .catch((e) => console.error("Failed to load hierarchy:", e))
+        .finally(() => setHierarchyReady(true));
+    const t = setTimeout(run, 1500);
+    return () => clearTimeout(t);
+  }, []);
 
-useEffect(() => {
+  useEffect(() => {
     if (needsLocationPrompt && user && !hasPromptedArea.current) {
-    hasPromptedArea.current = true;
-    setShowAreaPicker(true);
-  }
-}, [needsLocationPrompt, user]);
+      hasPromptedArea.current = true;
+      setShowAreaPicker(true);
+    }
+  }, [needsLocationPrompt, user]);
 
-const [activeKey, setActiveKey] = useState("All");
+  const [activeKey, setActiveKey] = useState("All");
   const [searchInput, setSearchInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
-// Reads ?q= from the URL on load, so a link like
+
+  // Reads ?q= from the URL on load, so a link like
   // https://www.bizmtaani.site/?q=plumber (e.g. from Google's
   // Sitelinks Searchbox) actually runs that search instead of
   // landing on a plain, unfiltered homepage.
@@ -386,57 +387,59 @@ const [activeKey, setActiveKey] = useState("All");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-const [shopResults, setShopResults] = useState<
-  { uid: string; name: string; photoURL: string }[]
->([]);
-const [shopSearchLoading, setShopSearchLoading] = useState(false);
 
-useEffect(() => {
-  if (!searchQuery) {
-    setShopResults([]);
-    return;
-  }
-  let cancelled = false;
-  setShopSearchLoading(true);
+  const [shopResults, setShopResults] = useState<
+    { uid: string; name: string; photoURL: string }[]
+  >([]);
+  const [shopSearchLoading, setShopSearchLoading] = useState(false);
 
-  const prefixLower = searchQuery.toLowerCase();
-  const shopsQuery = query(
-    collection(db, "users"),
-    orderBy("searchNameLower"),
-    startAt(prefixLower),
-    endAt(prefixLower + "\uf8ff"),
-    limit(10)
-  );
+  useEffect(() => {
+    if (!searchQuery) {
+      setShopResults([]);
+      return;
+    }
+    let cancelled = false;
+    setShopSearchLoading(true);
 
-  getDocs(shopsQuery)
-    .then((snap) => {
-      if (cancelled) return;
-      setShopResults(
-        snap.docs.map((d) => {
-          const data = d.data();
-          return {
-            uid: d.id,
-            name: data.businessName || data.displayName || "Unnamed",
-            photoURL: data.photoURL || "",
-          };
-        })
-      );
-    })
-    .catch((err) => {
-      console.warn("Shop search failed:", err);
-      if (!cancelled) setShopResults([]);
-    })
-    .finally(() => {
-      if (!cancelled) setShopSearchLoading(false);
-    });
+    const prefixLower = searchQuery.toLowerCase();
+    const shopsQuery = query(
+      collection(db, "users"),
+      orderBy("searchNameLower"),
+      startAt(prefixLower),
+      endAt(prefixLower + "\uf8ff"),
+      limit(10)
+    );
 
-  return () => {
-    cancelled = true;
-  };
-}, [searchQuery]);
+    getDocs(shopsQuery)
+      .then((snap) => {
+        if (cancelled) return;
+        setShopResults(
+          snap.docs.map((d) => {
+            const data = d.data();
+            return {
+              uid: d.id,
+              name: data.businessName || data.displayName || "Unnamed",
+              photoURL: data.photoURL || "",
+            };
+          })
+        );
+      })
+      .catch((err) => {
+        console.warn("Shop search failed:", err);
+        if (!cancelled) setShopResults([]);
+      })
+      .finally(() => {
+        if (!cancelled) setShopSearchLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchQuery]);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  
+
   // Bumped whenever the user returns to "/" right after posting —
   // forces useHomeFeeds to re-fetch even though nothing else about
   // location/category changed.
@@ -454,7 +457,7 @@ useEffect(() => {
       // sessionStorage unavailable — nothing to do
     }
   }, [currentPath]);
-  
+
   usePageMeta({
     title: "BizMtaani — Buy, Sell & Find Jobs Near You in Kenya",
     description:
@@ -484,6 +487,9 @@ useEffect(() => {
     loadMore,
     areaIsPremiumOnly,
     adminBroadcastProducts,
+    adminBroadcastLoading,
+    previewProducts,
+    previewLoading,
   } = useHomeFeeds({
     gpsReady,
     userCoords,
@@ -491,8 +497,22 @@ useEffect(() => {
     locationInfo,
     refreshKey: feedRefreshKey,
   });
-    const placeholderProducts = adminBroadcastProducts.slice(0, 8);
+
+  // Placeholder content shown while the visitor has no location yet:
+  // admin broadcast adverts first, then recent nationwide listings.
+  const placeholderProducts = useMemo(
+    () => dedupe(adminBroadcastProducts, previewProducts).slice(0, 12),
+    [adminBroadcastProducts, previewProducts]
+  );
+
   const waitingForLocation = !userCoords;
+
+  // Correct loading signal: with no location, the real feed never runs,
+  // so we wait on the placeholder fetches instead of initialLoading.
+  const stillLoading = waitingForLocation
+    ? previewLoading || adminBroadcastLoading
+    : initialLoading;
+
   const areaPrompt =
     !isLocationLoading && waitingForLocation ? (
       <div className="text-center mb-3">
@@ -506,13 +526,13 @@ useEffect(() => {
     ) : null;
 
   useEffect(() => {
-  if (!initialLoading) {
-    setLoadingTooLong(false);
-    return;
-  }
-  const timer = setTimeout(() => setLoadingTooLong(true), 3000);
-  return () => clearTimeout(timer);
-}, [initialLoading]);
+    if (!stillLoading) {
+      setLoadingTooLong(false);
+      return;
+    }
+    const timer = setTimeout(() => setLoadingTooLong(true), 3000);
+    return () => clearTimeout(timer);
+  }, [stillLoading]);
 
   useEffect(() => {
     const el = sentinelRef.current;
@@ -540,90 +560,88 @@ useEffect(() => {
       }
     };
   }, [loadMore]);
-  
-  const handleAreaSelect = useCallback(
-  async (choice: ResolvedLocation) => {
-    setLocationInfo(choice);
-    if (choice.lat != null && choice.lng != null) {
-      setUserCoords([choice.lat, choice.lng]);
-    }
-    setGpsReady(true);
-    setNeedsLocationPrompt(false);
-    setShowAreaPicker(false);
-    localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
 
-    // Save permanently to the user's profile so this is never asked
-    // again — future sessions load it straight from homeLocation,
-    // same as a brand-new signup would.
-    if (user) {
-      try {
-        await updateDoc(doc(db, "users", user.uid), {
-          homeLocation: {
-            areaName: choice.wardName,
-            constituency: choice.constituency,
-            county: choice.county,
-            lat: choice.lat,
-            lng: choice.lng,
-            label: choice.label ?? null,
-          },
-        });
-      } catch (error) {
-        console.warn("Failed to save home location to profile:", error);
+  const handleAreaSelect = useCallback(
+    async (choice: ResolvedLocation) => {
+      setLocationInfo(choice);
+      if (choice.lat != null && choice.lng != null) {
+        setUserCoords([choice.lat, choice.lng]);
       }
-    }
-  },
-  [setLocationInfo, setUserCoords, setGpsReady, setNeedsLocationPrompt, user]
-);
+      setGpsReady(true);
+      setNeedsLocationPrompt(false);
+      setShowAreaPicker(false);
+      localStorage.setItem(AREA_PICKER_STORAGE_KEY, JSON.stringify(choice));
+
+      // Save permanently to the user's profile so this is never asked
+      // again — future sessions load it straight from homeLocation,
+      // same as a brand-new signup would.
+      if (user) {
+        try {
+          await updateDoc(doc(db, "users", user.uid), {
+            homeLocation: {
+              areaName: choice.wardName,
+              constituency: choice.constituency,
+              county: choice.county,
+              lat: choice.lat,
+              lng: choice.lng,
+              label: choice.label ?? null,
+            },
+          });
+        } catch (error) {
+          console.warn("Failed to save home location to profile:", error);
+        }
+      }
+    },
+    [setLocationInfo, setUserCoords, setGpsReady, setNeedsLocationPrompt, user]
+  );
 
   const [resolvingAreaSearch, setResolvingAreaSearch] = useState(false);
 
+  const handleProductClick = useCallback((productId: string) => {
+    setLocation(`/product/${productId}`);
+  }, [setLocation]);
 
-const handleProductClick = useCallback((productId: string) => {
-  setLocation(`/product/${productId}`);
-}, [setLocation]);
+  const handleAreaSearchSelect = useCallback(
+    async (ward: { wardName: string; constituencyName: string; countyName: string; label?: string }) => {
+      setResolvingAreaSearch(true);
+      try {
+        const coords = await getWardCoordinates(
+          ward.wardName,
+          ward.constituencyName,
+          ward.countyName
+        );
 
+        if (!coords) {
+          toast({
+            title: "Couldn't find that area on the map",
+            description: "Try a nearby, larger area name instead.",
+          });
+          return;
+        }
 
-const handleAreaSearchSelect = useCallback(
-  async (ward: { wardName: string; constituencyName: string; countyName: string; label?: string }) => {
-    setResolvingAreaSearch(true);
-    try {
-      const coords = await getWardCoordinates(
-        ward.wardName,
-        ward.constituencyName,
-        ward.countyName
-      );
+        const resolved: ResolvedLocation = {
+          lat: coords.lat,
+          lng: coords.lng,
+          wardName: ward.wardName,
+          constituency: ward.constituencyName,
+          county: ward.countyName,
+          displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
+          label: ward.label,
+        } as ResolvedLocation;
 
-      if (!coords) {
+        handleAreaSelect(resolved);
+      } catch (error) {
+        console.warn("Failed to resolve selected area:", error);
         toast({
-          title: "Couldn't find that area on the map",
-          description: "Try a nearby, larger area name instead.",
+          title: "Something went wrong",
+          description: "Please try again or pick a different area.",
         });
-        return;
+      } finally {
+        setResolvingAreaSearch(false);
       }
-
-      const resolved: ResolvedLocation = {
-        lat: coords.lat,
-        lng: coords.lng,
-        wardName: ward.wardName,
-        constituency: ward.constituencyName,
-        county: ward.countyName,
-        displayName: ward.label ?? `${ward.wardName}, ${ward.constituencyName}`,
-        label: ward.label,
-      } as ResolvedLocation;
-
-      handleAreaSelect(resolved);
-    } catch (error) {
-      console.warn("Failed to resolve selected area:", error);
-      toast({
-        title: "Something went wrong",
-        description: "Please try again or pick a different area.",
-      });
-    } finally {
-      setResolvingAreaSearch(false);
-    }
-  },
-  [handleAreaSelect, toast]
-);
+    },
+    [handleAreaSelect, toast]
+  );
 
   function applyFilters(products: Product[]): Product[] {
     const nowSec = Date.now() / 1000;
@@ -664,7 +682,7 @@ const handleAreaSearchSelect = useCallback(
       totalVisible: rankedWard.length + rankedArea.length,
     };
   }, [wardProducts, areaProducts, adminBroadcastProducts, activeKey, searchQuery, userCoords]);
-  
+
   const isLoadingMore = areaLoading;
   const allDone = areaDone;
 
@@ -732,46 +750,46 @@ const handleAreaSearchSelect = useCallback(
       )}
 
       {isSearchMode && (
-  <div className="flex-shrink-0 bg-card border-b border-border px-4 py-2 flex items-center gap-2 z-40">
-    <span className="text-xs text-muted-foreground">Results for:</span>
-    <span className="flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
-      {searchQuery}
-      <button onClick={clearSearch} className="ml-1"><X size={11} /></button>
-    </span>
-  </div>
-)}
+        <div className="flex-shrink-0 bg-card border-b border-border px-4 py-2 flex items-center gap-2 z-40">
+          <span className="text-xs text-muted-foreground">Results for:</span>
+          <span className="flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
+            {searchQuery}
+            <button onClick={clearSearch} className="ml-1"><X size={11} /></button>
+          </span>
+        </div>
+      )}
 
-{isSearchMode && (shopSearchLoading || shopResults.length > 0) && (
-  <div className="flex-shrink-0 bg-card border-b border-border px-4 py-3 z-30">
-    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
-      Shops
-    </p>
-    {shopSearchLoading ? (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <Loader2 size={14} className="animate-spin" /> Searching shops...
-      </div>
-    ) : (
-      <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {shopResults.map((shop) => (
-          <button
-            key={shop.uid}
-            onClick={() => setLocation(`/shop/${shop.uid}`)}
-            className="flex-shrink-0 flex items-center gap-2 bg-muted rounded-full pl-1 pr-3 py-1 hover:bg-muted/80 transition-colors"
-          >
-            {shop.photoURL ? (
-              <img src={shop.photoURL} alt={shop.name} className="w-6 h-6 rounded-full object-cover" />
-            ) : (
-              <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                <Store size={12} className="text-primary" />
-              </div>
-            )}
-            <span className="text-xs font-semibold">{shop.name}</span>
-          </button>
-        ))}
-      </div>
-    )}
-  </div>
-)}
+      {isSearchMode && (shopSearchLoading || shopResults.length > 0) && (
+        <div className="flex-shrink-0 bg-card border-b border-border px-4 py-3 z-30">
+          <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide mb-2">
+            Shops
+          </p>
+          {shopSearchLoading ? (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 size={14} className="animate-spin" /> Searching shops...
+            </div>
+          ) : (
+            <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              {shopResults.map((shop) => (
+                <button
+                  key={shop.uid}
+                  onClick={() => setLocation(`/shop/${shop.uid}`)}
+                  className="flex-shrink-0 flex items-center gap-2 bg-muted rounded-full pl-1 pr-3 py-1 hover:bg-muted/80 transition-colors"
+                >
+                  {shop.photoURL ? (
+                    <img src={shop.photoURL} alt={shop.name} className="w-6 h-6 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                      <Store size={12} className="text-primary" />
+                    </div>
+                  )}
+                  <span className="text-xs font-semibold">{shop.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex-shrink-0 bg-card/90 backdrop-blur-sm border-b border-border z-30">
         <div className="flex gap-2 px-4 py-2.5 overflow-x-auto no-scrollbar">
@@ -809,7 +827,7 @@ const handleAreaSearchSelect = useCallback(
           onSetArea={() => setShowAreaPicker(true)}
           locationErrorMsg={locationErrorMsg}
         />
-        
+
         {locationErrorMsg && (
           <div className="mx-4 my-2 p-3 bg-amber-500/15 border border-amber-500/30 rounded-2xl flex items-start gap-3 shadow-sm">
             <MapPin size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
@@ -841,58 +859,67 @@ const handleAreaSearchSelect = useCallback(
           </div>
         )}
 
-        {/* Show loading spinner while initial loading and no products yet */}
-                {(initialLoading || waitingForLocation) ? (
-  <div className="px-3 pt-3 pb-24">
-    {isOffline ? (
-      <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-6">
-        <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center">
-          <X size={28} className="text-amber-600" />
-        </div>
-        <p className="font-bold text-base">Uko offline</p>
-        <p className="text-sm text-muted-foreground">
-          Cheki mneti connection yako and try again.
-        </p>
-      </div>
-        ) : placeholderProducts.length > 0 ? (
-      <>
-        {areaPrompt ?? (
-          <p className="text-center text-xs text-muted-foreground mb-3">
-            Finding listings near you...
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          {placeholderProducts.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              userCoords={userCoords}
-              hierarchyReady={hierarchyReady}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleProductClick(p.id);
-              }}
-            />
-          ))}
-        </div>
-      </>
-    ) : (
-      <>
+        {/* Loading / placeholder state: shown while the real feed is loading
+            or while the visitor has no location yet. */}
+        {(initialLoading || waitingForLocation) ? (
+          <div className="px-3 pt-3 pb-24">
+            {isOffline ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3 text-center px-6">
+                <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center">
+                  <X size={28} className="text-amber-600" />
+                </div>
+                <p className="font-bold text-base">Uko offline</p>
+                <p className="text-sm text-muted-foreground">
+                  Cheki mneti connection yako and try again.
+                </p>
+              </div>
+            ) : placeholderProducts.length > 0 ? (
+              <>
+                {areaPrompt ?? (
+                  <p className="text-center text-xs text-muted-foreground mb-3">
+                    Finding listings near you...
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {placeholderProducts.map((p) => (
+                    <ProductCard
+                      key={p.id}
+                      product={p}
+                      userCoords={userCoords}
+                      hierarchyReady={hierarchyReady}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleProductClick(p.id);
+                      }}
+                    />
+                  ))}
+                </div>
+              </>
+            ) : (
+              <>
                 {areaPrompt}
-        {loadingTooLong && (
-          <p className="text-center text-xs text-muted-foreground mb-3">
-            This is taking longer than usual — check mneti connection yako.
-          </p>
-        )}
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
-        </div>
-      </>
-    )}
-  </div>
-) : totalVisible === 0 ? (
+                {stillLoading ? (
+                  <>
+                    {loadingTooLong && (
+                      <p className="text-center text-xs text-muted-foreground mb-3">
+                        Still loading, please wait…
+                      </p>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      {Array.from({ length: 8 }).map((_, i) => (
+                        <ProductCardSkeleton key={i} />
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-center text-xs text-muted-foreground py-10">
+                    No listings to show yet. Set your area to see adverts near you.
+                  </p>
+                )}
+              </>
+            )}
+          </div>
+        ) : totalVisible === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 gap-4 px-6">
             <div className="w-20 h-20 rounded-3xl bg-muted flex items-center justify-center">
               <Package size={36} className="text-muted-foreground" />
@@ -934,8 +961,8 @@ const handleAreaSearchSelect = useCallback(
                       userCoords={userCoords}
                       hierarchyReady={hierarchyReady}
                       onClick={(e) => {
-                      e.stopPropagation();
-                      handleProductClick(p.id);
+                        e.stopPropagation();
+                        handleProductClick(p.id);
                       }}
                     />
                   ))}
@@ -964,9 +991,9 @@ const handleAreaSearchSelect = useCallback(
                       userCoords={userCoords}
                       hierarchyReady={hierarchyReady}
                       onClick={(e) => {
-                      e.stopPropagation();
-                      handleProductClick(p.id);
-                     }}
+                        e.stopPropagation();
+                        handleProductClick(p.id);
+                      }}
                     />
                   ))}
                 </div>
@@ -974,22 +1001,22 @@ const handleAreaSearchSelect = useCallback(
             )}
 
             <div ref={sentinelRef} className="h-1" />
-{isLoadingMore && (
-  isOffline ? (
-    <div className="flex flex-col items-center justify-center py-8 gap-2 text-center px-6">
-      <p className="text-sm font-semibold text-amber-700">You're offline</p>
-      <p className="text-xs text-muted-foreground">
-        Check your Mneti connection to load more.
-      </p>
-    </div>
-  ) : (
-    <div className="grid grid-cols-2 gap-3 mt-3">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <ProductCardSkeleton key={`more-${i}`} />
-      ))}
-    </div>
-  )
-)}
+            {isLoadingMore && (
+              isOffline ? (
+                <div className="flex flex-col items-center justify-center py-8 gap-2 text-center px-6">
+                  <p className="text-sm font-semibold text-amber-700">You're offline</p>
+                  <p className="text-xs text-muted-foreground">
+                    Check your Mneti connection to load more.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <ProductCardSkeleton key={`more-${i}`} />
+                  ))}
+                </div>
+              )
+            )}
 
             {allDone && totalVisible > 0 && (
               <p className="text-center text-xs text-muted-foreground py-6">
@@ -1012,7 +1039,7 @@ const handleAreaSearchSelect = useCallback(
         </div>
       )}
 
-            {!user && !likelySignedIn && (
+      {!user && !likelySignedIn && (
         <div className="flex-shrink-0 bg-card border-t border-border px-4 py-3 flex items-center gap-3 z-40">
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm">Sell to buyers near you</p>
@@ -1078,7 +1105,7 @@ const handleAreaSearchSelect = useCallback(
           </div>
         </>
       )}
-      
+
       {showAreaPicker && (
         <AreaPickerSheet
           onSearchSelect={handleAreaSearchSelect}
@@ -1088,4 +1115,5 @@ const handleAreaSearchSelect = useCallback(
       )}
     </div>
   );
-      }
+}
+
