@@ -234,11 +234,14 @@ export function clearFeedCache() {
 
 function computeFeedCacheKey(
   wardName: string | undefined,
-  userCoords: [number, number],
+  userCoords: [number, number] | null,
   category?: string,
   subcategory?: string
 ): string {
-  return `${wardName ?? ""}_${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}_${category ?? ""}_${subcategory ?? ""}`;
+  const coordsPart = userCoords
+    ? `${userCoords[0].toFixed(2)}_${userCoords[1].toFixed(2)}`
+    : "nogps";
+  return `${wardName ?? ""}_${coordsPart}_${category ?? ""}_${subcategory ?? ""}`;
 }
 
 // Reads a still-fresh cache entry synchronously, for seeding a hook's
