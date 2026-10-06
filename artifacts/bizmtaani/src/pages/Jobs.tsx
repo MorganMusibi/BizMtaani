@@ -52,6 +52,10 @@ export const JOBS_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const JOBS_CACHE_STORAGE_KEY = "bizmtaani_jobs_cache";
 const MAX_CACHED_KEYS = 6;
 
+// How long a signed-in user waits for their saved area before the
+// page falls back to the general (non-location) job list.
+const LOCATION_WAIT_MS = 4000;
+
 type Cursor = QueryDocumentSnapshot<DocumentData>;
 
 // ============================================================
@@ -507,12 +511,25 @@ function JobCard({ job, onClick }: { job: JobPost; onClick: () => void }) {
 
 export default function Jobs() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, likelySignedIn } = useAuth();
   const { toast } = useToast();
 
   const { locationInfo, userCoords, gpsGranted, gpsReady, isLocationLoading } = useLocationContext();
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
+
+  // Signed-in users (or those likely signed in) have a saved profile
+  // area, so they get a short wait for it. Brand-new visitors never
+  // get a location, so they must not wait at all.
+  const expectsLocation = Boolean(user || likelySignedIn);
+  const [waitedForLocation, setWaitedForLocation] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWaitedForLocation(true), LOCATION_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  // True when it's OK to start the initial fetch: location is ready,
+  // or there's no location to wait for, or we've waited long enough.
+  const canLoad = gpsReady || !expectsLocation || waitedForLocation;
 
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeType, setActiveType] = useState("All Types");
@@ -597,7 +614,10 @@ export default function Jobs() {
 
   // ─── Initial fetch ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!gpsReady) return;
+    // Visitors (no location to wait for) and anyone who has waited
+    // long enough go straight to the fallback list; signed-in users
+    // get a short window for their saved area first.
+    if (!canLoad) return;
 
     const cacheKey = computeJobsCacheKey(activeCategory, activeType, userCoords);
 
@@ -678,7 +698,7 @@ export default function Jobs() {
         setDone(true);
       }
     })();
-  }, [gpsReady, userCoords, activeCategory, activeType, locationInfo?.wardName]);
+  }, [canLoad, userCoords, activeCategory, activeType, locationInfo?.wardName]);
 
   // ─── Load more ─────────────────────────────────────────────────────
   const loadMore = useCallback(async () => {
