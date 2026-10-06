@@ -50,6 +50,29 @@ function ProductCardSkeleton() {
   );
 }
 
+function TopLoadingBar() {
+  return (
+    <div className="sticky top-0 z-20 h-1 w-full overflow-hidden bg-primary/15">
+      <style>{`@keyframes bm-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
+      <div
+        className="h-full w-2/5 rounded-full bg-primary"
+        style={{ animation: "bm-slide 1.1s ease-in-out infinite" }}
+      />
+    </div>
+  );
+}
+
+function LoadingIndicator({ slow }: { slow: boolean }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-3">
+      <Loader2 size={24} className="animate-spin text-primary" />
+      <p className="text-xs text-muted-foreground">
+        {slow ? "Still loading, hang tight…" : "Loading listings…"}
+      </p>
+    </div>
+  );
+}
+
 const ProductCard = memo(function ProductCard({
   product,
   userCoords,
@@ -501,7 +524,7 @@ export default function Home() {
   // Placeholder content shown while the visitor has no location yet:
   // admin broadcast adverts first, then recent nationwide listings.
   const placeholderProducts = useMemo(
-    () => dedupe(adminBroadcastProducts, previewProducts).slice(0, 12),
+    () => dedupe(adminBroadcastProducts, previewProducts).slice(0, 60),
     [adminBroadcastProducts, previewProducts]
   );
 
@@ -817,6 +840,7 @@ export default function Home() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {stillLoading && <TopLoadingBar />}
         <LocationBanner
           gpsReady={gpsReady}
           gpsGranted={gpsGranted}
@@ -875,11 +899,7 @@ export default function Home() {
               </div>
             ) : placeholderProducts.length > 0 ? (
               <>
-                {areaPrompt ?? (
-                  <p className="text-center text-xs text-muted-foreground mb-3">
-                    Finding listings near you...
-                  </p>
-                )}
+                {areaPrompt ?? (stillLoading ? <LoadingIndicator slow={loadingTooLong} /> : null)}
                 <div className="grid grid-cols-2 gap-3">
                   {placeholderProducts.map((p) => (
                     <ProductCard
@@ -900,11 +920,7 @@ export default function Home() {
                 {areaPrompt}
                 {stillLoading ? (
                   <>
-                    {loadingTooLong && (
-                      <p className="text-center text-xs text-muted-foreground mb-3">
-                        Still loading, please wait…
-                      </p>
-                    )}
+                    <LoadingIndicator slow={loadingTooLong} />
                     <div className="grid grid-cols-2 gap-3">
                       {Array.from({ length: 8 }).map((_, i) => (
                         <ProductCardSkeleton key={i} />
@@ -1116,4 +1132,3 @@ export default function Home() {
     </div>
   );
 }
-
