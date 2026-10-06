@@ -13,13 +13,17 @@ import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Button } from "@/components/ui/button";
 
+// How long a signed-in user waits for their saved area before the
+// category page loads without a location.
+const LOCATION_WAIT_MS = 4000;
+
 export default function CategoryAds() {
   const { categoryKey, subcategory } = useParams<{ 
     categoryKey: string; 
     subcategory: string 
   }>();
   const [, navigate] = useLocation();
-  const { user } = useAuth();
+  const { user, likelySignedIn } = useAuth();
   const { toast } = useToast();
 
   // Use location from context (shared with homepage)
@@ -35,6 +39,17 @@ export default function CategoryAds() {
   setGpsReady,
   setGpsGranted,
 } = useLocationContext();
+
+  // Signed-in users have a saved profile area, so they get a short wait
+  // for it. Brand-new visitors never get a location, so they must not
+  // wait at all — the page loads straight away without one.
+  const expectsLocation = Boolean(user || likelySignedIn);
+  const [waitedForLocation, setWaitedForLocation] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setWaitedForLocation(true), LOCATION_WAIT_MS);
+    return () => clearTimeout(t);
+  }, []);
+  const canLoad = gpsReady || !expectsLocation || waitedForLocation;
 
   const catDef = categoryKey ? getCategoryDef(decodeURIComponent(categoryKey)) : undefined;
   const subName = subcategory ? decodeURIComponent(subcategory) : "";
@@ -224,6 +239,8 @@ const handleAreaSelect = useCallback(
   }, [locationInfo?.wardName, toast, setGpsGranted, setLocationInfo, setUserCoords]);
 
   // Use the shared hook!
+  // gpsReady is replaced by canLoad here so that visitors with no
+  // location (and signed-in users after a short wait) still load.
   const {
     areaProducts,
     areaLoading,
@@ -231,7 +248,7 @@ const handleAreaSelect = useCallback(
     initialLoading,
     loadMore,
   } = useHomeFeeds({
-    gpsReady,
+    gpsReady: canLoad,
     userCoords,
     isSearchMode: false,
     locationInfo: locationInfo as any,
@@ -357,6 +374,18 @@ return rankProducts(visibleProducts, userCoords, {
       )}
 
       <div className="px-3 pt-3">
+        {/* Visitors with no location: invite them to choose an area */}
+        {!userCoords && !isLocationLoading && (
+          <div className="text-center mb-3">
+            <p className="text-xs text-muted-foreground mb-2">
+              Choose your area to see listings near you
+            </p>
+            <Button size="sm" onClick={() => setShowRefreshOptions(true)}>
+              Set my area
+            </Button>
+          </div>
+        )}
+
         {initialLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
@@ -367,7 +396,9 @@ return rankProducts(visibleProducts, userCoords, {
             <Package size={36} className="text-muted-foreground" />
             <p className="font-bold text-lg">No adverts found</p>
             <p className="text-muted-foreground text-sm text-center">
-              No listings in {subName} yet.
+              {userCoords
+                ? `No listings in ${subName} yet.`
+                : `Set your area to see ${subName} adverts near you.`}
             </p>
             {user && (
               <button
@@ -536,4 +567,4 @@ return rankProducts(visibleProducts, userCoords, {
       )}
     </div>
   );
-          }
+}
