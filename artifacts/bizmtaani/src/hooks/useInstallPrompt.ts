@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
@@ -6,64 +6,85 @@ interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
 }
 
-export function useInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstallable, setIsInstallable] = useState(false);
-  const [isInstalled, setIsInstalled] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(() => {
-    try { return localStorage.getItem("pwa-install-dismissed") === "1"; } catch { return false; }
+// New key on purpose: old permanent "pwa-install-dismissed=1" flags are ignored.
+const DISMISS_KEY = "pwa-install-dismissed-at";
+const DISMISS_MS = 3 * 24 * 60 * 60 * 1000; // show again after 3 days
+
+// Module-level, so the event is captured the moment this file loads,
+// even if no component has mounted yet.
+let deferredPrompt: BeforeInstallPromptEvent | null = null;
+let installedFlag = false;
+const subscribers = new Set<() => void>();
+const notify = () => subscribers.forEach((fn) => fn());
+
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    notify();
   });
+  window.addEventListener("appinstalled", () => {
+    installedFlag = true;
+    deferredPrompt = null;
+    notify();
+  });
+}
+
+function isStandaloneNow() {
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (navigator as Navigator & { standalone?: boolean }).standalone === true
+  );
+}
+
+function recentlyDismissed() {
+  try {
+    const t = Number(localStorage.getItem(DISMISS_KEY) || 0);
+    return t > 0 && Date.now() - t < DISMISS_MS;
+  } catch {
+    return false;
+  }
+}
+
+export function useInstallPrompt() {
+  const [, rerender] = useState(0);
+  const [dismissed, setDismissed] = useState(recentlyDismissed);
 
   useEffect(() => {
-    // Already installed (standalone display mode)
-    if (window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true) {
-      setIsInstalled(true);
-      return;
-    }
-
-    // iOS Safari — no beforeinstallprompt, show manual instructions
-    const isIOSDevice = /iphone|ipad|ipod/i.test(navigator.userAgent.toLowerCase()) && !(window as Window & { MSStream?: unknown }).MSStream;
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    if (isIOSDevice && isSafari) {
-      setIsIOS(true);
-      setIsInstallable(true);
-      return;
-    }
-
-    // Chrome / Edge on Android or Desktop
-    const handler = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setIsInstallable(true);
-    };
-    const installedHandler = () => setIsInstalled(true);
-
-    window.addEventListener("beforeinstallprompt", handler);
-    window.addEventListener("appinstalled", installedHandler);
+    const fn = () => rerender((n) => n + 1);
+    subscribers.add(fn);
     return () => {
-      window.removeEventListener("beforeinstallprompt", handler);
-      window.removeEventListener("appinstalled", installedHandler);
+      subscribers.delete(fn);
     };
   }, []);
 
-  async function install() {
+  const ua = navigator.userAgent;
+  const isIOSDevice =
+    /iphone|ipad|ipod/i.test(ua) && !(window as Window & { MSStream?: unknown }).MSStream;
+  const isIOSSafari = isIOSDevice && /^((?!chrome|android).)*safari/i.test(ua);
+  const installed = installedFlag || isStandaloneNow();
+
+  const install = useCallback(async () => {
     if (!deferredPrompt) return;
-    await deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === "accepted") {
-      setIsInstalled(true);
-      setIsInstallable(false);
+    const p = deferredPrompt;
+    await p.prompt();
+    const { outcome } = await p.userChoice;
+    deferredPrompt = null;
+    if (outcome === "accepted") installedFlag = true;
+    notify();
+  }, []);
+
+  const dismiss = useCallback(() => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(DISMISS_KEY, String(Date.now()));
+    } catch {
+      /* ignore */
     }
-    setDeferredPrompt(null);
-  }
+  }, []);
 
-  function dismiss() {
-    setIsDismissed(true);
-    try { localStorage.setItem("pwa-install-dismissed", "1"); } catch { /* ignore */ }
-  }
+  const installable = isIOSSafari || deferredPrompt !== null;
+  const showBanner = installable && !installed && !dismissed;
 
-  const showBanner = isInstallable && !isInstalled && !isDismissed;
-
-  return { showBanner, isIOS, install, dismiss };
+  return { showBanner, isIOS: isIOSSafari, install, dismiss };
 }
