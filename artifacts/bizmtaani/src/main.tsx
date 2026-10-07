@@ -65,6 +65,23 @@ window.addEventListener("vite:preloadError", async () => {
   window.location.reload();
 });
 
+// ─── PWA install prompt ───
+// Chrome fires "beforeinstallprompt" once, often before React has mounted.
+// Save it here so any page (see InstallBanner) can offer a real Install button.
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  (window as any).__bmInstallPrompt = event;
+  window.dispatchEvent(new Event("bm-install-available"));
+});
+window.addEventListener("appinstalled", () => {
+  (window as any).__bmInstallPrompt = null;
+  try {
+    localStorage.setItem("bizmtaani_installed", "1");
+  } catch {
+    // ignore
+  }
+});
+
 // A synchronous throw here must never stop the app from rendering
 // (which would leave the user stuck on the boot splash).
 try {
@@ -89,3 +106,4 @@ function hideSplash() {
 requestAnimationFrame(() => requestAnimationFrame(hideSplash));
 // Last resort if anything above stalled.
 setTimeout(hideSplash, 8000);
+
