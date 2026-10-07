@@ -232,6 +232,8 @@ export function clearFeedCache() {
   }
 }
 
+// userCoords may be null: category pages load without a location
+// (visitors who haven't chosen an area yet), keyed as "nogps".
 function computeFeedCacheKey(
   wardName: string | undefined,
   userCoords: [number, number] | null,
@@ -1072,12 +1074,10 @@ useEffect(() => {
 
   (async () => {
     try {
-      // Master admin can post unlimited adverts, so a single
-      // ADMIN_BROADCAST_PAGE-sized fetch could silently miss anything
-      // beyond the newest 30 — page through until exhausted.
-      // ADMIN_BROADCAST_MAX_PAGES is a runaway-loop safety net, not a
-      // real visibility limit (50 * 30 = 1500 admin ads ceiling).
-            const snap = await getDocs(adminBroadcastQuery(null));
+      // Fetches the newest ADMIN_BROADCAST_PAGE (30) admin adverts in
+      // one request. If the admin ever has more than that, older ones
+      // won't appear here — add paging when that becomes a real limit.
+      const snap = await getDocs(adminBroadcastQuery(null));
       const all = toProducts(snap.docs);
 
       if (!cancelled) {
@@ -1099,14 +1099,21 @@ useEffect(() => {
 }, [refreshKey]);
 
 useEffect(() => {
+  // Category pages never show the nationwide preview, so don't spend
+  // a Firestore read on it there.
+  if (category && subcategory) {
+    setPreviewLoading(false);
+    return;
+  }
+
   // Only worth fetching a nationwide fallback when the real,
   // location-based feed hasn't already resolved synchronously
   // (localStorage cache or saved profile location) — for a
   // returning user, the real feed fires almost instantly and this
   // would just be a wasted Firestore read for content nobody sees.
-  // gpsReady's value at mount time is what matters here, which is
-  // exactly what an empty dependency array captures.
-    if (gpsReady && userCoords) {
+  // Needs BOTH gpsReady and coordinates: a visitor can have
+  // gpsReady true (e.g. from a cached state) but still no coords.
+  if (gpsReady && userCoords) {
     setPreviewLoading(false);
     return;
   }
@@ -1139,13 +1146,13 @@ useEffect(() => {
 }, []);
 
 useEffect(() => {
-  // Category pages can load premium/admin adverts without a location;
-  // every other mode still needs coordinates.
+  // Category pages can load premium/admin adverts without a location,
+  // so they run without coordinates; every other mode still needs them.
   const isCategoryMode = Boolean(category && subcategory);
   if (!gpsReady) return;
   if (!userCoords && !isCategoryMode) return;
 
-  const cacheKeyForThisRun = computeFeedCacheKey(
+  const cacheKeyForThisRun = computeFeedCacheKey(locationInfo?.wardName, userCoords, category, subcategory);
   // State was already seeded from this exact cache entry when the hook
   // first mounted — skip the reset-and-refetch for this one run only.
   if (!isSearchMode && skipNextResetRef.current === cacheKeyForThisRun) {
@@ -1224,10 +1231,12 @@ setCategoryPremiumDone(false);
     setWardProducts([]);
 
     setAreaProducts(
-      sortNearbyProducts(
-        products,
-        userCoords
-      )
+      userCoords
+        ? sortNearbyProducts(
+            products,
+            userCoords
+          )
+        : products
     );
 
     const lastDoc = snap.docs[snap.docs.length - 1];
@@ -1338,15 +1347,18 @@ const premiumProducts = toProducts(premiumSnap.docs);
   setInitialLoading(false);
   return;
 }
-    // ============================================================
-    // NORMAL HOME FEED
-    // Keep existing ward + nearby geohash behavior.
-    // ============================================================
+
     // Past this point everything needs real coordinates.
     if (!userCoords) {
       setInitialLoading(false);
       return;
     }
+
+    // ============================================================
+    // NORMAL HOME FEED
+    // Keep existing ward + nearby geohash behavior.
+    // ============================================================
+
      const wardName = locationInfo?.wardName ?? "";
 
     let localWardProducts: Product[] = [];
@@ -1731,6 +1743,8 @@ userCoords?.[1],
 ]);
 
 const loadMore = useCallback(async () => {
+  // Category pages paginate without a location; every other mode
+  // needs coordinates.
   const isCategoryMode = Boolean(category && subcategory);
   if (!userCoords && !isCategoryMode) return;
 
@@ -1755,10 +1769,12 @@ const loadMore = useCallback(async () => {
       setAreaProducts((prev) => {
         const merged = dedupe(prev, newProducts);
 
-        return sortNearbyProducts(
-          merged,
-          userCoords
-        );
+        return userCoords
+          ? sortNearbyProducts(
+              merged,
+              userCoords
+            )
+          : merged;
       });
 
       const lastDoc = snap.docs[snap.docs.length - 1];
@@ -1837,6 +1853,10 @@ if (category && subcategory) {
   }
   return;
 }
+
+     // Normal feed pagination needs real coordinates.
+     if (!userCoords) return;
+
      // ============================================================
 // NORMAL FEED — PROGRESSIVE NEARBY AREA PAGINATION
 //
