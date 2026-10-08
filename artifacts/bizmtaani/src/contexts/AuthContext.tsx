@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   useCallback,
   type ReactNode,
@@ -21,6 +22,12 @@ import { getFirebaseErrorMessage } from "@/lib/firebaseErrors";
 import { registerForNotifications } from "@/lib/notifications";
 
 const OPTIMISTIC_AUTH_KEY = "bizmtaani_was_signed_in";
+
+// When Firestore can't reach the server yet (weak connection), it may
+// report "this profile doesn't exist" from its empty local cache. That is
+// NOT proof the user is new, so we wait up to this long for the server's
+// real answer before treating the user as profile-less.
+const PROFILE_SERVER_WAIT_MS = 8000;
 
 export interface HomeLocation {
   lat: number;
@@ -130,6 +137,12 @@ export function AuthProvider({
 
   const [profileLoading, setProfileLoading] = useState(true);
 
+  // Remembers a profile that was just saved from the setup screen
+  // (setProfileDirectly). If a later snapshot wrongly says "no profile"
+  // (stale cache, flaky connection), we keep this one instead of throwing
+  // the user back to the "How will you use BizMtaani?" screen.
+  const directProfileRef = useRef<{ uid: string; profile: UserProfile } | null>(null);
+
   // Admin state
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminLoading, setAdminLoading] =
@@ -137,7 +150,12 @@ export function AuthProvider({
 
   const setProfileDirectly = useCallback(
     (profile: UserProfile) => {
+      const current = auth.currentUser;
+      if (current) {
+        directProfileRef.current = { uid: current.uid, profile };
+      }
       setUserProfile(profile);
+      setProfileLoading(false);
     },
     []
   );
@@ -186,6 +204,16 @@ export function AuthProvider({
     let unsubscribeProfile:
       | (() => void)
       | undefined;
+    let missingProfileTimer:
+      | ReturnType<typeof setTimeout>
+      | undefined;
+
+    function clearMissingProfileTimer() {
+      if (missingProfileTimer) {
+        clearTimeout(missingProfileTimer);
+        missingProfileTimer = undefined;
+      }
+    }
 
     const unsubscribeAuth =
       onAuthStateChanged(
@@ -212,9 +240,11 @@ export function AuthProvider({
             unsubscribeProfile();
             unsubscribeProfile = undefined;
           }
+          clearMissingProfileTimer();
 
           // No logged-in user
           if (!currentUser) {
+            directProfileRef.current = null;
             setUserProfile(null);
             setProfileLoading(false);
             setAdminLoading(false);
@@ -285,12 +315,44 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
           unsubscribeProfile = onSnapshot(
             docRef,
             (snap) => {
-              setUserProfile(
-                snap.exists()
-                  ? (snap.data() as UserProfile)
-                  : null
-              );
+              clearMissingProfileTimer();
 
+              // A real profile always wins.
+              if (snap.exists()) {
+                setUserProfile(snap.data() as UserProfile);
+                setProfileLoading(false);
+                return;
+              }
+
+              // The document looks missing. Before concluding "new user":
+
+              // 1) If this user just finished the setup screen, keep that
+              //    profile — a stale or empty snapshot must never undo it.
+              const direct = directProfileRef.current;
+              if (direct && direct.uid === currentUser.uid) {
+                console.warn(
+                  "Profile snapshot said 'missing' right after setup — keeping the just-saved profile.",
+                  { fromCache: snap.metadata.fromCache }
+                );
+                setUserProfile(direct.profile);
+                setProfileLoading(false);
+                return;
+              }
+
+              // 2) If the answer came from the local cache (server not
+              //    reached yet, e.g. weak connection), it proves nothing.
+              //    Keep waiting for the server's real answer, with a limit
+              //    so the app can never hang forever.
+              if (snap.metadata.fromCache) {
+                missingProfileTimer = setTimeout(() => {
+                  setUserProfile(null);
+                  setProfileLoading(false);
+                }, PROFILE_SERVER_WAIT_MS);
+                return;
+              }
+
+              // 3) The server itself says there is no profile: genuinely new user.
+              setUserProfile(null);
               setProfileLoading(false);
             },
             (error) => {
@@ -306,7 +368,13 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
               // errors to the user.
               // The app can continue using
               // the default free plan.
-              setUserProfile(null);
+              // But never discard a profile the user just saved.
+              const direct = directProfileRef.current;
+              if (direct && direct.uid === currentUser.uid) {
+                setUserProfile(direct.profile);
+              } else {
+                setUserProfile(null);
+              }
               setProfileLoading(false);
             }
           );
@@ -316,6 +384,7 @@ if (!sessionStorage.getItem(notifRegisteredKey)) {
 
     return () => {
       unsubscribeAuth();
+      clearMissingProfileTimer();
 
       if (unsubscribeProfile) {
         unsubscribeProfile();
