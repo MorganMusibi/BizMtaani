@@ -6,7 +6,7 @@ import { useState } from "react";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { getWardInfo } from "@/lib/location";
+import { getWardInfo, getWardCoordinates } from "@/lib/location";
 import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,13 +20,47 @@ interface HomeLocation {
   areaName: string; constituency: string; county: string;
 }
 
+type CanonicalMatch = {
+  wardName: string;
+  constituencyName: string;
+  countyName: string;
+};
+
+/**
+ * Turns a matched ward (from MasterHierarchy.json) into a HomeLocation WITH
+ * real coordinates. Previously this saved lat 0 / lng 0 (a point in the sea
+ * off West Africa) whenever the online geocoder failed, which broke the
+ * user's nearby feed. Now it looks the ward's coordinates up by name first
+ * (4 s limit), and only falls back to 0/0 if that also fails.
+ */
+async function homeLocationFromCanonical(c: CanonicalMatch): Promise<HomeLocation> {
+  let lat = 0;
+  let lng = 0;
+  try {
+    const coords = await Promise.race([
+      getWardCoordinates(c.wardName, c.constituencyName, c.countyName),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    ]);
+    if (coords) {
+      lat = coords.lat;
+      lng = coords.lng;
+    }
+  } catch {
+    // keep the fallback below
+  }
+  return {
+    lat,
+    lng,
+    areaName: c.wardName,
+    constituency: c.constituencyName,
+    county: c.countyName,
+  };
+}
+
 /**
  * Try to geocode an area name → coordinates + ward info.
  * Times out in 4 s. Returns null on any failure — never throws.
  */
-
-import { resolveCanonicalLocation } from "@/lib/locationHierarchy";
-
 async function geocodeArea(area: string): Promise<HomeLocation | null> {
   const trimmed = area.trim();
 
@@ -46,14 +80,7 @@ async function geocodeArea(area: string): Promise<HomeLocation | null> {
 
     if (!results.length) {
       // No geocode hit — use the direct hierarchy match if we found one
-      return directCanonical
-        ? {
-            lat: 0, lng: 0,
-            areaName: directCanonical.wardName,
-            constituency: directCanonical.constituencyName,
-            county: directCanonical.countyName,
-          }
-        : null;
+      return directCanonical ? await homeLocationFromCanonical(directCanonical) : null;
     }
 
     const { lat, lon } = results[0];
@@ -67,14 +94,7 @@ async function geocodeArea(area: string): Promise<HomeLocation | null> {
 
     return { lat: c.lat, lng: c.lng, areaName, constituency, county };
   } catch {
-    return directCanonical
-      ? {
-          lat: 0, lng: 0,
-          areaName: directCanonical.wardName,
-          constituency: directCanonical.constituencyName,
-          county: directCanonical.countyName,
-        }
-      : null;
+    return directCanonical ? await homeLocationFromCanonical(directCanonical) : null;
   }
 }
 export function ProfileSetupModal() {
@@ -127,6 +147,8 @@ export function ProfileSetupModal() {
 
       // Dismiss the modal immediately — don't wait for a Firestore re-read.
       // A slow or blocked read would leave the app in an infinite loading state.
+      // AuthContext also remembers this profile, so a stale "no profile"
+      // snapshot can't bring this screen back.
       setProfileDirectly(profileData);
     
     } catch (err) {
