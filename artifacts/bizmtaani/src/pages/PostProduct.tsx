@@ -120,21 +120,7 @@ const PRICING_BASIS_OPTIONS = [
   { value: "per_session", label: "Per Session" },
   { value: "quote_only", label: "Quote Only" },
 ];
-
-// The flow is now 3 steps:
-//   1 = Category
-//   2 = Details + Photos + Location
-//   3 = Plan & Publish
-type Step = 1 | 2 | 3;
-
-// Old saved drafts used the previous 5-step numbering
-// (1 Category, 2 Details, 3 Photos, 4 Plan, 5 Review). Map them onto
-// the new 3-step flow so a restored draft lands on the right screen.
-function mapDraftStep(oldStep: number): Step {
-  if (oldStep <= 1) return 1;
-  if (oldStep <= 3) return 2;
-  return 3;
-}
+type Step = 1 | 2 | 3 | 4 | 5;
 
 // Persists text/location/plan fields across accidental reloads (e.g.
 // Android/iOS killing the backgrounded tab when the user briefly
@@ -316,11 +302,8 @@ const [priceDisplay, setPriceDisplay] =
     price: string;
     priceText: string;
   }>({ name: "", priceType: "fixed", price: "", priceText: "" });
-  // The "Related items" section is optional, so it stays collapsed
-  // until the seller asks for it (or already has items in the list).
-  const [showPriceList, setShowPriceList] = useState(false);
 
-  // Photos + location (now part of step 2)
+  // Step 3 — Images + location
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -329,11 +312,8 @@ const [priceDisplay, setPriceDisplay] =
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [resolvingArea, setResolvingArea] = useState(false);
 
-  // Step 3 — Plan & payment
+  // Step 4 — Plan & payment
   const [plan, setPlan] = useState<ListingPlan>("free");
-  // When false (and the plan is Free), step 3 shows one compact Free
-  // card with a "See Premium plans" link instead of three big cards.
-  const [showAllPlans, setShowAllPlans] = useState(false);
   useEffect(() => {
   if (hasActivePremium) {
     setPlan(subscriptionPlan);
@@ -439,7 +419,7 @@ const [ticketPrice, setTicketPrice] = useState("");
     );
   }, [user, userProfile, authLoading, profileLoading]);
 
-
+ 
   // Cleanup preview URLs only when the component actually unmounts —
 // not on every add/remove, which would revoke URLs still in use.
 const imagePreviewsRef = useRef<string[]>([]);
@@ -468,7 +448,7 @@ useEffect(() => {
         return;
       }
 
-      setStep(mapDraftStep(Number(draft.step)));
+      setStep(draft.step);
       setSelectedCategory(draft.selectedCategory);
       setSelectedSubcategory(draft.selectedSubcategory);
       setCustomSubcategory(draft.customSubcategory);
@@ -503,7 +483,6 @@ useEffect(() => {
       setEateryPaybillAccount(draft.eateryPaybillAccount);
       setHotelMenu(draft.hotelMenu);
       setPriceListItems(draft.priceListItems);
-      if (draft.priceListItems && draft.priceListItems.length > 0) setShowPriceList(true);
       setCoords(draft.coords);
       setWardInfo(draft.wardInfo);
       setLocationName(draft.locationName);
@@ -1008,7 +987,7 @@ const isNormalAdvertCategory =
 
 const subcategories =
   catDef?.subcategories ?? [];
-
+  
   function getPriceOptions() {
   if (isJobSeeking) {
     return [];
@@ -1068,35 +1047,19 @@ if (isEventListing) {
     { value: "negotiable", label: "Negotiable" },
   ];
 }
-
+  
 async function handleImageFiles(files: FileList | null) {
   if (!files) return;
 
-  // The cap now follows the CURRENT plan (Free = 1 photo), so people
-  // can't pick more photos than their plan will accept at publish time.
-  // The seller can upgrade from the photo section to unlock more.
-  const currentLimit = photoLimit;
+  const currentLimit = maxPossiblePhotoLimit;
   const remaining = currentLimit - imageFiles.length;
 
   if (remaining <= 0) {
     toast({
-      title: plan === "free" ? "Free plan allows 1 photo" : "Maximum photos reached",
-      description:
-        plan === "free"
-          ? `Upgrade to Premium to add up to ${MAX_PHOTO_LIMIT.premium_weekly} photos.`
-          : `You can add up to ${photoLimit} photos per advert.`,
+      title: "Maximum photos reached",
+      description: `You can add up to ${maxPossiblePhotoLimit} photos per advert.`,
     });
     return;
-  }
-
-  if (files.length > remaining) {
-    toast({
-      title: `Only ${remaining} more photo${remaining === 1 ? "" : "s"} allowed`,
-      description:
-        plan === "free"
-          ? "Free plan allows 1 photo. Upgrade to Premium for more."
-          : `Your plan allows up to ${photoLimit} photos.`,
-    });
   }
 
   const toAdd = Array.from(files).slice(0, remaining);
@@ -1132,7 +1095,7 @@ async function handleImageFiles(files: FileList | null) {
   const previews = lockedInFiles.map((f) => URL.createObjectURL(f));
   setImagePreviews((prev) => [...prev, ...previews]);
 }
-
+  
   function removeImage(i: number) {
     URL.revokeObjectURL(imagePreviews[i]);
     setImageFiles((prev) => prev.filter((_, idx) => idx !== i));
@@ -1207,7 +1170,7 @@ async function handleImageFiles(files: FileList | null) {
     setResolvingArea(false);
   }
 }
-
+  
     async function validateStep(): Promise<boolean> {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
@@ -1219,7 +1182,7 @@ async function handleImageFiles(files: FileList | null) {
       }
       return true;
     }
-
+    
     if (step === 2) {
       // Job seeker validation
       if (isJobSeeking) {
@@ -1238,7 +1201,7 @@ async function handleImageFiles(files: FileList | null) {
 
         return true;
       }
-
+      
       // Vehicle validation
       if (isVehicleForSale) {
         if (!title.trim()) {
@@ -1297,7 +1260,7 @@ async function handleImageFiles(files: FileList | null) {
         }
         return true;
       }
-
+      
       // Professional service validation
       if (isProfessionalService) {
         if (!title.trim()) {
@@ -1338,7 +1301,7 @@ async function handleImageFiles(files: FileList | null) {
 
         return true;
       }
-
+      
       // Normal advert validation
       if (!title.trim()) {
         toast({
@@ -1347,7 +1310,7 @@ async function handleImageFiles(files: FileList | null) {
         });
         return false;
       }
-
+      
       // Accommodation must always have rent (except Sale/Land, which use price instead)
 if (isAccommodation && !isAccommodationSale && !isAccommodationLand && !rentPerMonth) {
   toast({
@@ -1364,7 +1327,7 @@ if (isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLa
   });
   return false;
 }
-
+      
       // Transport uses pricingBasis, not priceDisplay — validate separately
 if (isTransport) {
   if (
@@ -1414,8 +1377,9 @@ if (priceDisplay === "custom" && !priceText.trim()) {
 return true;
     }
 
-    // Step 3 (Plan & Publish) has nothing left to validate here —
-    // publishing validates its own inputs.
+    if (step === 3) {
+      return true;
+    }
 return true;
   }
 function isValidKenyanPhone(phone: string): boolean {
@@ -1457,7 +1421,7 @@ function isValidKenyanPhone(phone: string): boolean {
 
   return true;
 }
-
+  
   async function goNext() {
       // Accommodation validation
   if (step === 2 && isAccommodation) {
@@ -1584,13 +1548,11 @@ function isValidKenyanPhone(phone: string): boolean {
   }
   if (!(await validateStep())) return;
 
-  // Location is now picked on step 2 (same screen as details/photos),
-  // so tidy it up right before moving on to the plan step.
-  if (step === 2) {
+  if (step === 3) {
     await validateAdvertLocation();
   }
 
-  if (step < 3) {
+  if (step < 5) {
     setStep((prev) => (prev + 1) as Step);
   }
 }
@@ -1808,7 +1770,7 @@ equipmentDetails: isEquipment
   ? { landSize: isCommercialPropertyLand ? landSize : "" }
   : null,
   };
-
+  
   // 3. Ask backend to create the advert
   interface PublishAndPayResponse extends PublishAdvertResponse {
     paymentInitiated: boolean;
@@ -1861,6 +1823,9 @@ async function handlePublishFree() {
   }
 
   if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+    // ... everything that was already inside handlePublishFree stays exactly as-is,
+    // all the way down to the closing of the try/catch/finally block that already
+    // exists inside this function (the one with setPublishingFree(true/false))
     toast({
       title: "Too many photos for Free plan",
       description: "Please upgrade your plan or remove extra photos before publishing.",
@@ -2048,9 +2013,9 @@ const data = result.data as PublishAdvertResponse;
     const errorMessage = error?.message || "";
 
     if (
-      errorMessage.toLowerCase().includes("limit") ||
-      errorMessage.toLowerCase().includes("maximum") ||
-      errorMessage.toLowerCase().includes("expired") ||
+      errorMessage.toLowerCase().includes("limit") || 
+      errorMessage.toLowerCase().includes("maximum") || 
+      errorMessage.toLowerCase().includes("expired") || 
       errorMessage.toLowerCase().includes("archived")
     ) {
       setLimitModalMessage(
@@ -2075,7 +2040,7 @@ toast({
     isPublishingRef.current = false;
   }
 }
-
+  
   async function handlePublishPremiumSubscriber() {
   if (isPublishingRef.current) return;
   isPublishingRef.current = true;
@@ -2112,7 +2077,7 @@ toast({
 }
 
 
-const stepLabels = ["Category", "Details", "Publish"];
+const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -2142,7 +2107,7 @@ const stepLabels = ["Category", "Details", "Publish"];
                   {done ? <Check size={12} /> : n}
                 </div>
                 <span className={`text-[10px] font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-                {i < stepLabels.length - 1 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
+                {i < 4 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
               </div>
             );
           })}
@@ -2185,8 +2150,8 @@ const stepLabels = ["Category", "Details", "Publish"];
       isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
     }`}
   >
-
-
+                      
+                  
                       <cat.icon size={22} className="flex-shrink-0 text-foreground" />
                       <div className="flex-1">
                         <p className="font-bold text-sm">{cat.displayShort}</p>
@@ -2388,7 +2353,7 @@ const stepLabels = ["Category", "Details", "Publish"];
           <p className="text-xs text-muted-foreground">
             Interested persons wanaweza waka kucontact via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-
+        
         </div>
 
       </div>
@@ -2475,7 +2440,7 @@ const stepLabels = ["Category", "Details", "Publish"];
             ))}
           </div>
         </div>
-
+        
 {!isVehicleBicycle && (
         <div className="grid grid-cols-2 gap-3">
 
@@ -2571,7 +2536,7 @@ const stepLabels = ["Category", "Details", "Publish"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-
+        
         </div>
 
       </div>
@@ -2625,7 +2590,7 @@ const stepLabels = ["Category", "Details", "Publish"];
 
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Service Type</label>
-
+        
           <Input
             placeholder="e.g. Accounting, Legal, IT Support, Graphic Design"
             value={serviceType}
@@ -2657,7 +2622,7 @@ const stepLabels = ["Category", "Details", "Publish"];
               { value: "quote_only", label: "Request Quote" },
             ].map((option) => (
               <button
-
+                
                 key={option.value}
                 type="button"
                 onClick={() => {
@@ -2707,7 +2672,7 @@ const stepLabels = ["Category", "Details", "Publish"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-
+        
         </div>
 
       </div>
@@ -2845,7 +2810,7 @@ const stepLabels = ["Category", "Details", "Publish"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-
+        
         </div>
 
       </div>
@@ -2926,7 +2891,7 @@ const stepLabels = ["Category", "Details", "Publish"];
             </div>
           </div>
         )}
-
+        
                         {isAccommodation && !isAccommodationLand && (
           <div className="space-y-4">
 
@@ -3013,4 +2978,1353 @@ const stepLabels = ["Category", "Details", "Publish"];
             type="button"
             onClick={() => setFurnishing(option)}
             className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
-             
+              furnishing === option
+                ? "border-primary bg-primary/5 text-primary"
+                : "border-border text-muted-foreground"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  </>
+)}
+            {(selectedSubcategory === "Airbnb / Short Stays" ||
+              selectedSubcategory === "Vacation Rentals" ||
+              selectedSubcategory === "Lodges / Guest Houses" ||
+              selectedSubcategory === "Serviced Apartments") && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">
+                  Stay Type / Booking Details
+                </label>
+
+                <Input
+                  placeholder="e.g. Available daily, weekly or monthly"
+                  value={stayDetails}
+                  onChange={(e) => setStayDetails(e.target.value)}
+                  className="h-12 text-base"
+                />
+              </div>
+            )}
+
+            {(selectedSubcategory === "Parking Spaces" ||
+              selectedSubcategory === "Garages") && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">
+                  Availability / Space Details
+                </label>
+
+                <Input
+                  placeholder="e.g. 2 parking spaces available"
+                  value={spaceDetails}
+                  onChange={(e) => setSpaceDetails(e.target.value)}
+                  className="h-12 text-base"
+                />
+              </div>
+            )}
+
+            {selectedSubcategory === "Roommates / Shared Housing" && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">
+                  Shared Housing Details
+                </label>
+
+                <Input
+                  placeholder="e.g. 1 room available in a 3-bedroom house"
+                  value={sharedHousingDetails}
+                  onChange={(e) =>
+                    setSharedHousingDetails(e.target.value)
+                  }
+                  className="h-12 text-base"
+                />
+              </div>
+            )}
+
+          </div>
+        )}
+{isAccommodation ? (
+  <div className="space-y-4">
+
+    {isAccommodationLand ? (
+  <>
+    <div className="space-y-1.5">
+      <label className="text-sm font-bold">
+        Land Size *
+      </label>
+      <Input
+        placeholder="e.g. 50 x 100 ft or 1/8 acre"
+        value={landSize}
+        onChange={(e) => setLandSize(e.target.value)}
+        className="h-12 text-base"
+      />
+    </div>
+
+    <div className="space-y-1.5">
+      <label className="text-sm font-bold">
+        Price (KES) *
+      </label>
+          <Input
+            type="text"
+            inputMode="text"
+            placeholder="e.g. 2500000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">
+            Price Display
+          </label>
+
+          <div className="flex gap-2">
+            {getPriceOptions().map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() =>
+                  setPriceDisplay(option.value as PriceDisplay)
+                }
+                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    ) : isAccommodationSale ? (
+      <div className="space-y-1.5">
+
+        <label className="text-sm font-bold">
+          Sale Price (KES) *
+        </label>
+
+        <Input
+          type="text"
+          inputMode="text"
+          placeholder="e.g. 8500000"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="h-12 text-base"
+        />
+
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() =>
+                setPriceDisplay(option.value as PriceDisplay)
+              }
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+      </div>
+    ) : (
+      <div className="space-y-1.5">
+
+        <label className="text-sm font-bold">
+  {isShortStay
+    ? "Rate (KES) *"
+    : (selectedSubcategory === "Parking Spaces" || selectedSubcategory === "Garages")
+    ? "Parking Fee (KES) *"
+    : "Monthly Rent (KES) *"}
+</label>
+
+<Input
+  type="text"
+  inputMode="text"
+  placeholder={isShortStay ? "e.g. 3500 per night" : "e.g. 7500"}
+  value={rentPerMonth}
+  onChange={(e) => setRentPerMonth(e.target.value)}
+  className="h-12 text-base"
+/>
+
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() =>
+                setPriceDisplay(option.value as PriceDisplay)
+              }
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+
+      </div>
+    )}
+
+  </div>
+
+) : isCommercialProperty ? (
+  <div className="space-y-4">
+
+    {isCommercialPropertyLand ? (
+      <>
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Land Size *</label>
+          <Input
+            placeholder="e.g. 1 acre or 50 x 100 ft"
+            value={landSize}
+            onChange={(e) => setLandSize(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Price (KES) *</label>
+          <Input
+            type="text"
+            inputMode="text"
+            placeholder="e.g. 5000000"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            className="h-12 text-base"
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-sm font-bold">Price Display</label>
+          <div className="flex gap-2">
+            {getPriceOptions().map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+                className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                  priceDisplay === option.value
+                    ? "border-primary bg-primary/5 text-primary"
+                    : "border-border text-muted-foreground"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    ) : isCommercialPropertySale ? (
+      <div className="space-y-1.5">
+        <label className="text-sm font-bold">Sale Price (KES) *</label>
+        <Input
+          type="text"
+          inputMode="text"
+          placeholder="e.g. 15000000"
+          value={price}
+          onChange={(e) => setPrice(e.target.value)}
+          className="h-12 text-base"
+        />
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    ) : (
+      <div className="space-y-1.5">
+        <label className="text-sm font-bold">Monthly Rent (KES) *</label>
+        <Input
+          type="text"
+          inputMode="text"
+          placeholder="e.g. 45000"
+          value={rentPerMonth}
+          onChange={(e) => setRentPerMonth(e.target.value)}
+          className="h-12 text-base"
+        />
+        <div className="flex gap-2">
+          {getPriceOptions().map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => setPriceDisplay(option.value as PriceDisplay)}
+              className={`flex-1 py-2.5 rounded-xl border-2 text-sm font-semibold ${
+                priceDisplay === option.value
+                  ? "border-primary bg-primary/5 text-primary"
+                  : "border-border text-muted-foreground"
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    )}
+
+  </div>
+
+        ) : isTransport ? (
+
+          <div className="space-y-3">
+
+            <div className="space-y-1.5">
+              <label className="text-sm font-bold">
+                Pricing Basis
+              </label>
+
+              <div className="grid grid-cols-2 gap-2">
+                {PRICING_BASIS_OPTIONS.map(({ value, label }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+  setPricingBasis(value);
+  if (value === "quote_only") {
+    setPriceDisplay("quote");
+  }
+}}
+                    className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold text-left transition-all ${
+                      pricingBasis === value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {pricingBasis !== "quote_only" && (
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold">
+                  Price (KES)
+                </label>
+
+                <Input
+                  type="text"
+                  inputMode="text"
+                  placeholder={
+                    pricingBasis === "per_km"
+                      ? "e.g. 50 per km"
+                      : "e.g. 2000"
+                  }
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-12 text-base"
+                />
+              </div>
+            )}
+
+          </div>
+
+        ) : !isEatery ? (
+
+          <div className="space-y-3">
+
+            {(priceDisplay === "fixed" ||
+              priceDisplay === "negotiable") && (
+              <div className="space-y-1.5">
+
+                <label className="text-sm font-bold">
+                  Price (KES)
+                </label>
+
+                <Input
+                  type="text"
+                  inputMode="text"
+                  placeholder="e.g. 1500"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  className="h-12 text-base"
+                />
+
+              </div>
+            )}
+
+            {priceDisplay === "custom" && (
+              <div className="space-y-1.5">
+
+                <label className="text-sm font-bold">
+                  Price Label
+                </label>
+
+                <Input
+                  type="text"
+                  placeholder="e.g. 30 pekee, @20, Ksh 500 non-negotiable"
+                  value={priceText}
+                  onChange={(e) => setPriceText(e.target.value)}
+                  className="h-12 text-base"
+                />
+
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2">
+              {getPriceOptions().map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() =>
+                    setPriceDisplay(option.value as PriceDisplay)
+                  }
+                  className={`py-2.5 rounded-xl border-2 text-sm font-semibold transition-all ${
+                    priceDisplay === option.value
+                      ? "border-primary bg-primary/5 text-primary"
+                      : "border-border text-muted-foreground"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+          </div>
+
+        ) : null}
+
+        {isEatery && (
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <p className="font-black text-base">Payment Method</p>
+
+                <div className="grid grid-cols-2 gap-2">
+                {[
+                  { value: "mpesa", label: "Direct M-Pesa (Phone)" },
+                  { value: "till", label: "Till Number" },
+                  { value: "pochi", label: "Pochi la Biashara" },
+                  { value: "paybill", label: "Paybill" },
+                  { value: "other", label: "Other" },
+                ].map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setEateryPaymentMethod(option.value as typeof eateryPaymentMethod)}
+                    className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                      eateryPaymentMethod === option.value
+                        ? "border-primary bg-primary/5 text-primary"
+                        : "border-border text-muted-foreground"
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {(eateryPaymentMethod === "till" || eateryPaymentMethod === "pochi") && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">
+                    {eateryPaymentMethod === "till" ? "Till Number" : "Pochi la Biashara Number"}
+                  </label>
+                  <Input
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="e.g. 123456"
+                    value={eateryPaymentNumber}
+                    onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "mpesa" && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">M-Pesa Phone Number</label>
+                  <Input
+                    type="tel"
+                    placeholder="e.g. 0712345678"
+                    value={eateryPaymentNumber}
+                    onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "other" && (
+                <div className="space-y-1.5">
+                  <label className="text-sm font-bold">Describe Payment Method</label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. Cash on delivery, Bank transfer..."
+                    value={eateryPaymentOther}
+                    onChange={(e) => setEateryPaymentOther(e.target.value)}
+                    className="h-12 text-base"
+                  />
+                </div>
+              )}
+
+              {eateryPaymentMethod === "paybill" && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">Paybill Number *</label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="e.g. 400200"
+                      value={eateryPaymentNumber}
+                      onChange={(e) => setEateryPaymentNumber(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-bold">Account Number *</label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. Your name/shop"
+                      value={eateryPaybillAccount}
+                      onChange={(e) => setEateryPaybillAccount(e.target.value)}
+                      className="h-12 text-base"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <p className="font-black text-base">
+              Hotel / Restaurant Menu
+            </p>
+
+            {MEAL_PERIODS.map(({ key, label }) => (
+              <div
+                key={key}
+                className="rounded-2xl border border-border overflow-hidden"
+              >
+
+                <div className="bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 border-b border-border">
+                  <span className="font-bold text-sm text-rose-700 dark:text-rose-400">
+                    {label}
+                  </span>
+                </div>
+
+                {hotelMenu[key].length > 0 && (
+                  <div className="divide-y divide-border">
+                    {hotelMenu[key].map((item, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center px-4 py-2.5 gap-2"
+                      >
+                        <span className="flex-1 text-sm font-medium">
+                          {item.name}
+                        </span>
+
+                        <span className="text-sm font-bold text-primary">
+                          KES {item.price}
+                        </span>
+
+                        <button
+                          onClick={() =>
+                            removeMenuItem(key, i)
+                          }
+                          className="ml-2 text-muted-foreground hover:text-destructive"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 p-3">
+
+                  <Input
+                    placeholder="Dish name"
+                    value={newItems[key].name}
+                    onChange={(e) =>
+                      setNewItems((prev) => ({
+                        ...prev,
+                        [key]: {
+                          ...prev[key],
+                          name: e.target.value,
+                        },
+                      }))
+                    }
+                    className="flex-1 h-9 text-sm"
+                  />
+
+                  <Input
+                    type="text"
+                    inputMode="text"
+                    placeholder="KES"
+                    value={newItems[key].price}
+                    onChange={(e) =>
+                      setNewItems((prev) => ({
+                        ...prev,
+                        [key]: {
+                          ...prev[key],
+                          price: e.target.value,
+                        },
+                      }))
+                    }
+                    className="w-24 h-9 text-sm"
+                  />
+
+                  <button
+                    onClick={() => addMenuItem(key)}
+                    className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <Plus size={16} />
+                  </button>
+
+                </div>
+
+              </div>
+            ))}
+
+          </div>
+        )}
+
+        <div className="bg-primary/5 border border-primary/20 rounded-2xl px-4 py-3 space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Phone size={14} className="text-primary flex-shrink-0" />
+            <label className="text-sm font-bold">
+              Contact Phone (WhatsApp) <span className="font-normal text-muted-foreground">(optional)</span>
+            </label>
+          </div>
+          <Input
+            type="tel"
+            placeholder="e.g. 0712345678"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="h-12 text-base bg-background"
+          />
+          <p className="text-xs text-muted-foreground">
+            Customers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
+          </p>
+        </div>
+
+      </div>
+    )}
+  </>
+)}
+                {/* ========== STEP 3: Photos & Location ========== */}
+        {step === 3 && (
+          <>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold">
+                  Photos (Optional • up to {photoLimit})
+                </label>
+                <span className="text-xs text-muted-foreground">{imageFiles.length}/{photoLimit}</span>
+              </div>
+
+              {imageFiles.length === 0 && (
+                <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 text-xs text-muted-foreground">
+                  Photos are optional. You can proceed to the next step without uploading a photo.
+                </div>
+              )}
+
+              {plan === "free" && imageFiles.length >= MAX_PHOTO_LIMIT.free && (
+                <div className="bg-muted/60 border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+                  <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Weekly or Monthly Premium for more photos.</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-3 gap-2">
+                {imagePreviews.map((src, i) => (
+                  <div key={i} className="relative aspect-square rounded-xl overflow-hidden">
+                    <img src={src} alt="" className="w-full h-full object-cover" />
+                    {i === 0 && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-[10px] text-center py-1 font-semibold">
+                        Cover
+                      </div>
+                    )}
+                    <button onClick={() => removeImage(i)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 text-white flex items-center justify-center">
+                      <X size={12} />
+                    </button>
+
+                    {i === 0 && imageFiles.length < maxPossiblePhotoLimit && (
+  <button
+    type="button"
+    onClick={() => setShowImageMenu(true)}
+    className="absolute top-1 left-1 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center shadow-md"
+    aria-label="Add another photo"
+  >
+    <Plus size={14} />
+  </button>
+)}
+                    
+                  </div>
+                ))}
+                {imageFiles.length < maxPossiblePhotoLimit && (
+  <button onClick={() => setShowImageMenu(true)}
+                    className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
+                    <Camera size={22} />
+                    <span className="text-[10px] font-semibold">Add photo</span>
+                  </button>
+                )}
+              </div>
+
+              <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden"
+                onChange={(e) => handleImageFiles(e.target.files)} />
+            </div>
+
+            {/* Other products / services list */}
+            <div className="space-y-3 mt-4">
+              <div>
+                <label className="text-sm font-bold">Related Items or Services (Optional)</label>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Selling more than one item? List other items with their prices — buyers will see a "View other items" option on this advert.
+                </p>
+              </div>
+
+              {priceListItems.length > 0 && (
+                <div className="rounded-2xl border border-border overflow-hidden divide-y divide-border">
+                  {priceListItems.map((item, i) => (
+                    <div key={i} className="flex items-center px-4 py-2.5 gap-2">
+                      <span className="flex-1 min-w-0 text-base font-bold truncate">{item.name}</span>
+                      <span className="text-sm font-bold text-primary">
+                        {item.priceType === "contact"
+                          ? "Contact for Price"
+                          : item.priceType === "custom"
+                          ? item.priceText
+                          : `KES ${item.price}`}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removePriceListItem(i)}
+                        className="ml-2 text-muted-foreground hover:text-destructive"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-muted-foreground">Item name</label>
+                <Input
+                  placeholder="e.g. Bikini, T-shirt"
+                  value={newPriceListItem.name}
+                  onChange={(e) =>
+                    setNewPriceListItem((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                  className="h-11 text-sm font-semibold"
+                />
+
+                <div className="flex gap-2">
+                  {[
+                    { value: "fixed", label: "Fixed Price" },
+                    { value: "contact", label: "DM for Price" },
+                    { value: "custom", label: "Custom label" },
+                  ].map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() =>
+                        setNewPriceListItem((prev) => ({
+                          ...prev,
+                          priceType: option.value as "fixed" | "contact" | "custom",
+                        }))
+                      }
+                      className={`flex-1 py-2 px-2 rounded-xl border-2 text-[11px] font-semibold transition-all ${
+                        newPriceListItem.priceType === option.value
+                          ? "border-primary bg-primary/5 text-primary"
+                          : "border-border text-muted-foreground"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex gap-2">
+                  {newPriceListItem.priceType === "fixed" && (
+                    <Input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="KES"
+                      value={newPriceListItem.price}
+                      onChange={(e) =>
+                        setNewPriceListItem((prev) => ({ ...prev, price: e.target.value }))
+                      }
+                      className="flex-1 h-9 text-sm"
+                    />
+                  )}
+
+                  {newPriceListItem.priceType === "custom" && (
+                    <Input
+                      type="text"
+                      placeholder="e.g. Thatee, @20"
+                      value={newPriceListItem.priceText}
+                      onChange={(e) =>
+                        setNewPriceListItem((prev) => ({ ...prev, priceText: e.target.value }))
+                      }
+                      className="flex-1 h-9 text-sm"
+                    />
+                  )}
+
+                  {newPriceListItem.priceType === "contact" && (
+                    <div className="flex-1 h-9 flex items-center px-3 rounded-xl bg-muted/50 text-xs text-muted-foreground">
+                      Buyers will be told to contact you for this item's price.
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={addPriceListItem}
+                    className="h-9 w-9 rounded-xl bg-primary text-white flex items-center justify-center flex-shrink-0"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2 mt-4">
+              <label className="text-sm font-bold">Location</label>
+              <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
+                <MapPin size={16} className="text-primary flex-shrink-0" />
+                <div className="flex-1">
+                  {wardInfo ? (
+                    <p className="text-sm font-semibold">{wardInfo.label || wardInfo.wardName || "Unknown ward"}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Detecting your location...</p>
+                  )}
+                  {wardInfo?.constituency && (
+                    <p className="text-xs text-muted-foreground">{wardInfo.constituency}, {wardInfo.county}</p>
+                  )}
+                </div>
+              </div>
+
+              <Button
+  type="button"
+  variant="outline"
+  size="sm"
+  onClick={() => setShowAreaPicker(true)}
+  className="w-full h-10 text-sm"
+>
+  Search mtaa different
+</Button>
+              {locationName && locationName !== wardInfo?.wardName && (
+                <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ========== STEP 4: Choose Plan & Publish ========== */}
+{step === 4 && (
+  hasActivePremium ? (
+    <>
+      <div>
+        <h2 className="font-black text-lg">Premium Subscription Active</h2>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Your advert will be published using your active premium subscription.
+          No additional payment is required.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border-2 border-[#00A651] bg-[#00A651]/5 p-4">
+        <div className="flex items-center gap-3">
+          <Shield className="text-[#00A651]" size={22} />
+
+          <div>
+            <p className="font-black text-base">
+              {subscriptionPlan === "premium_monthly"
+                ? "Monthly Premium"
+                : "Weekly Premium"}
+            </p>
+
+            <p className="text-sm text-muted-foreground">
+              Your subscription iko active.
+            </p>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : (
+    <>
+    <div>
+      <h2 className="font-black text-lg">Choose Your Plan</h2>
+      <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
+    </div>
+
+    {/* Free plan */}
+{isPremiumOnlyCategory ? (
+  <div className="w-full text-left p-4 rounded-2xl border-2 border-border bg-muted/30 opacity-60">
+    <div className="flex justify-between items-center">
+      <div>
+        <span className="font-black text-base">Free</span>
+        <p className="text-sm text-muted-foreground">Not available for {selectedCategory}</p>
+        <p className="text-xs text-amber-600 font-semibold mt-1">This category requires Premium</p>
+      </div>
+      <span className="font-black text-xl text-muted-foreground">—</span>
+    </div>
+  </div>
+) : (
+    <button
+  onClick={() => {
+    if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
+      toast({
+        title: "Bwerere plan allows only 1 pic per advert",
+        description: "Toa extra photos, au choose Weekly ama Monthly Premium.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setPlan("free");
+  }}
+  className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "free" ? "border-primary bg-primary/5" : "border-border"}`}
+>
+      <div className="flex justify-between items-center">
+        <div>
+  <span className="font-black text-base">Free</span>
+  <p className="text-sm text-muted-foreground">Up to 3 adverts with maximum of 1 photo each · Live for 7 days</p>
+  <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a short radius (⚠️ WEAK Visibility)</p>
+</div>
+        <span className="font-black text-xl text-muted-foreground">Free</span>
+      </div>
+
+      {plan === "free" && (
+        <div className="mt-3 pt-3 border-t border-border/60 flex items-center justify-between gap-3">
+          <p className="text-xs text-muted-foreground">
+            Upgrade to reach up to 30km radius + boosted Visibility and rank higher in the feed
+          </p>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              setPlan("premium_weekly");
+            }}
+            className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+            style={{ color: "#00A651", backgroundColor: "#00A65115" }}
+          >
+            Upgrade →
+          </button>
+        </div>
+      )}
+    </button>
+)}
+
+    {/* Weekly Premium */}
+    <button onClick={() => setPlan("premium_weekly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_weekly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
+      <div className="flex justify-between items-center">
+        <div>
+  <span className="font-black text-base">Weekly Premium</span>
+  <p className="text-sm text-muted-foreground">Up to 5 adverts with maximum of 3 photos each · Live for 7 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 3x more photos build customer trust, reach more people within a short time, and rank higher — get noticed and sell chap chap</p>
+</div>
+        <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
+      </div>
+    </button>
+
+    {/* Monthly Premium */}
+    <button onClick={() => setPlan("premium_monthly")} className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${plan === "premium_monthly" ? "border-[#00A651] bg-[#00A651]/5" : "border-border"}`}>
+      <div className="flex justify-between items-center">
+        <div>
+  <span className="font-black text-base">Monthly Premium</span>
+  <p className="text-sm text-muted-foreground">Up to 8 adverts with maximum of 3 photos each · Live for 30 days</p>
+  <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 Sasa hii ndio BEST: stay live 4x longer with 3x more photos, wider 30KM+ reach, and top the ranking by reaching more people instantly</p>
+</div>
+        <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
+      </div>
+    </button>
+
+    {/* Common features */}
+    <div className="bg-muted/40 rounded-2xl px-4 py-4 space-y-2.5">
+      <p className="text-xs font-black text-muted-foreground uppercase tracking-wide">Included in all plans</p>
+      {[
+        "Listed in your ward & nearby areas",
+        "Visible to buyers searching your category",
+        "Direct chat with interested buyers",
+      ].map((f) => (
+        <div key={f} className="flex items-center gap-2">
+          <Check size={13} className="text-[#00A651] flex-shrink-0" />
+          <span className="text-sm text-muted-foreground">{f}</span>
+        </div>
+      ))}
+    </div>
+
+    {plan !== "free" && (
+      <div className="bg-card border border-border rounded-2xl px-4 py-3 flex items-start gap-3">
+        <Smartphone size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-muted-foreground">
+          You'll receive an M-Pesa prompt on your phone to complete payment.
+          Your listing goes live <strong className="text-foreground">immediately</strong> once payment is confirmed.
+        </p>
+      </div>
+    )}
+    </>
+  )
+)}
+        
+              {/* ========== STEP 5: Review and Publish ========== */}
+        {step === 5 && (
+          <div className="space-y-6 py-2">
+            <h2 className="font-black text-lg">Review advert yako</h2>
+            
+            {/* Summary Card */}
+            <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
+              <div className="aspect-video bg-muted rounded-xl overflow-hidden">
+                {imagePreviews[0] ? (
+  <img
+    src={imagePreviews[0]}
+    className="w-full h-full object-cover"
+    alt="Preview"
+  />
+) : (
+  <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
+    <Camera size={40} />
+    <p className="mt-2 text-xs font-medium">No photo added</p>
+  </div>
+)}
+              </div>
+              
+              <div>
+                <h3 className="font-bold text-base">{title || "Untitled Advert"}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{description || "No description provided."}</p>
+              </div>
+
+              <div className="flex items-center justify-between border-t border-border pt-4">
+  <span className="text-sm font-bold text-primary">
+    {isAccommodationLand || isCommercialPropertyLand
+      ? `KES ${price}`
+      : isAccommodationSale || isCommercialPropertySale
+      ? `KES ${price}${priceDisplay === "negotiable" ? " (Negotiable)" : ""}`
+      : isAccommodation || isCommercialProperty
+      ? `KES ${rentPerMonth}/mo`
+      : isEventListing
+      ? priceDisplay === "free"
+        ? "Free Entry"
+        : priceDisplay === "contact"
+        ? "Contact for Price"
+        : `KES ${ticketPrice}`
+      : priceDisplay === "contact"
+      ? "Contact for Price"
+      : priceDisplay === "quote"
+      ? "Request Quote"
+      : priceDisplay === "negotiable"
+      ? `KES ${price} (Negotiable)`
+      : `KES ${price}`}
+  </span>
+
+  <span className="text-sm text-muted-foreground">
+    {selectedCategory} / {selectedSubcategory}
+  </span>
+</div>
+ <div className="flex items-center justify-between">
+<span className="text-sm font-semibold">
+    {isAccommodationLand || isCommercialPropertyLand
+      ? "Land Price"
+      : isAccommodationSale || isCommercialPropertySale
+      ? "Sale Price"
+      : isAccommodation || isCommercialProperty
+      ? "Monthly Rent"
+      : "Price"}
+  </span>
+
+  <span className="text-sm font-bold text-primary">
+    {isAccommodationLand || isCommercialPropertyLand
+      ? price
+        ? `KES ${price}`
+        : "Not specified"
+      : isAccommodationSale || isCommercialPropertySale
+      ? price
+        ? `KES ${price}`
+        : "Not specified"
+      : isAccommodation || isCommercialProperty
+      ? rentPerMonth
+        ? `KES ${rentPerMonth}/mo`
+        : "Not specified"
+      : price
+      ? `KES ${price}`
+      : "Negotiable"}
+  </span>
+</div>
+{isAccommodation && (
+  <div className="space-y-2 border-t border-border pt-4">
+
+    {isAccommodationLand ? (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Land Size
+        </span>
+        <span className="text-sm text-muted-foreground">
+          {landSize || "Not specified"}
+        </span>
+      </div>
+    ) : (
+      <>
+        {bedrooms && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Bedrooms
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {bedrooms}
+            </span>
+          </div>
+        )}
+
+        {bathrooms && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Bathrooms
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {bathrooms}
+            </span>
+          </div>
+        )}
+
+        {furnishing && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-semibold">
+              Furnishing
+            </span>
+            <span className="text-sm text-muted-foreground">
+              {furnishing}
+            </span>
+          </div>
+        )}
+      </>
+    )}
+
+    {stayDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Stay Details
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {stayDetails}
+        </span>
+      </div>
+    )}
+
+    {spaceDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Space Details
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {spaceDetails}
+        </span>
+      </div>
+    )}
+
+    {sharedHousingDetails && (
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-semibold">
+          Shared Housing
+        </span>
+        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
+          {sharedHousingDetails}
+        </span>
+      </div>
+    )}
+
+  </div>
+)}
+                {isCommercialPropertyLand && (
+  <div className="space-y-2 border-t border-border pt-4">
+    <div className="flex items-center justify-between">
+      <span className="text-sm font-semibold">Land Size</span>
+      <span className="text-sm text-muted-foreground">
+        {landSize || "Not specified"}
+      </span>
+    </div>
+  </div>
+)}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold">Plan</span>
+                <span className="text-sm font-bold capitalize">{plan}</span>
+              </div>
+            </div>
+
+            </div>
+        )}
+        </div>
+      {/* Bottom action */}
+<div
+  className="fixed left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl z-[60] bg-card border-t border-border px-4 py-3 md:border-x"
+  style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
+>
+        {step < 5 ? (
+          <div className="flex gap-3">
+            {step > 1 && (
+              <Button
+                type="button"
+                variant="outline"
+                className="w-1/3 h-12 font-black text-base rounded-2xl border-2"
+                onClick={() => setStep((prev) => (prev - 1) as Step)}
+              >
+                Back
+              </Button>
+            )}
+            <Button 
+              className={`h-12 font-black text-base rounded-2xl shadow-lg ${step > 1 ? "flex-1" : "w-full"}`} 
+              onClick={goNext}
+            >
+              Next
+            </Button>
+          </div>
+        ) : (
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-1/3 h-12 font-black text-base rounded-2xl border-2"
+              onClick={() => setStep((prev) => (prev - 1) as Step)}
+              disabled={publishingFree}
+            >
+              Back
+            </Button>
+
+            {hasActivePremium ? (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+                onClick={handlePublishPremiumSubscriber}
+                disabled={publishingFree}
+              >
+                {publishingFree ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  "Publish Advert"
+                )}
+              </Button>
+            ) : plan === "free" ? (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg"
+                onClick={handlePublishFree}
+                disabled={publishingFree}
+              >
+                {publishingFree ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  "Publish Free"
+                )}
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 h-12 font-black text-base rounded-2xl shadow-lg gap-2"
+                style={{ backgroundColor: "#00A651" }}
+                onClick={() => setShowPaymentModal(true)}
+              >
+                <Smartphone size={18} />
+                Pay KES {PLAN_AMOUNTS[plan as PaidListingPlan]} & Publish
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+
+
+      {/* Image source picker sheet */}
+      {showImageMenu && (
+  <>
+    <div className="fixed inset-0 z-[70] bg-black/40" onClick={() => setShowImageMenu(false)} />
+    <div className="fixed bottom-0 left-0 right-0 z-[70] bg-card rounded-t-3xl border-t border-border px-4 pt-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}>
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
+            <div className="relative mb-4">
+  <p className="font-bold text-sm text-center">Add a photo</p>
+  <button
+    type="button"
+    onClick={() => setShowImageMenu(false)}
+    className="absolute right-0 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-muted flex items-center justify-center text-muted-foreground"
+    aria-label="Close"
+  >
+    <X size={16} />
+  </button>
+</div>
+            <div className="space-y-2">
+              <button type="button" onClick={() => { setShowImageMenu(false); cameraRef.current?.click(); }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
+                <Camera size={20} className="text-primary" />Take a photo
+              </button>
+              <button type="button" onClick={() => { setShowImageMenu(false); fileRef.current?.click(); }}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-muted font-semibold text-sm">
+                <Camera size={20} className="text-primary" />Chagua from gallery
+              </button>
+              <button type="button" onClick={() => setShowImageMenu(false)}
+                className="w-full flex items-center justify-center px-4 py-3.5 rounded-2xl font-semibold text-sm text-muted-foreground">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+    
+      {/* M-Pesa listing payment modal */}
+      <MpesaPaymentModal
+        open={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        plan={plan as PaidListingPlan}
+        defaultPhone={phone}
+        onInitiate={handleInitiate}
+        onSuccess={(pid) => {
+          toast({ title: "Listing is live!", description: "Your advert is now visible in the marketplace." });
+          invalidateOwnCaches();
+          navigate(`/product/${pid}`);
+        }}
+      />
+      
+      {showAreaPicker && (
+  <AreaPickerSheet
+    onSearchSelect={handleAreaPicked}
+    resolving={resolvingArea}
+    onDismiss={() => setShowAreaPicker(false)}
+  />
+)}
+            {/* Limit Reached Professional Modal */}
+      {limitModalMessage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border rounded-3xl max-w-sm w-full p-6 shadow-xl space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+              <Shield size={24} />
+            </div>
+            
+            <div className="text-center space-y-1">
+              <h3 className="font-black text-lg">Oops! Listing Limit Reached</h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {limitModalMessage}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                type="button"
+                className="w-full h-12 font-bold rounded-2xl shadow-lg"
+                onClick={() => setLimitModalMessage(null)}
+              >
+                Got it
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+</div>
+  );
+}
