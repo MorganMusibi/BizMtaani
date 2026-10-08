@@ -191,6 +191,7 @@ function getDraftKey(uid: string) {
 }
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium, loading: authLoading,
+  profileLoading,
 } = useAuth();
 
   // Invalidate this seller's own cached advert lists (My Listings +
@@ -371,17 +372,29 @@ const [eventVenue, setEventVenue] = useState("");
 const [eventOrganizer, setEventOrganizer] = useState("");
 const [ticketPrice, setTicketPrice] = useState("");
 
-  useEffect(() => {
-  if (authLoading) return;
-  if (!user) { navigate("/login"); return; }
-  if (user.phoneNumber) setPhone(user.phoneNumber);
+    useEffect(() => {
+    if (authLoading) return;
+    if (!user) { navigate("/login"); return; }
+    if (user.phoneNumber) setPhone(user.phoneNumber);
+  }, [user, authLoading]);
 
-    // Show profile's saved area immediately so the field isn't blank
-    // while we wait for GPS to resolve (GPS will override this if it succeeds).
-    if (userProfile?.homeLocation) {
-      const hl = userProfile.homeLocation;
+  // Set the location ONCE, after the profile has finished loading.
+  const locationInitRef = useRef(false);
+  useEffect(() => {
+    if (authLoading || profileLoading || !user || locationInitRef.current) return;
+    locationInitRef.current = true;
+
+    const hl = userProfile?.homeLocation;
+    const hasUsableProfileLocation = !!hl && !(hl.lat === 0 && hl.lng === 0);
+
+    if (hl && hasUsableProfileLocation) {
       setCoords({ lat: hl.lat, lng: hl.lng });
-      setWardInfo({ wardName: hl.areaName, constituency: hl.constituency, county: hl.county, displayName: hl.areaName });
+      setWardInfo({
+        wardName: hl.areaName,
+        constituency: hl.constituency,
+        county: hl.county,
+        displayName: hl.areaName,
+      });
       setLocationName(hl.areaName);
     }
 
@@ -395,9 +408,7 @@ const [ticketPrice, setTicketPrice] = useState("");
         });
       },
       () => {
-        // GPS denied/failed. If we already have a profile home location, keep it.
-        // Otherwise, don't guess a location — let the user set it manually via search.
-        if (!userProfile?.homeLocation) {
+        if (!hasUsableProfileLocation) {
           toast({
             title: "Set your location",
             description: "We couldn't detect your location. Please search for your area below.",
@@ -406,7 +417,7 @@ const [ticketPrice, setTicketPrice] = useState("");
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [user, userProfile]);
+  }, [user, userProfile, authLoading, profileLoading]);
 
  
   // Cleanup preview URLs only when the component actually unmounts —
