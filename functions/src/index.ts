@@ -18,7 +18,7 @@ const db = admin.firestore();
 // abuse loop or traffic spike on any single function scales instances
 // unbounded, which is unbounded cost. Individual functions below can
 // still override these via their own options object (e.g. mpesaCallback).
-setGlobalOptions({ maxInstances: 200, memory: "256MiB", timeoutSeconds: 60 });
+setGlobalOptions({ maxInstances: 20, memory: "256MiB", timeoutSeconds: 60 });
 
 // ─── Secrets ───────────────────────────────────────────────────────────────
 const cloudinaryApiKey = defineSecret("CLOUDINARY_API_KEY");
@@ -471,7 +471,7 @@ export const attachDraftUploadImages = onCall({ region: "europe-west1", cors: tr
 // 2. M-PESA PAYMENTS & CALLBACK
 // ═══════════════════════════════════════════════════════════════════════════
 const MPESA_INITIATION_COOLDOWN_MS = 30_000;
-export const initiateMpesaPayment = onCall({ region: "europe-west1", minInstances: 1, memory: "512MiB", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 150, timeoutSeconds: 120 }, async (request) => {
+export const initiateMpesaPayment = onCall({ region: "europe-west1", memory: "512MiB", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 10, timeoutSeconds: 120 }, async (request) => {
   console.log("STEP 1: function started");
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
   const { phone, productId, recaptchaToken } = request.data as { phone: string; productId: string; recaptchaToken?: string };
@@ -1840,7 +1840,7 @@ export const reverseGeocode = onCall(
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const publishAdvert = onCall({ region: "europe-west1", minInstances: 1, cors: true, maxInstances: 200 }, async (request) => {
+export const publishAdvert = onCall({ region: "europe-west1", cors: true, maxInstances: 10 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, productId: existingProductId, ...otherData } = request.data;
@@ -2151,7 +2151,7 @@ try {
 };
   });
 
-  export const publishAdvertAndPay = onCall({ region: "europe-west1", minInstances: 1, secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 200, timeoutSeconds: 120 }, async (request) => {
+    export const publishAdvertAndPay = onCall({ region: "europe-west1", secrets: [mpesaConsumerKey, mpesaConsumerSecret, mpesaPasskey], cors: true, maxInstances: 10, timeoutSeconds: 120 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
 
   const { plan, title, price, imageUrls, draftId, productId: existingProductId, phone, ...otherData } = request.data;
