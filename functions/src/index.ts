@@ -70,9 +70,9 @@ const MAX_PHOTO_LIMIT: Record<string, number> = {
 };
 
 const MAX_ACTIVE_ADS: Record<string, number> = {
-  free: 3,
-  premium_weekly: 5,
-  premium_monthly: 8,
+  free: 5,
+  premium_weekly: 10,
+  premium_monthly: 10,
 };
 // Add this in your Constants section
 const LISTING_DURATIONS: Record<string, number> = {
