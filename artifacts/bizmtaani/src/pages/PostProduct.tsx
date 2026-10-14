@@ -120,7 +120,21 @@ const PRICING_BASIS_OPTIONS = [
   { value: "per_session", label: "Per Session" },
   { value: "quote_only", label: "Quote Only" },
 ];
-type Step = 1 | 2 | 3 | 4 | 5;
+
+// The flow is now 3 steps:
+//   1 = Category
+//   2 = Details + Photos + Location
+//   3 = Plan & Publish
+type Step = 1 | 2 | 3;
+
+// Old saved drafts used the previous 5-step numbering
+// (1 Category, 2 Details, 3 Photos, 4 Plan, 5 Review). Map them onto
+// the new 3-step flow so a restored draft lands on the right screen.
+function mapDraftStep(oldStep: number): Step {
+  if (oldStep <= 1) return 1;
+  if (oldStep <= 3) return 2;
+  return 3;
+}
 
 // Persists text/location/plan fields across accidental reloads (e.g.
 // Android/iOS killing the backgrounded tab when the user briefly
@@ -302,8 +316,11 @@ const [priceDisplay, setPriceDisplay] =
     price: string;
     priceText: string;
   }>({ name: "", priceType: "fixed", price: "", priceText: "" });
+  // The "Related items" section is optional, so it stays collapsed
+  // until the seller asks for it (or already has items in the list).
+  const [showPriceList, setShowPriceList] = useState(false);
 
-  // Step 3 — Images + location
+  // Photos + location (now part of step 2)
   const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
@@ -312,8 +329,11 @@ const [priceDisplay, setPriceDisplay] =
   const [showAreaPicker, setShowAreaPicker] = useState(false);
   const [resolvingArea, setResolvingArea] = useState(false);
 
-  // Step 4 — Plan & payment
+  // Step 3 — Plan & payment
   const [plan, setPlan] = useState<ListingPlan>("free");
+  // When false (and the plan is Free), step 3 shows one compact Free
+  // card with a "See Premium plans" link instead of three big cards.
+  const [showAllPlans, setShowAllPlans] = useState(false);
   useEffect(() => {
   if (hasActivePremium) {
     setPlan(subscriptionPlan);
@@ -419,7 +439,7 @@ const [ticketPrice, setTicketPrice] = useState("");
     );
   }, [user, userProfile, authLoading, profileLoading]);
 
- 
+
   // Cleanup preview URLs only when the component actually unmounts —
 // not on every add/remove, which would revoke URLs still in use.
 const imagePreviewsRef = useRef<string[]>([]);
@@ -448,7 +468,7 @@ useEffect(() => {
         return;
       }
 
-      setStep(draft.step);
+      setStep(mapDraftStep(Number(draft.step)));
       setSelectedCategory(draft.selectedCategory);
       setSelectedSubcategory(draft.selectedSubcategory);
       setCustomSubcategory(draft.customSubcategory);
@@ -483,6 +503,7 @@ useEffect(() => {
       setEateryPaybillAccount(draft.eateryPaybillAccount);
       setHotelMenu(draft.hotelMenu);
       setPriceListItems(draft.priceListItems);
+      if (draft.priceListItems && draft.priceListItems.length > 0) setShowPriceList(true);
       setCoords(draft.coords);
       setWardInfo(draft.wardInfo);
       setLocationName(draft.locationName);
@@ -987,7 +1008,7 @@ const isNormalAdvertCategory =
 
 const subcategories =
   catDef?.subcategories ?? [];
-  
+
   function getPriceOptions() {
   if (isJobSeeking) {
     return [];
@@ -1047,19 +1068,35 @@ if (isEventListing) {
     { value: "negotiable", label: "Negotiable" },
   ];
 }
-  
+
 async function handleImageFiles(files: FileList | null) {
   if (!files) return;
 
-  const currentLimit = maxPossiblePhotoLimit;
+  // The cap now follows the CURRENT plan (Free = 1 photo), so people
+  // can't pick more photos than their plan will accept at publish time.
+  // The seller can upgrade from the photo section to unlock more.
+  const currentLimit = photoLimit;
   const remaining = currentLimit - imageFiles.length;
 
   if (remaining <= 0) {
     toast({
-      title: "Maximum photos reached",
-      description: `You can add up to ${maxPossiblePhotoLimit} photos per advert.`,
+      title: plan === "free" ? "Free plan allows 1 photo" : "Maximum photos reached",
+      description:
+        plan === "free"
+          ? `Upgrade to Premium to add up to ${MAX_PHOTO_LIMIT.premium_weekly} photos.`
+          : `You can add up to ${photoLimit} photos per advert.`,
     });
     return;
+  }
+
+  if (files.length > remaining) {
+    toast({
+      title: `Only ${remaining} more photo${remaining === 1 ? "" : "s"} allowed`,
+      description:
+        plan === "free"
+          ? "Free plan allows 1 photo. Upgrade to Premium for more."
+          : `Your plan allows up to ${photoLimit} photos.`,
+    });
   }
 
   const toAdd = Array.from(files).slice(0, remaining);
@@ -1095,7 +1132,7 @@ async function handleImageFiles(files: FileList | null) {
   const previews = lockedInFiles.map((f) => URL.createObjectURL(f));
   setImagePreviews((prev) => [...prev, ...previews]);
 }
-  
+
   function removeImage(i: number) {
     URL.revokeObjectURL(imagePreviews[i]);
     setImageFiles((prev) => prev.filter((_, idx) => idx !== i));
@@ -1170,7 +1207,7 @@ async function handleImageFiles(files: FileList | null) {
     setResolvingArea(false);
   }
 }
-  
+
     async function validateStep(): Promise<boolean> {
     if (step === 1) {
       if (!selectedCategory) { toast({ title: "Select a category", variant: "destructive" }); return false; }
@@ -1182,7 +1219,7 @@ async function handleImageFiles(files: FileList | null) {
       }
       return true;
     }
-    
+
     if (step === 2) {
       // Job seeker validation
       if (isJobSeeking) {
@@ -1201,7 +1238,7 @@ async function handleImageFiles(files: FileList | null) {
 
         return true;
       }
-      
+
       // Vehicle validation
       if (isVehicleForSale) {
         if (!title.trim()) {
@@ -1260,7 +1297,7 @@ async function handleImageFiles(files: FileList | null) {
         }
         return true;
       }
-      
+
       // Professional service validation
       if (isProfessionalService) {
         if (!title.trim()) {
@@ -1301,7 +1338,7 @@ async function handleImageFiles(files: FileList | null) {
 
         return true;
       }
-      
+
       // Normal advert validation
       if (!title.trim()) {
         toast({
@@ -1310,7 +1347,7 @@ async function handleImageFiles(files: FileList | null) {
         });
         return false;
       }
-      
+
       // Accommodation must always have rent (except Sale/Land, which use price instead)
 if (isAccommodation && !isAccommodationSale && !isAccommodationLand && !rentPerMonth) {
   toast({
@@ -1327,7 +1364,7 @@ if (isCommercialProperty && !isCommercialPropertySale && !isCommercialPropertyLa
   });
   return false;
 }
-      
+
       // Transport uses pricingBasis, not priceDisplay — validate separately
 if (isTransport) {
   if (
@@ -1377,9 +1414,8 @@ if (priceDisplay === "custom" && !priceText.trim()) {
 return true;
     }
 
-    if (step === 3) {
-      return true;
-    }
+    // Step 3 (Plan & Publish) has nothing left to validate here —
+    // publishing validates its own inputs.
 return true;
   }
 function isValidKenyanPhone(phone: string): boolean {
@@ -1421,7 +1457,7 @@ function isValidKenyanPhone(phone: string): boolean {
 
   return true;
 }
-  
+
   async function goNext() {
       // Accommodation validation
   if (step === 2 && isAccommodation) {
@@ -1548,11 +1584,13 @@ function isValidKenyanPhone(phone: string): boolean {
   }
   if (!(await validateStep())) return;
 
-  if (step === 3) {
+  // Location is now picked on step 2 (same screen as details/photos),
+  // so tidy it up right before moving on to the plan step.
+  if (step === 2) {
     await validateAdvertLocation();
   }
 
-  if (step < 5) {
+  if (step < 3) {
     setStep((prev) => (prev + 1) as Step);
   }
 }
@@ -1770,7 +1808,7 @@ equipmentDetails: isEquipment
   ? { landSize: isCommercialPropertyLand ? landSize : "" }
   : null,
   };
-  
+
   // 3. Ask backend to create the advert
   interface PublishAndPayResponse extends PublishAdvertResponse {
     paymentInitiated: boolean;
@@ -1823,9 +1861,6 @@ async function handlePublishFree() {
   }
 
   if (imageFiles.length > MAX_PHOTO_LIMIT.free) {
-    // ... everything that was already inside handlePublishFree stays exactly as-is,
-    // all the way down to the closing of the try/catch/finally block that already
-    // exists inside this function (the one with setPublishingFree(true/false))
     toast({
       title: "Too many photos for Free plan",
       description: "Please upgrade your plan or remove extra photos before publishing.",
@@ -2013,13 +2048,13 @@ const data = result.data as PublishAdvertResponse;
     const errorMessage = error?.message || "";
 
     if (
-      errorMessage.toLowerCase().includes("limit") || 
-      errorMessage.toLowerCase().includes("maximum") || 
-      errorMessage.toLowerCase().includes("expired") || 
+      errorMessage.toLowerCase().includes("limit") ||
+      errorMessage.toLowerCase().includes("maximum") ||
+      errorMessage.toLowerCase().includes("expired") ||
       errorMessage.toLowerCase().includes("archived")
     ) {
       setLimitModalMessage(
-        "You have reached your maximum limit of 3 active free adverts, or have 3 archived items. Upgrade to post more adverts, add more photos, and reach audiences up to 30km away — or delete/manage existing listings to post a new one."
+        "You have reached your maximum limit of 5 active free adverts, or your archived items limit. Upgrade to post up to 10 adverts, add more photos, and reach audiences up to 30km away — or delete/manage existing listings to post a new one."
       );
     } else {
       const message = getFirebaseErrorMessage(
@@ -2040,7 +2075,7 @@ toast({
     isPublishingRef.current = false;
   }
 }
-  
+
   async function handlePublishPremiumSubscriber() {
   if (isPublishingRef.current) return;
   isPublishingRef.current = true;
@@ -2077,7 +2112,7 @@ toast({
 }
 
 
-const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
+const stepLabels = ["Category", "Details", "Publish"];
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -2107,7 +2142,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   {done ? <Check size={12} /> : n}
                 </div>
                 <span className={`text-[10px] font-semibold truncate ${active ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
-                {i < 4 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
+                {i < stepLabels.length - 1 && <div className="flex-1 h-px bg-border min-w-[2px]" />}
               </div>
             );
           })}
@@ -2115,8 +2150,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-5">
-
-        {/* ========== STEP 1: Category ========== */}
+                {/* ========== STEP 1: Category ========== */}
         {step === 1 && (
           <>
             <h2 className="font-black text-lg">What are you selling?</h2>
@@ -2150,8 +2184,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       isSelected ? "border-primary bg-primary/5" : "border-border bg-card hover:border-border/80"
     }`}
   >
-                      
-                  
+
+
                       <cat.icon size={22} className="flex-shrink-0 text-foreground" />
                       <div className="flex-1">
                         <p className="font-bold text-sm">{cat.displayShort}</p>
@@ -2353,7 +2387,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <p className="text-xs text-muted-foreground">
             Interested persons wanaweza waka kucontact via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-        
+
         </div>
 
       </div>
@@ -2440,7 +2474,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             ))}
           </div>
         </div>
-        
+
 {!isVehicleBicycle && (
         <div className="grid grid-cols-2 gap-3">
 
@@ -2536,7 +2570,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-        
+
         </div>
 
       </div>
@@ -2590,7 +2624,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
         <div className="space-y-1.5">
           <label className="text-sm font-bold">Service Type</label>
-        
+
           <Input
             placeholder="e.g. Accounting, Legal, IT Support, Graphic Design"
             value={serviceType}
@@ -2622,7 +2656,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
               { value: "quote_only", label: "Request Quote" },
             ].map((option) => (
               <button
-                
+
                 key={option.value}
                 type="button"
                 onClick={() => {
@@ -2672,7 +2706,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-        
+
         </div>
 
       </div>
@@ -2810,7 +2844,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
           <p className="text-xs text-muted-foreground">
             Buyers can always reach you via BizMtaani Chat — add your number too if you'd also like WhatsApp contact.
           </p>
-        
+
         </div>
 
       </div>
@@ -2891,7 +2925,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             </div>
           </div>
         )}
-        
+
                         {isAccommodation && !isAccommodationLand && (
           <div className="space-y-4">
 
@@ -3619,8 +3653,9 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
     )}
   </>
 )}
-                {/* ========== STEP 3: Photos & Location ========== */}
-        {step === 3 && (
+
+        {/* ========== STEP 2 (continued): Photos, related items, location ========== */}
+        {step === 2 && (
           <>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -3632,7 +3667,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
 
               {imageFiles.length === 0 && (
                 <div className="bg-muted/50 border border-border rounded-2xl px-4 py-3 text-xs text-muted-foreground">
-                  Photos are optional. You can proceed to the next step without uploading a photo.
+                  Photos are optional. You can continue without uploading a photo.
                 </div>
               )}
 
@@ -3641,8 +3676,16 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                   <Shield size={15} className="text-muted-foreground flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <p className="text-xs font-bold text-foreground">Free plan: 1 photo max</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Weekly or Monthly Premium for more photos.</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Upgrade to Premium to add up to {MAX_PHOTO_LIMIT.premium_weekly} photos.</p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setPlan("premium_weekly")}
+                    className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+                    style={{ color: "#00A651", backgroundColor: "#00A65115" }}
+                  >
+                    Upgrade →
+                  </button>
                 </div>
               )}
 
@@ -3660,7 +3703,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                       <X size={12} />
                     </button>
 
-                    {i === 0 && imageFiles.length < maxPossiblePhotoLimit && (
+                    {i === 0 && imageFiles.length < photoLimit && (
   <button
     type="button"
     onClick={() => setShowImageMenu(true)}
@@ -3670,10 +3713,10 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
     <Plus size={14} />
   </button>
 )}
-                    
+
                   </div>
                 ))}
-                {imageFiles.length < maxPossiblePhotoLimit && (
+                {imageFiles.length < photoLimit && (
   <button onClick={() => setShowImageMenu(true)}
                     className="aspect-square rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors">
                     <Camera size={22} />
@@ -3688,7 +3731,17 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 onChange={(e) => handleImageFiles(e.target.files)} />
             </div>
 
-            {/* Other products / services list */}
+            {/* Other products / services list — collapsed until the seller asks for it */}
+            {!showPriceList && priceListItems.length === 0 ? (
+              <button
+                type="button"
+                onClick={() => setShowPriceList(true)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-border text-sm font-semibold text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+              >
+                <Plus size={16} />
+                Selling more than one item? Add other items (optional)
+              </button>
+            ) : (
             <div className="space-y-3 mt-4">
               <div>
                 <label className="text-sm font-bold">Related Items or Services (Optional)</label>
@@ -3800,41 +3853,69 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 </div>
               </div>
             </div>
+            )}
 
-            <div className="space-y-2 mt-4">
-              <label className="text-sm font-bold">Location</label>
-              <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
-                <MapPin size={16} className="text-primary flex-shrink-0" />
-                <div className="flex-1">
-                  {wardInfo ? (
-                    <p className="text-sm font-semibold">{wardInfo.label || wardInfo.wardName || "Unknown ward"}</p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">Detecting your location...</p>
-                  )}
-                  {wardInfo?.constituency && (
-                    <p className="text-xs text-muted-foreground">{wardInfo.constituency}, {wardInfo.county}</p>
-                  )}
-                </div>
+            {/* Location — compact one-line summary with a Change button */}
+            <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
+              <MapPin size={16} className="text-primary flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] text-muted-foreground">Posting in</p>
+                {wardInfo ? (
+                  <p className="text-sm font-semibold truncate">
+                    {wardInfo.label || wardInfo.wardName || "Unknown ward"}
+                    {wardInfo.constituency ? ` · ${wardInfo.constituency}` : ""}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Detecting your location...</p>
+                )}
               </div>
-
-              <Button
-  type="button"
-  variant="outline"
-  size="sm"
-  onClick={() => setShowAreaPicker(true)}
-  className="w-full h-10 text-sm"
->
-  Search mtaa different
-</Button>
-              {locationName && locationName !== wardInfo?.wardName && (
-                <p className="text-xs text-muted-foreground">Listing location: <strong>{locationName}</strong></p>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowAreaPicker(true)}
+                className="text-xs font-bold text-primary px-3 py-1.5 rounded-lg bg-primary/10 flex-shrink-0"
+              >
+                Change
+              </button>
             </div>
           </>
         )}
 
-        {/* ========== STEP 4: Choose Plan & Publish ========== */}
-{step === 4 && (
+        {/* ========== STEP 3: Summary + Plan & Publish ========== */}
+        {step === 3 && (
+          <div className="flex items-center gap-3 p-3 bg-card border border-border rounded-2xl">
+            <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted flex items-center justify-center flex-shrink-0">
+              {imagePreviews[0] ? (
+                <img src={imagePreviews[0]} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <Camera size={20} className="text-muted-foreground" />
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm truncate">{title || jobTitle || "Untitled Advert"}</p>
+              <p className="text-xs text-muted-foreground truncate">
+                {selectedSubcategory && selectedSubcategory !== "Other"
+                  ? selectedSubcategory
+                  : customSubcategory || selectedCategory}
+                {" · "}
+                {imageFiles.length} photo{imageFiles.length === 1 ? "" : "s"}
+              </p>
+              {(wardInfo?.label || wardInfo?.wardName) && (
+                <p className="text-xs text-muted-foreground truncate">
+                  {wardInfo?.label || wardInfo?.wardName}
+                </p>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="text-xs font-bold text-primary px-3 py-1.5 rounded-lg bg-primary/10 flex-shrink-0"
+            >
+              Edit
+            </button>
+          </div>
+        )}
+
+        {step === 3 && (
   hasActivePremium ? (
     <>
       <div>
@@ -3870,6 +3951,38 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <p className="text-sm text-muted-foreground mt-0.5">Free listings go live instantly. Paid plans unlock more reach.</p>
     </div>
 
+    {plan === "free" && !showAllPlans && !isPremiumOnlyCategory ? (
+      <>
+        {/* Compact default: one Free card + a link to see Premium plans */}
+        <div className="rounded-2xl border-2 border-primary bg-primary/5 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="font-black text-base">Free advert</p>
+              <p className="text-sm text-muted-foreground">
+                Goes live instantly · Up to 5 adverts · 1 photo each · 7 days
+              </p>
+            </div>
+            <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
+              <Check size={13} className="text-white" />
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setShowAllPlans(true)}
+          className="w-full text-left rounded-2xl border border-[#00A651]/40 bg-[#00A651]/5 px-4 py-3"
+        >
+          <p className="text-sm font-bold" style={{ color: "#00A651" }}>
+            🚀 Want more reach? See Premium plans →
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Up to 30km reach, 3 photos and higher ranking in the feed.
+          </p>
+        </button>
+      </>
+    ) : (
+    <>
     {/* Free plan */}
 {isPremiumOnlyCategory ? (
   <div className="w-full text-left p-4 rounded-2xl border-2 border-border bg-muted/30 opacity-60">
@@ -3900,7 +4013,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Free</span>
-  <p className="text-sm text-muted-foreground">Up to 3 adverts with maximum of 1 photo each · Live for 7 days</p>
+  <p className="text-sm text-muted-foreground">Up to 5 adverts with maximum of 1 photo each · Live for 7 days</p>
   <p className="text-xs text-amber-600 font-semibold mt-1">Visible to audiences within a short radius (⚠️ WEAK Visibility)</p>
 </div>
         <span className="font-black text-xl text-muted-foreground">Free</span>
@@ -3932,7 +4045,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Weekly Premium</span>
-  <p className="text-sm text-muted-foreground">Up to 5 adverts with maximum of 3 photos each · Live for 7 days</p>
+  <p className="text-sm text-muted-foreground">Up to 10 adverts with maximum of 3 photos each · Live for 7 days</p>
   <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 3x more photos build customer trust, reach more people within a short time, and rank higher — get noticed and sell chap chap</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_weekly}</span>
@@ -3944,7 +4057,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       <div className="flex justify-between items-center">
         <div>
   <span className="font-black text-base">Monthly Premium</span>
-  <p className="text-sm text-muted-foreground">Up to 8 adverts with maximum of 3 photos each · Live for 30 days</p>
+  <p className="text-sm text-muted-foreground">Up to 10 adverts with maximum of 3 photos each · Live for 30 days</p>
   <p className="text-xs font-semibold mt-1" style={{ color: "#00A651" }}>🚀 Sasa hii ndio BEST: stay live 4x longer with 3x more photos, wider 30KM+ reach, and top the ranking by reaching more people instantly</p>
 </div>
         <span className="font-black text-2xl" style={{ color: "#00A651" }}>KES {PLAN_AMOUNTS.premium_monthly}</span>
@@ -3976,201 +4089,17 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       </div>
     )}
     </>
+    )}
+    </>
   )
 )}
-        
-              {/* ========== STEP 5: Review and Publish ========== */}
-        {step === 5 && (
-          <div className="space-y-6 py-2">
-            <h2 className="font-black text-lg">Review advert yako</h2>
-            
-            {/* Summary Card */}
-            <div className="bg-card border border-border rounded-2xl p-4 space-y-4">
-              <div className="aspect-video bg-muted rounded-xl overflow-hidden">
-                {imagePreviews[0] ? (
-  <img
-    src={imagePreviews[0]}
-    className="w-full h-full object-cover"
-    alt="Preview"
-  />
-) : (
-  <div className="w-full h-full flex flex-col items-center justify-center bg-muted text-muted-foreground">
-    <Camera size={40} />
-    <p className="mt-2 text-xs font-medium">No photo added</p>
-  </div>
-)}
-              </div>
-              
-              <div>
-                <h3 className="font-bold text-base">{title || "Untitled Advert"}</h3>
-                <p className="text-sm text-muted-foreground mt-1">{description || "No description provided."}</p>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-border pt-4">
-  <span className="text-sm font-bold text-primary">
-    {isAccommodationLand || isCommercialPropertyLand
-      ? `KES ${price}`
-      : isAccommodationSale || isCommercialPropertySale
-      ? `KES ${price}${priceDisplay === "negotiable" ? " (Negotiable)" : ""}`
-      : isAccommodation || isCommercialProperty
-      ? `KES ${rentPerMonth}/mo`
-      : isEventListing
-      ? priceDisplay === "free"
-        ? "Free Entry"
-        : priceDisplay === "contact"
-        ? "Contact for Price"
-        : `KES ${ticketPrice}`
-      : priceDisplay === "contact"
-      ? "Contact for Price"
-      : priceDisplay === "quote"
-      ? "Request Quote"
-      : priceDisplay === "negotiable"
-      ? `KES ${price} (Negotiable)`
-      : `KES ${price}`}
-  </span>
-
-  <span className="text-sm text-muted-foreground">
-    {selectedCategory} / {selectedSubcategory}
-  </span>
-</div>
- <div className="flex items-center justify-between">
-<span className="text-sm font-semibold">
-    {isAccommodationLand || isCommercialPropertyLand
-      ? "Land Price"
-      : isAccommodationSale || isCommercialPropertySale
-      ? "Sale Price"
-      : isAccommodation || isCommercialProperty
-      ? "Monthly Rent"
-      : "Price"}
-  </span>
-
-  <span className="text-sm font-bold text-primary">
-    {isAccommodationLand || isCommercialPropertyLand
-      ? price
-        ? `KES ${price}`
-        : "Not specified"
-      : isAccommodationSale || isCommercialPropertySale
-      ? price
-        ? `KES ${price}`
-        : "Not specified"
-      : isAccommodation || isCommercialProperty
-      ? rentPerMonth
-        ? `KES ${rentPerMonth}/mo`
-        : "Not specified"
-      : price
-      ? `KES ${price}`
-      : "Negotiable"}
-  </span>
-</div>
-{isAccommodation && (
-  <div className="space-y-2 border-t border-border pt-4">
-
-    {isAccommodationLand ? (
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          Land Size
-        </span>
-        <span className="text-sm text-muted-foreground">
-          {landSize || "Not specified"}
-        </span>
-      </div>
-    ) : (
-      <>
-        {bedrooms && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">
-              Bedrooms
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {bedrooms}
-            </span>
-          </div>
-        )}
-
-        {bathrooms && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">
-              Bathrooms
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {bathrooms}
-            </span>
-          </div>
-        )}
-
-        {furnishing && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-semibold">
-              Furnishing
-            </span>
-            <span className="text-sm text-muted-foreground">
-              {furnishing}
-            </span>
-          </div>
-        )}
-      </>
-    )}
-
-    {stayDetails && (
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          Stay Details
-        </span>
-        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
-          {stayDetails}
-        </span>
-      </div>
-    )}
-
-    {spaceDetails && (
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          Space Details
-        </span>
-        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
-          {spaceDetails}
-        </span>
-      </div>
-    )}
-
-    {sharedHousingDetails && (
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">
-          Shared Housing
-        </span>
-        <span className="text-sm text-muted-foreground text-right max-w-[60%]">
-          {sharedHousingDetails}
-        </span>
-      </div>
-    )}
-
-  </div>
-)}
-                {isCommercialPropertyLand && (
-  <div className="space-y-2 border-t border-border pt-4">
-    <div className="flex items-center justify-between">
-      <span className="text-sm font-semibold">Land Size</span>
-      <span className="text-sm text-muted-foreground">
-        {landSize || "Not specified"}
-      </span>
-    </div>
-  </div>
-)}
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold">Plan</span>
-                <span className="text-sm font-bold capitalize">{plan}</span>
-              </div>
-            </div>
-
-            </div>
-        )}
         </div>
       {/* Bottom action */}
 <div
   className="fixed left-0 right-0 md:left-1/2 md:right-auto md:-translate-x-1/2 md:w-full md:max-w-2xl z-[60] bg-card border-t border-border px-4 py-3 md:border-x"
   style={{ bottom: "calc(4rem + env(safe-area-inset-bottom))" }}
 >
-        {step < 5 ? (
+        {step < 3 ? (
           <div className="flex gap-3">
             {step > 1 && (
               <Button
@@ -4182,8 +4111,8 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
                 Back
               </Button>
             )}
-            <Button 
-              className={`h-12 font-black text-base rounded-2xl shadow-lg ${step > 1 ? "flex-1" : "w-full"}`} 
+            <Button
+              className={`h-12 font-black text-base rounded-2xl shadow-lg ${step > 1 ? "flex-1" : "w-full"}`}
               onClick={goNext}
             >
               Next
@@ -4276,7 +4205,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         </>
       )}
 
-    
+
       {/* M-Pesa listing payment modal */}
       <MpesaPaymentModal
         open={showPaymentModal}
@@ -4287,10 +4216,11 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
         onSuccess={(pid) => {
           toast({ title: "Listing is live!", description: "Your advert is now visible in the marketplace." });
           invalidateOwnCaches();
+          clearDraft();
           navigate(`/product/${pid}`);
         }}
       />
-      
+
       {showAreaPicker && (
   <AreaPickerSheet
     onSearchSelect={handleAreaPicked}
@@ -4305,7 +4235,7 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
             <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
               <Shield size={24} />
             </div>
-            
+
             <div className="text-center space-y-1">
               <h3 className="font-black text-lg">Oops! Listing Limit Reached</h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
@@ -4327,4 +4257,4 @@ const stepLabels = ["Category", "Details", "Photos", "Plan", "Review"];
       )}
 </div>
   );
-}
+    }
