@@ -239,6 +239,15 @@ const saveDraftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const [, navigate] = useLocation();
 const { toast } = useToast();
 const [step, setStep] = useState<Step>(1);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+// Whenever the step changes, start the new screen at the top. Without
+// this, the previous screen's scroll position carries over and the new
+// step appears to start "from the middle".
+useEffect(() => {
+  window.scrollTo(0, 0);
+  contentRef.current?.scrollTo(0, 0);
+}, [step]);
 
   // Step 1 — Category
   const [selectedCategory, setSelectedCategory] = useState<CategoryKey | "">("");
@@ -2149,7 +2158,7 @@ const stepLabels = ["Category", "Details", "Publish"];
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-5">
+      <div ref={contentRef} className="flex-1 overflow-y-auto px-4 py-4 pb-32 space-y-5">
                 {/* ========== STEP 1: Category ========== */}
         {step === 1 && (
           <>
