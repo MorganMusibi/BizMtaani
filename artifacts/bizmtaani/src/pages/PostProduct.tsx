@@ -203,6 +203,12 @@ const DRAFT_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours — older drafts aren't rest
 function getDraftKey(uid: string) {
   return `bizmtaani_post_draft_${uid}`;
 }
+// Timestamp of the last successful publish. A saved draft that is not
+// newer than this belongs to an advert that is already live, so it is
+// never restored.
+function getDraftClearedKey(uid: string) {
+  return `bizmtaani_post_draft_cleared_${uid}`;
+}
 export default function PostProduct() {
   const { user, userProfile, subscriptionPlan, hasActivePremium, loading: authLoading,
   profileLoading,
@@ -235,6 +241,7 @@ const draftIdRef = useRef<string | null>(null); const pendingProductIdRef = useR
 const categoryRefs = useRef<Record<string, HTMLDivElement | null>>({});
 const isPublishingRef = useRef(false);
 const draftRestoredRef = useRef(false);
+const publishedRef = useRef(false);
 const saveDraftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 const [, navigate] = useLocation();
 const { toast } = useToast();
@@ -472,7 +479,8 @@ useEffect(() => {
       const raw = sessionStorage.getItem(getDraftKey(user.uid));
       if (!raw) return;
       const draft = JSON.parse(raw) as PostDraftSnapshot;
-      if (Date.now() - draft.savedAt > DRAFT_TTL_MS) {
+            const clearedAt = Number(sessionStorage.getItem(getDraftClearedKey(user.uid)) || 0);
+      if (Date.now() - draft.savedAt > DRAFT_TTL_MS || draft.savedAt <= clearedAt) {
         sessionStorage.removeItem(getDraftKey(user.uid));
         return;
       }
@@ -559,19 +567,20 @@ useEffect(() => {
     };
   }
 
-  function saveDraftNow() {
-    if (!user) return;
+    function saveDraftNow() {
+    if (!user || publishedRef.current) return;
     try {
       sessionStorage.setItem(getDraftKey(user.uid), JSON.stringify(buildDraftSnapshot()));
     } catch (err) {
       console.warn("Failed to save post draft:", err);
     }
-  }
-
+  } 
   function clearDraft() {
     if (!user) return;
+    publishedRef.current = true;
     try {
       sessionStorage.removeItem(getDraftKey(user.uid));
+      sessionStorage.setItem(getDraftClearedKey(user.uid), String(Date.now()));
     } catch {
       // ignore
     }
