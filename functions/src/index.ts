@@ -3817,3 +3817,133 @@ export const jobShareMeta = onRequest(
     res.status(200).send(html);
   }
 );
+
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 12. MARKETER PROGRAM — "I have a buyer" claims
+// An approved marketer taps "I have a buyer" on an advert that is open to
+// marketers. This records a timestamped claim (one per marketer per advert)
+// and returns the seller's WhatsApp number, so the number is only handed
+// out through an accountable, logged action. BizMtaani never handles the
+// sale money — the seller pays the marketer's commission directly.
+// ═══════════════════════════════════════════════════════════════════════════
+const AFFILIATE_MAX_CLAIMS_PER_DAY = 10;
+
+export const createAffiliateClaim = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  const uid = request.auth.uid;
+
+  const { productId, viewingTime } = request.data as {
+    productId?: string;
+    viewingTime?: string;
+  };
+
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "productId is required.");
+  }
+
+  const marketerRef = db.collection("marketers").doc(uid);
+  const productRef = db.collection("products").doc(productId.trim());
+
+  const [marketerSnap, productSnap] = await Promise.all([marketerRef.get(), productRef.get()]);
+
+  if (!marketerSnap.exists || marketerSnap.data()?.status !== "active") {
+    throw new HttpsError("permission-denied", "Only approved marketers can claim a buyer.");
+  }
+  if (!productSnap.exists) {
+    throw new HttpsError("not-found", "Advert not found.");
+  }
+
+  const product = productSnap.data()!;
+
+  if (product.status !== "active") {
+    throw new HttpsError("failed-precondition", "This advert is no longer active.");
+  }
+  if (product.affiliate?.enabled !== true) {
+    throw new HttpsError("failed-precondition", "This advert is not open to marketers.");
+  }
+  if (product.sellerId === uid) {
+    throw new HttpsError("failed-precondition", "You cannot claim your own advert.");
+  }
+
+  // One claim per marketer per advert: the claim id is deterministic, so
+  // a repeat tap (or a retry after a network drop) can never duplicate it.
+  const claimRef = db.collection("affiliateClaims").doc(`${productRef.id}_${uid}`);
+
+  // Daily cap, tracked on the marketer doc itself (EAT day) so it needs no
+  // extra index or query.
+  const dayKey = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+  const cleanViewingTime =
+    typeof viewingTime === "string" && viewingTime.trim() ? viewingTime.trim().slice(0, 100) : null;
+
+  let alreadyClaimed = false;
+
+  await db.runTransaction(async (tx) => {
+    const [claimSnap, freshMarketerSnap] = await Promise.all([tx.get(claimRef), tx.get(marketerRef)]);
+
+    if (claimSnap.exists) {
+      alreadyClaimed = true;
+      return;
+    }
+
+    const marketerData = freshMarketerSnap.data() ?? {};
+    const claimsToday = marketerData.claimsDayKey === dayKey ? (marketerData.claimsToday ?? 0) : 0;
+
+    if (claimsToday >= AFFILIATE_MAX_CLAIMS_PER_DAY) {
+      throw new HttpsError(
+        "resource-exhausted",
+        `You can make up to ${AFFILIATE_MAX_CLAIMS_PER_DAY} claims per day. Try again tomorrow.`
+      );
+    }
+
+    tx.set(claimRef, {
+      advertId: productRef.id,
+      advertTitle: typeof product.title === "string" ? product.title.slice(0, 120) : "",
+      marketerUid: uid,
+      sellerUid: product.sellerId,
+      status: "claimed",
+      // Snapshot of the commission at claim time, so a later edit to the
+      // advert can't change what the marketer was promised.
+      affiliate: {
+        type: product.affiliate.type ?? null,
+        amount: typeof product.affiliate.amount === "number" ? product.affiliate.amount : null,
+      },
+      viewingTime: cleanViewingTime,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    tx.update(marketerRef, {
+      claimsToday: claimsToday + 1,
+      claimsDayKey: dayKey,
+      totalClaims: admin.firestore.FieldValue.increment(1),
+    });
+  });
+
+  // Tell the seller (never blocks or fails the claim).
+  if (!alreadyClaimed && typeof product.sellerId === "string") {
+    await sendPushToUid(
+      product.sellerId,
+      "A marketer has a buyer for you 🎉",
+      `A marketer says they have a buyer for "${product.title ?? "your advert"}". Expect a WhatsApp message.`,
+      { type: "affiliate_claim", productId: productRef.id }
+    );
+  }
+
+  let sellerPhone: string | null = null;
+  try {
+    sellerPhone = typeof product.phone === "string" && product.phone.trim()
+      ? normalizePhone(product.phone)
+      : null;
+  } catch {
+    sellerPhone = null;
+  }
+
+  return {
+    success: true,
+    claimId: claimRef.id,
+    sellerPhone,
+    referralCode: marketerSnap.data()?.referralCode ?? "",
+    alreadyClaimed,
+  };
+});
