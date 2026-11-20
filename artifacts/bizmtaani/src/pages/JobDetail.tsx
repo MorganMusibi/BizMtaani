@@ -98,6 +98,20 @@ function companyInitial(job: JobPost): string {
   return (job.company || job.title || "J").trim().charAt(0).toUpperCase();
 }
 
+// Only ever open real web links. Anyone can write to Firestore, so a
+// stored "contact" could be something like javascript:... — never trust it.
+function getSafeWebLink(value?: string): string | null {
+  const v = (value ?? "").trim();
+  if (!/^https?:\/\//i.test(v)) return null;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 function buildJobMeta(job: JobPost): PageMeta {
   const place = job.areaLabel || job.ward || job.county || "Kenya";
   const title = `${job.title.trim().slice(0, 60)} at ${job.company} | BizMtaani`;
@@ -629,7 +643,7 @@ export default function JobDetail() {
     }
   }
 
-  // Copies the recruiter's email/phone
+  // Copies the recruiter's email/phone/website link
   async function handleCopyContact() {
     if (!job?.contact) return;
     try {
@@ -642,7 +656,14 @@ export default function JobDetail() {
 
   function handleApply() {
     if (!job) return;
-    if (job.contactMethod === "email") {
+    if (job.contactMethod === "link") {
+      const url = getSafeWebLink(job.contact);
+      if (!url) {
+        toast({ title: "This application link is not valid", variant: "destructive" });
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else if (job.contactMethod === "email") {
       window.location.href = `mailto:${job.contact}?subject=Application for ${job.title}`;
     } else if (job.contactMethod === "whatsapp") {
       const num = job.contact.replace(/\D/g, "").replace(/^0/, "254");
@@ -698,12 +719,39 @@ export default function JobDetail() {
   const closingSoon = !isExpired && remainingDays !== null && remainingDays <= 3;
   const place = jobPlace(job);
 
-  const ApplyIcon = job.contactMethod === "email" ? Mail : job.contactMethod === "whatsapp" ? MessageSquare : Phone;
-  const applyLabel = job.contactMethod === "email" ? "Apply via Email" : job.contactMethod === "whatsapp" ? "Apply on WhatsApp" : "Call to Apply";
+  const isLinkApply = job.contactMethod === "link";
+  const safeLink = isLinkApply ? getSafeWebLink(job.contact) : null;
 
-  // True when the recruiter gave their own way to apply
-  const hasExternalContact =
-    !!job.contactMethod && job.contactMethod !== "none" && !!job.contact?.trim();
+  const ApplyIcon = isLinkApply
+    ? ExternalLink
+    : job.contactMethod === "email"
+    ? Mail
+    : job.contactMethod === "whatsapp"
+    ? MessageSquare
+    : Phone;
+  const applyLabel = isLinkApply
+    ? "Apply on Company Website"
+    : job.contactMethod === "email"
+    ? "Apply via Email"
+    : job.contactMethod === "whatsapp"
+    ? "Apply on WhatsApp"
+    : "Call to Apply";
+  const contactLabel = isLinkApply
+    ? "Website"
+    : job.contactMethod === "email"
+    ? "Email"
+    : job.contactMethod === "whatsapp"
+    ? "WhatsApp"
+    : "Phone";
+  const contactDisplay = isLinkApply
+    ? (safeLink ?? job.contact).replace(/^https?:\/\//i, "")
+    : job.contact;
+
+  // True when the recruiter gave their own way to apply. For website
+  // links, the link must also be a safe http(s) URL.
+  const hasExternalContact = isLinkApply
+    ? !!safeLink
+    : !!job.contactMethod && job.contactMethod !== "none" && !!job.contact?.trim();
 
   const requirementLines = (job.requirements ?? "")
     .split("\n")
@@ -860,10 +908,8 @@ export default function JobDetail() {
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground">
-                      {job.contactMethod === "email" ? "Email" : job.contactMethod === "whatsapp" ? "WhatsApp" : "Phone"}
-                    </p>
-                    <p className="font-semibold break-all select-text">{job.contact}</p>
+                    <p className="text-xs text-muted-foreground">{contactLabel}</p>
+                    <p className="font-semibold break-all select-text">{contactDisplay}</p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleCopyContact}>
                     <Copy className="mr-1" size={14} /> Copy
@@ -944,4 +990,4 @@ export default function JobDetail() {
       </div>
     </div>
   );
-  }
+}
