@@ -23,8 +23,25 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+// Accepts "company.co.ke/careers" or "https://company.co.ke/careers".
+// Returns a clean https/http URL, or null if it isn't a usable web link.
+function normalizeUrl(value: string): string | null {
+  let v = value.trim();
+  if (!v) return null;
+  if (!/^https?:\/\//i.test(v)) v = "https://" + v;
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    if (!u.hostname.includes(".")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 const CONTACT_METHODS = [
   { value: "none", label: "BizMtaani Chat Only" },
+  { value: "link", label: "Company Website Link" },
   { value: "whatsapp", label: "WhatsApp" },
   { value: "phone", label: "Phone Call" },
   { value: "email", label: "Email" },
@@ -45,7 +62,7 @@ export default function PostJob() {
   const [requirements, setRequirements] = useState("");
   const [contact, setContact] = useState("");
   const [contactMethod, setContactMethod] = useState<
-  "none" | "whatsapp" | "phone" | "email"
+  "none" | "whatsapp" | "phone" | "email" | "link"
 >("none");
   const [ward, setWard] = useState("");
   const [county, setCounty] = useState("");
@@ -146,7 +163,7 @@ export default function PostJob() {
     }
     if (contactMethod !== "none" && !contact.trim()) {
   toast({
-    title: "Enter contact details",
+    title: contactMethod === "link" ? "Enter the application link" : "Enter contact details",
     variant: "destructive",
   });
   return;
@@ -169,6 +186,24 @@ export default function PostJob() {
       });
       return;
     }
+
+    // For website links, validate and store the cleaned-up URL
+    // (adds https:// if the recruiter left it off).
+    let finalContact = contact.trim();
+    if (contactMethod === "link") {
+      const url = normalizeUrl(contact);
+      if (!url) {
+        toast({
+          title: "Enter a valid website link",
+          description: "e.g. https://company.co.ke/careers",
+          variant: "destructive",
+        });
+        return;
+      }
+      finalContact = url;
+    }
+    if (contactMethod === "none") finalContact = "";
+
     if (!user) return;
 
     setSubmitting(true);
@@ -182,7 +217,7 @@ export default function PostJob() {
   deadline: deadline,
   description: description.trim(),
   requirements: requirements.trim() || null,
-  contact: contact.trim(),
+  contact: finalContact,
   contactMethod,
   ward,
   county,
@@ -226,7 +261,7 @@ export default function PostJob() {
         </div>
       </header>
 
-      <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-4 py-5 pb-40 space-y-5">
+      <form onSubmit={handleSubmit} noValidate className="flex-1 overflow-y-auto px-4 py-5 pb-40 space-y-5">
         {/* Title & Company */}
         <div className="space-y-1.5">
           <Label>Job Title *</Label>
@@ -327,7 +362,7 @@ export default function PostJob() {
   <p className="text-xs text-muted-foreground">
     Applicants can always apply through BizMtaani Chat.
     You can optionally provide another way for applicants
-    to contact you.
+    to contact you, or send them to your company website to apply.
   </p>
 
   <div className="grid grid-cols-2 gap-2">
@@ -335,7 +370,10 @@ export default function PostJob() {
       <button
         key={value}
         type="button"
-        onClick={() => setContactMethod(value)}
+        onClick={() => {
+          if (value !== contactMethod) setContact("");
+          setContactMethod(value);
+        }}
         className={`py-2.5 px-3 rounded-xl border-2 text-xs font-semibold transition-all ${
           contactMethod === value
             ? "border-primary bg-primary/5 text-primary"
@@ -356,15 +394,28 @@ export default function PostJob() {
       placeholder={
         contactMethod === "email"
           ? "your@email.com"
+          : contactMethod === "link"
+          ? "https://company.co.ke/careers"
           : contactMethod === "whatsapp"
           ? "07XXXXXXXX (WhatsApp number)"
           : "07XXXXXXXX"
       }
+      type={contactMethod === "link" ? "url" : "text"}
+      inputMode={contactMethod === "link" ? "url" : undefined}
+      autoCapitalize={contactMethod === "link" ? "none" : undefined}
+      autoCorrect={contactMethod === "link" ? "off" : undefined}
       value={contact}
       onChange={(e) => setContact(e.target.value)}
       className="h-12"
       required
     />
+  )}
+
+  {contactMethod === "link" && (
+    <p className="text-xs text-muted-foreground">
+      Applicants will tap "Apply on company website" and be taken to this
+      link to apply. Use the direct page where they can apply.
+    </p>
   )}
 
   {contactMethod === "none" && (
