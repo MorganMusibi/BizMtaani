@@ -901,15 +901,35 @@ export default function JobDetail() {
             {/* The recruiter's own contact method is primary; BizMtaani chat is secondary */}
             {hasExternalContact ? (
               <>
-                <Button type="button" className="w-full h-12 font-bold rounded-xl" onClick={handleApply}>
-                  <ApplyIcon className="mr-2" size={18} />
-                  {applyLabel}
-                </Button>
+                {isLinkApply && safeLink ? (
+                  <Button asChild className="w-full h-12 font-bold rounded-xl">
+                    <a href={safeLink} target="_blank" rel="noopener noreferrer">
+                      <ApplyIcon className="mr-2" size={18} />
+                      {applyLabel}
+                    </a>
+                  </Button>
+                ) : (
+                  <Button type="button" className="w-full h-12 font-bold rounded-xl" onClick={handleApply}>
+                    <ApplyIcon className="mr-2" size={18} />
+                    {applyLabel}
+                  </Button>
+                )}
 
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3">
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground">{contactLabel}</p>
-                    <p className="font-semibold break-all select-text">{contactDisplay}</p>
+                    {isLinkApply && safeLink ? (
+                      <a
+                        href={safeLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-semibold break-all text-primary underline underline-offset-2"
+                      >
+                        {contactDisplay}
+                      </a>
+                    ) : (
+                      <p className="font-semibold break-all select-text">{contactDisplay}</p>
+                    )}
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={handleCopyContact}>
                     <Copy className="mr-1" size={14} /> Copy
