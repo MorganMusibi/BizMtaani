@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { AreaPickerSheet } from "@/components/AreaPickerSheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield, Phone } from "lucide-react";
+import { ChevronLeft, Camera, Plus, X, Loader2, MapPin, Check, Smartphone, Shield, Phone, Users } from "lucide-react";
 import { CATEGORY_DEFS, type CategoryKey } from "@/lib/categories";
 import { clearFeedCache } from "@/hooks/useHomeFeed";
 import { encodeGeohash } from "@/lib/geohash";
@@ -91,6 +91,9 @@ async function uploadImagesLimited(
 
   return results;
 }
+
+// Marketer Program: how the seller's commission is expressed.
+type AffiliateType = "fixed" | "percentage" | "half_month_rent" | "one_month_rent";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -196,6 +199,9 @@ interface PostDraftSnapshot {
   eventVenue: string;
   eventOrganizer: string;
   ticketPrice: string;
+  affiliateEnabled?: boolean;
+  affiliateType?: AffiliateType;
+  affiliateAmount?: string;
   savedAt: number;
 }
 
@@ -408,6 +414,11 @@ const [eventVenue, setEventVenue] = useState("");
 const [eventOrganizer, setEventOrganizer] = useState("");
 const [ticketPrice, setTicketPrice] = useState("");
 
+// Marketer Program — "Open to marketers" switch + commission
+const [affiliateEnabled, setAffiliateEnabled] = useState(false);
+const [affiliateType, setAffiliateType] = useState<AffiliateType>("fixed");
+const [affiliateAmount, setAffiliateAmount] = useState("");
+
     useEffect(() => {
     if (authLoading) return;
     if (!user) { navigate("/login"); return; }
@@ -540,6 +551,9 @@ useEffect(() => {
       setEventVenue(draft.eventVenue);
       setEventOrganizer(draft.eventOrganizer);
       setTicketPrice(draft.ticketPrice);
+      setAffiliateEnabled(!!draft.affiliateEnabled);
+      setAffiliateType(draft.affiliateType ?? "fixed");
+      setAffiliateAmount(draft.affiliateAmount ?? "");
 
       toast({
         title: "Draft restored",
@@ -563,6 +577,7 @@ useEffect(() => {
       bedrooms, bathrooms, furnishing, landSize, stayDetails, spaceDetails, sharedHousingDetails,
       equipmentType, equipmentCondition,
       eventDate, eventStartTime, eventEndTime, eventVenue, eventOrganizer, ticketPrice,
+      affiliateEnabled, affiliateType, affiliateAmount,
       savedAt: Date.now(),
     };
   }
@@ -608,6 +623,7 @@ useEffect(() => {
     bedrooms, bathrooms, furnishing, landSize, stayDetails, spaceDetails, sharedHousingDetails,
     equipmentType, equipmentCondition,
     eventDate, eventStartTime, eventEndTime, eventVenue, eventOrganizer, ticketPrice,
+    affiliateEnabled, affiliateType, affiliateAmount,
   ]);
 
   // Flush immediately the instant the tab is backgrounded — the debounce
@@ -1023,6 +1039,102 @@ const isNormalAdvertCategory =
 // ============================================================
 // SUBCATEGORY LIST FOR SELECTED CATEGORY
 // ============================================================
+
+// ============================================================
+// MARKETER PROGRAM ("Open to marketers")
+// Sellers/landlords let approved marketers bring buyers and pay the
+// marketer a commission directly. BizMtaani never handles sale money.
+// ============================================================
+
+// Phase 1: only premium sellers can switch it on. The server must
+// enforce this too — this is just the UI side.
+const canUseAffiliate = hasActivePremium || plan !== "free";
+
+// Not offered for jobs, eateries, services, events or transport —
+// there is no item/house to sell or rent through a marketer.
+const affiliateEligible =
+  !isJobSeeking &&
+  !isEatery &&
+  !isProfessionalService &&
+  !isEventListing &&
+  !isTransport;
+
+const affiliateActive = affiliateEligible && canUseAffiliate && affiliateEnabled;
+
+const AFFILIATE_TYPE_OPTIONS: { value: AffiliateType; label: string }[] =
+  isResidentialRental
+    ? [
+        { value: "half_month_rent", label: "Half a month's rent" },
+        { value: "one_month_rent", label: "One month's rent" },
+        { value: "fixed", label: "Custom (KES)" },
+      ]
+    : [
+        { value: "fixed", label: "Fixed (KES)" },
+        { value: "percentage", label: "Percentage (%)" },
+      ];
+
+// Category changes can leave a type that isn't offered any more
+// (e.g. "percentage" after switching to a rental) — fall back safely.
+const effectiveAffiliateType: AffiliateType = AFFILIATE_TYPE_OPTIONS.some(
+  (o) => o.value === affiliateType
+)
+  ? affiliateType
+  : AFFILIATE_TYPE_OPTIONS[0].value;
+
+// Price the commission is measured against.
+const affiliateBase = isResidentialRental
+  ? extractPriceValue(rentPerMonth)
+  : extractPriceValue(price);
+
+// Commission as a KES amount (or % number for "percentage").
+function getAffiliateAmountValue(): number {
+  if (effectiveAffiliateType === "half_month_rent") {
+    return Math.round(extractPriceValue(rentPerMonth) * 0.5);
+  }
+  if (effectiveAffiliateType === "one_month_rent") {
+    return extractPriceValue(rentPerMonth);
+  }
+  return extractPriceValue(affiliateAmount);
+}
+
+function getAffiliateError(): string | null {
+  if (!affiliateActive) return null;
+  const amount = getAffiliateAmountValue();
+
+  if (effectiveAffiliateType === "percentage") {
+    if (amount < 1 || amount > 50) return "Enter a percentage between 1 and 50.";
+    return null;
+  }
+  if (amount <= 0) {
+    return isResidentialRental && effectiveAffiliateType !== "fixed"
+      ? "Enter the monthly rent first so the commission can be worked out."
+      : "Enter the commission amount in KES.";
+  }
+  if (affiliateBase > 0 && amount > affiliateBase) {
+    return "The commission can't be more than the price.";
+  }
+  return null;
+}
+
+function buildAffiliatePayload() {
+  return {
+    enabled: true,
+    type: effectiveAffiliateType,
+    amount: getAffiliateAmountValue(),
+  };
+}
+
+function describeAffiliate(): string {
+  const amount = getAffiliateAmountValue();
+  if (effectiveAffiliateType === "percentage") {
+    return amount > 0 ? `${amount}% of the sale price` : "";
+  }
+  if (amount <= 0) return "";
+  const kes = `KES ${amount.toLocaleString()}`;
+  if (effectiveAffiliateType === "half_month_rent") return `${kes} (half a month's rent)`;
+  if (effectiveAffiliateType === "one_month_rent") return `${kes} (one month's rent)`;
+  return kes;
+}
 
 const subcategories =
   catDef?.subcategories ?? [];
@@ -1600,6 +1712,18 @@ function isValidKenyanPhone(phone: string): boolean {
       }
     }
   }
+  if (step === 2) {
+    const affiliateError = getAffiliateError();
+    if (affiliateError) {
+      toast({
+        title: "Check the marketer commission",
+        description: affiliateError,
+        variant: "destructive",
+      });
+      return;
+    }
+  }
+
   if (!(await validateStep())) return;
 
   // Location is now picked on step 2 (same screen as details/photos),
@@ -1730,6 +1854,8 @@ areaLabel: wardInfo?.label?.trim() || "",
     phone: cleanedPhone,
     draftId: draftIdRef.current,
     productId: pendingProductIdRef.current ?? undefined,
+    // Marketer Program — null unless premium + switched on + valid
+    affiliate: affiliateActive ? buildAffiliatePayload() : null,
     // Category-specific details
 jobDetails: isJobSeeking
   ? {
@@ -2273,7 +2399,6 @@ const stepLabels = ["Category", "Details", "Publish"];
             </div>
           </>
         )}
-
     {/* ========== STEP 2: Details ========== */}
 {step === 2 && (
   <>
@@ -3873,6 +3998,101 @@ const stepLabels = ["Category", "Details", "Publish"];
             </div>
             )}
 
+            {/* Marketer Program — "Open to marketers" */}
+            {affiliateEligible && (
+              <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <Users size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold">Open to marketers</p>
+                      <span className="text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#00A651]/10 text-[#00A651]">
+                        Premium
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Let approved marketers find you a buyer. You pay the commission you set directly to the marketer, only after the sale. BizMtaani never handles the sale money.
+                    </p>
+                  </div>
+                  {canUseAffiliate ? (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={affiliateEnabled}
+                      aria-label="Open to marketers"
+                      onClick={() => setAffiliateEnabled((v) => !v)}
+                      className={`relative w-11 h-6 rounded-full flex-shrink-0 transition-colors ${
+                        affiliateEnabled ? "bg-[#00A651]" : "bg-muted-foreground/30"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${
+                          affiliateEnabled ? "translate-x-5" : ""
+                        }`}
+                      />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPlan("premium_weekly")}
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg flex-shrink-0"
+                      style={{ color: "#00A651", backgroundColor: "#00A65115" }}
+                    >
+                      Unlock →
+                    </button>
+                  )}
+                </div>
+
+                {affiliateActive && (
+                  <div className="space-y-3 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-muted-foreground">
+                        Commission for the marketer
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {AFFILIATE_TYPE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setAffiliateType(option.value)}
+                            className={`py-2.5 px-2 rounded-xl border-2 text-xs font-semibold transition-all ${
+                              effectiveAffiliateType === option.value
+                                ? "border-primary bg-primary/5 text-primary"
+                                : "border-border text-muted-foreground"
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {(effectiveAffiliateType === "fixed" ||
+                      effectiveAffiliateType === "percentage") && (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={
+                          effectiveAffiliateType === "percentage"
+                            ? "e.g. 5 (percent)"
+                            : "e.g. 500 (KES)"
+                        }
+                        value={affiliateAmount}
+                        onChange={(e) => setAffiliateAmount(e.target.value)}
+                        className="h-11 text-sm"
+                      />
+                    )}
+
+                    {describeAffiliate() && (
+                      <p className="text-xs text-muted-foreground">
+                        Marketers will see: <strong className="text-foreground">Earn {describeAffiliate()}</strong> when they bring you a buyer.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Location — compact one-line summary with a Change button */}
             <div className="flex items-center gap-2 p-3 bg-primary/5 border border-primary/20 rounded-2xl">
               <MapPin size={16} className="text-primary flex-shrink-0" />
@@ -4275,4 +4495,4 @@ const stepLabels = ["Category", "Details", "Publish"];
       )}
 </div>
   );
-    }
+                  }
