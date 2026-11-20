@@ -656,13 +656,13 @@ export default function JobDetail() {
 
   function handleApply() {
     if (!job) return;
-    if (job.contactMethod === "link") {
-      const url = getSafeWebLink(job.contact);
-      if (!url) {
+    const linkUrl = getSafeWebLink(job.contact);
+    if (job.contactMethod === "link" || linkUrl) {
+      if (!linkUrl) {
         toast({ title: "This application link is not valid", variant: "destructive" });
         return;
       }
-      window.open(url, "_blank", "noopener,noreferrer");
+      window.open(linkUrl, "_blank", "noopener,noreferrer");
     } else if (job.contactMethod === "email") {
       window.location.href = `mailto:${job.contact}?subject=Application for ${job.title}`;
     } else if (job.contactMethod === "whatsapp") {
@@ -719,8 +719,11 @@ export default function JobDetail() {
   const closingSoon = !isExpired && remainingDays !== null && remainingDays <= 3;
   const place = jobPlace(job);
 
-  const isLinkApply = job.contactMethod === "link";
-  const safeLink = isLinkApply ? getSafeWebLink(job.contact) : null;
+  // A contact that is a web address is always treated as a website link,
+  // even if contactMethod is missing or unfamiliar (e.g. an older cached
+  // version of the app saved it differently).
+  const safeLink = getSafeWebLink(job.contact);
+  const isLinkApply = job.contactMethod === "link" || !!safeLink;
 
   const ApplyIcon = isLinkApply
     ? ExternalLink
@@ -751,7 +754,7 @@ export default function JobDetail() {
   // links, the link must also be a safe http(s) URL.
   const hasExternalContact = isLinkApply
     ? !!safeLink
-    : !!job.contactMethod && job.contactMethod !== "none" && !!job.contact?.trim();
+    : ["phone", "email", "whatsapp"].includes(job.contactMethod) && !!job.contact?.trim();
 
   const requirementLines = (job.requirements ?? "")
     .split("\n")
