@@ -230,7 +230,7 @@ export interface JobPost {
   description: string;
   requirements?: string;
   contact: string;
-  contactMethod: "phone" | "email" | "whatsapp";
+  contactMethod: "none" | "phone" | "email" | "whatsapp" | "link";
   posterId: string;
   posterName: string;
   createdAt?: { seconds: number } | null;
