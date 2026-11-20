@@ -8,7 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 // CHANGE 1: added Copy icon
-import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight, Copy } from "lucide-react";
+import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight, Copy, Users } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
 import {
@@ -67,6 +67,12 @@ interface Product {
   areaLabel?: string;
   county?: string;
   pricingBasis?: string;
+  // Marketer Program — set when the seller switched on "Open to marketers"
+  affiliate?: {
+    enabled: boolean;
+    type: "fixed" | "percentage" | "half_month_rent" | "one_month_rent";
+    amount: number;
+  } | null;
   hotelMenu?: HotelMenu;
   eateryPayment?: {
     method: "mpesa" | "till" | "paybill" | "pochi" | "other" | "";
@@ -81,6 +87,19 @@ interface Product {
     priceText?: string;
   }[];
   createdAt: { seconds: number } | null;
+}
+
+// Marketer status is checked once per session per user (only on adverts
+// that are open to marketers), so browsing many adverts doesn't repeat
+// the read.
+let cachedMarketerInfo: { uid: string; info: { referralCode: string } | null } | null = null;
+
+function describeAffiliateCommission(aff: NonNullable<Product["affiliate"]>): string {
+  if (aff.type === "percentage") return `${aff.amount}% of the sale price`;
+  const kes = `KES ${aff.amount.toLocaleString()}`;
+  if (aff.type === "half_month_rent") return `${kes} (half a month's rent)`;
+  if (aff.type === "one_month_rent") return `${kes} (one month's rent)`;
+  return kes;
 }
 
 const MEAL_PERIODS: { key: keyof HotelMenu; label: string }[] = [
@@ -792,6 +811,97 @@ useEffect(() => {
     : null
 );
 
+  // ===== Marketer Program: "I have a buyer" =====
+  const [marketerInfo, setMarketerInfo] = useState<{ referralCode: string } | null>(
+    cachedMarketerInfo && user && cachedMarketerInfo.uid === user.uid
+      ? cachedMarketerInfo.info
+      : null
+  );
+  const [claiming, setClaiming] = useState(false);
+  const [showBuyerModal, setShowBuyerModal] = useState(false);
+  const [viewingTime, setViewingTime] = useState("");
+
+  useEffect(() => {
+    if (!user || !product?.affiliate?.enabled || product.sellerId === user.uid) {
+      setMarketerInfo(null);
+      return;
+    }
+    if (cachedMarketerInfo && cachedMarketerInfo.uid === user.uid) {
+      setMarketerInfo(cachedMarketerInfo.info);
+      return;
+    }
+
+    let cancelled = false;
+    const uid = user.uid;
+    getDoc(doc(db, "marketers", uid))
+      .then((snap) => {
+        const data = snap.exists() ? snap.data() : null;
+        const info =
+          data && data.status === "active"
+            ? { referralCode: String(data.referralCode ?? "") }
+            : null;
+        cachedMarketerInfo = { uid, info };
+        if (!cancelled) setMarketerInfo(info);
+      })
+      .catch(() => {
+        if (!cancelled) setMarketerInfo(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.uid, product?.id, product?.affiliate?.enabled]);
+
+  async function handleHaveBuyer(viewing?: string) {
+    if (!user || !product || !marketerInfo) return;
+    setClaiming(true);
+    try {
+      const createAffiliateClaim = httpsCallable<
+        { productId: string; viewingTime?: string },
+        {
+          success: boolean;
+          claimId: string;
+          sellerPhone: string | null;
+          referralCode: string;
+          alreadyClaimed: boolean;
+        }
+      >(functions, "createAffiliateClaim");
+
+      const viewingNote = viewing?.trim() || "";
+      const res = await createAffiliateClaim({
+        productId: product.id,
+        viewingTime: viewingNote || undefined,
+      });
+      const { sellerPhone, referralCode } = res.data;
+
+      let message = `Hi, I have a buyer for your ${product.title}.`;
+      if (referralCode) message += ` Ref: ${referralCode}`;
+      if (viewingNote) message += ` Preferred viewing time: ${viewingNote}.`;
+
+      setShowBuyerModal(false);
+      setViewingTime("");
+
+      if (sellerPhone) {
+        toast({ title: "Claim saved", description: "Opening WhatsApp to message the seller…" });
+        window.location.href = `https://wa.me/${sellerPhone}?text=${encodeURIComponent(message)}`;
+      } else {
+        // Seller gave no phone number — their claim is still recorded,
+        // so fall back to BizMtaani chat.
+        toast({ title: "Claim saved", description: "This seller has no WhatsApp number, opening chat instead." });
+        handleChat();
+      }
+    } catch (error: any) {
+      console.error("Failed to create marketer claim:", error);
+      toast({
+        title: "Couldn't save your claim",
+        description: error?.message ?? "Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setClaiming(false);
+    }
+  }
+
   // CHANGE 2: new function to copy the seller's phone number
   async function handleCopyPhone() {
     if (!product?.phone) return;
@@ -990,6 +1100,8 @@ async function saveMenuChanges() {
   }
 
   const isSeller = user?.uid === product.sellerId;
+  const showMarketerButton =
+    !isSeller && !!marketerInfo && product.affiliate?.enabled === true;
 
   const isAccommodation = product.category === "Accommodation";
   const isEatery = product.subcategory === "Hotels / Eateries" || product.subcategory === "Restaurants & Cooked Food";
@@ -1005,7 +1117,7 @@ async function saveMenuChanges() {
 
     return (
   /* CHANGE 3: select-none -> select-text so users can highlight and copy text */
-  <div className="min-h-screen bg-background pb-36 select-text">
+  <div className={`min-h-screen bg-background ${showMarketerButton ? "pb-52" : "pb-36"} select-text`}>
     <header className="sticky top-0 z-40 bg-transparent px-4 h-14 flex items-center">
       <button
         data-testid="button-back"
@@ -1141,6 +1253,20 @@ async function saveMenuChanges() {
 )}
 
         
+        {product.affiliate?.enabled === true && (
+          <Card className="p-4 border-[#00A651]/30 bg-[#00A651]/5">
+            <div className="flex items-start gap-3">
+              <Users size={18} className="text-[#00A651] flex-shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold">Open to marketers</p>
+                <p className="text-sm text-muted-foreground mt-0.5">
+                  Earn <strong className="text-foreground">{describeAffiliateCommission(product.affiliate)}</strong> when you bring a buyer. The commission is paid by the seller after the sale.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         {product.description && (
   <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
     <div className="p-5 space-y-3">
@@ -1449,6 +1575,18 @@ const itemDistance =
       {/* Bottom action bar follows here... */}
 
 <div className="fixed bottom-16 left-0 right-0 px-4 pb-2 space-y-2">
+  {showMarketerButton && (
+    <Button
+      type="button"
+      className="w-full h-12 font-bold gap-2 shadow-lg"
+      style={{ backgroundColor: "#00A651" }}
+      onClick={() => (isAccommodation ? setShowBuyerModal(true) : handleHaveBuyer())}
+      disabled={claiming}
+    >
+      {claiming ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}
+      I have a buyer
+    </Button>
+  )}
   {isSeller ? (
     <div className="space-y-2">
       <div className="text-center text-sm text-muted-foreground">
@@ -1503,6 +1641,53 @@ const itemDistance =
 </div>
 
       
+    {/* --- MARKETER: I HAVE A BUYER (houses: optional viewing time) --- */}
+      {showBuyerModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end justify-center animate-in fade-in duration-200">
+          <div
+            className="bg-background w-full rounded-t-3xl p-5 space-y-4 shadow-2xl"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}
+          >
+            <div className="space-y-1">
+              <h3 className="font-black text-lg">I have a buyer</h3>
+              <p className="text-sm text-muted-foreground">
+                We'll record your claim and open WhatsApp so you can message the landlord. You can add a preferred viewing time.
+              </p>
+            </div>
+
+            <input
+              type="text"
+              placeholder="Preferred viewing time (optional), e.g. Saturday 10am"
+              value={viewingTime}
+              onChange={(e) => setViewingTime(e.target.value)}
+              maxLength={100}
+              className="w-full h-12 px-3 rounded-xl border-2 border-border bg-background text-sm"
+            />
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 h-12 font-bold rounded-2xl border-2"
+                onClick={() => setShowBuyerModal(false)}
+                disabled={claiming}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 h-12 font-bold rounded-2xl"
+                style={{ backgroundColor: "#00A651" }}
+                onClick={() => handleHaveBuyer(viewingTime)}
+                disabled={claiming}
+              >
+                {claiming ? <Loader2 size={16} className="animate-spin" /> : "Open WhatsApp"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
     {/* --- REPORT MODAL --- */}
       {showReportModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
@@ -1746,5 +1931,4 @@ const itemDistance =
       )}
     </div>
   );
-}
-
+                             }
