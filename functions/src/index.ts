@@ -1839,6 +1839,86 @@ export const reverseGeocode = onCall(
 // ═══════════════════════════════════════════════════════════════════════════
 // 5. SUBSCRIPTION GATEKEEPER
 // ═══════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════
+// MARKETER PROGRAM — "Open to marketers" commission on an advert
+// BizMtaani never handles the sale money: the seller pays the marketer
+// directly. This only validates and stores what the seller chose.
+// ═══════════════════════════════════════════════════════════════════════════
+const AFFILIATE_TYPES = ["fixed", "percentage", "half_month_rent", "one_month_rent"] as const;
+type AffiliateType = (typeof AFFILIATE_TYPES)[number];
+const AFFILIATE_MIN_PERCENT = 1;
+const AFFILIATE_MAX_PERCENT = 50;
+
+function sanitizeAffiliate(
+  otherData: Record<string, any>,
+  price: unknown,
+  effectivePlan: string,
+  isMasterAdmin: boolean
+): { enabled: true; type: AffiliateType; amount: number } | null {
+  const raw = otherData.affiliate;
+  if (!raw || typeof raw !== "object" || raw.enabled !== true) return null;
+
+  // Not offered for jobs, eateries, services, events or transport —
+  // there is no item or house for a marketer to sell. Mirrors the UI.
+  if (
+    otherData.jobDetails ||
+    otherData.hotelMenu ||
+    otherData.serviceDetails ||
+    otherData.eventDetails ||
+    typeof otherData.pricingBasis === "string"
+  ) {
+    return null;
+  }
+
+  // Phase 1: Premium only. The UI hides the switch for free sellers,
+  // but this is the check that actually counts.
+  if (effectivePlan === "free" && !isMasterAdmin) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Open to marketers is available on Premium plans."
+    );
+  }
+
+  const type = raw.type;
+  if (!(AFFILIATE_TYPES as readonly string[]).includes(type)) {
+    throw new HttpsError("invalid-argument", "Invalid commission type.");
+  }
+
+  // `price` is the sale price, or the monthly rent for rentals (the
+  // client sends the rent as `price` for those categories).
+  const basePrice = Number(price);
+
+  let amount: number;
+  if (type === "half_month_rent") {
+    amount = Math.round(basePrice * 0.5);
+  } else if (type === "one_month_rent") {
+    amount = Math.round(basePrice);
+  } else {
+    amount = Number(raw.amount);
+  }
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new HttpsError("invalid-argument", "Enter a valid commission amount.");
+  }
+
+  if (type === "percentage") {
+    if (amount < AFFILIATE_MIN_PERCENT || amount > AFFILIATE_MAX_PERCENT) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Commission percentage must be between ${AFFILIATE_MIN_PERCENT} and ${AFFILIATE_MAX_PERCENT}.`
+      );
+    }
+  } else if (Number.isFinite(basePrice) && basePrice > 0 && amount > basePrice) {
+    throw new HttpsError("invalid-argument", "The commission can't be more than the price.");
+  }
+
+  return {
+    enabled: true,
+    type: type as AffiliateType,
+    amount: type === "percentage" ? Math.round(amount * 100) / 100 : Math.round(amount),
+  };
+}
+
 
 export const publishAdvert = onCall({ region: "europe-west1", cors: true, maxInstances: 10 }, async (request) => {
   if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
@@ -2056,8 +2136,12 @@ const isMasterAdmin = uid === OWNER_UID;
     }
   }
 
+// Validated server-side — never trust the client's affiliate object as-is.
+const affiliate = sanitizeAffiliate(otherData, price, effectivePlan, isMasterAdmin);
+
 try {
   const productPayload = {
+    affiliate,
     title,
     description: typeof otherData.description === "string" ? otherData.description : "",
     price,
@@ -2331,8 +2415,12 @@ const isMasterAdmin = uid === OWNER_UID;
     }
   }
 
+    // Validated server-side — never trust the client's affiliate object as-is.
+  const affiliate = sanitizeAffiliate(otherData, price, effectivePlan, isMasterAdmin);
+
   try {
     const productPayload = {
+      affiliate,
       title,
       description: typeof otherData.description === "string" ? otherData.description : "",
       price,
