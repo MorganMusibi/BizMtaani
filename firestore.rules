@@ -539,6 +539,12 @@ allow read, create, update, delete:
 if request.auth != null
 && request.auth.uid == userId;
 }
+match /affiliateClaims/{claimId} {
+  allow read: if request.auth != null &&
+    (resource.data.marketerUid == request.auth.uid ||
+     resource.data.sellerUid == request.auth.uid);
+  allow write: if false;
+}
 
 // ============================================================
 // DEFAULT DENY
