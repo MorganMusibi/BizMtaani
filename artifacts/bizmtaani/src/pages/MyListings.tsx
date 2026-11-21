@@ -11,7 +11,7 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock } from "lucide-react";
+import { Plus, Trash2, Package, Loader2, Store, RefreshCw, Clock, CheckCircle2 } from "lucide-react";
 import { getThumbnailUrl } from "@/lib/cloudinaryUrl";
 import { MpesaPaymentModal } from "@/components/MpesaPaymentModal";
 import { initiateStkPush, type PaidListingPlan, MAX_PHOTO_LIMIT, PLAN_AMOUNTS, LISTING_DURATION_DAYS } from "@/lib/mpesa";
@@ -28,6 +28,7 @@ interface Product {
   expiresAt?: { seconds: number } | null;
   status?: string;
   plan?: string;
+  affiliate?: { enabled?: boolean } | null;
   priceDisplay?: "fixed" | "negotiable" | "contact" | "quote" | "free" | "custom";
   priceText?: string;
   priceList?: {
@@ -134,6 +135,13 @@ export default function MyListings() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [confirmProduct, setConfirmProduct] = useState<Product | null>(null);
 
+  // Sold / Occupied state
+  const [soldProduct, setSoldProduct] = useState<Product | null>(null);
+  const [soldClaims, setSoldClaims] = useState<any[]>([]);
+  const [soldLoading, setSoldLoading] = useState(false);
+  const [soldSaving, setSoldSaving] = useState(false);
+  const [soldPick, setSoldPick] = useState<string | null>(null);
+
   // Renewal state
   const [renewProduct, setRenewProduct] = useState<Product | null>(null);
   const [renewPlan, setRenewPlan] = useState<PaidListingPlan>("premium_weekly");
@@ -238,6 +246,39 @@ export default function MyListings() {
       setDeleting(null); }
   }
 
+  async function openSold(product: Product) {
+    setSoldProduct(product);
+    setSoldClaims([]);
+    setSoldPick(null);
+    if (!product.affiliate?.enabled) return;
+    setSoldLoading(true);
+    try {
+      const fn = httpsCallable<{ productId: string }, { claims: any[] }>(functions, "getAdvertClaims");
+      const { data } = await fn({ productId: product.id });
+      setSoldClaims(data.claims.filter((c) => c.status === "claimed"));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSoldLoading(false);
+    }
+  }
+
+  async function confirmSold() {
+    if (!soldProduct) return;
+    setSoldSaving(true);
+    try {
+      const fn = httpsCallable<{ productId: string; claimId: string | null }, { success: boolean }>(functions, "markAdvertSold");
+      await fn({ productId: soldProduct.id, claimId: soldPick });
+      toast({ title: soldProduct.category === "accommodation" ? "Marked occupied" : "Marked sold" });
+      setSoldProduct(null);
+      await fetchProducts({ skipCache: true });
+    } catch (err: unknown) {
+      toast({ title: "Error", description: err instanceof Error ? err.message : "Try again.", variant: "destructive" });
+    } finally {
+      setSoldSaving(false);
+    }
+  }
+
   async function handleRenewInitiate(phone: string): Promise<{ checkoutRequestId: string; productId: string }> {
   if (!renewProduct) throw new Error("No product selected");
 
@@ -259,10 +300,12 @@ export default function MyListings() {
   // Separate active vs expired
   const activeProducts = products.filter((p) => p.status !== "pending_payment");
   const expiredProducts = activeProducts.filter((p) => {
+    if (p.status === "sold") return false;
     const info = getExpiryInfo(p);
     return info?.isExpired;
   });
   const liveProducts = activeProducts.filter((p) => {
+    if (p.status === "sold") return true;
     const info = getExpiryInfo(p);
     return !info?.isExpired;
   });
@@ -312,6 +355,7 @@ export default function MyListings() {
                 <div className="grid grid-cols-2 gap-3">
                   {liveProducts.map((product) => {
                     const expiry = getExpiryInfo(product);
+                    const isSold = product.status === "sold";
                     return (
                       <div key={product.id} data-testid={`card-product-${product.id}`}
                         className="bg-card rounded-2xl border border-border overflow-hidden">
@@ -333,27 +377,40 @@ export default function MyListings() {
                               ? `KES ${(product.rentPerMonth ?? product.price).toLocaleString()}`
                               : "Quote only"}
                           </p>
-                          {expiry && (
+                          {expiry && !isSold && (
                             <div className={`flex items-center gap-1 mt-1 text-[10px] font-bold ${expiry.color}`}>
                               <Clock size={10} />
                               {expiry.label}
                             </div>
                           )}
                           <PriceListPreview priceList={product.priceList} />
-                          <div className="flex items-center justify-between mt-2">
-                            <button data-testid={`button-delete-${product.id}`}
-                              onClick={() => setConfirmProduct(product)} disabled={deleting === product.id}
-                              className="flex items-center gap-1 text-destructive text-xs font-medium hover:opacity-70 transition-opacity">
-                              {deleting === product.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                              Delete
-                            </button>
-                            {expiry && !expiry.isExpired && (
-                              <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium_monthly" ? "premium_monthly" : "premium_weekly") as PaidListingPlan); }}
-                                className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
-                                <RefreshCw size={11} />Renew
+                          {isSold ? (
+                            <p className="mt-2 text-xs font-black text-muted-foreground">
+                              {product.category === "accommodation" ? "OCCUPIED" : "SOLD"}
+                            </p>
+                          ) : (
+                            <div className="flex items-center justify-between mt-2">
+                              <button data-testid={`button-delete-${product.id}`}
+                                onClick={() => setConfirmProduct(product)} disabled={deleting === product.id}
+                                className="flex items-center gap-1 text-destructive text-xs font-medium hover:opacity-70 transition-opacity">
+                                {deleting === product.id ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                                Delete
                               </button>
-                            )}
-                          </div>
+                              {expiry && !expiry.isExpired && (
+                                <button onClick={() => { setRenewProduct(product); setRenewPlan((product.plan === "premium_monthly" ? "premium_monthly" : "premium_weekly") as PaidListingPlan); }}
+                                  className="flex items-center gap-1 text-[#00A651] text-xs font-bold">
+                                  <RefreshCw size={11} />Renew
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          {!isSold && (
+                            <button onClick={() => openSold(product)}
+                              className="mt-2 w-full flex items-center justify-center gap-1 rounded-xl bg-[#00A651]/10 py-1.5 text-xs font-bold text-[#00A651]">
+                              <CheckCircle2 size={12} />
+                              {product.category === "accommodation" ? "Mark occupied" : "Mark sold"}
+                            </button>
+                          )}
                         </div>
                       </div>
                     );
@@ -473,6 +530,59 @@ export default function MyListings() {
           fetchProducts({ skipCache: true });
         }}
       />
+
+      {/* Mark sold / occupied sheet */}
+      {soldProduct && (
+        <div className="fixed inset-0 z-[90] bg-black/50 flex flex-col justify-end">
+          <div className="bg-card rounded-t-3xl border-t border-border px-5 pt-4 max-h-[80vh] overflow-y-auto"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}>
+            <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-4" />
+            <p className="font-black text-base mb-1">
+              {soldProduct.category === "accommodation" ? "Mark as occupied" : "Mark as sold"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4 line-clamp-1">{soldProduct.title}</p>
+
+            {soldLoading ? (
+              <div className="flex justify-center py-6"><Loader2 size={22} className="animate-spin text-primary" /></div>
+            ) : soldClaims.length > 0 ? (
+              <div className="space-y-2 mb-4">
+                <p className="text-sm font-semibold">Did one of these marketers bring the buyer?</p>
+                {soldClaims.map((c) => (
+                  <button key={c.claimId} onClick={() => setSoldPick(c.claimId)}
+                    className={`w-full text-left rounded-2xl border-2 px-3 py-2.5 ${soldPick === c.claimId ? "border-primary bg-primary/5" : "border-border"}`}>
+                    <p className="font-bold text-sm">{c.marketerName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.referralCode ? `Ref ${c.referralCode} · ` : ""}
+                      {c.createdAtMs ? new Date(c.createdAtMs).toLocaleDateString() : ""}
+                    </p>
+                  </button>
+                ))}
+                <button onClick={() => setSoldPick(null)}
+                  className={`w-full text-left rounded-2xl border-2 px-3 py-2.5 text-sm font-semibold ${soldPick === null ? "border-primary bg-primary/5" : "border-border"}`}>
+                  No, I found the buyer myself
+                </button>
+                {soldPick && (
+                  <p className="text-xs text-muted-foreground">
+                    You agree to pay this marketer the commission you advertised, directly. BizMtaani does not handle the money.
+                  </p>
+                )}
+              </div>
+            ) : null}
+
+            <div className="flex gap-3">
+              <button onClick={() => setSoldProduct(null)} disabled={soldSaving}
+                className="flex-1 py-3 rounded-2xl border-2 border-border text-sm font-semibold text-muted-foreground">
+                Cancel
+              </button>
+              <button onClick={confirmSold} disabled={soldSaving || soldLoading}
+                className="flex-1 py-3 rounded-2xl text-sm font-black text-white flex items-center justify-center gap-2"
+                style={{ backgroundColor: "#00A651" }}>
+                {soldSaving && <Loader2 size={14} className="animate-spin" />}Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <AlertDialog open={!!confirmProduct} onOpenChange={(open) => { if (!open) setConfirmProduct(null); }}>
         <AlertDialogContent>
