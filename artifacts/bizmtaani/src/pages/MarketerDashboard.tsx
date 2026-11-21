@@ -1,26 +1,28 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { 
-  doc, 
-  getDoc, 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  limit,
   getDocs,
   startAfter,
   QueryDocumentSnapshot
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
-import { 
-  ChevronLeft, 
-  Loader2, 
-  Wallet, 
-  Copy, 
-  Check, 
-  Share2, 
+import {
+  ChevronLeft,
+  Loader2,
+  Wallet,
+  Copy,
+  Check,
+  Share2,
   TrendingUp,
   ChevronDown,
   RefreshCw,
@@ -43,6 +45,8 @@ interface MarketerData {
   earningsThisMonth?: number;
   signupsThisMonth?: number;
   earningsMonthKey?: string;
+  totalClaims?: number;
+  confirmedSales?: number;
 }
 
 interface Commission {
@@ -60,6 +64,24 @@ interface ReferredUser {
   joinedAt?: { seconds: number } | null;
   commissionPaidOut: boolean;
   isPremium: boolean;
+}
+
+interface AffiliateClaim {
+  id: string;
+  advertId: string;
+  advertTitle?: string;
+  status: "claimed" | "confirmed" | "closed" | "disputed";
+  affiliate?: { type?: string; amount?: number } | null;
+  createdAt?: { seconds: number } | null;
+}
+
+function claimCommissionText(a?: { type?: string; amount?: number } | null): string {
+  if (!a) return "";
+  const amt = Number(a.amount) || 0;
+  if (a.type === "percentage") return `${amt}%`;
+  if (a.type === "half_month_rent") return "Half month's rent";
+  if (a.type === "one_month_rent") return "One month's rent";
+  return amt ? `KES ${amt.toLocaleString()}` : "";
 }
 
 // ─── Multi-Level Cache ───────────────────────────────────────────────
@@ -186,14 +208,16 @@ export default function MarketerDashboard() {
   const [marketer, setMarketer] = useState<MarketerData | null>(null);
   const [commissions, setCommissions] = useState<Commission[]>([]);
   const [referrals, setReferrals] = useState<ReferredUser[]>([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [codeCopied, setCodeCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 const [commissionsError, setCommissionsError] = useState<string | null>(null);
 const [referralsError, setReferralsError] = useState<string | null>(null);
-  
+const [claims, setClaims] = useState<AffiliateClaim[]>([]);
+const [reporting, setReporting] = useState<string | null>(null);
+
   // Pagination - Commissions
   const [commissionsLoading, setCommissionsLoading] = useState(false);
   const [hasMoreCommissions, setHasMoreCommissions] = useState(true);
@@ -250,7 +274,7 @@ try {
         orderBy("createdAt", "desc"),
         limit(COMMISSIONS_PAGE_SIZE)
       );
-      
+
       const commissionsSnap = await getDocs(commissionsQuery);
       const commissionsData = commissionsSnap.docs.map(
         (d) => ({ id: d.id, ...d.data() } as Commission)
@@ -263,13 +287,13 @@ try {
         orderBy("createdAt", "desc"),
         limit(REFERRALS_PAGE_SIZE)
       );
-      
+
       const referralsSnap = await getDocs(referralsQuery);
-      
+
       // ✅ Use cached user profiles
       const userUids = referralsSnap.docs.map((d) => d.id);
-      const userProfileMap = userUids.length > 0 
-  ? await getUserProfiles(userUids) 
+      const userProfileMap = userUids.length > 0
+  ? await getUserProfiles(userUids)
   : new Map();
       const referralsData: ReferredUser[] = referralsSnap.docs.map((d) => {
         const data = d.data();
@@ -378,8 +402,8 @@ try {
 
       // ✅ Use cached user profiles for new referrals
       const userUids = snap.docs.map((d) => d.id);
-      const userProfileMap = userUids.length > 0 
-        ? await getUserProfiles(userUids) 
+      const userProfileMap = userUids.length > 0
+        ? await getUserProfiles(userUids)
         : new Map();
 
       const newReferrals: ReferredUser[] = snap.docs.map((d) => {
@@ -406,6 +430,42 @@ try {
   setReferralsLoading(false);
 }
   }, [user, lastReferralDoc, hasMoreReferrals, referralsLoading]);
+
+  // ─── Load Claims ───────────────────────────────────────────────────
+
+  const loadClaims = useCallback(async () => {
+    if (!user) return;
+    try {
+      // Equality-only query (no composite index); sorted in the browser.
+      const snap = await getDocs(
+        query(collection(db, "affiliateClaims"), where("marketerUid", "==", user.uid), limit(30))
+      );
+      const rows = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as AffiliateClaim))
+        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+      setClaims(rows);
+    } catch (e) {
+      console.error("Failed to load claims:", e);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (marketer) loadClaims();
+  }, [marketer, loadClaims]);
+
+  async function handleReportNonPayment(claimId: string) {
+    if (!window.confirm("Report that the seller has not paid your commission? Only do this after you have asked them directly.")) return;
+    setReporting(claimId);
+    try {
+      const fn = httpsCallable<{ claimId: string }, { success: boolean }>(functions, "reportNonPayment");
+      await fn({ claimId });
+      await loadClaims();
+    } catch (e: any) {
+      window.alert(e?.message || "Could not send the report. Try again.");
+    } finally {
+      setReporting(null);
+    }
+  }
 
   // ─── Initial Load ──────────────────────────────────────────────────
 
@@ -536,6 +596,81 @@ try {
               {marketer.status || "Pending"}
             </p>
           </div>
+        </div>
+
+        {/* ─── Earn board + sales stats ─────────────────────────────── */}
+        <Button onClick={() => navigate("/earn")} className="w-full gap-2 bg-[#00A651] hover:bg-[#00A651]/90">
+          <Wallet size={16} />
+          Open Earn board
+        </Button>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground">Buyers claimed</p>
+            <p className="font-bold text-lg">{marketer.totalClaims || 0}</p>
+          </div>
+          <div className="bg-card border border-border rounded-2xl p-4">
+            <p className="text-xs text-muted-foreground">Confirmed sales</p>
+            <p className="font-bold text-lg">{marketer.confirmedSales || 0}</p>
+          </div>
+        </div>
+
+        {/* ─── My claims ────────────────────────────────────────────── */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Gift size={17} className="text-primary" />
+            <p className="font-black text-sm">My Claims</p>
+          </div>
+          {claims.length === 0 ? (
+            <div className="flex flex-col items-center py-10 gap-2 text-center border border-dashed border-border rounded-2xl">
+              <p className="text-sm text-muted-foreground px-6">
+                No claims yet. Open the Earn board and tap "I have a buyer" on an advert.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {claims.map((c) => (
+                <div key={c.id} className="bg-card border border-border rounded-2xl p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm truncate">{c.advertTitle || "Advert"}</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        {claimCommissionText(c.affiliate)}
+                        {c.createdAt ? ` · ${timeAgo(c.createdAt.seconds)}` : ""}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                        c.status === "confirmed"
+                          ? "text-green-600 bg-green-100"
+                          : c.status === "disputed"
+                          ? "text-red-600 bg-red-100"
+                          : c.status === "closed"
+                          ? "text-muted-foreground bg-muted"
+                          : "text-amber-600 bg-amber-100"
+                      }`}
+                    >
+                      {c.status === "claimed"
+                        ? "Awaiting seller"
+                        : c.status === "confirmed"
+                        ? "Sale confirmed"
+                        : c.status === "disputed"
+                        ? "Reported"
+                        : "Closed"}
+                    </span>
+                  </div>
+                  {c.status === "confirmed" && (
+                    <button
+                      onClick={() => handleReportNonPayment(c.id)}
+                      disabled={reporting === c.id}
+                      className="mt-2 text-xs font-semibold text-destructive disabled:opacity-50"
+                    >
+                      {reporting === c.id ? "Sending…" : "Seller didn't pay"}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* ─── Referral Code ─────────────────────────────────────────── */}
@@ -716,4 +851,4 @@ try {
       </div>
     </div>
   );
-        }
+}
