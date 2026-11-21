@@ -40,6 +40,7 @@ const CategorySubcategories = lazy(() => import("@/pages/CategorySubcategories")
 const CategoryAds = lazy(() => import("@/pages/CategoryAds"));
 const MarketerDashboard = lazy(() => import("@/pages/MarketerDashboard"));
 const ClaimListing = lazy(() => import("@/pages/ClaimListing"));
+const EarnBoard = lazy(() => import("@/pages/EarnBoard"));
 const WardCategoryPage = lazy(() => import("@/pages/WardCategoryPage"));
 
 // Configuration for API requests
@@ -119,6 +120,7 @@ function Router() {
         <Route path="/category/:categoryKey" component={CategorySubcategories} />
         <Route path="/category/:categoryKey/:subcategory" component={CategoryAds} />
         <Route path="/marketer" component={MarketerDashboard} />
+        <Route path="/earn" component={EarnBoard} />
         <Route path="/claim/:listingId" component={ClaimListing} />
         <Route path="/:countySlug/:wardSlug/:categorySlug" component={WardCategoryPage} />
         <Route component={NotFound} />
