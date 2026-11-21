@@ -3947,3 +3947,149 @@ export const createAffiliateClaim = onCall({ cors: true }, async (request) => {
     alreadyClaimed,
   };
 });
+// ═══════════════════════════════════════════════════════════════════════════
+// 13. MARKETER PROGRAM — Sold / Occupied marking with marketer tagging
+// The seller marks an advert sold (or occupied) and, if a marketer brought
+// the buyer, picks that marketer. The pick is the seller's confirmation:
+// the claim becomes "confirmed" and counts toward the marketer's record.
+// BizMtaani never handles the sale money.
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Lists the marketers who tapped "I have a buyer" on one of the caller's
+// adverts, so the seller can pick who to credit.
+export const getAdvertClaims = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  const uid = request.auth.uid;
+
+  const { productId } = request.data as { productId?: string };
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "productId is required.");
+  }
+
+  const productSnap = await db.collection("products").doc(productId.trim()).get();
+  if (!productSnap.exists || productSnap.data()?.sellerId !== uid) {
+    throw new HttpsError("permission-denied", "This is not your advert.");
+  }
+
+  const claimsSnap = await db
+    .collection("affiliateClaims")
+    .where("advertId", "==", productSnap.id)
+    .where("sellerUid", "==", uid)
+    .limit(20)
+    .get();
+
+  const claims = await Promise.all(
+    claimsSnap.docs.map(async (c) => {
+      const d = c.data();
+      let name = "Marketer";
+      let referralCode = "";
+      try {
+        const [mSnap, uSnap] = await Promise.all([
+          db.collection("marketers").doc(d.marketerUid).get(),
+          db.collection("users").doc(d.marketerUid).get(),
+        ]);
+        referralCode = mSnap.data()?.referralCode ?? "";
+        const u = uSnap.data() ?? {};
+        name = u.displayName || u.name || u.fullName || "Marketer";
+      } catch {
+        // fall back to defaults
+      }
+      return {
+        claimId: c.id,
+        marketerName: String(name).slice(0, 60),
+        referralCode,
+        status: d.status ?? "claimed",
+        viewingTime: d.viewingTime ?? null,
+        createdAtMs: d.createdAt?.toMillis ? d.createdAt.toMillis() : null,
+        affiliate: d.affiliate ?? null,
+      };
+    })
+  );
+
+  claims.sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0));
+  return { claims };
+});
+
+// Marks the caller's advert sold/occupied. If claimId is given, that
+// marketer is credited (claim -> "confirmed"), all other open claims on
+// the advert are closed.
+export const markAdvertSold = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  const uid = request.auth.uid;
+
+  const { productId, claimId } = request.data as { productId?: string; claimId?: string | null };
+  if (typeof productId !== "string" || !productId.trim()) {
+    throw new HttpsError("invalid-argument", "productId is required.");
+  }
+
+  const productRef = db.collection("products").doc(productId.trim());
+  let creditedMarketerUid: string | null = null;
+  let advertTitle = "";
+
+  await db.runTransaction(async (tx) => {
+    const productSnap = await tx.get(productRef);
+    if (!productSnap.exists) throw new HttpsError("not-found", "Advert not found.");
+    const product = productSnap.data()!;
+
+    if (product.sellerId !== uid) {
+      throw new HttpsError("permission-denied", "This is not your advert.");
+    }
+    if (product.status !== "active") {
+      throw new HttpsError("failed-precondition", "Only live adverts can be marked sold.");
+    }
+    advertTitle = typeof product.title === "string" ? product.title : "";
+
+    const claimsQuery = db
+      .collection("affiliateClaims")
+      .where("advertId", "==", productRef.id)
+      .where("sellerUid", "==", uid)
+      .limit(20);
+    const claimsSnap = await tx.get(claimsQuery);
+
+    let chosenRef: FirebaseFirestore.DocumentReference | null = null;
+    if (claimId) {
+      const chosen = claimsSnap.docs.find((c) => c.id === claimId);
+      if (!chosen) throw new HttpsError("invalid-argument", "That marketer did not claim this advert.");
+      if (chosen.data().status !== "claimed") {
+        throw new HttpsError("failed-precondition", "That claim is already settled.");
+      }
+      chosenRef = chosen.ref;
+      creditedMarketerUid = chosen.data().marketerUid as string;
+    }
+
+    const marketerRef = creditedMarketerUid ? db.collection("marketers").doc(creditedMarketerUid) : null;
+    const marketerSnap = marketerRef ? await tx.get(marketerRef) : null;
+
+    tx.update(productRef, {
+      status: "sold",
+      soldAt: admin.firestore.FieldValue.serverTimestamp(),
+      soldViaMarketer: creditedMarketerUid,
+    });
+
+    for (const c of claimsSnap.docs) {
+      if (chosenRef && c.ref.path === chosenRef.path) {
+        tx.update(c.ref, {
+          status: "confirmed",
+          confirmedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } else if (c.data().status === "claimed") {
+        tx.update(c.ref, { status: "closed", closedAt: admin.firestore.FieldValue.serverTimestamp() });
+      }
+    }
+
+    if (marketerRef && marketerSnap?.exists) {
+      tx.update(marketerRef, { confirmedSales: admin.firestore.FieldValue.increment(1) });
+    }
+  });
+
+  if (creditedMarketerUid) {
+    await sendPushToUid(
+      creditedMarketerUid,
+      "Sale confirmed 🎉",
+      `The seller confirmed you brought the buyer for "${advertTitle || "an advert"}". Agree payment of your commission with them directly.`,
+      { type: "affiliate_confirmed", productId: productRef.id }
+    );
+  }
+
+  return { success: true, credited: !!creditedMarketerUid };
+});
