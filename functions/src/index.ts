@@ -4093,3 +4093,61 @@ export const markAdvertSold = onCall({ cors: true }, async (request) => {
 
   return { success: true, credited: !!creditedMarketerUid };
 });
+// ═══════════════════════════════════════════════════════════════════════════
+// 14. MARKETER PROGRAM — "Seller didn't pay" report
+// Only on a claim the seller confirmed, and only after 48 hours.
+// ═══════════════════════════════════════════════════════════════════════════
+export const reportNonPayment = onCall({ cors: true }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Must be signed in");
+  const uid = request.auth.uid;
+
+  const { claimId } = request.data as { claimId?: string };
+  if (typeof claimId !== "string" || !claimId.trim()) {
+    throw new HttpsError("invalid-argument", "claimId is required.");
+  }
+
+  const claimRef = db.collection("affiliateClaims").doc(claimId.trim());
+  const snap = await claimRef.get();
+  if (!snap.exists || snap.data()?.marketerUid !== uid) {
+    throw new HttpsError("permission-denied", "This is not your claim.");
+  }
+  const claim = snap.data()!;
+
+  if (claim.status !== "confirmed") {
+    throw new HttpsError("failed-precondition", "Only confirmed sales can be reported.");
+  }
+  const confirmedMs = claim.confirmedAt?.toMillis ? claim.confirmedAt.toMillis() : 0;
+  if (confirmedMs && Date.now() - confirmedMs < 48 * 60 * 60 * 1000) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Please wait 48 hours after the sale was confirmed before reporting non-payment."
+    );
+  }
+
+  await claimRef.update({
+    status: "disputed",
+    disputedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await db.collection("nonPaymentReports").add({
+    claimId: claimRef.id,
+    advertId: claim.advertId ?? null,
+    advertTitle: claim.advertTitle ?? "",
+    marketerUid: uid,
+    sellerUid: claim.sellerUid ?? null,
+    affiliate: claim.affiliate ?? null,
+    status: "open",
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  if (typeof claim.sellerUid === "string") {
+    await sendPushToUid(
+      claim.sellerUid,
+      "Commission reminder",
+      `A marketer says your agreed commission for "${claim.advertTitle || "your advert"}" is still unpaid. Please settle it directly.`,
+      { type: "affiliate_nonpayment", productId: String(claim.advertId ?? "") }
+    );
+  }
+
+  return { success: true };
+});
