@@ -1,16 +1,43 @@
 import { getToken, onMessage } from "firebase/messaging";
-import { doc, setDoc, deleteDoc } from "firebase/firestore";
+import { doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { getMessagingIfSupported } from "@/lib/firebase";
 
 // You'll find this in Firebase Console → Project Settings → Cloud Messaging
 // → Web configuration → Web Push certificates (generate one if you haven't).
-const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
+// Trimmed and stripped of stray quotes, since a pasted env var often
+// carries whitespace/quotes that break base64 decoding.
+const VAPID_KEY = String(import.meta.env.VITE_FIREBASE_VAPID_KEY ?? "")
+  .trim()
+  .replace(/^["']|["']$/g, "");
+
+// Guards against onMessage being attached more than once per page load.
+let foregroundListenerAttached = false;
+
+async function getTokenWithRetry(
+  messaging: Parameters<typeof getToken>[0],
+  registration: ServiceWorkerRegistration
+): Promise<string> {
+  try {
+    return await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+  } catch (firstError) {
+    console.warn("[FCM debug] getToken failed, retrying once:", firstError);
+    await new Promise((r) => setTimeout(r, 1500));
+    return await getToken(messaging, {
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: registration,
+    });
+  }
+}
 
 /**
  * Requests notification permission (if not already granted/denied),
  * retrieves an FCM token, registers the service worker, and saves
- * the token to Firestore so backend functions can send to this device.
+ * the token to Firestore (fcmTokens/{uid}) so backend functions can
+ * send to this device.
  * Safe to call multiple times — no-ops if permission was already denied.
  */
 export async function registerForNotifications(uid: string): Promise<void> {
@@ -46,35 +73,47 @@ export async function registerForNotifications(uid: string): Promise<void> {
 
     let token: string;
     try {
-      token = await getToken(messaging, {
-        vapidKey: VAPID_KEY,
-        serviceWorkerRegistration: registration,
-      });
+      token = await getTokenWithRetry(messaging, registration);
     } catch (tokenError) {
       console.error("[FCM debug] getToken failed:", tokenError);
-      // Rethrow so the outer catch below still handles/logs it as before —
-      // this inner catch exists only to log state at the exact failure point.
+      // Rethrow so the outer catch below still handles/logs it.
       throw tokenError;
     }
+
+    if (!token) {
+      console.warn("[FCM debug] getToken returned an empty token");
+      return;
+    }
+
+    // Save the token so backend functions (sendPushToUid) can reach this
+    // device. Doc id = uid, matching the backend and Firestore rules.
+    await setDoc(
+      doc(db, "fcmTokens", uid),
+      { token, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
 
     // Foreground messages (app open, tab focused) — service worker's
     // onBackgroundMessage only fires when the tab isn't focused, so
     // this handles the case where the user is actively using the app.
-    onMessage(messaging, (payload) => {
-  const { title, body } = payload.notification ?? {};
-  const clickUrl = payload.data?.clickUrl || "/";
-  if (Notification.permission === "granted") {
-    const notification = new Notification(title ?? "BizMtaani", {
-      body: body ?? "",
-      icon: "/icon-192.png",
-    });
-    notification.onclick = () => {
-      window.focus();
-      window.location.href = clickUrl;
-      notification.close();
-    };
-  }
-});
+    if (!foregroundListenerAttached) {
+      foregroundListenerAttached = true;
+      onMessage(messaging, (payload) => {
+        const { title, body } = payload.notification ?? {};
+        const clickUrl = payload.data?.clickUrl || "/";
+        if (Notification.permission === "granted") {
+          const notification = new Notification(title ?? "BizMtaani", {
+            body: body ?? "",
+            icon: "/icon-192.png",
+          });
+          notification.onclick = () => {
+            window.focus();
+            window.location.href = clickUrl;
+            notification.close();
+          };
+        }
+      });
+    }
   } catch (error) {
     console.warn("Failed to register for notifications:", error);
   }
