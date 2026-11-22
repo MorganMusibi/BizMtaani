@@ -38,7 +38,7 @@ import { db } from "@/lib/firebase";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "@/lib/firebase";
 
-type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog" | "createListing";
+type Tab = "overview" | "users" | "adverts" | "jobs" | "payments" | "reports" | "support" | "marketers" | "applications" | "payouts" | "leaderboard" | "auditlog" | "disputes" | "createListing";
 interface ProductReport {
   id: string;
   productId: string;
@@ -376,6 +376,9 @@ export default function AdminDashboard() {
 
   // Marketer applications tab — lazily loaded, bounded, matches the pattern used elsewhere
   const [applications, setApplications] = useState<MarketerApplication[]>([]);
+  const [disputes, setDisputes] = useState<any[]>([]);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [resolvingDisputeId, setResolvingDisputeId] = useState<string | null>(null);
   const [applicationsLoading, setApplicationsLoading] = useState(false);
   const [applicationsLoaded, setApplicationsLoaded] = useState(false);
   const [processingApplicationId, setProcessingApplicationId] = useState<string | null>(null);
@@ -668,6 +671,34 @@ export default function AdminDashboard() {
       console.error("Failed to load marketer applications:", error);
     } finally {
       setApplicationsLoading(false);
+    }
+  }
+    async function loadDisputes() {
+    setDisputesLoading(true);
+    try {
+      const fn = httpsCallable<unknown, { disputes: any[] }>(functions, "listCommissionDisputes");
+      const result = await fn({});
+      setDisputes(result.data.disputes);
+    } catch (error) {
+      console.error("Failed to load disputes:", error);
+      alert("Could not load commission disputes.");
+    } finally {
+      setDisputesLoading(false);
+    }
+  }
+
+  async function resolveDispute(id: string, resolution: "paid" | "dismissed" | "seller_warned") {
+    const note = window.prompt("Add a short note (optional):") ?? "";
+    setResolvingDisputeId(id);
+    try {
+      const fn = httpsCallable(functions, "resolveCommissionDispute");
+      await fn({ reportId: id, resolution, note });
+      setDisputes((prev) => prev.filter((d) => d.id !== id));
+    } catch (error) {
+      console.error("Failed to resolve dispute:", error);
+      alert("Failed to resolve this dispute.");
+    } finally {
+      setResolvingDisputeId(null);
     }
   }
 
@@ -1006,6 +1037,7 @@ export default function AdminDashboard() {
     if (tab === "jobs") loadJobs();
     if (tab === "marketers") loadMarketers();
     if (tab === "applications") loadApplications();
+    if (tab === "disputes") loadDisputes();
     if (tab === "payments") loadPayments();
     if (tab === "payouts") loadPayouts(payoutMonth);
     if (tab === "leaderboard") loadLeaderboard();
@@ -1186,6 +1218,7 @@ export default function AdminDashboard() {
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
     { title: "Payments", icon: CreditCard, tab: "payments" },
     { title: "Reports", icon: Flag, tab: "reports", badge: pendingReportsCount },
+    { title: "Commission disputes", icon: Flag, tab: "disputes", badge: disputes.length || null },
     { title: "Support", icon: Flag, tab: "support", badge: pendingSupportCount },
     { title: "Payouts", icon: CreditCard, tab: "payouts" },
     { title: "Leaderboard", icon: TrendingUp, tab: "leaderboard" },
@@ -1806,6 +1839,85 @@ export default function AdminDashboard() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </>
+          )}
+
+                   
+        {activeTab === "disputes" && (
+            <>
+              <div className="mb-6">
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Commission disputes</h2>
+                <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
+                  Marketers who say a seller confirmed a sale but did not pay the commission.
+                </p>
+              </div>
+
+              {disputesLoading ? (
+                <Spinner />
+              ) : disputes.length === 0 ? (
+                <EmptyState>No open disputes.</EmptyState>
+              ) : (
+                <div className={`${panelCls} divide-y`} style={{ borderColor: "var(--pd-line)" }}>
+                  {disputes.map((d) => (
+                    <div key={d.id} className="p-4 space-y-3" style={{ borderColor: "var(--pd-line)" }}>
+                      <div>
+                        <p className="font-semibold">{d.advertTitle || "Advert"}</p>
+                        <p className="text-xs text-[var(--pd-ink-soft)]">
+                          Commission: {d.affiliate?.type === "percentage"
+                            ? `${d.affiliate?.amount}%`
+                            : d.affiliate?.type === "half_month_rent"
+                            ? "Half month's rent"
+                            : d.affiliate?.type === "one_month_rent"
+                            ? "One month's rent"
+                            : `KES ${Number(d.affiliate?.amount || 0).toLocaleString()}`}
+                          {d.createdAtMs ? ` · reported ${new Date(d.createdAtMs).toLocaleDateString()}` : ""}
+                        </p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-xs uppercase text-[var(--pd-ink-soft)]">Marketer</p>
+                          <p className="font-medium">{d.marketerName}</p>
+                          {d.marketerPhone && <p className="text-xs">{d.marketerPhone}</p>}
+                          {d.marketerMpesa && <p className="text-xs">M-Pesa: {d.marketerMpesa}</p>}
+                        </div>
+                        <div>
+                          <p className="text-xs uppercase text-[var(--pd-ink-soft)]">Seller</p>
+                          <p className="font-medium">{d.sellerName}</p>
+                          {d.sellerPhone && <p className="text-xs">{d.sellerPhone}</p>}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {d.advertId && (
+                          <a href={`/product/${d.advertId}`} target="_blank" rel="noreferrer" className="text-xs underline">
+                            View advert
+                          </a>
+                        )}
+                        <button
+                          disabled={resolvingDisputeId === d.id}
+                          onClick={() => resolveDispute(d.id, "paid")}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border"
+                        >
+                          Seller paid
+                        </button>
+                        <button
+                          disabled={resolvingDisputeId === d.id}
+                          onClick={() => resolveDispute(d.id, "seller_warned")}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border"
+                        >
+                          Seller warned
+                        </button>
+                        <button
+                          disabled={resolvingDisputeId === d.id}
+                          onClick={() => resolveDispute(d.id, "dismissed")}
+                          className="text-xs font-semibold px-3 py-1.5 rounded-lg border"
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </>
