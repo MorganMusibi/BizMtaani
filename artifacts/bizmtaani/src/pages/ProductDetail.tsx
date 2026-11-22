@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useParams } from "wouter";
 import { httpsCallable } from "firebase/functions";
-import { functions } from "@/lib/firebase";
+import { functions, functionsEU } from "@/lib/firebase";
 import { doc, getDoc, updateDoc, collection, query, where, getDocs, addDoc, serverTimestamp, deleteDoc, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
@@ -1078,7 +1078,7 @@ async function saveMenuChanges() {
     if (!product || !user) return;
 
     try {
-      const deleteAdvert = httpsCallable(functions, "deleteAdvert");
+      const deleteAdvert = httpsCallable(functionsEU, "deleteAdvert");
       await deleteAdvert({ productId: product.id });
 
       productDetailCache.delete(product.id);
