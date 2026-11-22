@@ -3265,7 +3265,7 @@ export const approveMarketer = onCall({ cors: true }, async (request) => {
 
   await sendPushToUid(
     uid,
-    "You're approved as a Brand Ambassador! 🎉",
+    "You're approved as a Marketer! 🎉",
     `Your referral code is ${code}. Start sharing it to earn commissions.`,
     { type: "marketer_approved", referralCode: code }
   );
@@ -3444,7 +3444,7 @@ export const applyForMarketer = onCall({ cors: true, }, async (request) => {
   }
 
   if (typeof reason !== "string" || !reason.trim()) {
-    throw new HttpsError("invalid-argument", "Please tell us why you want to be a Brand Ambassador.");
+    throw new HttpsError("invalid-argument", "Please tell us why you want to be a Marketer.");
   }
 
   // Pull email from the user's own account/profile — never trust a
@@ -3484,8 +3484,8 @@ export const rejectMarketerApplication = onCall({ cors: true }, async (request) 
 
   await sendPushToUid(
     uid,
-    "Brand Ambassador application update",
-    "Your Brand Ambassador application wasn't approved this time. Contact support if you'd like to know more.",
+    "Marketer application update",
+    "Your Marketer application wasn't approved this time. Contact support if you'd like to know more.",
     { type: "marketer_rejected" }
   );
 
