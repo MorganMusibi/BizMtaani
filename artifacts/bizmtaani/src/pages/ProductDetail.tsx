@@ -1262,6 +1262,14 @@ async function saveMenuChanges() {
                 <p className="text-sm text-muted-foreground mt-0.5">
                   Earn <strong className="text-foreground">{describeAffiliateCommission(product.affiliate)}</strong> when you bring a buyer. The commission is paid by the seller after the sale.
                 </p>
+                {!isSeller && !marketerInfo && (
+                  <button
+                    onClick={() => setLocation("/profile")}
+                    className="mt-2 text-sm font-bold text-[#00A651]"
+                  >
+                    Want to earn like this? Become a Marketer →
+                  </button>
+                )}
               </div>
             </div>
           </Card>
@@ -1931,4 +1939,4 @@ const itemDistance =
       )}
     </div>
   );
-                             }
+}
