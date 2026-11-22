@@ -23,7 +23,9 @@ interface LocationContextType {
 const LocationContext = createContext<LocationContextType | undefined>(undefined);
 
 const LOCATION_STATE_STORAGE_KEY = "bizmtaani_location_state";
-const LOCATION_CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
+// A ward rarely changes, so keep the cached location for 30 days. The
+// saved profile area is still synced in the background once it loads.
+const LOCATION_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const LOCATION_RESOLVE_CAP_MS = 5000;
 
 function loadCachedLocationState() {
@@ -48,7 +50,8 @@ function loadCachedLocationState() {
 
 export function LocationProvider({ children }: { children: ReactNode }) {
   const { user, userProfile, profileLoading, likelySignedIn } = useAuth();
-  const cached = loadCachedLocationState();
+  // Read localStorage once, not on every render.
+  const [cached] = useState(loadCachedLocationState);
 
   const [locationInfo, setLocationInfo] = useState<ResolvedLocation | null>(cached?.locationInfo ?? null);
   const [userCoords, setUserCoords] = useState<[number, number] | null>(cached?.userCoords ?? null);
@@ -61,6 +64,8 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   // Guards against both the GPS callback and the 5s cap timer trying
   // to settle the outcome — only the first one to fire wins.
   const settledRef = useRef(false);
+  // Ensures the background profile sync (after a cached start) runs once.
+  const profileSyncedRef = useRef(false);
   const capTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startGpsRef = useRef<(() => void) | null>(null);
   function settle(outcome: "resolved" | "unresolved") {
@@ -103,7 +108,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
   const PROFILE_WAIT_SAFETY_CAP_MS = 4000;
 
   useEffect(() => {
-        if (!user) {
+    if (!user) {
       setIsLocationLoading(false);
       // brand-new visitor: no cache, not signed in → Home shows the "Set my area" prompt
       if (!likelySignedIn && !cached?.userCoords) setNeedsLocationPrompt(true);
@@ -120,7 +125,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
     resolutionStarted.current = true;
 
-        function startGps() {
+    function startGps() {
       if (settledRef.current) return;
       if (!navigator.geolocation) {
         setGpsReady(true);
@@ -187,16 +192,40 @@ export function LocationProvider({ children }: { children: ReactNode }) {
 
     return () => clearTimeout(safetyTimer);
   }, [user]);
+
   // Resolves from the profile the moment it finishes loading — races
   // against startGps() above via the shared settledRef; whichever
   // settles first wins, the other is simply ignored.
   useEffect(() => {
     if (!user) return;
     if (profileLoading) return;
-    if (settledRef.current) return;
 
     const savedArea = userProfile?.homeLocation;
+
+    if (settledRef.current) {
+      // Already showed the cached location instantly. Once the real
+      // profile loads, quietly sync it if the saved area differs.
+      if (!profileSyncedRef.current && savedArea?.areaName) {
+        profileSyncedRef.current = true;
+        if (savedArea.areaName !== locationInfo?.wardName) {
+          setLocationInfo({
+            wardName: savedArea.areaName,
+            constituency: savedArea.constituency,
+            county: savedArea.county,
+            lat: savedArea.lat,
+            lng: savedArea.lng,
+            label: savedArea.label ?? undefined,
+          } as ResolvedLocation);
+          if (savedArea.lat != null && savedArea.lng != null) {
+            setUserCoords([savedArea.lat, savedArea.lng]);
+          }
+        }
+      }
+      return;
+    }
+
     if (savedArea && savedArea.areaName) {
+      profileSyncedRef.current = true;
       setLocationInfo({
         wardName: savedArea.areaName,
         constituency: savedArea.constituency,
@@ -219,6 +248,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       startGpsRef.current?.();
     }
   }, [profileLoading, userProfile]);
+
   const refreshLocation = async () => {
     setIsLocationLoading(true);
     setNeedsLocationPrompt(false);
