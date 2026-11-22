@@ -1089,12 +1089,12 @@ async function saveMenuChanges() {
         description: "Your advert has been removed." 
       });
       setLocation("/");
-    } catch (error) {
+        } catch (error: any) {
       console.error("Delete error:", error);
-      toast({ 
-        title: "Delete failed", 
-        description: "Please try again.", 
-        variant: "destructive" 
+      toast({
+        title: "Delete failed",
+        description: `${error?.code ?? ""} ${error?.message ?? "Please try again."}`,
+        variant: "destructive",
       });
     }
   }
