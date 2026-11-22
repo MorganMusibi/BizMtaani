@@ -2561,27 +2561,44 @@ export const deleteAdvert = onCall({ region: "europe-west1", cors: true, secrets
   if (!productSnap.exists) throw new HttpsError("not-found", "Advert not found.");
   const product = productSnap.data()!;
 
-  // Check ownership
-  if (product.sellerId !== request.auth.uid && product.ownerId !== request.auth.uid) {
+  // Ownership check (master admin may delete any advert)
+  const isOwner =
+    product.sellerId === request.auth.uid || product.ownerId === request.auth.uid;
+  const isMasterAdmin = request.auth.uid === OWNER_UID;
+  if (!isOwner && !isMasterAdmin) {
     throw new HttpsError("permission-denied", "You can only delete your own adverts.");
   }
 
-  // 1. Delete Cloudinary Images
-  if (Array.isArray(product.imageUrls)) {
-    for (const image of product.imageUrls) {
-      const publicId = typeof image === "string" ? null : image.public_id;
-      if (publicId) await deleteCloudinaryImage(publicId);
+  // 1. Delete Cloudinary images. Never let a failure here block the delete.
+  try {
+    if (Array.isArray(product.imageUrls)) {
+      const publicIds: string[] = [];
+      for (const image of product.imageUrls) {
+        const publicId =
+          image && typeof image === "object" ? (image as any).public_id : null;
+        if (publicId) publicIds.push(publicId);
+      }
+      await deleteCloudinaryImagesBatched(publicIds);
     }
+  } catch (err) {
+    console.error("deleteAdvert: image cleanup failed", productId, err);
   }
 
-  // 2. Delete associated chats and their messages (avoid ghost chats
-  // and orphaned message subcollections — recursiveDelete removes both).
-  const chatQuery = await db.collection("chats").where("productId", "==", productId).get();
-  for (const chatDoc of chatQuery.docs) {
-    await db.recursiveDelete(chatDoc.ref);
+  // 2. Delete associated chats and messages. Also non-blocking.
+  try {
+    const chatQuery = await db.collection("chats").where("productId", "==", productId).get();
+    for (const chatDoc of chatQuery.docs) {
+      try {
+        await db.recursiveDelete(chatDoc.ref);
+      } catch (err) {
+        console.error("deleteAdvert: chat cleanup failed", chatDoc.id, err);
+      }
+    }
+  } catch (err) {
+    console.error("deleteAdvert: chat query failed", productId, err);
   }
 
-  // 3. Delete the advert
+  // 3. Delete the advert itself
   await productRef.delete();
 
   return { success: true, message: "Advert and associated data removed." };
