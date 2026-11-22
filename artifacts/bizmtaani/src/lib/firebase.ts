@@ -62,7 +62,8 @@ export const db = initializeFirestore(app, {
 });
 
 export const storage = getStorage(app);
-export const functions = getFunctions(app, "us-central1"); // Added this
+export const functions = getFunctions(app, "us-central1");
+export const functionsEU = getFunctions(app, "europe-west1");
 
 export async function getMessagingIfSupported() {
   const supported = await isSupported();
