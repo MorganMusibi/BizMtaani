@@ -4151,3 +4151,97 @@ export const reportNonPayment = onCall({ cors: true }, async (request) => {
 
   return { success: true };
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 15. ADMIN — Commission disputes (marketer "seller didn't pay" reports)
+// ═══════════════════════════════════════════════════════════════════════════
+export const listCommissionDisputes = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const snap = await db
+    .collection("nonPaymentReports")
+    .where("status", "==", "open")
+    .limit(50)
+    .get();
+
+  const disputes = await Promise.all(
+    snap.docs.map(async (d) => {
+      const r = d.data();
+      let marketerName = "Marketer";
+      let marketerMpesa = "";
+      let marketerPhone = "";
+      let sellerName = "Seller";
+      let sellerPhone = "";
+      try {
+        const [mSnap, muSnap, suSnap] = await Promise.all([
+          db.collection("marketers").doc(r.marketerUid).get(),
+          db.collection("users").doc(r.marketerUid).get(),
+          db.collection("users").doc(r.sellerUid).get(),
+        ]);
+        const m = mSnap.data() ?? {};
+        const mu = muSnap.data() ?? {};
+        const su = suSnap.data() ?? {};
+        marketerName = m.fullName || mu.displayName || "Marketer";
+        marketerMpesa = m.mpesaNumber ?? "";
+        marketerPhone = mu.phone ?? "";
+        sellerName = su.businessName || su.displayName || "Seller";
+        sellerPhone = su.phone ?? "";
+      } catch {
+        // fall back to defaults
+      }
+      return {
+        id: d.id,
+        claimId: r.claimId ?? null,
+        advertId: r.advertId ?? null,
+        advertTitle: r.advertTitle ?? "",
+        affiliate: r.affiliate ?? null,
+        marketerUid: r.marketerUid,
+        marketerName,
+        marketerMpesa,
+        marketerPhone,
+        sellerUid: r.sellerUid ?? null,
+        sellerName,
+        sellerPhone,
+        createdAtMs: r.createdAt?.toMillis ? r.createdAt.toMillis() : null,
+      };
+    })
+  );
+
+  disputes.sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0));
+  return { disputes };
+});
+
+export const resolveCommissionDispute = onCall({ cors: true }, async (request) => {
+  requireAdmin(request);
+
+  const { reportId, resolution, note } = request.data as {
+    reportId?: string;
+    resolution?: string;
+    note?: string;
+  };
+  if (typeof reportId !== "string" || !reportId.trim()) {
+    throw new HttpsError("invalid-argument", "reportId is required.");
+  }
+  if (resolution !== "paid" && resolution !== "dismissed" && resolution !== "seller_warned") {
+    throw new HttpsError("invalid-argument", "Invalid resolution.");
+  }
+
+  const ref = db.collection("nonPaymentReports").doc(reportId.trim());
+  const snap = await ref.get();
+  if (!snap.exists) throw new HttpsError("not-found", "Report not found.");
+
+  await ref.update({
+    status: "resolved",
+    resolution,
+    note: typeof note === "string" ? note.trim().slice(0, 300) : "",
+    resolvedBy: request.auth.uid,
+    resolvedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  await logAdminAction(request.auth.uid, "resolve_commission_dispute", {
+    reportId: ref.id,
+    resolution,
+  });
+
+  return { success: true };
+});
