@@ -33,7 +33,7 @@ export default function Terms() {
             </h1>
 
             <p className="text-xs text-muted-foreground mb-4">
-              Effective date: August 11, 2026
+              Effective date: November 22, 2026
             </p>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -191,46 +191,84 @@ export default function Terms() {
             </h2>
 
             <p className="text-sm text-muted-foreground leading-relaxed mb-3">
-              BizMtaani offers an optional referral marketer program. Approval
-              to become a marketer is at BizMtaani's sole discretion and
-              requires submitting accurate identifying and payout information,
-              including your full name, national ID number, and M-Pesa number.
+              BizMtaani offers an optional marketer program. Anyone may apply, but approval is at BizMtaani's sole discretion and requires accurate identifying and payout information, including your full name, national ID number, and M-Pesa number.
             </p>
-
-            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+            <p className="text-sm font-bold mb-2 mt-4">7.1 Independent status</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
               <li>
-                Approved marketers receive a unique referral code to share
-                with prospective users.
+                Marketers are independent. A marketer is not an employee, agent, partner, or representative of BizMtaani and must not claim to speak or act on behalf of BizMtaani.
               </li>
               <li>
-                A commission is earned only when a user who registered using
-                your referral code completes their first successful Premium
-                payment. Subsequent payments by the same referred user do not
-                generate additional commission.
+                Participation does not create a salary, guaranteed income, or any promise of earnings. You are responsible for any taxes that apply to what you earn.
+              </li>
+            </ul>
+            <p className="text-sm font-bold mb-2 mt-4">7.2 Referral commission</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>
+                Approved marketers receive a unique referral code to share with prospective users.
               </li>
               <li>
-                Commission rates, minimum payout thresholds, and payout
-                timing are set by BizMtaani and may be updated from time to
-                time. Current terms are displayed within the app.
+                A commission is earned only when a user who registered using your referral code completes their first successful Premium payment. Later payments by the same user do not generate additional commission.
               </li>
               <li>
-                Payouts are made to the M-Pesa number on file for your
-                marketer account. You are responsible for keeping this
-                information accurate and up to date.
+                Referral commission rates, minimum payout thresholds, and payout timing are set by BizMtaani and may be updated from time to time. Current terms are displayed within the app. Payouts are made to the M-Pesa number on file, which you must keep accurate and up to date.
               </li>
               <li>
-                BizMtaani may withhold, delay, or deny commission payments
-                where there is a reasonable basis to suspect fraudulent
-                referrals, self-referral, fake accounts, or other abuse of
-                the program.
+                Referral codes may only be used for new user sign-ups and cannot be applied retroactively to existing accounts.
+              </li>
+            </ul>
+            <p className="text-sm font-bold mb-2 mt-4">7.3 Advert commission (Open to marketers)</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>
+                Sellers on a Premium plan may mark an advert as Open to marketers and set the commission they will pay if a marketer brings the buyer. The commission is shown on the advert.
               </li>
               <li>
-                BizMtaani may suspend or terminate a marketer's participation
-                in the program, or the program itself, at any time.
+                When an approved marketer taps I have a buyer, BizMtaani records a dated and timed claim and shares the seller's contact details with that marketer. The commission shown on the advert at the time of the claim is the commission that applies to that claim.
               </li>
               <li>
-                Referral codes may only be used for new user sign-ups and
-                cannot be applied retroactively to existing accounts.
+                The commission is an arrangement between the seller and the marketer. BizMtaani does not collect, hold, guarantee, or pay it, and is not a party to the sale. The sale money and the commission are handled directly between the people involved.
+              </li>
+              <li>
+                A sale is credited to a marketer when the seller marks the advert as sold or occupied and selects that marketer. If the seller selects no marketer, or a different one, BizMtaani is not responsible for deciding who brought the buyer.
+              </li>
+              <li>
+                We encourage the seller and marketer to agree the details, such as the amount and when it will be paid, in writing, for example by WhatsApp message.
+              </li>
+              <li>
+                If a seller confirmed a sale but did not pay the agreed commission, the marketer may report it through the app after 48 hours. BizMtaani may contact the seller and may warn, restrict, or suspend the seller's account, but does not guarantee that any commission will be recovered and does not act as a debt collector.
+              </li>
+            </ul>
+            <p className="text-sm font-bold mb-2 mt-4">7.4 Seller responsibilities</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>
+                If you mark an advert as Open to marketers, you agree to pay the advertised commission, in good faith and within the time agreed, to the marketer you confirm as having brought the buyer.
+              </li>
+              <li>
+                Do not mark an advert as sold, or select a marketer, unless it is true.
+              </li>
+            </ul>
+            <p className="text-sm font-bold mb-2 mt-4">7.5 Marketer conduct</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>
+                Only tap I have a buyer when you genuinely have a buyer for that advert. Fake or repeated claims are not allowed, and a daily limit on claims applies.
+              </li>
+              <li>
+                Use a seller's contact details only to arrange the sale of that advert. Do not share them, spam the seller, or harass anyone.
+              </li>
+              <li>
+                Do not claim commission on your own adverts, and do not collect payment from buyers on behalf of a seller or BizMtaani.
+              </li>
+              <li>
+                Be honest with buyers and sellers, and follow all other parts of these Terms.
+              </li>
+            </ul>
+            <p className="text-sm font-bold mb-2 mt-4">7.6 Withholding, suspension, and changes</p>
+            <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground mb-4">
+              <li>
+                BizMtaani may withhold, delay, or deny referral commission where there is a reasonable basis to suspect fraudulent referrals, self-referral, fake accounts, false claims, or other abuse of the program.
+              </li>
+              <li>
+                BizMtaani may suspend or end a marketer's participation, restrict a seller's use of Open to marketers, or change or end the program, at any time.
               </li>
             </ul>
           </section>
@@ -447,4 +485,4 @@ export default function Terms() {
 
     </div>
   );
-}
+          }
