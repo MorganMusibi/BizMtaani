@@ -373,16 +373,6 @@ export default function Home() {
     );
   }, [locationInfo?.wardName, toast, setGpsGranted, setGpsReady, setLocationInfo, setUserCoords]);
 
-  // Load hierarchy with localStorage caching
-  useEffect(() => {
-    const run = () =>
-      getLocationHierarchy()
-        .catch((e) => console.error("Failed to load hierarchy:", e))
-        .finally(() => setHierarchyReady(true));
-    const t = setTimeout(run, 1500);
-    return () => clearTimeout(t);
-  }, []);
-
   useEffect(() => {
     if (needsLocationPrompt && user && !hasPromptedArea.current) {
       hasPromptedArea.current = true;
@@ -460,7 +450,9 @@ export default function Home() {
     };
   }, [searchQuery]);
 
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  // State (not a ref) so the observer re-attaches when the sentinel
+  // actually mounts, after the loading placeholder is replaced.
+  const [sentinelEl, setSentinelEl] = useState<HTMLDivElement | null>(null);
   const loadMoreDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Bumped whenever the user returns to "/" right after posting —
@@ -548,6 +540,23 @@ export default function Home() {
       </div>
     ) : null;
 
+  // Load the location hierarchy only once the first listings have
+  // painted, during browser idle time, so it never competes with the feed.
+  useEffect(() => {
+    if (stillLoading || hierarchyReady) return;
+    const run = () =>
+      getLocationHierarchy()
+        .catch((e) => console.error("Failed to load hierarchy:", e))
+        .finally(() => setHierarchyReady(true));
+    const w = window as any;
+    if (typeof w.requestIdleCallback === "function") {
+      const id = w.requestIdleCallback(run, { timeout: 2000 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(run, 2000);
+    return () => clearTimeout(t);
+  }, [stillLoading, hierarchyReady]);
+
   useEffect(() => {
     if (!stillLoading) {
       setLoadingTooLong(false);
@@ -558,7 +567,7 @@ export default function Home() {
   }, [stillLoading]);
 
   useEffect(() => {
-    const el = sentinelRef.current;
+    const el = sentinelEl;
     if (!el) return;
 
     const observer = new IntersectionObserver(
@@ -582,7 +591,7 @@ export default function Home() {
         clearTimeout(loadMoreDebounceRef.current);
       }
     };
-  }, [loadMore]);
+  }, [loadMore, sentinelEl]);
 
   const handleAreaSelect = useCallback(
     async (choice: ResolvedLocation) => {
@@ -1016,7 +1025,7 @@ export default function Home() {
               </>
             )}
 
-            <div ref={sentinelRef} className="h-1" />
+            <div ref={setSentinelEl} className="h-1" />
             {isLoadingMore && (
               isOffline ? (
                 <div className="flex flex-col items-center justify-center py-8 gap-2 text-center px-6">
@@ -1131,4 +1140,4 @@ export default function Home() {
       )}
     </div>
   );
-}
+      }
