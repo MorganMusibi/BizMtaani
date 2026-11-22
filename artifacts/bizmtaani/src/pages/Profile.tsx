@@ -147,7 +147,7 @@ const [selectedWard, setSelectedWard] = useState<{
     return;
   }
   if (!marketerReason.trim()) {
-    toast({ title: "Tell us why you want to be a brand ambassador", variant: "destructive" });
+    toast({ title: "Tell us why you want to be a marketer", variant: "destructive" });
     return;
   }
 
@@ -793,9 +793,9 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Brand Ambassador Dashboard</p>
+              <p className="font-black text-sm">Marketer Dashboard</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                View earnings & your referral code
+                Earn board, claims & your referral code
               </p>
             </div>
             <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
@@ -806,7 +806,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-muted-foreground" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Brand Ambassador Application Pending</p>
+              <p className="font-black text-sm">Marketer Application Pending</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 We're reviewing your application
               </p>
@@ -821,9 +821,9 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
               <Gift size={22} className="text-primary" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="font-black text-sm">Become a Brand Ambassador</p>
+              <p className="font-black text-sm">Become a Marketer</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                Earn cash by referring premium users
+                Earn commission by bringing buyers and referring premium users
               </p>
             </div>
             <ChevronRight size={18} className="text-muted-foreground flex-shrink-0" />
@@ -1237,7 +1237,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
     <X size={16} />
   </button>
   <div className="w-10 h-1 rounded-full bg-muted mx-auto mb-5" />
-  <p className="font-bold text-sm text-center mb-4">Apply to be a Brand Ambassador</p>
+  <p className="font-bold text-sm text-center mb-4">Apply to be a Marketer</p>
 
  <div className="space-y-3">
   <div>
@@ -1275,7 +1275,7 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
 
 <div>
   <label className="text-xs font-semibold text-muted-foreground">
-    Why do you want to be a brand ambassador? *
+    Why do you want to be a marketer? *
   </label>
   <textarea
     placeholder="Tell us a bit about yourself..."
@@ -1285,6 +1285,9 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
     className="w-full mt-1 px-3 py-2 rounded-xl border border-border bg-background text-sm min-h-[80px]"
   />
 </div>
+<p className="text-[11px] text-muted-foreground leading-snug">
+  Marketers are independent. You are not an employee or agent of BizMtaani, and income is not guaranteed. For adverts, the seller agrees your commission and pays you directly.
+</p>
 <Button
                 onClick={() => setShowConfirmStep(true)}
                 disabled={submittingApplication}
@@ -1351,4 +1354,4 @@ const displayName = userProfile?.businessName || userProfile?.displayName || use
 
     </div>
   );
-}
+        }
