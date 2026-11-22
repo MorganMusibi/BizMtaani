@@ -568,19 +568,19 @@ export default function AdminDashboard() {
   }
 
   async function makeMarketer(targetUser: AdminUser) {
-    if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a Brand Ambassador?`)) return;
+    if (!confirm(`Approve "${targetUser.displayName || targetUser.id}" as a Marketer?`)) return;
     setProcessingUserId(targetUser.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
       const result = await approveMarketer({ uid: targetUser.id });
       const { referralCode } = result.data as { referralCode: string };
-      alert(`Brand Ambassador approved. Their referral code is: ${referralCode}`);
-      // Invalidate the marketers cache so the Brand Ambassadors tab shows
+      alert(`Marketer approved. Their referral code is: ${referralCode}`);
+      // Invalidate the marketers cache so the Marketers tab shows
       // this new entry next time it's opened, without an extra read now.
       setMarketersLoaded(false);
     } catch (error) {
       console.error("Failed to approve marketer:", error);
-      alert("Failed to approve this user as a Brand Ambassador.");
+      alert("Failed to approve this user as a Marketer.");
     } finally {
       setProcessingUserId(null);
     }
@@ -672,15 +672,15 @@ export default function AdminDashboard() {
   }
 
   async function approveApplication(application: MarketerApplication) {
-    if (!confirm(`Approve "${application.fullName || application.id}" as a Brand Ambassador?`)) return;
+    if (!confirm(`Approve "${application.fullName || application.id}" as a Marketer?`)) return;
     setProcessingApplicationId(application.id);
     try {
       const approveMarketer = httpsCallable(functions, "approveMarketer");
       const result = await approveMarketer({ uid: application.id });
       const { referralCode } = result.data as { referralCode: string };
-      alert(`Brand Ambassador approved. Their referral code is: ${referralCode}`);
+      alert(`Marketer approved. Their referral code is: ${referralCode}`);
       setApplications((prev) => prev.filter((a) => a.id !== application.id));
-      // Invalidate marketers cache so the Brand Ambassadors tab reflects this on next open.
+      // Invalidate marketers cache so the Marketers tab reflects this on next open.
       setMarketersLoaded(false);
     } catch (error) {
       console.error("Failed to approve application:", error);
@@ -1179,9 +1179,9 @@ export default function AdminDashboard() {
   const menuItems: { title: string; icon: typeof Users; tab: Tab; badge?: number | null }[] = [
     { title: "Overview", icon: LayoutDashboard, tab: "overview" },
     { title: "Users", icon: Users, tab: "users" },
-    { title: "Brand Ambassador Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
+    { title: "Marketer Applications", icon: Megaphone, tab: "applications", badge: applicationsLoaded ? applications.length : null },
     { title: "Create Listing", icon: Plus, tab: "createListing" },
-    { title: "Brand Ambassadors", icon: Megaphone, tab: "marketers" },
+    { title: "Marketers", icon: Megaphone, tab: "marketers" },
     { title: "Adverts", icon: Package, tab: "adverts" },
     { title: "Jobs", icon: Briefcase, tab: "jobs" },
     { title: "Payments", icon: CreditCard, tab: "payments" },
@@ -1659,7 +1659,7 @@ export default function AdminDashboard() {
                                     disabled={processingUserId === u.id}
                                     className={linkGreen}
                                   >
-                                    {processingUserId === u.id ? "…" : "Make Brand Ambassador"}
+                                    {processingUserId === u.id ? "…" : "Make Marketer"}
                                   </button>
                                 )}
                                 {u.role !== "admin" && (
@@ -1814,9 +1814,9 @@ export default function AdminDashboard() {
           {activeTab === "applications" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassador applications</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer applications</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
-                  Pending applications from users wanting to become Brand Ambassadors.
+                  Pending applications from users wanting to become Marketers.
                 </p>
               </div>
 
@@ -2003,16 +2003,16 @@ export default function AdminDashboard() {
           {activeTab === "marketers" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassadors</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketers</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">
-                  Approved Brand Ambassadors and their commission earnings. To approve a new one, use "Make Brand Ambassador" on the Users tab.
+                  Approved Marketers and their commission earnings. To approve a new one, use "Make Marketer" on the Users tab.
                 </p>
               </div>
 
               {marketersLoading ? (
                 <Spinner />
               ) : marketers.length === 0 ? (
-                <EmptyState>No Brand Ambassadors approved yet.</EmptyState>
+                <EmptyState>No Marketers approved yet.</EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
@@ -2085,8 +2085,8 @@ export default function AdminDashboard() {
             <>
               <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Brand Ambassador payouts</h2>
-                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Monthly commission owed to each Brand Ambassador.</p>
+                  <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Marketer payouts</h2>
+                  <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Monthly commission owed to each Marketer.</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -2106,7 +2106,7 @@ export default function AdminDashboard() {
                 <Spinner />
               ) : payouts.length === 0 ? (
                 <EmptyState>
-                  No payout data for {payoutMonth}. It may not have closed yet, or no Brand Ambassadors earned commissions.
+                  No payout data for {payoutMonth}. It may not have closed yet, or no Marketers earned commissions.
                 </EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
@@ -2159,14 +2159,14 @@ export default function AdminDashboard() {
           {activeTab === "leaderboard" && (
             <>
               <div className="mb-6">
-                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Top Brand Ambassadors</h2>
+                <h2 className="text-2xl" style={{ ...fontSerif, fontWeight: 600 }}>Top Marketers</h2>
                 <p className="mt-1 text-sm text-[var(--pd-ink-soft)]">Ranked by earnings this month.</p>
               </div>
 
               {leaderboardLoading ? (
                 <Spinner />
               ) : leaderboard.length === 0 ? (
-                <EmptyState>No Brand Ambassador earnings recorded yet this month.</EmptyState>
+                <EmptyState>No Marketer earnings recorded yet this month.</EmptyState>
               ) : (
                 <div className={`${panelCls} overflow-hidden overflow-x-auto`}>
                   <table className="w-full text-sm">
@@ -2372,4 +2372,4 @@ export default function AdminDashboard() {
       )}
     </div>
   );
-}
+                                }
