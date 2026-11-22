@@ -32,7 +32,7 @@ export default function Privacy() {
             </h1>
 
             <p className="text-xs text-muted-foreground mb-4">
-              Effective date: August 11, 2026
+              Effective date: November 22, 2026
             </p>
 
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -81,6 +81,12 @@ export default function Privacy() {
                 identity and process commission payouts.
               </li>
               <li>
+                If you use the marketer program, records of your activity in
+                it, such as buyer claims (with the date and time), sales
+                confirmed by sellers, and any report that a commission was
+                not paid.
+              </li>
+              <li>
                 Technical information required to operate, secure, and
                 troubleshoot the service.
               </li>
@@ -104,6 +110,10 @@ export default function Privacy() {
               <li>Display adverts and marketplace content.</li>
               <li>Personalize local advert discovery.</li>
               <li>Process payments and premium services.</li>
+              <li>
+                Run the marketer program, including recording buyer claims,
+                confirming sales, and handling commission disputes.
+              </li>
               <li>Respond to customer support requests.</li>
               <li>Investigate reports, fraud, abuse, or security issues.</li>
               <li>Maintain and improve the platform.</li>
@@ -187,9 +197,28 @@ export default function Privacy() {
             </p>
 
             <p className="text-sm text-muted-foreground leading-relaxed mt-3">
-              This information is not displayed publicly and is not shared
-              with other users. It may be accessed by BizMtaani staff for the
-              purposes of reviewing applications and issuing payouts.
+              Your national ID number and M-Pesa number are not displayed
+              publicly and are not shared with other users. They may be
+              accessed by BizMtaani staff for the purposes of reviewing
+              applications and issuing payouts.
+            </p>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              Some information is shared between the people involved in an
+              advert commission. When an approved marketer taps "I have a
+              buyer", the contact number the seller provided on the advert is
+              given to that marketer, along with the marketer's referral code
+              in the message sent to the seller. The seller can also see the
+              marketer's name and referral code when marking an advert as sold,
+              so that the seller can credit the right marketer. This
+              information may be used only to arrange the sale of that advert.
+            </p>
+
+            <p className="text-sm text-muted-foreground leading-relaxed mt-3">
+              If a marketer reports that a seller did not pay an agreed
+              commission, BizMtaani staff may see the names and contact details
+              of both people and the details of the advert, so that we can look
+              into the report and contact them.
             </p>
           </section>
 
@@ -205,6 +234,10 @@ export default function Privacy() {
             </p>
 
             <ul className="list-disc pl-5 space-y-2 text-sm text-muted-foreground">
+              <li>
+                Sellers and marketers, to the extent described in the Marketer
+                Program Data section above.
+              </li>
               <li>Technology and infrastructure service providers.</li>
               <li>Payment and transaction service providers.</li>
               <li>Cloud, storage, hosting, and media service providers.</li>
@@ -372,4 +405,4 @@ export default function Privacy() {
 
     </div>
   );
-}
+      }
