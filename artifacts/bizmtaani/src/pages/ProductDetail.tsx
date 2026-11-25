@@ -17,6 +17,7 @@ import {
 } from "@/lib/chatService";
 import { isProductVisibleToUser, clearFeedCache } from "@/hooks/useHomeFeed";
 import { usePageMeta, SITE_URL, type PageMeta } from "@/hooks/usePageMeta";
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
 
 interface MenuItem { name: string; price: number; }
 interface HotelMenu { breakfast: MenuItem[]; lunch: MenuItem[]; supper: MenuItem[]; }
@@ -1331,7 +1332,9 @@ async function saveMenuChanges() {
   <h2 className="text-lg font-bold mb-4">Seller</h2>      
 
   <div
-    onClick={() => setLocation(`/shop/${product.sellerId}`)}
+    onClick={() => {
+  if (product.sellerId !== OWNER_UID) setLocation(`/shop/${product.sellerId}`);
+}}
     className="flex items-center gap-4 cursor-pointer"
   >
     {product.sellerAvatar ? (
@@ -1379,7 +1382,9 @@ async function saveMenuChanges() {
   <Button
     variant="outline"
     className="w-full mt-5"
-    onClick={() => setLocation(`/shop/${product.sellerId}`)}
+    onClick={() => {
+  if (product.sellerId !== OWNER_UID) setLocation(`/shop/${product.sellerId}`);
+}}
   >
     {isSeller ? "View My Shop" : "View Shop"}
   </Button>
