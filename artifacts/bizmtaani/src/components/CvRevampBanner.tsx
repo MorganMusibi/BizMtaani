@@ -11,16 +11,33 @@ const CV_AND_COVER_PRICE = 300;
 
 const HIDDEN_KEY = "bizmtaani_cv_banner_hidden";
 
-function whatsappLink(service: string, price: number) {
+interface CvRevampBannerProps {
+  // When shown on a job page, these fill in the WhatsApp message so
+  // the CV can be tailored to that exact job.
+  jobTitle?: string;
+  company?: string;
+  jobUrl?: string;
+}
+
+function whatsappLink(
+  service: string,
+  price: number,
+  { jobTitle, company, jobUrl }: CvRevampBannerProps
+) {
+  const jobLines = jobTitle
+    ? `I'm applying for: ${jobTitle}${company ? ` at ${company}` : ""}.\n` +
+      (jobUrl ? `Job link: ${jobUrl}\n` : "")
+    : `I'm targeting ___ jobs (job title and company, if I have one in mind).\n`;
+
   const message =
     `Hi, I'd like my CV revamped (${service}, KES ${price}).\n` +
     `My name is ___.\n` +
-    `I'm targeting ___ jobs (job title and company, if I have one in mind).\n` +
+    jobLines +
     `I'll send my current CV here.`;
   return `https://wa.me/${CV_WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
-export function CvRevampBanner() {
+export function CvRevampBanner(props: CvRevampBannerProps) {
   const [hidden, setHidden] = useState(() => {
     try {
       return sessionStorage.getItem(HIDDEN_KEY) === "1";
@@ -67,7 +84,7 @@ export function CvRevampBanner() {
       <div className="grid grid-cols-2 gap-2 mt-3">
         <Button asChild variant="outline" className="h-auto py-2 flex-col gap-0.5 font-bold">
           <a
-            href={whatsappLink("CV only", CV_ONLY_PRICE)}
+            href={whatsappLink("CV only", CV_ONLY_PRICE, props)}
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -78,7 +95,7 @@ export function CvRevampBanner() {
 
         <Button asChild className="h-auto py-2 flex-col gap-0.5 font-bold">
           <a
-            href={whatsappLink("CV + cover letter", CV_AND_COVER_PRICE)}
+            href={whatsappLink("CV + cover letter", CV_AND_COVER_PRICE, props)}
             target="_blank"
             rel="noopener noreferrer"
           >
