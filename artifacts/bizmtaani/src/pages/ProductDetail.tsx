@@ -1101,6 +1101,8 @@ async function saveMenuChanges() {
   }
 
   const isSeller = user?.uid === product.sellerId;
+  // Adverts posted by the master admin: no public seller card or shop link.
+  const isManaged = product.sellerId === OWNER_UID;
   const showMarketerButton =
     !isSeller && !!marketerInfo && product.affiliate?.enabled === true;
 
@@ -1328,67 +1330,62 @@ async function saveMenuChanges() {
           </Card>
         )}
         
+        {!isManaged && (
           <Card className="p-5 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
-  <h2 className="text-lg font-bold mb-4">Seller</h2>      
+            <h2 className="text-lg font-bold mb-4">Seller</h2>
 
-  <div
-    onClick={() => {
-  if (product.sellerId !== OWNER_UID) setLocation(`/shop/${product.sellerId}`);
-}}
-    className="flex items-center gap-4 cursor-pointer"
-  >
-    {product.sellerAvatar ? (
-      <img
-        src={getAvatarThumbnailUrl(product.sellerAvatar)}
-        alt={product.sellerName}
-        className="w-14 h-14 rounded-full object-cover"
-      />
-    ) : (
-      <div className="w-14 h-14 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-xl">
-        {product.sellerName[0]?.toUpperCase()}
-      </div>
-    )}
+            <div
+              onClick={() => setLocation(`/shop/${product.sellerId}`)}
+              className="flex items-center gap-4 cursor-pointer"
+            >
+              {product.sellerAvatar ? (
+                <img
+                  src={getAvatarThumbnailUrl(product.sellerAvatar)}
+                  alt={product.sellerName}
+                  className="w-14 h-14 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-orange-500 text-white flex items-center justify-center font-bold text-xl">
+                  {product.sellerName[0]?.toUpperCase()}
+                </div>
+              )}
 
-    <div className="flex-1">
-      <h3
-        data-testid="text-seller-name"
-        className="font-bold text-base"
-      >
-        {product.sellerName}
-      </h3>
+              <div className="flex-1">
+                <h3
+                  data-testid="text-seller-name"
+                  className="font-bold text-base"
+                >
+                  {product.sellerName}
+                </h3>
 
-      {/* CHANGE 9: the "Verified Seller" line only shows when the advert is really
-          marked verified, and the made-up "4.8 rating • 24 Listings" line is removed
-          because there is no real data behind it */}
-      {product.verified === true && (
-        <p className="text-sm text-green-600">
-          ✓ Verified Seller
-        </p>
-      )}
+                {product.verified === true && (
+                  <p className="text-sm text-green-600">
+                    ✓ Verified Seller
+                  </p>
+                )}
 
-      {distance !== null && (
-        <p className="text-xs text-muted-foreground mt-1">
-          <MapPin className="inline w-3 h-3 mr-1" />
-          {distance < 1
-            ? `${(distance * 1000).toFixed(0)}m away`
-            : `${distance.toFixed(1)} km away`}
-        </p>
-      )}
-    </div>
+                {distance !== null && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    <MapPin className="inline w-3 h-3 mr-1" />
+                    {distance < 1
+                      ? `${(distance * 1000).toFixed(0)}m away`
+                      : `${distance.toFixed(1)} km away`}
+                  </p>
+                )}
+              </div>
 
-    <ChevronRight className="text-muted-foreground" />
-  </div>
+              <ChevronRight className="text-muted-foreground" />
+            </div>
 
-  <Button
-    variant="outline"
-    className="w-full mt-5"
-    onClick={() => {
-  if (product.sellerId !== OWNER_UID) setLocation(`/shop/${product.sellerId}`);
-}}
-  >
-    {isSeller ? "View My Shop" : "View Shop"}
-  </Button>
-</Card>
+            <Button
+              variant="outline"
+              className="w-full mt-5"
+              onClick={() => setLocation(`/shop/${product.sellerId}`)}
+            >
+              {isSeller ? "View My Shop" : "View Shop"}
+            </Button>
+          </Card>
+        )}
 
          {relatedProducts.length > 0 && (
   <section className="space-y-4">
@@ -1944,4 +1941,4 @@ const itemDistance =
       )}
     </div>
   );
-}
+                         }
