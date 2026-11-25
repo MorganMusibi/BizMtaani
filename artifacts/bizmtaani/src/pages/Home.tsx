@@ -32,6 +32,10 @@ import { usePageMeta, SITE_URL } from "@/hooks/usePageMeta";
 
 const AREA_PICKER_STORAGE_KEY = "bizmtaani_area_chosen";
 
+// Master admin account — has no public shop, so it is kept out of the
+// "Shops" search results. Must match OWNER_UID in the backend.
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+
 const FILTER_CHIPS = [
   { label: "All", key: "All" },
   ...CATEGORY_DEFS.map((c) => ({ label: c.displayShort, key: c.key })),
@@ -427,7 +431,9 @@ export default function Home() {
       .then((snap) => {
         if (cancelled) return;
         setShopResults(
-          snap.docs.map((d) => {
+          snap.docs
+            .filter((d) => d.id !== OWNER_UID)
+            .map((d) => {
             const data = d.data();
             return {
               uid: d.id,
@@ -1140,4 +1146,4 @@ export default function Home() {
       )}
     </div>
   );
-      }
+        }
