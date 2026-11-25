@@ -30,6 +30,11 @@ import {
   ChatParticipant,
 } from "@/lib/chatService";
 
+// Must match OWNER_UID in the Cloud Functions backend and useHomeFeed.ts.
+// The master admin account posts adverts on behalf of many different
+// sellers, so it has no public shop page of its own.
+const OWNER_UID = "MdkkpY3BkMNdTYChcR2TaNtK08W2";
+
 interface ProductImage {
   url: string;
   public_id?: string;
@@ -340,6 +345,15 @@ export default function ShopCatalogue() {
 
   const isOwn =
     user?.uid === userId;
+
+  // Hide the master admin's shop from everyone except the admin
+  // themselves. Wait for auth to settle so the admin is never bounced.
+  const hideAdminShop =
+    userId === OWNER_UID && !authLoading && user?.uid !== OWNER_UID;
+
+  useEffect(() => {
+    if (hideAdminShop) navigate("/", { replace: true });
+  }, [hideAdminShop, navigate]);
 
   /*
    * ------------------------------------------------------------
@@ -679,6 +693,8 @@ useEffect(() => {
    * LOADING STATE
    * ------------------------------------------------------------
    */
+
+  if (hideAdminShop) return null;
 
   if (loading || authLoading) {
   return (
@@ -1276,4 +1292,4 @@ useEffect(() => {
       )}
     </div>
   );
-}
+      }
