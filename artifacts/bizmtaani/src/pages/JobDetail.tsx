@@ -45,6 +45,7 @@ import {
 import { clearJobsCache, jobsCache, JOBS_CACHE_TTL_MS, type JobPost } from "./Jobs";
 import { usePageMeta, SITE_URL, type PageMeta } from "@/hooks/usePageMeta";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
+import { CvRevampBanner } from "@/components/CvRevampBanner";
 
 // ------------------------------------------------------------
 // Small helpers
@@ -962,6 +963,13 @@ export default function JobDetail() {
                 BizMtaani jobs hazihitaji ulipie pesa ama utume M-Pesa kabla ya interview ya Mundu khu Mundu.
               </p>
             </div>
+
+            {/* CV revamp offer, pre-filled with this job's details */}
+            <CvRevampBanner
+              jobTitle={job.title}
+              company={job.company}
+              jobUrl={window.location.href}
+            />
           </div>
         )}
 
@@ -1013,4 +1021,4 @@ export default function JobDetail() {
       </div>
     </div>
   );
-}
+          }
