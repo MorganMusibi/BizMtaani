@@ -113,6 +113,18 @@ function getSafeWebLink(value?: string): string | null {
   }
 }
 
+// When the recruiter gave their own way to apply (email, website link,
+// WhatsApp or phone), applicants must use that method. The BizMtaani
+// chat is only available for jobs with no contact details at all.
+function isChatBlocked(job: JobPost): boolean {
+  const link = getSafeWebLink(job.contact);
+  if (job.contactMethod === "link" || link) return !!link;
+  return (
+    ["email", "whatsapp", "phone"].includes(job.contactMethod) &&
+    !!job.contact?.trim()
+  );
+}
+
 function buildJobMeta(job: JobPost): PageMeta {
   const place = job.areaLabel || job.ward || job.county || "Kenya";
   const title = `${job.title.trim().slice(0, 60)} at ${job.company} | BizMtaani`;
@@ -594,6 +606,15 @@ export default function JobDetail() {
   }
 
   async function handleApplyViaChat() {
+    if (job && isChatBlocked(job)) {
+      toast({
+        title: "Apply using the employer's method",
+        description: "This employer asked applicants to use the contact details provided.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     if (!job || !user) {
       toast({
         title: "Authentication required",
@@ -940,13 +961,15 @@ export default function JobDetail() {
                   </Button>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleApplyViaChat}
-                  className="w-full text-center text-sm text-muted-foreground underline underline-offset-4 py-1"
-                >
-                  Or message the employer on BizMtaani
-                </button>
+                {!isChatBlocked(job) && (
+                  <button
+                    type="button"
+                    onClick={handleApplyViaChat}
+                    className="w-full text-center text-sm text-muted-foreground underline underline-offset-4 py-1"
+                  >
+                    Or message the employer on BizMtaani
+                  </button>
+                )}
               </>
             ) : (
               <Button type="button" className="w-full h-12 font-bold rounded-xl" onClick={handleApplyViaChat}>
@@ -1021,4 +1044,4 @@ export default function JobDetail() {
       </div>
     </div>
   );
-          }
+}
