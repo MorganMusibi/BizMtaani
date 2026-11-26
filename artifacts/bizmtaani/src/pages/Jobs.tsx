@@ -10,8 +10,15 @@
  * has fewer than PAGE_SIZE jobs within 30km, they just see fewer
  * jobs — there is no nationwide/expanding fallback, which is what
  * keeps this cheap.
+ *
+ * Back-navigation: the list loads PAGE_SIZE jobs at a time, newest
+ * first. When a user opens a job, the exact state of the list (every
+ * page loaded so far, filters, search, cursors and scroll position)
+ * is saved in memory. Pressing back from the job restores all of it,
+ * so the user resumes exactly where they were — no reload from the
+ * top and no extra Firestore reads.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useLocation } from "wouter";
 import {
   collection, query, orderBy, where, limit, startAfter,
@@ -145,9 +152,53 @@ function computeAdminBroadcastJobsCacheKey(category: string, jobType: string): s
   return `${category}_${jobType}`;
 }
 
+// ============================================================
+// LIST VIEW STATE (back-button restore)
+//
+// A snapshot of everything on screen, saved the moment the user taps
+// a job and consumed the next time the Jobs page mounts. Kept in
+// memory only (module-level) because Firestore cursors can't be
+// serialized. If the app is reloaded the snapshot is gone and the
+// list simply loads fresh — which is the correct behaviour.
+// ============================================================
+
+interface JobsViewState {
+  category: string;
+  type: string;
+  searchQuery: string;
+  cacheKey: string;
+  jobs: JobPost[];
+  buffer: JobPost[];
+  prefixCursors: Record<string, Cursor | null>;
+  prefixDone: Record<string, boolean>;
+  fallbackCursor: Cursor | null;
+  done: boolean;
+  adminBroadcastJobs: JobPost[];
+  scrollTop: number;
+  timestamp: number;
+}
+
+let jobsViewState: JobsViewState | null = null;
+
+// Called by JobDetail when the user deliberately wants a fresh list
+// (e.g. "See all" / "Browse all jobs") rather than going back.
+export function clearJobsViewState() {
+  jobsViewState = null;
+}
+
+function readJobsViewState(): JobsViewState | null {
+  if (!jobsViewState) return null;
+  if (Date.now() - jobsViewState.timestamp > JOBS_CACHE_TTL_MS) {
+    jobsViewState = null;
+    return null;
+  }
+  return jobsViewState;
+}
+
 // Called after a successful job post so the poster's own device shows
 // the new listing immediately instead of waiting out the TTL.
 export function clearJobsCache() {
+  jobsViewState = null;
   jobsCache.clear();
   try {
     localStorage.removeItem(JOBS_CACHE_STORAGE_KEY);
@@ -518,6 +569,10 @@ export default function Jobs() {
 
   const [hierarchyReady, setHierarchyReady] = useState(false);
 
+  // Snapshot left behind by the previous visit to this page (set when
+  // the user opened a job). Read once, on first render only.
+  const [restored] = useState<JobsViewState | null>(() => readJobsViewState());
+
   // Signed-in users (or those likely signed in) have a saved profile
   // area, so they get a short wait for it. Brand-new visitors never
   // get a location, so they must not wait at all.
@@ -531,39 +586,80 @@ export default function Jobs() {
   // or there's no location to wait for, or we've waited long enough.
   const canLoad = gpsReady || !expectsLocation || waitedForLocation;
 
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [activeType, setActiveType] = useState("All Types");
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState(restored?.category ?? "All");
+  const [activeType, setActiveType] = useState(restored?.type ?? "All Types");
+  const [searchInput, setSearchInput] = useState(restored?.searchQuery ?? "");
+  const [searchQuery, setSearchQuery] = useState(restored?.searchQuery ?? "");
   const [showSearch, setShowSearch] = useState(false);
   const isSearchMode = searchQuery.length > 0;
 
   const initialCacheKey = gpsReady ? computeJobsCacheKey(activeCategory, activeType, userCoords) : null;
-  const initialCached = initialCacheKey ? getFreshJobsCacheEntry(initialCacheKey) : null;
-  const skipNextResetRef = useRef(initialCached ? initialCacheKey : null);
+  const initialCached = !restored && initialCacheKey ? getFreshJobsCacheEntry(initialCacheKey) : null;
+  const skipNextResetRef = useRef<string | null>(
+    restored ? restored.cacheKey : initialCached ? initialCacheKey : null
+  );
 
-  const [jobs, setJobs] = useState<JobPost[]>(initialCached?.jobs ?? []);
-  const [buffer, setBuffer] = useState<JobPost[]>(initialCached?.buffer ?? []);
-  const [prefixCursors, setPrefixCursors] = useState<Record<string, Cursor | null>>(initialCached?.prefixCursors ?? {});
-  const [prefixDone, setPrefixDone] = useState<Record<string, boolean>>(initialCached?.prefixDone ?? {});
-  const [fallbackCursor, setFallbackCursor] = useState<Cursor | null>(null);
-  const [done, setDone] = useState(initialCached?.done ?? false);
-  const [loading, setLoading] = useState(!initialCached);
+  const [jobs, setJobs] = useState<JobPost[]>(restored?.jobs ?? initialCached?.jobs ?? []);
+  const [buffer, setBuffer] = useState<JobPost[]>(restored?.buffer ?? initialCached?.buffer ?? []);
+  const [prefixCursors, setPrefixCursors] = useState<Record<string, Cursor | null>>(
+    restored?.prefixCursors ?? initialCached?.prefixCursors ?? {}
+  );
+  const [prefixDone, setPrefixDone] = useState<Record<string, boolean>>(
+    restored?.prefixDone ?? initialCached?.prefixDone ?? {}
+  );
+  const [fallbackCursor, setFallbackCursor] = useState<Cursor | null>(restored?.fallbackCursor ?? null);
+  const [done, setDone] = useState(restored?.done ?? initialCached?.done ?? false);
+  const [loading, setLoading] = useState(!(restored || initialCached));
   const [loadingMore, setLoadingMore] = useState(false);
   const sentinelRef = useRef<HTMLDivElement>(null);
+
+  // The list's own scroll container (the page itself doesn't scroll).
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTopRef = useRef(restored?.scrollTop ?? 0);
 
   // Master admin broadcast jobs — independent of GPS/location, always
   // visible regardless of category filter matching what was fetched.
   const initialBroadcastCacheKey = computeAdminBroadcastJobsCacheKey(activeCategory, activeType);
   const initialBroadcastCached = adminBroadcastJobsCache.get(initialBroadcastCacheKey);
   const [adminBroadcastJobs, setAdminBroadcastJobs] = useState<JobPost[]>(
-    initialBroadcastCached && Date.now() - initialBroadcastCached.timestamp < ADMIN_BROADCAST_JOBS_CACHE_TTL_MS
+    restored
+      ? restored.adminBroadcastJobs
+      : initialBroadcastCached && Date.now() - initialBroadcastCached.timestamp < ADMIN_BROADCAST_JOBS_CACHE_TTL_MS
       ? initialBroadcastCached.jobs
       : []
   );
+  // When restoring, the admin jobs were already captured with the list,
+  // so skip re-fetching them once — otherwise they could pop in and
+  // shift the restored scroll position.
+  const restoredAdminKeyRef = useRef<string | null>(
+    restored ? computeAdminBroadcastJobsCacheKey(restored.category, restored.type) : null
+  );
+
+  // Put the list back exactly where the user left it, then drop the
+  // snapshot so a normal visit to /jobs later starts fresh.
+  useLayoutEffect(() => {
+    if (!restored) return;
+    const target = restored.scrollTop;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = target;
+    // Second pass after layout settles (fonts, late renders).
+    const raf = requestAnimationFrame(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = target;
+    });
+    clearJobsViewState();
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const cacheKey = computeAdminBroadcastJobsCacheKey(activeCategory, activeType);
+
+    if (restoredAdminKeyRef.current === cacheKey) {
+      restoredAdminKeyRef.current = null;
+      return;
+    }
+    restoredAdminKeyRef.current = null;
+
     const cached = adminBroadcastJobsCache.get(cacheKey);
     if (cached && Date.now() - cached.timestamp < ADMIN_BROADCAST_JOBS_CACHE_TTL_MS) {
       setAdminBroadcastJobs(cached.jobs);
@@ -788,6 +884,27 @@ export default function Jobs() {
     return () => obs.disconnect();
   }, [loadMore]);
 
+  // Save everything on screen, then open the job. When the user comes
+  // back, the list is rebuilt from this snapshot (see `restored`).
+  function openJob(jobId: string) {
+    jobsViewState = {
+      category: activeCategory,
+      type: activeType,
+      searchQuery,
+      cacheKey: computeJobsCacheKey(activeCategory, activeType, userCoords),
+      jobs,
+      buffer,
+      prefixCursors,
+      prefixDone,
+      fallbackCursor,
+      done,
+      adminBroadcastJobs,
+      scrollTop: scrollTopRef.current,
+      timestamp: Date.now(),
+    };
+    setLocation(`/jobs/${jobId}`);
+  }
+
   function applyLocalFilters(list: JobPost[]) {
     if (!searchQuery) return list;
     const q = searchQuery.toLowerCase();
@@ -897,7 +1014,11 @@ export default function Jobs() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto pb-20">
+      <div
+        ref={scrollRef}
+        onScroll={(e) => { scrollTopRef.current = e.currentTarget.scrollTop; }}
+        className="flex-1 overflow-y-auto pb-20"
+      >
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
             <Loader2 size={28} className="animate-spin text-primary" />
@@ -931,7 +1052,7 @@ export default function Jobs() {
               {!searchQuery && userCoords ? " near you" : ""}
             </p>
             {visible.map((job) => (
-              <JobCard key={job.id} job={job} onClick={() => setLocation(`/jobs/${job.id}`)} />
+              <JobCard key={job.id} job={job} onClick={() => openJob(job.id)} />
             ))}
             <div ref={sentinelRef} className="h-1" />
             {loadingMore && (
