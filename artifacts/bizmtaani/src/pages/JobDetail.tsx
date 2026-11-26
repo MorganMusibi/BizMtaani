@@ -42,7 +42,13 @@ import {
   startJobApplicationChat,
   type ChatParticipant,
 } from "@/lib/chatService";
-import { clearJobsCache, jobsCache, JOBS_CACHE_TTL_MS, type JobPost } from "./Jobs";
+import {
+  clearJobsCache,
+  clearJobsViewState,
+  jobsCache,
+  JOBS_CACHE_TTL_MS,
+  type JobPost,
+} from "./Jobs";
 import { usePageMeta, SITE_URL, type PageMeta } from "@/hooks/usePageMeta";
 import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { OnlineServicesButton } from "@/components/OnlineServicesButton";
@@ -590,6 +596,25 @@ export default function JobDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.id]);
 
+  // Go back to wherever the user came from. Using the browser's own
+  // history (instead of pushing a new /jobs entry) is what lets the
+  // Jobs list restore its pages and scroll position. If the page was
+  // opened directly (shared link, new tab) there is nothing to go
+  // back to, so fall back to the jobs list.
+  function handleBack() {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      navigate("/jobs");
+    }
+  }
+
+  // "See all" / "Browse all jobs" want a fresh list, not a restore.
+  function handleBrowseAll() {
+    clearJobsViewState();
+    navigate("/jobs");
+  }
+
   async function handleDelete() {
     if (!job) return;
     setDeleting(true);
@@ -728,7 +753,7 @@ export default function JobDetail() {
     return (
       <div className="flex flex-col h-screen items-center justify-center gap-4 px-6">
         <p className="font-bold text-lg">Job not found</p>
-        <Button onClick={() => navigate("/jobs")}>Back to Jobs</Button>
+        <Button onClick={handleBrowseAll}>Back to Jobs</Button>
       </div>
     );
   }
@@ -786,7 +811,7 @@ export default function JobDetail() {
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 h-14">
-        <button onClick={() => navigate("/jobs")} aria-label="Back to jobs">
+        <button onClick={handleBack} aria-label="Back to jobs">
           <ChevronLeft size={22} />
         </button>
 
@@ -1007,7 +1032,7 @@ export default function JobDetail() {
             </h3>
             <button
               type="button"
-              onClick={() => navigate("/jobs")}
+              onClick={handleBrowseAll}
               className="text-xs font-bold text-primary"
             >
               See all
@@ -1036,7 +1061,7 @@ export default function JobDetail() {
             type="button"
             variant="outline"
             className="w-full h-11 rounded-xl font-semibold"
-            onClick={() => navigate("/jobs")}
+            onClick={handleBrowseAll}
           >
             Browse all jobs
           </Button>
@@ -1044,4 +1069,4 @@ export default function JobDetail() {
       </div>
     </div>
   );
-          }
+}
