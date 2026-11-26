@@ -8,7 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 // CHANGE 1: added Copy icon
-import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight, Copy, Users } from "lucide-react";
+import { ChevronLeft, MessageCircle, MapPin, Clock, Tag, Loader2, Store, Phone, ChevronRight, Copy, Users, Maximize2, X } from "lucide-react";
+import { createPortal } from "react-dom";
 import { Card } from "@/components/ui/card";
 import { getCategoryBadgeColor } from "@/lib/categories";
 import {
@@ -409,10 +410,259 @@ function HotelMenuDisplay({ menu }: { menu: HotelMenu }) {
   );
 }
 
+// Tiny, heavily compressed version used as a blurred backdrop and as an
+// instant preview while the full photo loads.
+function getTinyBlurUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto:low,w_60,c_fill/");
+  }
+  return url;
+}
+
+// Larger version for the full-screen zoom viewer.
+function getZoomImageUrl(url: string): string {
+  if (!url) return "";
+  if (url.includes("res.cloudinary.com") && url.includes("/upload/")) {
+    return url.replace("/upload/", "/upload/f_auto,q_auto,w_1600,c_limit/");
+  }
+  return url;
+}
+
+function touchDistance(a: React.Touch, b: React.Touch): number {
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+}
+
+// Full-screen photo viewer: pinch to zoom, double-tap to zoom, drag to
+// pan when zoomed, swipe left/right to change photo, swipe down to close.
+function ImageLightbox({
+  images,
+  startIndex,
+  onIndexChange,
+  onClose,
+}: {
+  images: string[];
+  startIndex: number;
+  onIndexChange: (index: number) => void;
+  onClose: () => void;
+}) {
+  const [index, setIndex] = useState(startIndex);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const gesture = useRef({
+    mode: "none" as "none" | "pinch" | "pan" | "swipe",
+    startDist: 0,
+    startScale: 1,
+    startX: 0,
+    startY: 0,
+    startOffX: 0,
+    startOffY: 0,
+    lastTap: 0,
+    moved: false,
+  });
+
+  function resetZoom() {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }
+
+  function go(direction: 1 | -1) {
+    setIndex((current) => (current + direction + images.length) % images.length);
+  }
+
+  // Back to normal zoom whenever the photo changes, and keep the page
+  // gallery in step so closing lands on the same photo.
+  useEffect(() => {
+    resetZoom();
+    onIndexChange(index);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index]);
+
+  useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") go(1);
+      if (e.key === "ArrowLeft") go(-1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function clampOffset(x: number, y: number, s: number) {
+    const maxX = ((s - 1) * window.innerWidth) / 2;
+    const maxY = ((s - 1) * window.innerHeight) / 2;
+    return {
+      x: Math.max(-maxX, Math.min(maxX, x)),
+      y: Math.max(-maxY, Math.min(maxY, y)),
+    };
+  }
+
+  function handleTouchStart(e: React.TouchEvent) {
+    e.stopPropagation();
+    const g = gesture.current;
+    g.moved = false;
+    if (e.touches.length === 2) {
+      g.mode = "pinch";
+      g.startDist = touchDistance(e.touches[0], e.touches[1]);
+      g.startScale = scale;
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      g.startX = t.clientX;
+      g.startY = t.clientY;
+      g.startOffX = offset.x;
+      g.startOffY = offset.y;
+      g.mode = scale > 1 ? "pan" : "swipe";
+    }
+  }
+
+  function handleTouchMove(e: React.TouchEvent) {
+    e.stopPropagation();
+    const g = gesture.current;
+    if (g.mode === "pinch" && e.touches.length === 2) {
+      const d = touchDistance(e.touches[0], e.touches[1]);
+      const next = Math.max(1, Math.min(4, g.startScale * (d / g.startDist)));
+      setScale(next);
+      setOffset((o) => clampOffset(o.x, o.y, next));
+      g.moved = true;
+    } else if (e.touches.length === 1) {
+      const t = e.touches[0];
+      const dx = t.clientX - g.startX;
+      const dy = t.clientY - g.startY;
+      if (Math.abs(dx) > 8 || Math.abs(dy) > 8) g.moved = true;
+      if (g.mode === "pan") {
+        setOffset(clampOffset(g.startOffX + dx, g.startOffY + dy, scale));
+      }
+    }
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    e.stopPropagation();
+    const g = gesture.current;
+
+    if (g.mode === "pinch") {
+      if (e.touches.length < 2) {
+        g.mode = "none";
+        if (scale < 1.05) resetZoom();
+      }
+      return;
+    }
+
+    const t = e.changedTouches[0];
+    const dx = t.clientX - g.startX;
+    const dy = t.clientY - g.startY;
+
+    if (g.mode === "swipe" && g.moved) {
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+        go(dx < 0 ? 1 : -1);
+      } else if (dy > 100 && Math.abs(dy) > Math.abs(dx)) {
+        onClose();
+      }
+    } else if (!g.moved) {
+      // Double-tap toggles zoom
+      const now = Date.now();
+      if (now - g.lastTap < 300) {
+        if (scale > 1) resetZoom();
+        else setScale(2.5);
+        g.lastTap = 0;
+      } else {
+        g.lastTap = now;
+      }
+    }
+    g.mode = "none";
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[80] bg-black flex items-center justify-center select-none"
+      style={{ touchAction: "none" }}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+      onMouseLeave={(e) => e.stopPropagation()}
+    >
+      <div
+        className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between px-4"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 0.75rem)" }}
+      >
+        <span className="rounded-full bg-black/60 px-3 py-1 text-sm font-semibold text-white">
+          {index + 1} / {images.length}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close photo viewer"
+          className="w-10 h-10 rounded-full bg-black/60 text-white flex items-center justify-center"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <img
+        src={getZoomImageUrl(images[index])}
+        alt={`Photo ${index + 1}`}
+        draggable={false}
+        onContextMenu={(e) => e.preventDefault()}
+        onDoubleClick={() => (scale > 1 ? resetZoom() : setScale(2.5))}
+        className="max-w-full max-h-full object-contain"
+        style={{
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transition: gesture.current.mode === "none" ? "transform 0.2s ease" : "none",
+          WebkitTouchCallout: "none",
+          WebkitUserSelect: "none",
+          userSelect: "none",
+        }}
+      />
+
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            aria-label="Previous photo"
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            aria-label="Next photo"
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center"
+          >
+            <ChevronRight size={22} />
+          </button>
+        </>
+      )}
+
+      {scale === 1 && (
+        <p
+          className="absolute left-0 right-0 text-center text-xs text-white/70"
+          style={{ bottom: "calc(env(safe-area-inset-bottom) + 1rem)" }}
+        >
+          Pinch or double-tap to zoom
+        </p>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 function ImageGallery({ images }: { images: string[] }) {
   const [active, setActive] = useState(0);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
+  const swiped = useRef(false);
+  const pressStartedAt = useRef(0);
 
   if (!images || images.length === 0) {
     return (
@@ -437,6 +687,8 @@ function ImageGallery({ images }: { images: string[] }) {
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     touchStartX.current = e.touches[0].clientX;
     touchEndX.current = null;
+    swiped.current = false;
+    pressStartedAt.current = Date.now();
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
@@ -460,6 +712,8 @@ function ImageGallery({ images }: { images: string[] }) {
       return;
     }
 
+    swiped.current = true;
+
     if (distance > 0) {
       goToNext();
     } else {
@@ -470,23 +724,55 @@ function ImageGallery({ images }: { images: string[] }) {
     touchEndX.current = null;
   };
 
+  const currentUrl = images[active];
+  const currentLoaded = loadedUrl === currentUrl;
+
   return (
     <div className="w-full">
-      {/* Main Image */}
+      {/* Main Image: shown whole (no cropping) over a blurred copy of itself */}
       <div
-        className="relative aspect-[4/5] sm:aspect-video w-full overflow-hidden rounded-b-2xl bg-muted touch-pan-y"
+        className="relative aspect-square sm:aspect-video w-full overflow-hidden rounded-b-2xl bg-muted touch-pan-y cursor-zoom-in"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        >
-      <img
-          src={getDetailImageUrl(images[active])}
+        onClick={() => {
+          // Ignore swipes and long-presses (the long-press opens the
+          // advert options menu instead).
+          const heldFor = Date.now() - pressStartedAt.current;
+          if (swiped.current || heldFor >= 500) {
+            swiped.current = false;
+            return;
+          }
+          setLightboxOpen(true);
+        }}
+      >
+        {/* Blurred backdrop — also doubles as an instant preview */}
+        <img
+          src={getTinyBlurUrl(currentUrl)}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="absolute inset-0 w-full h-full object-cover scale-125 blur-2xl opacity-70"
+        />
+
+        <img
+          key={currentUrl}
+          src={getDetailImageUrl(currentUrl)}
           alt={`Product image ${active + 1}`}
-          className="w-full h-full object-cover"
+          className={`relative w-full h-full object-contain transition-opacity duration-300 ${
+            currentLoaded ? "opacity-100" : "opacity-0"
+          }`}
+          onLoad={() => setLoadedUrl(currentUrl)}
+          onError={() => setLoadedUrl(currentUrl)}
           onContextMenu={(e) => e.preventDefault()}
           draggable={false}
           style={{ WebkitTouchCallout: "none", WebkitUserSelect: "none", userSelect: "none" }}
         />
+
+        {/* Expand hint */}
+        <div className="pointer-events-none absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center">
+          <Maximize2 size={15} />
+        </div>
 
         {/* Photo Counter */}
         {images.length > 1 && (
@@ -501,7 +787,7 @@ function ImageGallery({ images }: { images: string[] }) {
         {images.length > 1 && (
           <button
             type="button"
-            onClick={goToPrevious}
+            onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
             aria-label="Previous image"
             className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center"
           >
@@ -513,7 +799,7 @@ function ImageGallery({ images }: { images: string[] }) {
         {images.length > 1 && (
           <button
             type="button"
-            onClick={goToNext}
+            onClick={(e) => { e.stopPropagation(); goToNext(); }}
             aria-label="Next image"
             className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm text-white flex items-center justify-center"
           >
@@ -549,6 +835,15 @@ function ImageGallery({ images }: { images: string[] }) {
             </button>
           ))}
         </div>
+      )}
+
+      {lightboxOpen && (
+        <ImageLightbox
+          images={images}
+          startIndex={active}
+          onIndexChange={setActive}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </div>
   );
@@ -875,9 +1170,12 @@ useEffect(() => {
       });
       const { sellerPhone, referralCode } = res.data;
 
-      let message = `Hi, I have a buyer for your ${product.title}.`;
-      if (referralCode) message += ` Ref: ${referralCode}`;
-      if (viewingNote) message += ` Preferred viewing time: ${viewingNote}.`;
+      // Include the advert's own link so the seller knows exactly which
+      // advert this is about and can open it in one tap.
+      const advertLink = `${SITE_URL}/product/${product.id}`;
+      let message = `Hi, I have a buyer for your advert: ${product.title}.\n${advertLink}`;
+      if (viewingNote) message += `\nPreferred viewing time: ${viewingNote}.`;
+      if (referralCode) message += `\nRef: ${referralCode}`;
 
       setShowBuyerModal(false);
       setViewingTime("");
@@ -1941,4 +2239,4 @@ const itemDistance =
       )}
     </div>
   );
-                         }
+          }
