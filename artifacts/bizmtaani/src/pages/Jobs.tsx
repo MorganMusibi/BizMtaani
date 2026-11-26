@@ -594,57 +594,84 @@ function PaginationBar({
   onChange: (page: number) => void;
 }) {
   const numbers = getPageNumbers(page, totalPages);
+  const canPrev = page > 1;
   const canNext = page < totalPages;
   const waitingForNext = page >= totalPages && hasMore;
 
   return (
-    <nav className="flex items-center justify-center gap-1.5 pt-3 pb-6" aria-label="Pagination">
-      <button
-        type="button"
-        onClick={() => onChange(page - 1)}
-        disabled={page <= 1}
-        aria-label="Previous page"
-        className="h-10 min-w-10 px-2 rounded-xl border border-border bg-card flex items-center justify-center disabled:opacity-40"
-      >
-        <ChevronLeft size={18} />
-      </button>
+    <nav
+      aria-label="Pagination"
+      className="mt-2 mb-4 rounded-2xl border border-border bg-card p-3 shadow-sm space-y-3"
+    >
+      {/* Row 1: Prev · Page X of Y · Next */}
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onChange(page - 1)}
+          disabled={!canPrev}
+          aria-label="Previous page"
+          className="h-10 pl-2.5 pr-4 rounded-xl border border-border bg-background text-sm font-semibold flex items-center gap-1 active:scale-95 transition-transform disabled:opacity-40 disabled:active:scale-100"
+        >
+          <ChevronLeft size={18} />
+          Prev
+        </button>
 
-      {numbers.map((n, i) =>
-        n === "…" ? (
-          <span key={`gap-${i}`} className="px-1 text-muted-foreground">…</span>
-        ) : (
-          <button
-            key={n}
-            type="button"
-            onClick={() => onChange(n)}
-            aria-label={`Page ${n}`}
-            aria-current={n === page ? "page" : undefined}
-            className={`h-10 min-w-10 px-3 rounded-xl text-sm font-bold border transition-colors ${
-              n === page
-                ? "bg-primary text-white border-primary"
-                : "bg-card border-border text-foreground"
-            }`}
-          >
-            {n}
-          </button>
-        )
-      )}
+        <p className="text-xs text-muted-foreground text-center leading-tight">
+          Page <span className="font-black text-foreground text-sm">{page}</span>
+          {!hasMore && (
+            <>
+              {" "}of <span className="font-bold text-foreground">{totalPages}</span>
+            </>
+          )}
+        </p>
 
-      {hasMore && <span className="px-1 text-muted-foreground">…</span>}
+        <button
+          type="button"
+          onClick={() => onChange(page + 1)}
+          disabled={!canNext}
+          aria-label="Next page"
+          className="h-10 pl-4 pr-2.5 rounded-xl bg-primary text-white text-sm font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-transform disabled:bg-muted disabled:text-muted-foreground disabled:shadow-none disabled:active:scale-100"
+        >
+          {waitingForNext && loadingMore ? (
+            <>
+              Loading
+              <Loader2 size={16} className="animate-spin" />
+            </>
+          ) : (
+            <>
+              Next
+              <ChevronRight size={18} />
+            </>
+          )}
+        </button>
+      </div>
 
-      <button
-        type="button"
-        onClick={() => onChange(page + 1)}
-        disabled={!canNext}
-        aria-label="Next page"
-        className="h-10 min-w-10 px-2 rounded-xl border border-border bg-card flex items-center justify-center disabled:opacity-40"
-      >
-        {waitingForNext && loadingMore ? (
-          <Loader2 size={16} className="animate-spin text-primary" />
-        ) : (
-          <ChevronRight size={18} />
+      {/* Row 2: page number bubbles */}
+      <div className="flex items-center justify-center gap-1.5">
+        {numbers.map((n, i) =>
+          n === "…" ? (
+            <span key={`gap-${i}`} className="w-5 text-center text-muted-foreground">
+              …
+            </span>
+          ) : (
+            <button
+              key={n}
+              type="button"
+              onClick={() => onChange(n)}
+              aria-label={`Page ${n}`}
+              aria-current={n === page ? "page" : undefined}
+              className={`h-9 min-w-9 px-2 rounded-full text-sm font-bold transition-all active:scale-95 ${
+                n === page
+                  ? "bg-primary text-white shadow-md"
+                  : "bg-muted text-foreground"
+              }`}
+            >
+              {n}
+            </button>
+          )
         )}
-      </button>
+        {hasMore && <span className="w-5 text-center text-muted-foreground">…</span>}
+      </div>
     </nav>
   );
 }
@@ -1133,7 +1160,7 @@ export default function Jobs() {
       <div
         ref={scrollRef}
         onScroll={(e) => { scrollTopRef.current = e.currentTarget.scrollTop; }}
-        className="flex-1 overflow-y-auto pb-20"
+        className={`flex-1 overflow-y-auto ${user ? "pb-44" : "pb-20"}`}
       >
         {loading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3">
