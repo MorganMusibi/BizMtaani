@@ -11,9 +11,14 @@
  * jobs — there is no nationwide/expanding fallback, which is what
  * keeps this cheap.
  *
- * Back-navigation: the list loads PAGE_SIZE jobs at a time, newest
- * first. When a user opens a job, the exact state of the list (every
- * page loaded so far, filters, search, cursors and scroll position)
+ * Pagination: jobs are shown as numbered pages (PAGE_SIZE per page),
+ * newest first, with Prev / page numbers / Next at the bottom. More
+ * jobs are fetched in the background when the user reaches the last
+ * loaded page, so Next is usually instant.
+ *
+ * Back-navigation: when a user opens a job, the exact state of the
+ * list (current page, every page loaded so far, filters, search,
+ * cursors and scroll position)
  * is saved in memory. Pressing back from the job restores all of it,
  * so the user resumes exactly where they were — no reload from the
  * top and no extra Firestore reads.
@@ -34,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import {
   Briefcase, Plus, Loader2, MapPin, Clock, Search, X,
-  Building2, Banknote, ChevronRight,
+  Building2, Banknote, ChevronRight, ChevronLeft,
 } from "lucide-react";
 
 // ============================================================
@@ -174,6 +179,7 @@ interface JobsViewState {
   fallbackCursor: Cursor | null;
   done: boolean;
   adminBroadcastJobs: JobPost[];
+  page: number;
   scrollTop: number;
   timestamp: number;
 }
@@ -560,6 +566,89 @@ function JobCard({ job, onClick }: { job: JobPost; onClick: () => void }) {
 // MAIN COMPONENT
 // ============================================================
 
+// Page numbers to show: always first, last and the current page with
+// its neighbours, with "…" where numbers are skipped.
+function getPageNumbers(current: number, total: number): (number | "…")[] {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  const wanted = new Set<number>([1, total, current - 1, current, current + 1]);
+  const sorted = [...wanted].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+function PaginationBar({
+  page,
+  totalPages,
+  hasMore,
+  loadingMore,
+  onChange,
+}: {
+  page: number;
+  totalPages: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onChange: (page: number) => void;
+}) {
+  const numbers = getPageNumbers(page, totalPages);
+  const canNext = page < totalPages;
+  const waitingForNext = page >= totalPages && hasMore;
+
+  return (
+    <nav className="flex items-center justify-center gap-1.5 pt-3 pb-6" aria-label="Pagination">
+      <button
+        type="button"
+        onClick={() => onChange(page - 1)}
+        disabled={page <= 1}
+        aria-label="Previous page"
+        className="h-10 min-w-10 px-2 rounded-xl border border-border bg-card flex items-center justify-center disabled:opacity-40"
+      >
+        <ChevronLeft size={18} />
+      </button>
+
+      {numbers.map((n, i) =>
+        n === "…" ? (
+          <span key={`gap-${i}`} className="px-1 text-muted-foreground">…</span>
+        ) : (
+          <button
+            key={n}
+            type="button"
+            onClick={() => onChange(n)}
+            aria-label={`Page ${n}`}
+            aria-current={n === page ? "page" : undefined}
+            className={`h-10 min-w-10 px-3 rounded-xl text-sm font-bold border transition-colors ${
+              n === page
+                ? "bg-primary text-white border-primary"
+                : "bg-card border-border text-foreground"
+            }`}
+          >
+            {n}
+          </button>
+        )
+      )}
+
+      {hasMore && <span className="px-1 text-muted-foreground">…</span>}
+
+      <button
+        type="button"
+        onClick={() => onChange(page + 1)}
+        disabled={!canNext}
+        aria-label="Next page"
+        className="h-10 min-w-10 px-2 rounded-xl border border-border bg-card flex items-center justify-center disabled:opacity-40"
+      >
+        {waitingForNext && loadingMore ? (
+          <Loader2 size={16} className="animate-spin text-primary" />
+        ) : (
+          <ChevronRight size={18} />
+        )}
+      </button>
+    </nav>
+  );
+}
+
 export default function Jobs() {
   const [, setLocation] = useLocation();
   const { user, likelySignedIn } = useAuth();
@@ -611,7 +700,8 @@ export default function Jobs() {
   const [done, setDone] = useState(restored?.done ?? initialCached?.done ?? false);
   const [loading, setLoading] = useState(!(restored || initialCached));
   const [loadingMore, setLoadingMore] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  // Current page number (1-based) of the numbered pagination.
+  const [page, setPage] = useState(restored?.page ?? 1);
 
   // The list's own scroll container (the page itself doesn't scroll).
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -722,6 +812,7 @@ export default function Jobs() {
       return;
     }
     skipNextResetRef.current = null;
+    setPage(1);
 
     const cached = getFreshJobsCacheEntry(cacheKey);
     if (cached) {
@@ -876,14 +967,6 @@ export default function Jobs() {
     }
   }, [done, loadingMore, buffer, jobs, userCoords, fallbackCursor, prefixCursors, prefixDone, activeCategory, activeType, locationInfo?.wardName]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) loadMore(); }, { rootMargin: "300px" });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [loadMore]);
-
   // Save everything on screen, then open the job. When the user comes
   // back, the list is rebuilt from this snapshot (see `restored`).
   function openJob(jobId: string) {
@@ -899,6 +982,7 @@ export default function Jobs() {
       fallbackCursor,
       done,
       adminBroadcastJobs,
+      page: safePage,
       scrollTop: scrollTopRef.current,
       timestamp: Date.now(),
     };
@@ -926,6 +1010,38 @@ export default function Jobs() {
     ? sortJobsByProximity(combinedJobs, userCoords, locationInfo?.wardName)
     : combinedJobs;
   const visible = applyLocalFilters(sortedCombinedJobs);
+
+  // ─── Pagination ────────────────────────────────────────────────────
+  // `visible` is already newest-first. Page 1 = newest jobs; each next
+  // page goes further back in time.
+  const totalLoadedPages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalLoadedPages);
+  const pageStart = (safePage - 1) * PAGE_SIZE;
+  const pageJobs = visible.slice(pageStart, pageStart + PAGE_SIZE);
+
+  // When the user reaches the last page loaded so far, quietly fetch the
+  // next batch so "Next" is ready. Stops once everything is loaded.
+  useEffect(() => {
+    if (loading || done || loadingMore) return;
+    if (safePage >= totalLoadedPages) loadMore();
+  }, [loading, done, loadingMore, safePage, totalLoadedPages, loadMore]);
+
+  function goToPage(p: number) {
+    const next = Math.min(Math.max(1, p), totalLoadedPages);
+    setPage(next);
+    scrollTopRef.current = 0;
+    scrollRef.current?.scrollTo({ top: 0 });
+  }
+
+  function changeCategory(cat: string) {
+    setActiveCategory(cat);
+    setPage(1);
+  }
+
+  function changeType(t: string) {
+    setActiveType(t);
+    setPage(1);
+  }
 
   return (
     <div className="flex flex-col h-screen bg-background overflow-hidden">
@@ -963,7 +1079,7 @@ export default function Jobs() {
 
       {showSearch && (
         <form
-          onSubmit={(e) => { e.preventDefault(); setSearchQuery(searchInput.trim()); }}
+          onSubmit={(e) => { e.preventDefault(); setSearchQuery(searchInput.trim()); setPage(1); }}
           className="flex-shrink-0 bg-card border-b border-border px-4 py-2 flex gap-2"
         >
           <input
@@ -980,7 +1096,7 @@ export default function Jobs() {
           <span className="text-xs text-muted-foreground">Results for:</span>
           <span className="flex items-center gap-1 bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
             {searchQuery}
-            <button onClick={() => { setSearchInput(""); setSearchQuery(""); setShowSearch(false); }}><X size={11} /></button>
+            <button onClick={() => { setSearchInput(""); setSearchQuery(""); setShowSearch(false); setPage(1); }}><X size={11} /></button>
           </span>
         </div>
       )}
@@ -990,7 +1106,7 @@ export default function Jobs() {
           {JOB_CATEGORIES.map((cat) => (
             <button
               key={cat}
-              onClick={() => setActiveCategory(cat)}
+              onClick={() => changeCategory(cat)}
               className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
                 activeCategory === cat ? "bg-primary text-white" : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
@@ -1003,7 +1119,7 @@ export default function Jobs() {
           {JOB_TYPES.map((t) => (
             <button
               key={t}
-              onClick={() => setActiveType(t)}
+              onClick={() => changeType(t)}
               className={`flex-shrink-0 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
                 activeType === t ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground"
               }`}
@@ -1048,20 +1164,23 @@ export default function Jobs() {
         ) : (
           <div className="px-3 pt-3 space-y-3">
             <p className="text-xs text-muted-foreground px-1">
-              {visible.length} job{visible.length !== 1 ? "s" : ""} found
+              Showing {pageStart + 1}–{pageStart + pageJobs.length} of {visible.length}
+              {done ? "" : "+"} job{visible.length !== 1 ? "s" : ""}
               {!searchQuery && userCoords ? " near you" : ""}
+              {" · "}Page {safePage}
+              {done ? ` of ${totalLoadedPages}` : ""}
             </p>
-            {visible.map((job) => (
+            {pageJobs.map((job) => (
               <JobCard key={job.id} job={job} onClick={() => openJob(job.id)} />
             ))}
-            <div ref={sentinelRef} className="h-1" />
-            {loadingMore && (
-              <div className="flex justify-center py-4">
-                <Loader2 size={20} className="animate-spin text-primary" />
-              </div>
-            )}
-            {done && visible.length > 0 && (
-              <p className="text-center text-xs text-muted-foreground py-4">All jobs loaded</p>
+            {(totalLoadedPages > 1 || !done) && (
+              <PaginationBar
+                page={safePage}
+                totalPages={totalLoadedPages}
+                hasMore={!done}
+                loadingMore={loadingMore}
+                onChange={goToPage}
+              />
             )}
           </div>
         )}
